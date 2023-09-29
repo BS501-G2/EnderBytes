@@ -41,7 +41,7 @@ public abstract partial class Resource<M, D, R> : IResource
       return null;
     }
 
-    public abstract R CreateResource(D data);
+    protected abstract R CreateResource(D data);
     public abstract Task Init(CancellationToken cancellationToken);
   }
 }

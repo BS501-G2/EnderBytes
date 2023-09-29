@@ -14,7 +14,7 @@ public sealed partial class EnderBytesServer
       {
         id = (ulong)Random.Shared.NextInt64();
       }
-      while (server.ProtocolWrappers.TryAdd(id, new(protocolWrapper)));
+      while (!server.ProtocolWrappers.TryAdd(id, new(protocolWrapper)));
 
       return id;
     }

@@ -8,7 +8,7 @@ public abstract partial class Resource<M, D, R>
       where Co : ResourceStream<Co, E>
       where E : ResourceEnumerator<Co, E>
     {
-      protected readonly Co Collection = collection;
+      protected readonly Co Stream = collection;
       protected readonly CancellationToken CancellationToken = cancellationToken;
 
       public abstract R Current { get; }

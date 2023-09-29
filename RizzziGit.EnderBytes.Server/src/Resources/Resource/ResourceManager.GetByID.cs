@@ -10,10 +10,10 @@ public abstract partial class Resource<M, D, R>
     public Task<R?> GetByID(ulong id, CancellationToken cancellationToken) => Database.RunTransaction((connection, cancellationToken) => GetByID(connection, id, cancellationToken), cancellationToken);
     public async Task<R?> GetByID(SQLiteConnection connection, ulong id, CancellationToken cancellationToken)
     {
-      using SQLiteDataReader reader = await connection.ExecuteReaderAsync($"select * from {Name} where {Resource<M, D, R>.KEY_ID} = {{0}} limit 1;", cancellationToken, []);
-      if (await reader.ReadAsync(cancellationToken))
+      await using var stream = (ResourceStream)await Wrapper.Select(connection, new() { { KEY_ID, ("=", id) } }, 0, 1, cancellationToken);
+      await foreach(R resource in stream)
       {
-        return AsResource(OnCreateData(reader));
+        return resource;
       }
 
       return null;

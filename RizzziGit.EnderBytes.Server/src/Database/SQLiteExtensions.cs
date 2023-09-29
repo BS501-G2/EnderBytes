@@ -24,7 +24,9 @@ public static class SQLiteExtensions
       command.Parameters.Add(paramValue != null ? new(paramName, paramValue) : new(paramName));
     }
 
+    // Console.WriteLine($"{sql} {paramStrings.Length}");
     command.CommandText = string.Format(sql, paramStrings);
+    Console.WriteLine(command.CommandText);
   }
 
   public static string ParamList(this SQLiteConnection connection, int count) => connection.ParamList(new Range(0, count));

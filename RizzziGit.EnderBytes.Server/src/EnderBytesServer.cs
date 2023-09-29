@@ -1,20 +1,20 @@
 ﻿namespace RizzziGit.EnderBytes;
 
-using Buffer;
-using RBMP;
 using Resources;
 
 public sealed partial class EnderBytesServer
 {
   public EnderBytesServer()
   {
-    ResourceManager = new(this);
+    Resources = new(this);
   }
 
-  private readonly MainResourceManager ResourceManager;
+  private readonly MainResourceManager Resources;
+
+  public UserResource.ResourceManager Users => Resources.Users;
 
   public async Task Init(CancellationToken cancellationToken)
   {
-    await ResourceManager.Init(cancellationToken);
+    await Resources.Init(cancellationToken);
   }
 }

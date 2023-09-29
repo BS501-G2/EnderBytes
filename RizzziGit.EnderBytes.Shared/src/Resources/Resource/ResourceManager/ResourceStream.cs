@@ -14,7 +14,7 @@ public abstract partial class Resource<M, D, R>
       public readonly M Manager = manager;
 
       public abstract Task<bool> MoveNext(CancellationToken cancellationToken);
-      public abstract Task<R> GetCurrent(CancellationToken cancellationToken);
+      public abstract R GetCurrent();
 
       public abstract ValueTask DisposeAsync();
 

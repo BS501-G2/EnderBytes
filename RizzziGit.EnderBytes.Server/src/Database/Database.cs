@@ -53,14 +53,11 @@ public sealed class Database
         }
 
         await transaction.CommitAsync(cancellationToken);
+        source.SetResult();
       }
       catch (Exception exception)
       {
         source.SetException(exception);
-      }
-      finally
-      {
-        source.SetResult();
       }
     }
   }

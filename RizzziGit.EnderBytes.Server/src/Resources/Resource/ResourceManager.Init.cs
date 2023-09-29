@@ -13,9 +13,13 @@ public abstract partial class Resource<M, D, R>
   {
     public async override Task Init(CancellationToken cancellationToken)
     {
-      await InitVersioningTable(cancellationToken);
+      int? version = null;
 
-      int? version = await GetResourceVersion(cancellationToken);
+      await Database.RunTransaction(async (connection, cancellationToken) =>
+      {
+        await InitVersioningTable(connection, cancellationToken);
+        version = await GetResourceVersion(connection, Name, cancellationToken);
+      }, cancellationToken);
 
       await Database.RunTransaction(async (connection, cancellationToken) =>
       {
@@ -34,15 +38,17 @@ public abstract partial class Resource<M, D, R>
           await OnInit(connection, (int)version, cancellationToken);
         }
       }, cancellationToken);
+
+      await Database.RunTransaction((connection, cancellationToken) => SetResourceVersion(connection, Name, Version, cancellationToken), cancellationToken);
     }
 
-    private D OnCreateData(SQLiteDataReader reader) => OnCreateData(reader,
-      (ulong)reader[KEY_ID],
-      (ulong)reader[KEY_CREATE_TIME],
-      (ulong)reader[KEY_UPDATE_TIME]
+    private D CreateData(SQLiteDataReader reader) => CreateData(reader,
+      (ulong)(long)reader[KEY_ID],
+      (ulong)(long)reader[KEY_CREATE_TIME],
+      (ulong)(long)reader[KEY_UPDATE_TIME]
     );
 
-    protected abstract D OnCreateData(SQLiteDataReader reader, ulong id, ulong createTime, ulong updateTime);
+    protected abstract D CreateData(SQLiteDataReader reader, ulong id, ulong createTime, ulong updateTime);
     protected abstract Task OnInit(SQLiteConnection connection, CancellationToken cancellationToken);
     protected abstract Task OnInit(SQLiteConnection connection, int previousVersion, CancellationToken cancellationToken);
   }

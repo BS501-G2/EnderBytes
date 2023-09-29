@@ -12,7 +12,7 @@ public abstract partial class MainResourceManager
       {
         id = (ulong)Random.Shared.NextInt64();
       }
-      while(main.ResourceManagers.TryAdd(id, new(manager)));
+      while(!main.ResourceManagers.TryAdd(id, new(manager)));
 
       return id;
     }

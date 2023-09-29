@@ -6,11 +6,9 @@ public abstract partial class Resource<M, D, R>
   {
     protected sealed class ResourceEnumerator(Resource<M, D, R>.ResourceManager.ResourceStream collection, CancellationToken cancellationToken) : ResourceEnumerator<ResourceStream, ResourceEnumerator>(collection, cancellationToken)
     {
-      public override R Current => throw new NotImplementedException();
-
-      public override ValueTask DisposeAsync() => Collection.DisposeAsync();
-
-      public override ValueTask<bool> MoveNextAsync() => new(Collection.MoveNext(CancellationToken));
+      public override R Current => Stream.GetCurrent();
+      public override ValueTask DisposeAsync() => Stream.DisposeAsync();
+      public override ValueTask<bool> MoveNextAsync() => new(Stream.MoveNext(CancellationToken));
     }
   }
 }

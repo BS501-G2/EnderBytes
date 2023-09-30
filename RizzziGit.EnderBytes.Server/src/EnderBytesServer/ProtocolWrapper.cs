@@ -29,7 +29,7 @@ public sealed partial class EnderBytesServer
       }
       else
       {
-        throw new InvalidOperationException($"Must be inherited from {nameof(EnderBytesMountPoint)} class.");
+        throw new InvalidOperationException($"Must be inherited from {nameof(EnderBytesProtocolWrapper)} class.");
       }
     }
 

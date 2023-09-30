@@ -7,5 +7,22 @@ public abstract partial class Resource<M, D, R> : Shared.Resources.Resource<M, D
 {
   protected Resource(M manager, D data) : base(manager, data)
   {
+    Logger = new(IDHex);
+
+    manager.Logger.Subscribe(Logger);
+    Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Resource Created");
+  }
+
+  ~Resource()
+  {
+    Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Resource Destroyed");
+    Manager.Logger.Unsubscribe(Logger);
+  }
+
+  public readonly EnderBytesLogger Logger;
+
+  protected override void UpdateData(D data)
+  {
+    Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Resource Copied");
   }
 }

@@ -11,10 +11,19 @@ public abstract partial class Resource<M, D, R>
     {
       Main = main;
       Wrapper = new((M)this);
+      Logger = new(name);
+
+      Main.Logger.Subscribe(Logger);
+    }
+
+    ~ResourceManager()
+    {
+      Main.Logger.Unsubscribe(Logger);
     }
 
     public new readonly MainResourceManager Main;
     public readonly DatabaseWrapper Wrapper;
+    public readonly EnderBytesLogger Logger;
 
     public Database Database => Main.RequireDatabase();
 
@@ -29,7 +38,6 @@ public abstract partial class Resource<M, D, R>
 
       ulong newId = await Wrapper.Insert(connection, data, cancellationToken);
 
-      Console.WriteLine(newId);
       await using var a = (ResourceStream)await Wrapper.Select(connection, new() { { KEY_ID, ("=", newId) } }, null, null, cancellationToken);
       await foreach (R resource in a)
       {

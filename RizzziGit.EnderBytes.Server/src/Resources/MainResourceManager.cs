@@ -7,10 +7,19 @@ public sealed partial class MainResourceManager : Shared.Resources.MainResourceM
   public MainResourceManager(EnderBytesServer server)
   {
     Server = server;
+    Logger = new("Resources");
     Users = new(this);
+
+    Server.Logger.Subscribe(Logger);
+  }
+
+  ~MainResourceManager()
+  {
+    Server.Logger.Unsubscribe(Logger);
   }
 
   public readonly EnderBytesServer Server;
+  public readonly EnderBytesLogger Logger;
   public Database? Database;
 
   public readonly UserResource.ResourceManager Users;
@@ -53,6 +62,7 @@ public sealed partial class MainResourceManager : Shared.Resources.MainResourceM
 
   public override async Task Init(CancellationToken cancellationToken)
   {
+
     await Open(cancellationToken);
     await base.Init(cancellationToken);
   }

@@ -11,6 +11,7 @@ public sealed class Database
     Database database = new(path);
     await database.Connection.OpenAsync(cancellationToken);
 
+    _ = database.RunTransactionQueue();
     return database;
   }
 
@@ -20,7 +21,8 @@ public sealed class Database
     {
       ConnectionString = new SQLiteConnectionStringBuilder
       {
-        DataSource = path
+        DataSource = path,
+        JournalMode = SQLiteJournalModeEnum.Memory
       }.ConnectionString
     };
     WaitQueue = new();
@@ -35,7 +37,7 @@ public sealed class Database
   private Task? WaitQueueTask;
   private async Task RunTransactionWaitQueue()
   {
-    while (WaitQueue.Count > 0)
+    while (true)
     {
       var (source, callback, cancellationToken) = await WaitQueue.Dequeue(CancellationToken.None);
       try
@@ -62,7 +64,7 @@ public sealed class Database
     }
   }
 
-  private async void RunTransactionQueue()
+  public async Task RunTransactionQueue()
   {
     if (WaitQueueTask != null)
     {
@@ -107,7 +109,6 @@ public sealed class Database
     TaskCompletionSource source = new();
 
     Task waitTask = WaitQueue.Enqueue((source, callback, cancellationToken), cancellationToken);
-    RunTransactionQueue();
     await waitTask;
     await source.Task;
   }
@@ -122,5 +123,9 @@ public sealed class Database
     return await source.Task;
   }
 
-  public Task Close() => Connection.CloseAsync();
+  public async Task Close()
+  {
+    await Connection.CloseAsync();
+    await (WaitQueueTask ?? Task.CompletedTask);
+  }
 }

@@ -47,5 +47,5 @@ public abstract partial class Resource<M, D, R>
   public ulong UpdateTime => Data.UpdateTime;
 
   public JObject ToJSON() => Data.ToJSON();
-  private void UpdateData(D data) => Data.CopyFrom(data);
+  protected virtual void UpdateData(D data) => Data.CopyFrom(data);
 }

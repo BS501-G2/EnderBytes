@@ -1,6 +1,7 @@
 using System.Data.SQLite;
 namespace RizzziGit.EnderBytes.Resources;
 
+using System.Text.RegularExpressions;
 using Database;
 
 public sealed partial class UserResource
@@ -14,6 +15,8 @@ public sealed partial class UserResource
 
   public new sealed partial class ResourceManager(MainResourceManager main) : Resource<ResourceManager, ResourceData, UserResource>.ResourceManager(main, VERSION, NAME)
   {
+    public readonly Regex ValidUsernameRegex = new(("^[A-Za-z0-9_\\-\\.]{6,16}$"));
+
     protected override UserResource CreateResource(ResourceData data) => new(this, data);
     protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, ulong createTime, ulong updateTime) => new(
       id, createTime, updateTime,
@@ -34,6 +37,11 @@ public sealed partial class UserResource
     public Task<UserResource> Create(string username, CancellationToken cancellationToken) => Database.RunTransaction((connection, cancellationToken) => Create(connection, username, cancellationToken), cancellationToken);
     public async Task<UserResource> Create(SQLiteConnection connection, string username, CancellationToken cancellationToken)
     {
+      if (!ValidUsernameRegex.IsMatch(username))
+      {
+        throw new InvalidOperationException();
+      }
+
       return await DbInsert(connection, new() { { KEY_USERNAME, username } }, cancellationToken);
     }
   }

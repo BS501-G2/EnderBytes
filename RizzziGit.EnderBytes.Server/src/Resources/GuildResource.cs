@@ -81,7 +81,7 @@ public sealed class GuildResource(GuildResource.ResourceManager manager, GuildRe
       {
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_OWNER_USER_ID} integer not null;", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_NAME} varchar(64) not null;", cancellationToken);
-        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_DESCRIPTION} varchar(4096) not null;", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_DESCRIPTION} varchar(4096);", cancellationToken);
 
         await connection.ExecuteNonQueryAsync($"create unique index {INDEX_OWNER_USER_ID} on {NAME}({KEY_OWNER_USER_ID});", cancellationToken);
       }

@@ -63,7 +63,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager
   {
-    private static readonly Regex ValidPasswordRegex = new("^(?=.*[{a-z}])(?=.*[{A-Z}])(?=.*[{0-9}])(?=.*[{\\W_}])[{a-z}{A-Z}{0-9}{\\W_}]{{8,64}}$");
+    private static readonly Regex ValidPasswordRegex = new("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[\\W_])[a-zA-Z0-9\\W_]{8,64}$");
 
     public ResourceManager(MainResourceManager main) : base(main, VERSION, NAME)
     {

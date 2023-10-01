@@ -36,7 +36,7 @@ public static class Program
       await server.RunTransaction(async (connection, cancellationToken) =>
       {
         UserResource user = await server.Users.Create(connection, "adcasdcasdf", cancellationToken);
-        await server.UserAuthentications.CreatePassword(connection, user, "asasdcasdc", cancellationToken);
+        await server.UserAuthentications.CreatePassword(connection, user, "dasdaASsd(^&921)", cancellationToken);
         await server.Guilds.Create(connection, user, "ASDLKAMSLDMK", null, cancellationToken);
       }, cancellationToken);
     }

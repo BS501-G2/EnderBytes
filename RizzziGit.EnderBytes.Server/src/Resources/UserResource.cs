@@ -6,21 +6,21 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Database;
 
-public sealed partial class UserResource(UserResource.ResourceManager manager, UserResource.ResourceData data) : Resource<UserResource.ResourceManager, UserResource.ResourceData, UserResource>(manager, data)
+public sealed class UserResource(UserResource.ResourceManager manager, UserResource.ResourceData data) : Resource<UserResource.ResourceManager, UserResource.ResourceData, UserResource>(manager, data)
 {
   public const string NAME = "User";
   public const int VERSION = 1;
 
-  public const string KEY_USERNAME = "Username";
+  private const string KEY_USERNAME = "Username";
 
-  public const string INDEX_USERNAME = $"Index_{NAME}_{KEY_USERNAME}";
+  private const string INDEX_USERNAME = $"Index_{NAME}_{KEY_USERNAME}";
 
   public const int EXCEPTION_CREATE_RESOURCE_USERNAME_INVALID = 1 << 0;
   public const int EXCEPTION_CREATE_RESOURCE_USERNAME_TAKEN = 1 << 1;
 
   public const string JSON_KEY_USERNAME = "username";
 
-  public new sealed partial class ResourceData(
+  public new sealed class ResourceData(
     ulong id,
     ulong createTime,
     ulong updateTime,
@@ -49,7 +49,7 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
     }
   }
 
-  public new sealed partial class ResourceManager(MainResourceManager main) : Resource<ResourceManager, ResourceData, UserResource>.ResourceManager(main, VERSION, NAME)
+  public new sealed class ResourceManager(MainResourceManager main) : Resource<ResourceManager, ResourceData, UserResource>.ResourceManager(main, VERSION, NAME)
   {
     private static readonly Regex ValidUsernameRegex = new("^[A-Za-z0-9_\\-\\.]{6,16}$");
 

@@ -6,17 +6,17 @@ using RizzziGit.EnderBytes.Database;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-public sealed partial class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
+public sealed class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
   public const string NAME = "UserAuthentication";
   public const int VERSION = 1;
 
-  public const string KEY_USER_ID = "UserID";
-  public const string KEY_TYPE = "Type";
-  public const string KEY_PAYLOAD = "Payload";
+  private const string KEY_USER_ID = "UserID";
+  private const string KEY_TYPE = "Type";
+  private const string KEY_PAYLOAD = "Payload";
 
-  public const string INDEX_USER_ID = $"Index_{NAME}_{KEY_USER_ID}";
-  public const string INDEX_TYPE = $"Index_{NAME}_{KEY_TYPE}";
+  private const string INDEX_USER_ID = $"Index_{NAME}_{KEY_USER_ID}";
+  private const string INDEX_TYPE = $"Index_{NAME}_{KEY_TYPE}";
 
   public const string JSON_KEY_USER_ID = "userId";
   public const string JSON_KEY_TYPE = "type";
@@ -61,7 +61,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
     }
   }
 
-  public new sealed partial class ResourceManager(MainResourceManager main) : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager(main, VERSION, NAME)
+  public new sealed class ResourceManager(MainResourceManager main) : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager(main, VERSION, NAME)
   {
     private static readonly Regex ValidPasswordRegex = new("^(?=.*[{a-z}])(?=.*[{A-Z}])(?=.*[{0-9}])(?=.*[{\\W_}])[{a-z}{A-Z}{0-9}{\\W_}]{{8,64}}$");
 
@@ -121,7 +121,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       return output;
     }
 
-    public async Task<UserAuthenticationResource> CreatePasswordAuthentication(SQLiteConnection connection, UserResource user, string password, CancellationToken cancellationToken)
+    public async Task<UserAuthenticationResource> CreatePassword(SQLiteConnection connection, UserResource user, string password, CancellationToken cancellationToken)
     {
       if (!ValidPasswordRegex.IsMatch(password))
       {

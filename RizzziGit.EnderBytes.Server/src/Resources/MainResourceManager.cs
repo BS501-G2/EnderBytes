@@ -2,13 +2,14 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Database;
 
-public sealed partial class MainResourceManager : Shared.Resources.MainResourceManager
+public sealed class MainResourceManager : Shared.Resources.MainResourceManager
 {
   public MainResourceManager(EnderBytesServer server)
   {
     Server = server;
     Logger = new("Resources");
     Users = new(this);
+    UserAuthentications = new(this);
 
     Server.Logger.Subscribe(Logger);
   }
@@ -23,6 +24,7 @@ public sealed partial class MainResourceManager : Shared.Resources.MainResourceM
   public Database? Database;
 
   public readonly UserResource.ResourceManager Users;
+  public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
 
   public readonly string DatabaseDirectory = Path.Join(Environment.CurrentDirectory, ".db");
   public string DatabaseFile => Path.Join(DatabaseDirectory, "srv.db");

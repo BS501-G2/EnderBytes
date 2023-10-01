@@ -6,14 +6,14 @@ namespace RizzziGit.EnderBytes.Resources;
 using Database;
 using RizzziGit.Buffer;
 
-public abstract partial class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Shared.Resources.IResource
+public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Shared.Resources.IResource
   where M : Resource<M, D, R>.ResourceManager
   where D : Resource<M, D, R>.ResourceData
   where R : Resource<M, D, R>
 {
-  public const string KEY_ID = "ID";
-  public const string KEY_CREATE_TIME = "CreateTime";
-  public const string KEY_UPDATE_TIME = "UpdateTime";
+  protected const string KEY_ID = "ID";
+  protected const string KEY_CREATE_TIME = "CreateTime";
+  protected const string KEY_UPDATE_TIME = "UpdateTime";
 
   private const string RV_TABLE = "__TableVersions";
   private const string RV_COLUMN_NAME = "Name";
@@ -45,7 +45,7 @@ public abstract partial class Resource<M, D, R> : Shared.Resources.Resource<M, D
       protected override ResourceEnumerator GetAsyncEnumerator(CancellationToken cancellationToken = default) => new(this, cancellationToken);
     }
 
-    public sealed partial class DatabaseWrapper(M manager)
+    public sealed class DatabaseWrapper(M manager)
     {
       public readonly M Manager = manager;
       public Database Database => Manager.Database;

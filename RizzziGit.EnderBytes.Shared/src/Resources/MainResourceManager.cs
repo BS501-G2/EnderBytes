@@ -1,6 +1,6 @@
 namespace RizzziGit.EnderBytes.Shared.Resources;
 
-public abstract partial class MainResourceManager()
+public abstract class MainResourceManager()
 {
   public abstract class ResourceManager
   {

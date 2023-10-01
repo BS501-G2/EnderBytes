@@ -10,7 +10,7 @@ public interface IResourceManager
   public Task Init(CancellationToken cancellationToken);
 }
 
-public abstract partial class Resource<M, D, R>(M manager, D data) : IResource
+public abstract class Resource<M, D, R>(M manager, D data) : IResource
   where M : Resource<M, D, R>.ResourceManager
   where D : Resource<M, D, R>.ResourceData
   where R : Resource<M, D, R>
@@ -53,7 +53,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data) : IResource
     };
   }
 
-  public abstract partial class ResourceManager(MainResourceManager main, int version, string name) : MainResourceManager.ResourceManager(main), IResourceManager
+  public abstract class ResourceManager(MainResourceManager main, int version, string name) : MainResourceManager.ResourceManager(main), IResourceManager
   {
     public abstract class ResourceEnumerator<Co, E>(Co collection, CancellationToken cancellationToken) : IAsyncEnumerator<R>
       where Co : ResourceStream<Co, E>

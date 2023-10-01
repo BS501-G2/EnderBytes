@@ -34,6 +34,9 @@ public sealed partial class MainResourceManager : Shared.Resources.MainResourceM
     return database;
   }
 
+  public Task RunTransaction(Database.TransactionCallback callback, CancellationToken cancellationToken) => RequireDatabase().RunTransaction(callback, cancellationToken);
+  public Task<T> RunTransaction<T>(Database.TransactionCallback<T> callback, CancellationToken cancellationToken) => RequireDatabase().RunTransaction<T>(callback, cancellationToken);
+
   private async Task Open(CancellationToken cancellationToken)
   {
     if (Database != null)

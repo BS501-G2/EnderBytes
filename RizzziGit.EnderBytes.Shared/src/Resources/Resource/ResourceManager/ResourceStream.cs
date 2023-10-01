@@ -7,7 +7,7 @@ public abstract partial class Resource<M, D, R>
 {
   public abstract partial class ResourceManager
   {
-    protected abstract class ResourceStream<Co, E>(M manager) : IAsyncEnumerable<R>, IAsyncDisposable
+    public abstract class ResourceStream<Co, E>(M manager) : IAsyncEnumerable<R>, IAsyncDisposable
       where Co : ResourceStream<Co, E>
       where E : ResourceEnumerator<Co, E>
     {

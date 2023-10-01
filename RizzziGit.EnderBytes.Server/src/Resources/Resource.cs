@@ -50,7 +50,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       public readonly M Manager = manager;
       public Database Database => Manager.Database;
 
-      public async Task<ulong> Insert(SQLiteConnection connection, Dictionary<string, object> data, CancellationToken cancellationToken)
+      public async Task<ulong> Insert(SQLiteConnection connection, Dictionary<string, object?> data, CancellationToken cancellationToken)
       {
         string commandString;
         {
@@ -85,9 +85,9 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
         return (ulong)connection.LastInsertRowId;
       }
 
-      public async Task<bool> Delete(SQLiteConnection connection, Dictionary<string, (string condition, object value)> where, CancellationToken cancellationToken)
+      public async Task<bool> Delete(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, CancellationToken cancellationToken)
       {
-        List<object> parameters = [];
+        List<object?> parameters = [];
 
         string commandString;
         {
@@ -106,7 +106,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
                 commandStringBuilder.Append(" and ");
               }
 
-              KeyValuePair<string, (string condition, object value)> whereEntry = where.ElementAt(index);
+              KeyValuePair<string, (string condition, object? value)> whereEntry = where.ElementAt(index);
               commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
               parameters.Add(whereEntry.Value.value);
             }
@@ -119,9 +119,9 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
         return (await connection.ExecuteNonQueryAsync(commandString, cancellationToken, [.. parameters])) != 0;
       }
 
-      public async Task<R?> SelectOne(SQLiteConnection connection, Dictionary<string, (string condition, object value)> where, int? offset, CancellationToken cancellationToken)
+      public async Task<R?> SelectOne(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, int? offset, CancellationToken cancellationToken)
       {
-        await using var stream = (ResourceStream)await Select(connection, where, offset, 1, cancellationToken);
+        await using var stream = await Select(connection, where, offset, 1, cancellationToken);
         await foreach (R resource in stream)
         {
           return resource;
@@ -130,9 +130,9 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
         return null;
       }
 
-      public async Task<ResourceStream> Select(SQLiteConnection connection, Dictionary<string, (string condition, object value)> where, int? offset, int? length, CancellationToken cancellationToken)
+      public async Task<ResourceStream> Select(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, int? offset, int? length, CancellationToken cancellationToken)
       {
-        List<object> parameters = [];
+        List<object?> parameters = [];
 
         string commandString;
         {
@@ -151,7 +151,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
                 commandStringBuilder.Append(" and ");
               }
 
-              KeyValuePair<string, (string condition, object value)> whereEntry = where.ElementAt(index);
+              KeyValuePair<string, (string condition, object? value)> whereEntry = where.ElementAt(index);
               commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
               parameters.Add(whereEntry.Value.value);
             }
@@ -159,7 +159,14 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
 
           if (length != null)
           {
-            commandStringBuilder.Append($" limit {offset}{(offset != null ? $" {length}" : "")};");
+            if (offset != null)
+            {
+              commandStringBuilder.Append($" limit {offset} {length};");
+            }
+            else
+            {
+              commandStringBuilder.Append($" limit {length};");
+            }
           }
 
           commandString = commandStringBuilder.ToString();
@@ -169,14 +176,14 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
         return new(Manager, await connection.ExecuteReaderAsync(commandString, cancellationToken, [.. parameters]));
       }
 
-      public async Task<bool> Update(SQLiteConnection connection, Dictionary<string, (string condition, object value)> where, Dictionary<string, object> data, CancellationToken cancellationToken)
+      public async Task<bool> Update(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, Dictionary<string, object?> data, CancellationToken cancellationToken)
       {
         if (data.Count == 0)
         {
           return false;
         }
 
-        List<object> parameters = [];
+        List<object?> parameters = [];
 
         string commandString;
         {
@@ -194,7 +201,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
                 commandStringBuilder.Append(", ");
               }
 
-              KeyValuePair<string, object> dataEntry = data.ElementAt(index);
+              KeyValuePair<string, object?> dataEntry = data.ElementAt(index);
               commandStringBuilder.Append($"{dataEntry.Key} = ({{{parameters.Count}}})");
               parameters.Add(dataEntry.Value);
             }
@@ -211,7 +218,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
                 commandStringBuilder.Append(" and ");
               }
 
-              KeyValuePair<string, (string condition, object value)> whereEntry = where.ElementAt(index);
+              KeyValuePair<string, (string condition, object? value)> whereEntry = where.ElementAt(index);
               commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
               parameters.Add(whereEntry.Value.value);
             }
@@ -246,6 +253,8 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       Logger = new(name);
 
       Main.Logger.Subscribe(Logger);
+
+      ResourceDeleteHandles = [];
     }
 
     ~ResourceManager()
@@ -257,11 +266,14 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
     public readonly DatabaseWrapper Wrapper;
     public readonly EnderBytesLogger Logger;
 
+    public delegate Task ResourceDeleteHandle(SQLiteConnection connection, R resource, CancellationToken cancellationToken);
+    public readonly List<ResourceDeleteHandle> ResourceDeleteHandles;
+
     public Database Database => Main.RequireDatabase();
 
     protected ulong GenerateTimestamp() => (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-    protected async Task<R> DbInsert(SQLiteConnection connection, Dictionary<string, object> data, CancellationToken cancellationToken)
+    protected async Task<R> DbInsert(SQLiteConnection connection, Dictionary<string, object?> data, CancellationToken cancellationToken)
     {
       ulong timestamp = GenerateTimestamp();
 
@@ -270,13 +282,51 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
 
       ulong newId = await Wrapper.Insert(connection, data, cancellationToken);
 
-      await using var a = (ResourceStream)await Wrapper.Select(connection, new() { { KEY_ID, ("=", newId) } }, null, null, cancellationToken);
+      await using var a = await Wrapper.Select(connection, new() { { KEY_ID, ("=", newId) } }, null, null, cancellationToken);
       await foreach (R resource in a)
       {
+        Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, $"#{resource.ID} inserted to the database.");
         return resource;
       }
 
       throw new InvalidOperationException("Failed to get new inserted resource.");
+    }
+
+    protected async Task<bool> DbUpdate(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, Dictionary<string, object?> newData, CancellationToken cancellationToken)
+    {
+      int output = 0;
+
+      await using var stream = await Wrapper.Select(connection, where, null, null, cancellationToken);
+      await foreach (R resource in stream)
+      {
+        if (!await Wrapper.Update(connection, new() { { KEY_ID, ("=", resource.ID) } }, newData, cancellationToken))
+        {
+          continue;
+        }
+
+        Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, $"#{resource.ID} updated on the database.");
+        output++;
+      }
+
+      return output != 0;
+    }
+
+    protected virtual async Task<bool> DbDelete(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> data, CancellationToken cancellationToken)
+    {
+      int output = 0;
+
+      await using var stream = await Wrapper.Select(connection, data, null, null, cancellationToken);
+      await foreach (R resource in stream)
+      {
+        if (!await Delete(connection, resource, cancellationToken))
+        {
+          continue;
+        }
+
+        output++;
+      }
+
+      return output != 0;
     }
 
     public Task<R?> GetByID(SQLiteConnection connection, string idHex, CancellationToken cancellationToken) => GetByID(connection, idHex, null, cancellationToken);
@@ -325,14 +375,37 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
     protected abstract D CreateData(SQLiteDataReader reader, ulong id, ulong createTime, ulong updateTime);
     protected abstract Task OnInit(SQLiteConnection connection, CancellationToken cancellationToken);
     protected abstract Task OnInit(SQLiteConnection connection, int previousVersion, CancellationToken cancellationToken);
+
+    public virtual async Task<bool> Delete(SQLiteConnection connection, R resource, CancellationToken cancellationToken)
+    {
+      if (resource.IsDeleted)
+      {
+        return false;
+      }
+
+      foreach (ResourceDeleteHandle handle in ResourceDeleteHandles)
+      {
+        await handle(connection, resource, cancellationToken);
+      }
+
+      resource.IsDeleted = true;
+      if (!await Wrapper.Delete(connection, new() { { KEY_ID, ("=", resource.ID) } }, cancellationToken))
+      {
+        return false;
+      }
+
+      Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, $"#{resource.ID} deleted from the database.");
+      return true;
+    }
   }
 
   protected Resource(M manager, D data) : base(manager, data)
   {
     Logger = new(IDHex);
+    IsDeleted = false;
 
     manager.Logger.Subscribe(Logger);
-    Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Resource Created");
+    Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Resource Constructed");
   }
 
   ~Resource()
@@ -345,8 +418,9 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
 
   protected override void UpdateData(D data)
   {
-    Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Resource Copied");
+    Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Resource Updated");
   }
 
+  public bool IsDeleted { get; private set; }
   public string IDHex => Buffer.From(ID).ToHexString();
 }

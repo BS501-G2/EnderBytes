@@ -10,6 +10,7 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
     Logger = new("Resources");
     Users = new(this);
     UserAuthentications = new(this);
+    Guilds = new(this);
 
     Server.Logger.Subscribe(Logger);
   }
@@ -21,20 +22,16 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
 
   public readonly EnderBytesServer Server;
   public readonly EnderBytesLogger Logger;
-  public Database? Database;
+  public Database? Database { get; private set; }
 
   public readonly UserResource.ResourceManager Users;
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
+  public readonly GuildResource.ResourceManager Guilds;
 
   public readonly string DatabaseDirectory = Path.Join(Environment.CurrentDirectory, ".db");
   public string DatabaseFile => Path.Join(DatabaseDirectory, "srv.db");
 
-  public Database RequireDatabase()
-  {
-    Database database = Database ?? throw new InvalidOperationException("Database is not open.");
-
-    return database;
-  }
+  public Database RequireDatabase() => Database ?? throw new InvalidOperationException("Database is not open.");
 
   public Task RunTransaction(Database.TransactionCallback callback, CancellationToken cancellationToken) => RequireDatabase().RunTransaction(callback, cancellationToken);
   public Task<T> RunTransaction<T>(Database.TransactionCallback<T> callback, CancellationToken cancellationToken) => RequireDatabase().RunTransaction<T>(callback, cancellationToken);
@@ -51,7 +48,7 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
       Directory.CreateDirectory(DatabaseDirectory);
     }
 
-    Database = await Database.Open(DatabaseFile, cancellationToken);
+    Database = await Database.Open(this, DatabaseFile, cancellationToken);
   }
 
   private async Task Close()
@@ -67,7 +64,6 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
 
   public override async Task Init(CancellationToken cancellationToken)
   {
-
     await Open(cancellationToken);
     await base.Init(cancellationToken);
   }

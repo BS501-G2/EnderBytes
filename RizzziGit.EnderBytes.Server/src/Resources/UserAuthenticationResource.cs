@@ -61,9 +61,18 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
     }
   }
 
-  public new sealed class ResourceManager(MainResourceManager main) : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager(main, VERSION, NAME)
+  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager
   {
     private static readonly Regex ValidPasswordRegex = new("^(?=.*[{a-z}])(?=.*[{A-Z}])(?=.*[{0-9}])(?=.*[{\\W_}])[{a-z}{A-Z}{0-9}{\\W_}]{{8,64}}$");
+
+    public ResourceManager(MainResourceManager main) : base(main, VERSION, NAME)
+    {
+      Generator = RandomNumberGenerator.Create();
+
+      main.Users.ResourceDeleteHandles.Add(DeleteAllFromUser);
+    }
+
+    public readonly RandomNumberGenerator Generator;
 
     protected override UserAuthenticationResource CreateResource(ResourceData data) => new(this, data);
     protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, ulong createTime, ulong updateTime) => new(
@@ -93,7 +102,9 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       { KEY_USER_ID, ("=", user.ID) }
     }, offset, length, cancellationToken);
 
-    public RandomNumberGenerator Generator = RandomNumberGenerator.Create();
+    public Task<bool> DeleteAllFromUser(SQLiteConnection connection, UserResource user, CancellationToken cancellationToken) => DbDelete(connection, new() {
+      { KEY_USER_ID, ("=", user.ID) }
+    }, cancellationToken);
 
     private byte[] GeneratePasswordHash(string password) => GeneratePasswordHash(password, Main.Server.Config.DefaultPasswordIterations);
     private byte[] GeneratePasswordHash(string password, int iterations) => GeneratePasswordHash(password, iterations, null);

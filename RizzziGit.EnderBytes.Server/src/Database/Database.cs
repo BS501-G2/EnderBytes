@@ -3,19 +3,20 @@ using System.Data.SQLite;
 namespace RizzziGit.EnderBytes.Database;
 
 using Collections;
+using Resources;
 
 public sealed class Database
 {
-  public static async Task<Database> Open(string path, CancellationToken cancellationToken)
+  public static async Task<Database> Open(MainResourceManager resourceManager, string path, CancellationToken cancellationToken)
   {
-    Database database = new(path);
+    Database database = new(resourceManager, path);
     await database.Connection.OpenAsync(cancellationToken);
 
     _ = database.RunTransactionQueue();
     return database;
   }
 
-  private Database(string path)
+  private Database(MainResourceManager resourceManager, string path)
   {
     Connection = new()
     {
@@ -25,9 +26,13 @@ public sealed class Database
         JournalMode = SQLiteJournalModeEnum.Memory
       }.ConnectionString
     };
+    Logger = new("Database");
+
+    resourceManager.Logger.Subscribe(Logger);
     WaitQueue = new();
   }
 
+  private readonly EnderBytesLogger Logger;
   private readonly SQLiteConnection Connection;
   private readonly WaitQueue<(TaskCompletionSource source, TransactionCallback callback, CancellationToken cancellationToken)> WaitQueue;
 
@@ -42,6 +47,7 @@ public sealed class Database
       var (source, callback, cancellationToken) = await WaitQueue.Dequeue(CancellationToken.None);
       try
       {
+        Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Begin transaction.");
         SQLiteTransaction transaction = (SQLiteTransaction)await Connection.BeginTransactionAsync(cancellationToken);
 
         try
@@ -50,10 +56,12 @@ public sealed class Database
         }
         catch
         {
+          Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Rollback failed transaction.");
           await transaction.RollbackAsync(cancellationToken);
           throw;
         }
 
+        Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Commit successful transaction.");
         await transaction.CommitAsync(cancellationToken);
         source.SetResult();
       }

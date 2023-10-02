@@ -7,12 +7,13 @@ using Resources;
 
 public sealed class Database
 {
+  public delegate Task TransactionCompleteHandler(SQLiteConnection connection);
+
   public static async Task<Database> Open(MainResourceManager resourceManager, string path, CancellationToken cancellationToken)
   {
     Database database = new(resourceManager, path);
     await database.Connection.OpenAsync(cancellationToken);
 
-    _ = database.RunTransactionQueue();
     return database;
   }
 
@@ -40,39 +41,93 @@ public sealed class Database
   public delegate Task<T> TransactionCallback<T>(SQLiteConnection connection, CancellationToken cancellationToken);
 
   private Task? WaitQueueTask;
-  private async Task RunTransactionWaitQueue()
+  private SQLiteTransaction? Transaction;
+  private readonly WeakKeyDictionary<SQLiteTransaction, List<TransactionCompleteHandler>> TransactionFailureHandlers = new();
+  private readonly WeakKeyDictionary<SQLiteTransaction, List<TransactionCompleteHandler>> TransactionSuccessHandlers = new();
+
+  public void RegisterOnTransactionCompleteHandlers(TransactionCompleteHandler? onSuccessHandler, TransactionCompleteHandler? onFailureHandler)
   {
-    while (true)
+    lock (this)
     {
-      var (source, callback, cancellationToken) = await WaitQueue.Dequeue(CancellationToken.None);
-      try
+      if (Transaction == null)
       {
-        Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Begin transaction.");
-        SQLiteTransaction transaction = (SQLiteTransaction)await Connection.BeginTransactionAsync(cancellationToken);
-
-        try
-        {
-          await callback(Connection, cancellationToken);
-        }
-        catch
-        {
-          Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Rollback failed transaction.");
-          await transaction.RollbackAsync(cancellationToken);
-          throw;
-        }
-
-        Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Commit successful transaction.");
-        await transaction.CommitAsync(cancellationToken);
-        source.SetResult();
+        return;
       }
-      catch (Exception exception)
+
+      if (TransactionSuccessHandlers.TryGetValue(Transaction, out List<TransactionCompleteHandler>? onSuccessHandlers) && onSuccessHandler != null)
       {
-        source.SetException(exception);
+        onSuccessHandlers.Add(onSuccessHandler);
+      }
+
+      if (TransactionFailureHandlers.TryGetValue(Transaction, out List<TransactionCompleteHandler>? onFailureHandlers) && onFailureHandler != null)
+      {
+        onFailureHandlers.Add(onFailureHandler);
       }
     }
   }
 
-  public async Task RunTransactionQueue()
+  private async Task RunTransactionWaitQueue(CancellationToken waitQueueCancellationToken)
+  {
+    while (true)
+    {
+      var (source, callback, cancellationToken) = await WaitQueue.Dequeue(waitQueueCancellationToken);
+      try
+      {
+        List<TransactionCompleteHandler> transactionFailureHandlers = [];
+        List<TransactionCompleteHandler> transactionSuccessHandlers = [];
+
+        try
+        {
+          Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Begin transaction.");
+          await using SQLiteTransaction transaction = (SQLiteTransaction)await Connection.BeginTransactionAsync(cancellationToken);
+
+          lock (this)
+          {
+            Transaction = transaction;
+            TransactionFailureHandlers.Add(transaction, transactionFailureHandlers);
+            TransactionSuccessHandlers.Add(transaction, transactionSuccessHandlers);
+          }
+
+          try
+          {
+            await callback(Connection, cancellationToken);
+          }
+          catch
+          {
+            Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Rollback failed transaction.");
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+          }
+
+          Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Commit successful transaction.");
+          await transaction.CommitAsync(cancellationToken);
+
+          foreach (TransactionCompleteHandler handler in transactionSuccessHandlers)
+          {
+            await handler(Connection);
+          }
+          source.SetResult();
+        }
+        catch (Exception exception)
+        {
+          source.SetException(exception);
+          foreach (TransactionCompleteHandler handler in transactionFailureHandlers)
+          {
+            await handler(Connection);
+          }
+        }
+      }
+      finally
+      {
+        lock (this)
+        {
+          Transaction = null;
+        }
+      }
+    }
+  }
+
+  public async Task RunTransactionQueue(CancellationToken waitQueueCancellationToken)
   {
     if (WaitQueueTask != null)
     {
@@ -86,7 +141,7 @@ public sealed class Database
     {
       try
       {
-        RunTransactionWaitQueue().Wait();
+        RunTransactionWaitQueue(waitQueueCancellationToken).Wait();
       }
       catch (AggregateException exception)
       {

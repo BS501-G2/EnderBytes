@@ -87,7 +87,9 @@ public abstract class Resource<M, D, R>(M manager, D data) : IResource
 
     private readonly WeakDictionary<ulong, R> Resources = new();
 
-    protected R AsResource(D data)
+    protected bool RemoveFromMemory(ulong id) => Resources.Remove(id);
+
+    protected virtual R AsResource(D data)
     {
       lock (Resources)
       {

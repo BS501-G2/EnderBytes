@@ -285,6 +285,14 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       await using var a = await Wrapper.Select(connection, new() { { KEY_ID, ("=", newId) } }, null, null, cancellationToken);
       await foreach (R resource in a)
       {
+        Database.RegisterOnTransactionCompleteHandlers(null, (_) =>
+        {
+          RemoveFromMemory(resource.ID);
+          resource.IsDeleted = true;
+
+          return Task.CompletedTask;
+        });
+
         Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, $"#{resource.ID} inserted to the database.");
         return resource;
       }
@@ -388,6 +396,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
         await handle(connection, resource, cancellationToken);
       }
 
+      RemoveFromMemory(resource.ID);
       resource.IsDeleted = true;
       if (!await Wrapper.Delete(connection, new() { { KEY_ID, ("=", resource.ID) } }, cancellationToken))
       {

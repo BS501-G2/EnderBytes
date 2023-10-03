@@ -69,7 +69,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
     {
       Generator = RandomNumberGenerator.Create();
 
-      main.Users.ResourceDeleteHandles.Add(DeleteAllFromUser);
+      main.Users.ResourceDeleteHandlers.Add(DeleteAllFromUser);
     }
 
     public readonly RandomNumberGenerator Generator;
@@ -97,7 +97,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       }
     }
 
-    public Task<ResourceStream> Stream(SQLiteConnection connection, UserResource user, int? offset, int? length, CancellationToken cancellationToken) => Wrapper.Select(connection, new()
+    public Task<ResourceStream> Stream(SQLiteConnection connection, UserResource user, int? offset, int? length, CancellationToken cancellationToken) => DbSelect(connection, new()
     {
       { KEY_USER_ID, ("=", user.ID) }
     }, offset, length, cancellationToken);
@@ -136,7 +136,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
     {
       if (!ValidPasswordRegex.IsMatch(password))
       {
-        throw new CreateResourceException(EXCEPTION_CREATE_RESOURCE_PASSWORD_INVALID, "Password is invalid.");
+        throw new ArgumentException("Password is invalid.", nameof(password));
       }
 
       return await DbInsert(connection, new()

@@ -74,18 +74,18 @@ public sealed class UserResource(UserResource.ResourceManager manager, UserResou
     {
       if (!ValidUsernameRegex.IsMatch(username))
       {
-        throw new CreateResourceException(EXCEPTION_CREATE_RESOURCE_USERNAME_INVALID, "Invalid username provided.");
+        throw new ArgumentException("Invalid username.", nameof(username));
       }
       else if (await GetByUsername(connection, username, cancellationToken) != null)
       {
-        throw new CreateResourceException(EXCEPTION_CREATE_RESOURCE_USERNAME_TAKEN, "Username is taken.");
+        throw new ArgumentException("Username is taken.", nameof(username));
       }
 
       return await DbInsert(connection, new() { { KEY_USERNAME, username } }, cancellationToken);
     }
 
     public Task<UserResource?> GetByUsername(SQLiteConnection connection, string username, CancellationToken cancellationToken) => GetByUsername(connection, username, null, cancellationToken);
-    public Task<UserResource?> GetByUsername(SQLiteConnection connection, string username, int? offset, CancellationToken cancellationToken) => Wrapper.SelectOne(connection, new() { { KEY_USERNAME, ("=", username) } }, offset, cancellationToken);
+    public Task<UserResource?> GetByUsername(SQLiteConnection connection, string username, int? offset, CancellationToken cancellationToken) => DbSelectOne(connection, new() { { KEY_USERNAME, ("=", username) } }, offset, cancellationToken);
   }
 
   public string Username => Data.Username;

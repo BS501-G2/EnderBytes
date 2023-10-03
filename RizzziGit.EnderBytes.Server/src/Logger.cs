@@ -1,8 +1,8 @@
 namespace RizzziGit.EnderBytes;
 
-public delegate void EnderBytesLoggerHandler(byte level, string scope, string message, ulong timestamp);
+public delegate void LoggerHandler(byte level, string scope, string message, ulong timestamp);
 
-public sealed class EnderBytesLogger(string name)
+public sealed class Logger(string name)
 {
   public const byte LOGLEVEL_VERBOSE = 5;
   public const byte LOGLEVEL_INFO = 4;
@@ -11,27 +11,27 @@ public sealed class EnderBytesLogger(string name)
   public const byte LOGLEVEL_FATAL = 1;
 
   private readonly string Name = name;
-  private readonly List<EnderBytesLogger> SubscribedLoggers = [];
+  private readonly List<Logger> SubscribedLoggers = [];
 
-  public event EnderBytesLoggerHandler? Logged;
+  public event LoggerHandler? Logged;
 
-  public void Subscribe(EnderBytesLogger logger) => logger.SubscribedLoggers.Add(this);
-  public void Subscribe(params EnderBytesLogger[] loggers)
+  public void Subscribe(Logger logger) => logger.SubscribedLoggers.Add(this);
+  public void Subscribe(params Logger[] loggers)
   {
-    foreach (EnderBytesLogger logger in loggers)
+    foreach (Logger logger in loggers)
     {
       Subscribe(logger);
     }
   }
 
-  public void Unsubscribe(params EnderBytesLogger[] loggers)
+  public void Unsubscribe(params Logger[] loggers)
   {
-    foreach (EnderBytesLogger logger in loggers)
+    foreach (Logger logger in loggers)
     {
       Unsubscribe(logger);
     }
   }
-  public void Unsubscribe(EnderBytesLogger logger)
+  public void Unsubscribe(Logger logger)
   {
     for (int index = 0; index < logger.SubscribedLoggers.Count; index++)
     {

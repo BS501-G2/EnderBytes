@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="RizzziGit.Collections" Version="1.0.12" />
+    <PackageReference Include="RizzziGit.Collections" Version="1.0.14" />
   </ItemGroup>
 
 </Project>

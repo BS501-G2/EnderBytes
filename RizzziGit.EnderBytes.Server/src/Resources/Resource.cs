@@ -45,193 +45,6 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       protected override ResourceEnumerator GetAsyncEnumerator(CancellationToken cancellationToken = default) => new(this, cancellationToken);
     }
 
-    public sealed class DatabaseWrapper(M manager)
-    {
-      public readonly M Manager = manager;
-      public Database Database => Manager.Database;
-
-      public async Task<ulong> Insert(SQLiteConnection connection, Dictionary<string, object?> data, CancellationToken cancellationToken)
-      {
-        string commandString;
-        {
-          StringBuilder commandStringBuilder = new();
-
-          commandStringBuilder.Append($"insert into {Manager.Name}");
-          if (data.Count != 0)
-          {
-            lock (data)
-            {
-              commandStringBuilder.Append('(');
-
-              for (int index = 0; index < data.Count; index++)
-              {
-                if (index != 0)
-                {
-                  commandStringBuilder.Append(',');
-                }
-
-                commandStringBuilder.Append(data.ElementAt(index).Key);
-              }
-
-              commandStringBuilder.Append($") values ({connection.ParamList(data.Count)});");
-            }
-          }
-
-          commandString = commandStringBuilder.ToString();
-          commandStringBuilder.Clear();
-        }
-
-        await connection.ExecuteNonQueryAsync(commandString, cancellationToken, [.. data.Values]);
-        return (ulong)connection.LastInsertRowId;
-      }
-
-      public async Task<bool> Delete(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, CancellationToken cancellationToken)
-      {
-        List<object?> parameters = [];
-
-        string commandString;
-        {
-          StringBuilder commandStringBuilder = new();
-
-          commandStringBuilder.Append($"delete from {Manager.Name}");
-
-          if (where.Count != 0)
-          {
-            commandStringBuilder.Append($" where ");
-
-            for (int index = 0; index < where.Count; index++)
-            {
-              if (index != 0)
-              {
-                commandStringBuilder.Append(" and ");
-              }
-
-              KeyValuePair<string, (string condition, object? value)> whereEntry = where.ElementAt(index);
-              commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
-              parameters.Add(whereEntry.Value.value);
-            }
-          }
-
-          commandString = commandStringBuilder.ToString();
-          commandStringBuilder.Clear();
-        }
-
-        return (await connection.ExecuteNonQueryAsync(commandString, cancellationToken, [.. parameters])) != 0;
-      }
-
-      public async Task<R?> SelectOne(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, int? offset, CancellationToken cancellationToken)
-      {
-        await using var stream = await Select(connection, where, offset, 1, cancellationToken);
-        await foreach (R resource in stream)
-        {
-          return resource;
-        }
-
-        return null;
-      }
-
-      public async Task<ResourceStream> Select(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, int? offset, int? length, CancellationToken cancellationToken)
-      {
-        List<object?> parameters = [];
-
-        string commandString;
-        {
-          StringBuilder commandStringBuilder = new();
-
-          commandStringBuilder.Append($"select * from {Manager.Name}");
-
-          if (where.Count != 0)
-          {
-            commandStringBuilder.Append($" where ");
-
-            for (int index = 0; index < where.Count; index++)
-            {
-              if (index != 0)
-              {
-                commandStringBuilder.Append(" and ");
-              }
-
-              KeyValuePair<string, (string condition, object? value)> whereEntry = where.ElementAt(index);
-              commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
-              parameters.Add(whereEntry.Value.value);
-            }
-          }
-
-          if (length != null)
-          {
-            if (offset != null)
-            {
-              commandStringBuilder.Append($" limit {offset} {length};");
-            }
-            else
-            {
-              commandStringBuilder.Append($" limit {length};");
-            }
-          }
-
-          commandString = commandStringBuilder.ToString();
-          commandStringBuilder.Clear();
-        }
-
-        return new(Manager, await connection.ExecuteReaderAsync(commandString, cancellationToken, [.. parameters]));
-      }
-
-      public async Task<bool> Update(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, Dictionary<string, object?> data, CancellationToken cancellationToken)
-      {
-        if (data.Count == 0)
-        {
-          return false;
-        }
-
-        List<object?> parameters = [];
-
-        string commandString;
-        {
-          StringBuilder commandStringBuilder = new();
-
-          commandStringBuilder.Append($"update {Manager.Name}");
-          if (data.Count != 0)
-          {
-            commandStringBuilder.Append(" set ");
-
-            for (int index = 0; index < data.Count; index++)
-            {
-              if (index != 0)
-              {
-                commandStringBuilder.Append(", ");
-              }
-
-              KeyValuePair<string, object?> dataEntry = data.ElementAt(index);
-              commandStringBuilder.Append($"{dataEntry.Key} = ({{{parameters.Count}}})");
-              parameters.Add(dataEntry.Value);
-            }
-          }
-
-          if (where.Count != 0)
-          {
-            commandStringBuilder.Append($" where ");
-
-            for (int index = 0; index < where.Count; index++)
-            {
-              if (index != 0)
-              {
-                commandStringBuilder.Append(" and ");
-              }
-
-              KeyValuePair<string, (string condition, object? value)> whereEntry = where.ElementAt(index);
-              commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
-              parameters.Add(whereEntry.Value.value);
-            }
-          }
-
-          commandString = commandStringBuilder.ToString();
-          commandStringBuilder.Clear();
-        }
-
-        return (await connection.ExecuteNonQueryAsync(commandString, cancellationToken, [.. parameters])) != 0;
-      }
-    }
-
     private static Task<int> InitVersioningTable(SQLiteConnection connection, CancellationToken cancellationToken) => connection.ExecuteNonQueryAsync(@$"create table if not exists {RV_TABLE}({RV_COLUMN_NAME} varchar(128) primary key, {RV_COLUMN_VERSION} integer not null);", cancellationToken);
     private static async Task SetResourceVersion(SQLiteConnection connection, string name, int version, CancellationToken cancellationToken)
     {
@@ -249,12 +62,11 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
     protected ResourceManager(MainResourceManager main, int version, string name) : base(main, version, name)
     {
       Main = main;
-      Wrapper = new((M)this);
       Logger = new(name);
 
       Main.Logger.Subscribe(Logger);
 
-      ResourceDeleteHandles = [];
+      ResourceDeleteHandlers = [];
     }
 
     ~ResourceManager()
@@ -263,11 +75,10 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
     }
 
     public new readonly MainResourceManager Main;
-    public readonly DatabaseWrapper Wrapper;
-    public readonly EnderBytesLogger Logger;
+    public readonly Logger Logger;
 
     public delegate Task ResourceDeleteHandle(SQLiteConnection connection, R resource, CancellationToken cancellationToken);
-    public readonly List<ResourceDeleteHandle> ResourceDeleteHandles;
+    public readonly List<ResourceDeleteHandle> ResourceDeleteHandlers;
 
     public Database Database => Main.RequireDatabase();
 
@@ -280,39 +91,52 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       data.Add(KEY_CREATE_TIME, timestamp);
       data.Add(KEY_UPDATE_TIME, timestamp);
 
-      ulong newId = await Wrapper.Insert(connection, data, cancellationToken);
+      ulong newId = await Database.Insert(connection, data, cancellationToken);
 
-      await using var a = await Wrapper.Select(connection, new() { { KEY_ID, ("=", newId) } }, null, null, cancellationToken);
+      await using var a = await DbSelect(connection, new() { { KEY_ID, ("=", newId) } }, null, null, cancellationToken);
       await foreach (R resource in a)
       {
         Database.RegisterOnTransactionCompleteHandlers(null, (_) =>
         {
           RemoveFromMemory(resource.ID);
           resource.IsDeleted = true;
+          Logger.Log(Logger.LOGLEVEL_WARN, $"#{resource.ID} removed from memory due to failed transaction.");
 
           return Task.CompletedTask;
         });
 
-        Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, $"#{resource.ID} inserted to the database.");
+        Logger.Log(Logger.LOGLEVEL_VERBOSE, $"#{resource.ID} inserted to the database.");
         return resource;
       }
 
       throw new InvalidOperationException("Failed to get new inserted resource.");
     }
 
+    protected async Task<ResourceStream> DbSelect(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, int? offset, int? length, CancellationToken cancellationToken) => new ResourceStream((M)this, await Database.Select(connection, where, offset, length, cancellationToken));
+    protected async Task<R?> DbSelectOne(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, int? offset, CancellationToken cancellationToken)
+    {
+      await using var stream = await DbSelect(connection, where, offset, null, cancellationToken);
+      await foreach (R resource in stream)
+      {
+        return resource;
+      }
+
+      return null;
+    }
+
     protected async Task<bool> DbUpdate(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, Dictionary<string, object?> newData, CancellationToken cancellationToken)
     {
       int output = 0;
 
-      await using var stream = await Wrapper.Select(connection, where, null, null, cancellationToken);
+      await using var stream = await DbSelect(connection, where, null, null, cancellationToken);
       await foreach (R resource in stream)
       {
-        if (!await Wrapper.Update(connection, new() { { KEY_ID, ("=", resource.ID) } }, newData, cancellationToken))
+        if (!await Database.Update(connection, new() { { KEY_ID, ("=", resource.ID) } }, newData, cancellationToken))
         {
           continue;
         }
 
-        Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, $"#{resource.ID} updated on the database.");
+        Logger.Log(Logger.LOGLEVEL_VERBOSE, $"#{resource.ID} updated on the database.");
         output++;
       }
 
@@ -323,7 +147,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
     {
       int output = 0;
 
-      await using var stream = await Wrapper.Select(connection, data, null, null, cancellationToken);
+      await using var stream = await DbSelect(connection, data, null, null, cancellationToken);
       await foreach (R resource in stream)
       {
         if (!await Delete(connection, resource, cancellationToken))
@@ -341,7 +165,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
     public Task<R?> GetByID(SQLiteConnection connection, string idHex, int? offset, CancellationToken cancellationToken) => GetByID(connection, Buffer.From(idHex, StringEncoding.Hex).ToUInt64(), offset, cancellationToken);
 
     public Task<R?> GetByID(SQLiteConnection connection, ulong id, CancellationToken cancellationToken) => GetByID(connection, id, null, cancellationToken);
-    public Task<R?> GetByID(SQLiteConnection connection, ulong id, int? offset, CancellationToken cancellationToken) => Wrapper.SelectOne(connection, new() { { KEY_ID, ("=", id) } }, offset, cancellationToken);
+    public Task<R?> GetByID(SQLiteConnection connection, ulong id, int? offset, CancellationToken cancellationToken) => DbSelectOne(connection, new() { { KEY_ID, ("=", id) } }, offset, cancellationToken);
 
     public async override Task Init(CancellationToken cancellationToken)
     {
@@ -391,19 +215,19 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
         return false;
       }
 
-      foreach (ResourceDeleteHandle handle in ResourceDeleteHandles)
+      foreach (ResourceDeleteHandle handle in ResourceDeleteHandlers)
       {
         await handle(connection, resource, cancellationToken);
       }
 
       RemoveFromMemory(resource.ID);
       resource.IsDeleted = true;
-      if (!await Wrapper.Delete(connection, new() { { KEY_ID, ("=", resource.ID) } }, cancellationToken))
+      if (!await Database.Delete(connection, new() { { KEY_ID, ("=", resource.ID) } }, cancellationToken))
       {
         return false;
       }
 
-      Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, $"#{resource.ID} deleted from the database.");
+      Logger.Log(Logger.LOGLEVEL_VERBOSE, $"#{resource.ID} deleted from the database.");
       return true;
     }
   }
@@ -414,20 +238,19 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
     IsDeleted = false;
 
     manager.Logger.Subscribe(Logger);
-    Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Resource Constructed");
+    Logger.Log(Logger.LOGLEVEL_VERBOSE, "Resource Constructed");
   }
 
   ~Resource()
   {
-    Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Resource Destroyed");
-    Manager.Logger.Unsubscribe(Logger);
+    Logger.Log(Logger.LOGLEVEL_VERBOSE, "Resource Destroyed");
   }
 
-  public readonly EnderBytesLogger Logger;
+  public readonly Logger Logger;
 
   protected override void UpdateData(D data)
   {
-    Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Resource Updated");
+    Logger.Log(Logger.LOGLEVEL_VERBOSE, "Resource Updated");
   }
 
   public bool IsDeleted { get; private set; }

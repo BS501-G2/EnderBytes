@@ -11,6 +11,7 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
     Users = new(this);
     UserAuthentications = new(this);
     Guilds = new(this);
+    StoragePools = new(this);
 
     Server.Logger.Subscribe(Logger);
   }
@@ -21,12 +22,13 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
   }
 
   public readonly EnderBytesServer Server;
-  public readonly EnderBytesLogger Logger;
+  public readonly Logger Logger;
   public Database? Database { get; private set; }
 
   public readonly UserResource.ResourceManager Users;
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
   public readonly GuildResource.ResourceManager Guilds;
+  public readonly StoragePoolResource.ResourceManager StoragePools;
 
   public readonly string DatabaseDirectory = Path.Join(Environment.CurrentDirectory, ".db");
   public string DatabaseFile => Path.Join(DatabaseDirectory, "srv.db");
@@ -49,6 +51,7 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
     }
 
     Database = await Database.Open(this, DatabaseFile, cancellationToken);
+    _ = Database.RunTransactionQueue(cancellationToken);
   }
 
   private async Task Close()

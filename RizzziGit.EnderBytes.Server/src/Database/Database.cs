@@ -2,6 +2,7 @@ using System.Data.SQLite;
 
 namespace RizzziGit.EnderBytes.Database;
 
+using System.Text;
 using Collections;
 using Resources;
 
@@ -9,31 +10,32 @@ public sealed class Database
 {
   public delegate Task TransactionCompleteHandler(SQLiteConnection connection);
 
-  public static async Task<Database> Open(MainResourceManager resourceManager, string path, CancellationToken cancellationToken)
+  public static async Task<Database> Open(MainResourceManager resourceManager, string name, CancellationToken cancellationToken)
   {
-    Database database = new(resourceManager, path);
+    Database database = new(resourceManager, name);
     await database.Connection.OpenAsync(cancellationToken);
 
     return database;
   }
 
-  private Database(MainResourceManager resourceManager, string path)
+  private Database(MainResourceManager resourceManager, string name)
   {
     Connection = new()
     {
       ConnectionString = new SQLiteConnectionStringBuilder
       {
-        DataSource = path,
+        DataSource = Path.Join(".db", $"{name}.sqlite3"),
         JournalMode = SQLiteJournalModeEnum.Memory
       }.ConnectionString
     };
+    Name = name;
     Logger = new("Database");
 
     resourceManager.Logger.Subscribe(Logger);
     WaitQueue = new();
   }
 
-  private readonly EnderBytesLogger Logger;
+  private readonly Logger Logger;
   private readonly SQLiteConnection Connection;
   private readonly WaitQueue<(TaskCompletionSource source, TransactionCallback callback, CancellationToken cancellationToken)> WaitQueue;
 
@@ -44,6 +46,8 @@ public sealed class Database
   private SQLiteTransaction? Transaction;
   private readonly WeakKeyDictionary<SQLiteTransaction, List<TransactionCompleteHandler>> TransactionFailureHandlers = new();
   private readonly WeakKeyDictionary<SQLiteTransaction, List<TransactionCompleteHandler>> TransactionSuccessHandlers = new();
+
+  public readonly string Name;
 
   public void RegisterOnTransactionCompleteHandlers(TransactionCompleteHandler? onSuccessHandler, TransactionCompleteHandler? onFailureHandler)
   {
@@ -78,7 +82,7 @@ public sealed class Database
 
         try
         {
-          Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Begin transaction.");
+          Logger.Log(Logger.LOGLEVEL_VERBOSE, "Begin transaction.");
           await using SQLiteTransaction transaction = (SQLiteTransaction)await Connection.BeginTransactionAsync(cancellationToken);
 
           lock (this)
@@ -94,12 +98,12 @@ public sealed class Database
           }
           catch
           {
-            Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Rollback failed transaction.");
+            Logger.Log(Logger.LOGLEVEL_WARN, "Rollback failed transaction.");
             await transaction.RollbackAsync(cancellationToken);
             throw;
           }
 
-          Logger.Log(EnderBytesLogger.LOGLEVEL_VERBOSE, "Commit successful transaction.");
+          Logger.Log(Logger.LOGLEVEL_VERBOSE, "Commit successful transaction.");
           await transaction.CommitAsync(cancellationToken);
 
           foreach (TransactionCompleteHandler handler in transactionSuccessHandlers)
@@ -110,11 +114,11 @@ public sealed class Database
         }
         catch (Exception exception)
         {
-          source.SetException(exception);
           foreach (TransactionCompleteHandler handler in transactionFailureHandlers)
           {
             await handler(Connection);
           }
+          source.SetException(exception);
         }
       }
       finally
@@ -184,6 +188,176 @@ public sealed class Database
     catch (Exception exception) { source.SetException(exception); }
 
     return await source.Task;
+  }
+
+  public async Task<ulong> Insert(SQLiteConnection connection, Dictionary<string, object?> data, CancellationToken cancellationToken)
+  {
+    string commandString;
+    {
+      StringBuilder commandStringBuilder = new();
+
+      commandStringBuilder.Append($"insert into {Name}");
+      if (data.Count != 0)
+      {
+        lock (data)
+        {
+          commandStringBuilder.Append('(');
+
+          for (int index = 0; index < data.Count; index++)
+          {
+            if (index != 0)
+            {
+              commandStringBuilder.Append(',');
+            }
+
+            commandStringBuilder.Append(data.ElementAt(index).Key);
+          }
+
+          commandStringBuilder.Append($") values ({connection.ParamList(data.Count)});");
+        }
+      }
+
+      commandString = commandStringBuilder.ToString();
+      commandStringBuilder.Clear();
+    }
+
+    await connection.ExecuteNonQueryAsync(commandString, cancellationToken, [.. data.Values]);
+    return (ulong)connection.LastInsertRowId;
+  }
+
+  public async Task<bool> Delete(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, CancellationToken cancellationToken)
+  {
+    List<object?> parameters = [];
+
+    string commandString;
+    {
+      StringBuilder commandStringBuilder = new();
+
+      commandStringBuilder.Append($"delete from {Name}");
+
+      if (where.Count != 0)
+      {
+        commandStringBuilder.Append($" where ");
+
+        for (int index = 0; index < where.Count; index++)
+        {
+          if (index != 0)
+          {
+            commandStringBuilder.Append(" and ");
+          }
+
+          KeyValuePair<string, (string condition, object? value)> whereEntry = where.ElementAt(index);
+          commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
+          parameters.Add(whereEntry.Value.value);
+        }
+      }
+
+      commandString = commandStringBuilder.ToString();
+      commandStringBuilder.Clear();
+    }
+
+    return (await connection.ExecuteNonQueryAsync(commandString, cancellationToken, [.. parameters])) != 0;
+  }
+
+  public async Task<SQLiteDataReader> Select(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, int? offset, int? length, CancellationToken cancellationToken)
+  {
+    List<object?> parameters = [];
+
+    string commandString;
+    {
+      StringBuilder commandStringBuilder = new();
+
+      commandStringBuilder.Append($"select * from {Name}");
+
+      if (where.Count != 0)
+      {
+        commandStringBuilder.Append($" where ");
+
+        for (int index = 0; index < where.Count; index++)
+        {
+          if (index != 0)
+          {
+            commandStringBuilder.Append(" and ");
+          }
+
+          KeyValuePair<string, (string condition, object? value)> whereEntry = where.ElementAt(index);
+          commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
+          parameters.Add(whereEntry.Value.value);
+        }
+      }
+
+      if (length != null)
+      {
+        if (offset != null)
+        {
+          commandStringBuilder.Append($" limit {offset} {length};");
+        }
+        else
+        {
+          commandStringBuilder.Append($" limit {length};");
+        }
+      }
+
+      commandString = commandStringBuilder.ToString();
+      commandStringBuilder.Clear();
+    }
+
+    return await connection.ExecuteReaderAsync(commandString, cancellationToken, [.. parameters]);
+  }
+
+  public async Task<bool> Update(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, Dictionary<string, object?> data, CancellationToken cancellationToken)
+  {
+    if (data.Count == 0)
+    {
+      return false;
+    }
+
+    List<object?> parameters = [];
+
+    string commandString;
+    {
+      StringBuilder commandStringBuilder = new();
+
+      commandStringBuilder.Append($"update {Name}");
+      if (data.Count != 0)
+      {
+        commandStringBuilder.Append(" set ");
+
+        for (int index = 0; index < data.Count; index++)
+        {
+          if (index != 0)
+          {
+            commandStringBuilder.Append(", ");
+          }
+
+          KeyValuePair<string, object?> dataEntry = data.ElementAt(index);
+          commandStringBuilder.Append($"{dataEntry.Key} = ({{{parameters.Count}}})");
+          parameters.Add(dataEntry.Value);
+        }
+      }
+
+      if (where.Count != 0)
+      {
+        commandStringBuilder.Append($" where ");
+
+        for (int index = 0; index < where.Count; index++)
+        {
+          if (index != 0)
+          {
+            commandStringBuilder.Append(" and ");
+          }
+
+          KeyValuePair<string, (string condition, object? value)> whereEntry = where.ElementAt(index);
+          commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
+          parameters.Add(whereEntry.Value.value);
+        }
+      }
+
+      commandString = commandStringBuilder.ToString();
+      commandStringBuilder.Clear();
+    }
+
+    return (await connection.ExecuteNonQueryAsync(commandString, cancellationToken, [.. parameters])) != 0;
   }
 
   public async Task Close()

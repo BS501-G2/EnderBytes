@@ -61,7 +61,7 @@ public sealed class GuildResource(GuildResource.ResourceManager manager, GuildRe
   {
     public ResourceManager(MainResourceManager main) : base(main, VERSION, NAME)
     {
-      main.Users.ResourceDeleteHandles.Add(DeleteAllFromUser);
+      main.Users.ResourceDeleteHandlers.Add(DeleteAllFromUser);
     }
 
     protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, ulong createTime, ulong updateTime) => new(
@@ -87,7 +87,7 @@ public sealed class GuildResource(GuildResource.ResourceManager manager, GuildRe
       }
     }
 
-    public Task<ResourceStream> Stream(SQLiteConnection connection, UserResource owner, int? offset, int? length, CancellationToken cancellationToken) => Wrapper.Select(connection, new()
+    public Task<ResourceStream> Stream(SQLiteConnection connection, UserResource owner, int? offset, int? length, CancellationToken cancellationToken) => DbSelect(connection, new()
     {
       { KEY_OWNER_USER_ID, ("=", owner.ID) }
     }, offset, length, cancellationToken);

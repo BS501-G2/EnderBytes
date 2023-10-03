@@ -123,14 +123,6 @@ public abstract class Resource<M, D, R>(M manager, D data) : IResource
     public abstract Task Init(CancellationToken cancellationToken);
   }
 
-  public class Exception(int code, string? message = null, Exception? innerException = null) : System.Exception(message, innerException)
-  {
-    public readonly int Code = code;
-  }
-
-  public class ResourceManagerException(int code, string? message = null, Exception? innerException = null) : Exception(code, message, innerException);
-  public class CreateResourceException(int code, string? message = null, Exception? innerException = null) : ResourceManagerException(code, message, innerException);
-
   protected readonly M Manager = manager;
   protected readonly D Data = data;
 

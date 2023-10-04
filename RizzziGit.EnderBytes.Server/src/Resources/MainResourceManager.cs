@@ -12,6 +12,8 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
     UserAuthentications = new(this);
     Guilds = new(this);
     StoragePools = new(this);
+    VirtualStorageNodes = new(this);
+    VirtualStorageBlobs = new(this);
 
     Server.Logger.Subscribe(Logger);
   }
@@ -29,9 +31,8 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
   public readonly GuildResource.ResourceManager Guilds;
   public readonly StoragePoolResource.ResourceManager StoragePools;
-
-  public readonly string DatabaseDirectory = Path.Join(Environment.CurrentDirectory, ".db");
-  public string DatabaseFile => Path.Join(DatabaseDirectory, "srv.db");
+  public readonly VirtualStorageNodeResource.ResourceManager VirtualStorageNodes;
+  public readonly VirtualStorageBlobResource.ResourceManager VirtualStorageBlobs;
 
   public Database RequireDatabase() => Database ?? throw new InvalidOperationException("Database is not open.");
 
@@ -45,12 +46,7 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
       await Close();
     }
 
-    if (!Directory.Exists(DatabaseDirectory))
-    {
-      Directory.CreateDirectory(DatabaseDirectory);
-    }
-
-    Database = await Database.Open(DatabaseFile, cancellationToken);
+    Database = await Database.Open(Server.Config.DatabaseDir, "server", cancellationToken);
     Logger.Subscribe(Database.Logger);
     _ = Database.RunTransactionQueue(cancellationToken);
   }

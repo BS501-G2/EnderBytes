@@ -97,10 +97,10 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       }
     }
 
-    public Task<ResourceStream> Stream(SQLiteConnection connection, UserResource user, int? offset, int? length, CancellationToken cancellationToken) => DbSelect(connection, new()
+    public Task<ResourceStream> Stream(SQLiteConnection connection, UserResource user, (int? offset, int length)? limit, CancellationToken cancellationToken) => DbSelect(connection, new()
     {
       { KEY_USER_ID, ("=", user.ID) }
-    }, offset, length, cancellationToken);
+    }, limit, null, cancellationToken);
 
     public Task<bool> DeleteAllFromUser(SQLiteConnection connection, UserResource user, CancellationToken cancellationToken) => DbDelete(connection, new() {
       { KEY_USER_ID, ("=", user.ID) }
@@ -149,7 +149,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
     public async Task<bool> ComparePasswordHash(SQLiteConnection connection, UserResource user, string rawPassword, CancellationToken cancellationToken)
     {
-      await using var stream = await Stream(connection, user, null, null, cancellationToken);
+      await using var stream = await Stream(connection, user, null, cancellationToken);
       await foreach (UserAuthenticationResource authentication in stream)
       {
         if (

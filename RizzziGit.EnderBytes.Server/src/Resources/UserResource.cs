@@ -85,7 +85,7 @@ public sealed class UserResource(UserResource.ResourceManager manager, UserResou
     }
 
     public Task<UserResource?> GetByUsername(SQLiteConnection connection, string username, CancellationToken cancellationToken) => GetByUsername(connection, username, null, cancellationToken);
-    public Task<UserResource?> GetByUsername(SQLiteConnection connection, string username, int? offset, CancellationToken cancellationToken) => DbSelectOne(connection, new() { { KEY_USERNAME, ("=", username) } }, offset, cancellationToken);
+    public Task<UserResource?> GetByUsername(SQLiteConnection connection, string username, int? offset, CancellationToken cancellationToken) => DbSelectOne(connection, new() { { KEY_USERNAME, ("=", username) } }, offset, null, cancellationToken);
   }
 
   public string Username => Data.Username;

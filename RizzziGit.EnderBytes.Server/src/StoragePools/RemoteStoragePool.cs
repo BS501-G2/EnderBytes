@@ -8,34 +8,57 @@ public sealed class RemoteStoragePool : StoragePool
   {
   }
 
-  public override bool IsDisposed { get => throw new NotImplementedException(); protected set => throw new NotImplementedException(); }
-
-  public override ValueTask DisposeAsync()
+  public override Task CloseFileHandle(uint handle, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task<Info?> Get(IEnumerable<string> path, CancellationToken cancellationToken)
+  public override Task CreateDirectory(IEnumerable<string> path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  protected override Task Delete(Info info, CancellationToken cancellationToken)
+  public override Task CreateFile(IEnumerable<string> path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  protected override Task<bool> Move(Info info, IEnumerable<string> destinationPath, CancellationToken cancellationToken)
+  public override Task DeleteFile(IEnumerable<string> path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  protected override Task<DirectoryHandle> OpenDirectoryHandle(DirectoryInfo info, CancellationToken cancellationToken)
+  public override Task InsertToFileHandle(uint handle, Buffer.Buffer buffer, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  protected override Task<FileHandle> OpenFileHandle(FileInfo info, CancellationToken cancellationToken)
+  public override Task<uint> OpenFile(IEnumerable<string> path, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task<IEnumerable<string>> ReadDirectory(IEnumerable<string> path, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task<Buffer.Buffer> ReadFromFileHandle(uint handle, long count, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task RemoveDirectory(IEnumerable<string> path, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task<FileInfo> Stats(IEnumerable<string> path, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task WriteToFileHandle(uint handle, Buffer.Buffer buffer, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }

@@ -91,7 +91,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       data.Add(KEY_CREATE_TIME, timestamp);
       data.Add(KEY_UPDATE_TIME, timestamp);
 
-      ulong newId = await Database.Insert(connection, data, cancellationToken);
+      ulong newId = await Database.Insert(connection, Name, data, cancellationToken);
 
       await using var a = await DbSelect(connection, new() { { KEY_ID, ("=", newId) } }, null, null, cancellationToken);
       await foreach (R resource in a)
@@ -112,10 +112,10 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       throw new InvalidOperationException("Failed to get new inserted resource.");
     }
 
-    protected async Task<ResourceStream> DbSelect(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, int? offset, int? length, CancellationToken cancellationToken) => new ResourceStream((M)this, await Database.Select(connection, where, offset, length, cancellationToken));
-    protected async Task<R?> DbSelectOne(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, int? offset, CancellationToken cancellationToken)
+    protected async Task<ResourceStream> DbSelect(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, (int? offset, int length)? limit, (string column, string orderBy)? order, CancellationToken cancellationToken) => new ResourceStream((M)this, await Database.Select(connection, Name, where, limit, order, cancellationToken));
+    protected async Task<R?> DbSelectOne(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, int? offset, (string column, string orderBy)? order, CancellationToken cancellationToken)
     {
-      await using var stream = await DbSelect(connection, where, offset, null, cancellationToken);
+      await using var stream = await DbSelect(connection, where, (offset, 1), order, cancellationToken);
       await foreach (R resource in stream)
       {
         return resource;
@@ -131,7 +131,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       await using var stream = await DbSelect(connection, where, null, null, cancellationToken);
       await foreach (R resource in stream)
       {
-        if (!await Database.Update(connection, new() { { KEY_ID, ("=", resource.ID) } }, newData, cancellationToken))
+        if (!await Database.Update(connection, Name, new() { { KEY_ID, ("=", resource.ID) } }, newData, cancellationToken))
         {
           continue;
         }
@@ -161,11 +161,8 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       return output != 0;
     }
 
-    public Task<R?> GetByID(SQLiteConnection connection, string idHex, CancellationToken cancellationToken) => GetByID(connection, idHex, null, cancellationToken);
-    public Task<R?> GetByID(SQLiteConnection connection, string idHex, int? offset, CancellationToken cancellationToken) => GetByID(connection, Buffer.From(idHex, StringEncoding.Hex).ToUInt64(), offset, cancellationToken);
-
-    public Task<R?> GetByID(SQLiteConnection connection, ulong id, CancellationToken cancellationToken) => GetByID(connection, id, null, cancellationToken);
-    public Task<R?> GetByID(SQLiteConnection connection, ulong id, int? offset, CancellationToken cancellationToken) => DbSelectOne(connection, new() { { KEY_ID, ("=", id) } }, offset, cancellationToken);
+    public Task<R?> GetByID(SQLiteConnection connection, string idHex, CancellationToken cancellationToken) => GetByID(connection, Buffer.From(idHex, StringEncoding.Hex).ToUInt64(), cancellationToken);
+    public Task<R?> GetByID(SQLiteConnection connection, ulong id, CancellationToken cancellationToken) => DbSelectOne(connection, new() { { KEY_ID, ("=", id) } }, null, null, cancellationToken);
 
     public async override Task Init(CancellationToken cancellationToken)
     {
@@ -222,7 +219,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
 
       RemoveFromMemory(resource.ID);
       resource.IsDeleted = true;
-      if (!await Database.Delete(connection, new() { { KEY_ID, ("=", resource.ID) } }, cancellationToken))
+      if (!await Database.Delete(connection, Name, new() { { KEY_ID, ("=", resource.ID) } }, cancellationToken))
       {
         return false;
       }

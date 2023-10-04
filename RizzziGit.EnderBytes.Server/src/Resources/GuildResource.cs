@@ -87,10 +87,10 @@ public sealed class GuildResource(GuildResource.ResourceManager manager, GuildRe
       }
     }
 
-    public Task<ResourceStream> Stream(SQLiteConnection connection, UserResource owner, int? offset, int? length, CancellationToken cancellationToken) => DbSelect(connection, new()
+    public Task<ResourceStream> Stream(SQLiteConnection connection, UserResource owner, (int? offset, int length)? limit, CancellationToken cancellationToken) => DbSelect(connection, new()
     {
       { KEY_OWNER_USER_ID, ("=", owner.ID) }
-    }, offset, length, cancellationToken);
+    }, limit, null, cancellationToken);
 
     public Task<bool> DeleteAllFromUser(SQLiteConnection connection, UserResource owner, CancellationToken cancellationToken) => DbDelete(connection, new()
     {

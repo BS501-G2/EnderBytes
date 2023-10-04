@@ -10,24 +10,30 @@ public sealed class Database
 {
   public delegate Task TransactionCompleteHandler(SQLiteConnection connection);
 
-  public static async Task<Database> Open(string name, CancellationToken cancellationToken)
+  public static async Task<Database> Open(string dir, string name, CancellationToken cancellationToken)
   {
-    Database database = new(name);
+    if (!Directory.Exists(dir))
+    {
+      Directory.CreateDirectory(dir);
+    }
+
+    Database database = new(dir, name);
     await database.Connection.OpenAsync(cancellationToken);
 
     return database;
   }
 
-  private Database(string name)
+  private Database(string dir, string name)
   {
     Connection = new()
     {
       ConnectionString = new SQLiteConnectionStringBuilder
       {
-        DataSource = Path.Join(".db", $"{name}.sqlite3"),
+        DataSource = Path.Join(dir, $"{name}.sqlite3"),
         JournalMode = SQLiteJournalModeEnum.Memory
       }.ConnectionString
     };
+
     Name = name;
     Logger = new("Database");
 
@@ -189,13 +195,13 @@ public sealed class Database
     return await source.Task;
   }
 
-  public async Task<ulong> Insert(SQLiteConnection connection, Dictionary<string, object?> data, CancellationToken cancellationToken)
+  public async Task<ulong> Insert(SQLiteConnection connection, string table, Dictionary<string, object?> data, CancellationToken cancellationToken)
   {
     string commandString;
     {
       StringBuilder commandStringBuilder = new();
 
-      commandStringBuilder.Append($"insert into {Name}");
+      commandStringBuilder.Append($"insert into {table}");
       if (data.Count != 0)
       {
         lock (data)
@@ -224,7 +230,7 @@ public sealed class Database
     return (ulong)connection.LastInsertRowId;
   }
 
-  public async Task<bool> Delete(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, CancellationToken cancellationToken)
+  public async Task<bool> Delete(SQLiteConnection connection, string table, Dictionary<string, (string condition, object? value)> where, CancellationToken cancellationToken)
   {
     List<object?> parameters = [];
 
@@ -232,7 +238,7 @@ public sealed class Database
     {
       StringBuilder commandStringBuilder = new();
 
-      commandStringBuilder.Append($"delete from {Name}");
+      commandStringBuilder.Append($"delete from {table}");
 
       if (where.Count != 0)
       {
@@ -258,7 +264,7 @@ public sealed class Database
     return (await connection.ExecuteNonQueryAsync(commandString, cancellationToken, [.. parameters])) != 0;
   }
 
-  public async Task<SQLiteDataReader> Select(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, int? offset, int? length, CancellationToken cancellationToken)
+  public async Task<SQLiteDataReader> Select(SQLiteConnection connection, string table, Dictionary<string, (string condition, object? value)> where, (int? offset, int length)? limit, (string column, string orderBy)? order, CancellationToken cancellationToken)
   {
     List<object?> parameters = [];
 
@@ -266,7 +272,7 @@ public sealed class Database
     {
       StringBuilder commandStringBuilder = new();
 
-      commandStringBuilder.Append($"select * from {Name}");
+      commandStringBuilder.Append($"select * from {table}");
 
       if (where.Count != 0)
       {
@@ -285,16 +291,21 @@ public sealed class Database
         }
       }
 
-      if (length != null)
+      if (limit != null)
       {
-        if (offset != null)
+        if (limit.Value.offset != null)
         {
-          commandStringBuilder.Append($" limit {offset} {length};");
+          commandStringBuilder.Append($" limit {limit.Value.offset} {limit.Value.length};");
         }
         else
         {
-          commandStringBuilder.Append($" limit {length};");
+          commandStringBuilder.Append($" limit {limit.Value.length};");
         }
+      }
+
+      if (order != null)
+      {
+
       }
 
       commandString = commandStringBuilder.ToString();
@@ -304,7 +315,7 @@ public sealed class Database
     return await connection.ExecuteReaderAsync(commandString, cancellationToken, [.. parameters]);
   }
 
-  public async Task<bool> Update(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, Dictionary<string, object?> data, CancellationToken cancellationToken)
+  public async Task<bool> Update(SQLiteConnection connection, string table, Dictionary<string, (string condition, object? value)> where, Dictionary<string, object?> data, CancellationToken cancellationToken)
   {
     if (data.Count == 0)
     {
@@ -317,7 +328,7 @@ public sealed class Database
     {
       StringBuilder commandStringBuilder = new();
 
-      commandStringBuilder.Append($"update {Name}");
+      commandStringBuilder.Append($"update {table}");
       if (data.Count != 0)
       {
         commandStringBuilder.Append(" set ");

@@ -2,45 +2,64 @@ namespace RizzziGit.EnderBytes.StoragePools;
 
 using Resources;
 using Database;
+using Buffer;
 
-public sealed class VirtualStoragePool : StoragePool
+public sealed class VirtualStoragePool(EnderBytesServer server, StoragePoolResource resource) : StoragePool(server, StoragePoolResource.TYPE_VIRTUAL_POOL, resource)
 {
-  public VirtualStoragePool(EnderBytesServer server, StoragePoolResource resource) : base(server, StoragePoolResource.TYPE_VIRTUAL_POOL, resource)
-  {
-    IsDisposed = false;
-  }
+  public MainResourceManager Resources = server.Resources;
 
-  public override bool IsDisposed { get; protected set; }
-
-  public override Task<Info?> Get(IEnumerable<string> path, CancellationToken cancellationToken)
+  public override Task<FileInfo> Stats(IEnumerable<string> path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  protected override Task Delete(Info info, CancellationToken cancellationToken)
+  public override Task CreateFile(IEnumerable<string> path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  protected override Task<bool> Move(Info info, IEnumerable<string> destinationPath, CancellationToken cancellationToken)
+  public override Task<uint> OpenFile(IEnumerable<string> path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  protected override Task<DirectoryHandle> OpenDirectoryHandle(DirectoryInfo info, CancellationToken cancellationToken)
+  public override Task DeleteFile(IEnumerable<string> path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  protected override Task<FileHandle> OpenFileHandle(FileInfo info, CancellationToken cancellationToken)
+  public override Task CloseFileHandle(uint handle, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override ValueTask DisposeAsync()
+  public override Task WriteToFileHandle(uint handle, Buffer buffer, CancellationToken cancellationToken)
   {
-    IsDisposed = true;
+    throw new NotImplementedException();
+  }
 
-    return new ValueTask();
+  public override Task InsertToFileHandle(uint handle, Buffer buffer, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task<Buffer> ReadFromFileHandle(uint handle, long count, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task CreateDirectory(IEnumerable<string> path, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task RemoveDirectory(IEnumerable<string> path, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task<IEnumerable<string>> ReadDirectory(IEnumerable<string> path, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
   }
 }

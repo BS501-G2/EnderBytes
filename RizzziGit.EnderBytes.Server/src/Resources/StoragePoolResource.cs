@@ -10,16 +10,16 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
   public const string NAME = "StoragePool";
   public const int VERSION = 1;
 
-  public const string KEY_NAME = "Name";
-  public const string KEY_TYPE = "Type";
-  public const string KEY_FLAGS = "Flags";
-  public const string KEY_OWNER_USER_ID = "OwnerUserID";
-  public const string KEY_PAYLOAD = "Payload";
+  private const string KEY_NAME = "Name";
+  private const string KEY_TYPE = "Type";
+  private const string KEY_FLAGS = "Flags";
+  private const string KEY_OWNER_USER_ID = "OwnerUserID";
+  private const string KEY_PAYLOAD = "Payload";
 
-  public const string KEY_PAYLOAD_KEY_LOCATION = "location";
-  public const string KEY_PAYLOAD_KEY_DIFFERENTIATOR = "differentiator";
-  public const string KEY_PAYLOAD_KEY_USERNAME = "username";
-  public const string KEY_PAYLOAD_KEY_PASSWORD = "password";
+  private const string KEY_PAYLOAD_KEY_LOCATION = "location";
+  private const string KEY_PAYLOAD_KEY_DIFFERENTIATOR = "differentiator";
+  private const string KEY_PAYLOAD_KEY_USERNAME = "username";
+  private const string KEY_PAYLOAD_KEY_PASSWORD = "password";
 
   public const string JSON_KEY_NAME = "name";
   public const string JSON_KEY_TYPE = "type";
@@ -99,10 +99,10 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     {
       if (previousVersion < 1)
       {
-        await connection.ExecuteNonQueryAsync($"alter table {NAME} add table {KEY_NAME} varchar(64) not null;", cancellationToken);
-        await connection.ExecuteNonQueryAsync($"alter table {NAME} add table {KEY_TYPE} integer not null", cancellationToken);
-        await connection.ExecuteNonQueryAsync($"alter table {NAME} add table {KEY_FLAGS} integer not null", cancellationToken);
-        await connection.ExecuteNonQueryAsync($"alter table {NAME} add table {KEY_OWNER_USER_ID} integer not null", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_NAME} varchar(64) not null;", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_TYPE} integer not null", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_FLAGS} integer not null", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_OWNER_USER_ID} integer not null", cancellationToken);
       }
     }
 

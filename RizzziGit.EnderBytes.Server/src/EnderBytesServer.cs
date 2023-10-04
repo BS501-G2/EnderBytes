@@ -7,6 +7,7 @@ using StoragePools;
 public struct EnderBytesConfig()
 {
   public int DefaultPasswordIterations = 100000;
+  public string DatabaseDir = Path.Join(Environment.CurrentDirectory, ".db");
 }
 
 public sealed class EnderBytesServer
@@ -101,14 +102,7 @@ public sealed class EnderBytesServer
           {
             if (weakRef.TryGetTarget(out StoragePools.StoragePool? target))
             {
-              if (target.IsDisposed)
-              {
-                weakRef.SetTarget(storagePool);
-              }
-              else
-              {
-                throw new InvalidOperationException($"Storage pool already open.");
-              }
+              throw new InvalidOperationException($"Storage pool already open.");
             }
             else
             {

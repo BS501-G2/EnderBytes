@@ -103,19 +103,21 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_TYPE} integer not null", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_FLAGS} integer not null", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_OWNER_USER_ID} integer not null", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_PAYLOAD} varchar(128) not null;", cancellationToken);
       }
     }
 
-    private Task<StoragePoolResource> Create(SQLiteConnection connection, string name, uint type, byte flags, JObject payload, CancellationToken cancellationToken) => DbInsert(connection, new()
+    private Task<StoragePoolResource> Create(SQLiteConnection connection, UserResource ownerUser, string name, uint type, byte flags, JObject payload, CancellationToken cancellationToken) => DbInsert(connection, new()
     {
+      { KEY_OWNER_USER_ID, ownerUser.ID },
       { KEY_NAME, name },
       { KEY_TYPE, type },
       { KEY_FLAGS, flags },
       { KEY_PAYLOAD, payload.ToString() },
     }, cancellationToken);
 
-    public Task<StoragePoolResource> CreatePhysicalPool(SQLiteConnection connection, string name, string location, byte flags, CancellationToken cancellationToken) => Create(
-      connection, name, TYPE_PHYSICAL_POOL, flags,
+    public Task<StoragePoolResource> CreatePhysicalPool(SQLiteConnection connection, UserResource ownerUser, string name, string location, byte flags, CancellationToken cancellationToken) => Create(
+      connection, ownerUser, name, TYPE_PHYSICAL_POOL, flags,
       new JObject()
       {
         { KEY_PAYLOAD_KEY_LOCATION, location }
@@ -123,12 +125,12 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
       cancellationToken
     );
 
-    public Task<StoragePoolResource> CreateSharedPool(SQLiteConnection connection, string name, byte flags, CancellationToken cancellationToken) => Create(
-      connection, name, TYPE_VIRTUAL_POOL, flags, [], cancellationToken
+    public Task<StoragePoolResource> CreateVirtualPool(SQLiteConnection connection, UserResource ownerUser, string name, byte flags, CancellationToken cancellationToken) => Create(
+      connection, ownerUser, name, TYPE_VIRTUAL_POOL, flags, [], cancellationToken
     );
 
-    public Task<StoragePoolResource> CreateNestedRemotePool(SQLiteConnection connection, string name, string location, string username, string password, byte flags, CancellationToken cancellationToken) => Create(
-      connection, name, TYPE_REMOTE_POOL, flags,
+    public Task<StoragePoolResource> CreateNestedRemotePool(SQLiteConnection connection, UserResource ownerUser, string name, string location, string username, string password, byte flags, CancellationToken cancellationToken) => Create(
+      connection, ownerUser, name, TYPE_REMOTE_POOL, flags,
       new JObject()
       {
         { KEY_PAYLOAD_KEY_LOCATION, location },

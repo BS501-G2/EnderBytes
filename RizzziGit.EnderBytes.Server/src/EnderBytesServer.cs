@@ -151,10 +151,6 @@ public sealed class EnderBytesServer
   public Task RunTransaction(Database.Database.TransactionCallback callback, CancellationToken cancellationToken) => Resources.RunTransaction(callback, cancellationToken);
   public Task<T> RunTransaction<T>(Database.Database.TransactionCallback<T> callback, CancellationToken cancellationToken) => Resources.RunTransaction(callback, cancellationToken);
 
-  public UserResource.ResourceManager Users => Resources.Users;
-  public UserAuthenticationResource.ResourceManager UserAuthentications => Resources.UserAuthentications;
-  public GuildResource.ResourceManager Guilds => Resources.Guilds;
-
   public async Task Run(CancellationToken cancellationToken)
   {
     await Resources.Init(cancellationToken);

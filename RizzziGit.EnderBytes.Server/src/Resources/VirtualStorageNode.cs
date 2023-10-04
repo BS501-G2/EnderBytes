@@ -17,8 +17,10 @@ public sealed class VirtualStorageNodeResource(VirtualStorageNodeResource.Resour
   private const string KEY_OWNER_USER_ID = "OwnerUserID";
   private const string KEY_ACCESS_TIME = "AccessTime";
   private const string KEY_BLOB_COUNT = "BlobCount";
+  private const string KEY_LENGTH = "Length";
 
   private const string INDEX_STORAGE_POOL_ID = $"Index_{NAME}_{KEY_STORAGE_POOL_ID}";
+  private const string INDEX_NAME = $"Index_{NAME}_{KEY_NAME}";
 
   public const int TYPE_FILE = 0;
   public const int TYPE_FOLDER = 1;
@@ -47,7 +49,8 @@ public sealed class VirtualStorageNodeResource(VirtualStorageNodeResource.Resour
     int mode,
     ulong ownerUserId,
     ulong accessTime,
-    ulong blobCount
+    ulong blobCount,
+    ulong length
   ) : Resource<ResourceManager, ResourceData, VirtualStorageNodeResource>.ResourceData(id, createTime, updateTime)
   {
     public ulong StoragePoolID = storagePoolId;
@@ -58,6 +61,7 @@ public sealed class VirtualStorageNodeResource(VirtualStorageNodeResource.Resour
     public ulong OwnerUserID = ownerUserId;
     public ulong AccessTime = accessTime;
     public ulong BlobCount = blobCount;
+    public ulong Length = length;
 
     public override void CopyFrom(ResourceData data)
     {
@@ -71,6 +75,7 @@ public sealed class VirtualStorageNodeResource(VirtualStorageNodeResource.Resour
       OwnerUserID = data.OwnerUserID;
       AccessTime = data.AccessTime;
       BlobCount = data.BlobCount;
+      Length = data.Length;
     }
   }
 
@@ -98,7 +103,8 @@ public sealed class VirtualStorageNodeResource(VirtualStorageNodeResource.Resour
       (int)(long)reader[KEY_MODE],
       (uint)(long)reader[KEY_OWNER_USER_ID],
       (ulong)(long)reader[KEY_ACCESS_TIME],
-      (ulong)(long)reader[KEY_BLOB_COUNT]
+      (ulong)(long)reader[KEY_BLOB_COUNT],
+      (ulong)(long)reader[KEY_LENGTH]
     );
 
     protected override VirtualStorageNodeResource CreateResource(ResourceData data) => new(this, data);
@@ -109,15 +115,53 @@ public sealed class VirtualStorageNodeResource(VirtualStorageNodeResource.Resour
       if (previousVersion < 1)
       {
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_STORAGE_POOL_ID} integer not null;", cancellationToken);
-        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_NAME} varchar(128) not null;", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_NAME} varchar(128) not null collate nocase;", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_PARENT_NODE_ID} integer;", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_TYPE} integer not null;", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_MODE} integer not null;", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_OWNER_USER_ID} integer not null;", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_ACCESS_TIME} integer not null;", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_BLOB_COUNT} integer not null;", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_LENGTH} integer not null;", cancellationToken);
 
         await connection.ExecuteNonQueryAsync($"create index {INDEX_STORAGE_POOL_ID} on {NAME}({KEY_STORAGE_POOL_ID})", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"create unique index {INDEX_NAME} on {NAME}({KEY_NAME},{KEY_PARENT_NODE_ID})", cancellationToken);
       }
+    }
+
+    public Task SetBlobCount(SQLiteConnection connection, VirtualStorageNodeResource node, ulong count, CancellationToken cancellationToken) => DbUpdate(
+      connection,
+      new() { { KEY_ID, ("=", node.ID) } },
+      new() { { KEY_BLOB_COUNT, count } },
+      cancellationToken
+    );
+
+    public Task SetLength(SQLiteConnection connection, VirtualStorageNodeResource node, ulong length, CancellationToken cancellationToken) => DbUpdate(
+      connection,
+      new() { { KEY_ID, ("=", node.ID) } },
+      new() { { KEY_LENGTH, length } },
+      cancellationToken
+    );
+
+    public async Task<VirtualStorageNodeResource> Create(SQLiteConnection connection, StoragePoolResource storagePool, string name, VirtualStorageNodeResource? parentNode, byte type, int mode, UserResource ownerUser, CancellationToken cancellationToken)
+    {
+      if (storagePool.Type != StoragePoolResource.TYPE_VIRTUAL_POOL)
+      {
+        throw new ArgumentException("Invalid storage pool type.", nameof(storagePool));
+      }
+
+      return await DbInsert(connection, new()
+      {
+        { KEY_STORAGE_POOL_ID, storagePool.ID },
+        { KEY_NAME, name },
+        { KEY_PARENT_NODE_ID, parentNode?.ID },
+        { KEY_TYPE, type },
+        { KEY_MODE, mode },
+        { KEY_ACCESS_TIME, GenerateTimestamp() },
+        { KEY_OWNER_USER_ID, ownerUser.ID },
+        { KEY_BLOB_COUNT, 0 },
+        { KEY_LENGTH, 0 }
+      }, cancellationToken);
     }
   }
 
@@ -129,4 +173,8 @@ public sealed class VirtualStorageNodeResource(VirtualStorageNodeResource.Resour
   public ulong OwnerUserID => Data.OwnerUserID;
   public ulong AccessTime => Data.AccessTime;
   public ulong BlobCount => Data.BlobCount;
+  public ulong Length => Data.Length;
+
+  public Task SetBlobCount(SQLiteConnection connection, ulong count, CancellationToken cancellationToken) => Manager.SetBlobCount(connection, this, count, cancellationToken);
+  public Task SetLength(SQLiteConnection connection, ulong length, CancellationToken cancellationToken) => Manager.SetLength(connection, this, length, cancellationToken);
 }

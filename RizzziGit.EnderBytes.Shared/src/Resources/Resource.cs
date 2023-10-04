@@ -1,7 +1,8 @@
+using Newtonsoft.Json.Linq;
+
 namespace RizzziGit.EnderBytes.Shared.Resources;
 
 using Collections;
-using Newtonsoft.Json.Linq;
 
 public interface IResource;
 public interface IResourceData;

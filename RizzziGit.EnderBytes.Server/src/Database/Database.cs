@@ -111,6 +111,7 @@ public sealed class Database
           Logger.Log(Logger.LOGLEVEL_VERBOSE, "Commit successful transaction.");
           await transaction.CommitAsync(cancellationToken);
 
+          transactionSuccessHandlers.Reverse();
           foreach (TransactionCompleteHandler handler in transactionSuccessHandlers)
           {
             await handler(Connection);
@@ -119,6 +120,7 @@ public sealed class Database
         }
         catch (Exception exception)
         {
+          transactionFailureHandlers.Reverse();
           foreach (TransactionCompleteHandler handler in transactionFailureHandlers)
           {
             await handler(Connection);
@@ -295,24 +297,24 @@ public sealed class Database
       {
         if (limit.Value.offset != null)
         {
-          commandStringBuilder.Append($" limit {limit.Value.offset} {limit.Value.length};");
+          commandStringBuilder.Append($" limit {limit.Value.offset} {limit.Value.length}");
         }
         else
         {
-          commandStringBuilder.Append($" limit {limit.Value.length};");
+          commandStringBuilder.Append($" limit {limit.Value.length}");
         }
       }
 
       if (order != null)
       {
-
+        commandStringBuilder.Append($" order by {order.Value.column} {order.Value.orderBy}");
       }
 
       commandString = commandStringBuilder.ToString();
       commandStringBuilder.Clear();
     }
 
-    return await connection.ExecuteReaderAsync(commandString, cancellationToken, [.. parameters]);
+    return await connection.ExecuteReaderAsync($"{commandString};", cancellationToken, [.. parameters]);
   }
 
   public async Task<bool> Update(SQLiteConnection connection, string table, Dictionary<string, (string condition, object? value)> where, Dictionary<string, object?> data, CancellationToken cancellationToken)

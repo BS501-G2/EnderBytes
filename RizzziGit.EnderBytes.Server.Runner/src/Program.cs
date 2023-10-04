@@ -49,24 +49,45 @@ public static class Program
         Console.WriteLine($"[{time}][{levelString}][{scope}] {message}");
       };
 
-      while (true)
+      try
       {
-        try
+        await server.RunTransaction(async (connection, cancellationToken) =>
         {
-          await server.RunTransaction(async (connection, cancellationToken) =>
+          UserResource user = await server.Resources.Users.Create(connection, "asdjoaskd", cancellationToken);
+          StoragePoolResource virtualStoragePool = await server.Resources.StoragePools.CreateVirtualPool(connection, user, "asdjoaskd", 0, cancellationToken);
+          VirtualStorageNodeResource node = await server.Resources.VirtualStorageNodes.Create(
+            connection,
+            virtualStoragePool,
+            "ASD",
+            null,
+            VirtualStorageNodeResource.TYPE_FILE,
+            VirtualStorageNodeResource.MODE_OTHERS_READ |
+            VirtualStorageNodeResource.MODE_OTHERS_WRITE |
+            VirtualStorageNodeResource.MODE_GROUP_READ |
+            VirtualStorageNodeResource.MODE_GROUP_WRITE |
+            VirtualStorageNodeResource.MODE_USER_READ |
+            VirtualStorageNodeResource.MODE_USER_WRITE,
+            user, cancellationToken);
+
+          using FileStream inFile = File.OpenRead("/home/cool/Documents/Code/.stignore");
+          for (byte[] buffer = new byte[1024 * 1024]; inFile.Position < inFile.Length;)
           {
-            for (int index = 0; index < 1000; index++)
-            {
-              UserResource user = await server.Users.Create(connection, Buffer.Random(8).ToHexString(), cancellationToken);
-              await server.UserAuthentications.CreatePassword(connection, user, Random.Shared.Next(10) == 1 ? "asd" : "dasdaASsd(^&921)", cancellationToken);
-              await server.Guilds.Create(connection, user, "ASDLKAMSLDMK", null, cancellationToken);
-            }
-          }, cancellationToken);
-        }
-        catch (Exception exception)
-        {
-          Console.Error.WriteLine(exception);
-        }
+            int bufferLength = inFile.Read(buffer);
+
+            await server.Resources.VirtualStorageBlobs.Append(connection, node, Buffer.From(buffer, 0, bufferLength), cancellationToken);
+          }
+
+          using var outFile = File.OpenWrite("/run/media/cool/AC233/out.txt");
+          await using var stream = await server.Resources.VirtualStorageBlobs.Stream(connection, node, null, cancellationToken);
+          await foreach (VirtualStorageBlobResource blob in stream)
+          {
+            outFile.Write(blob.Read().ToByteArray());
+          }
+        }, cancellationToken);
+      }
+      catch (Exception exception)
+      {
+        Console.Error.WriteLine(exception);
       }
     }
     finally

@@ -50,7 +50,8 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
       Directory.CreateDirectory(DatabaseDirectory);
     }
 
-    Database = await Database.Open(this, DatabaseFile, cancellationToken);
+    Database = await Database.Open(DatabaseFile, cancellationToken);
+    Logger.Subscribe(Database.Logger);
     _ = Database.RunTransactionQueue(cancellationToken);
   }
 

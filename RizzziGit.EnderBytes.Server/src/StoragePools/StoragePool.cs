@@ -1,15 +1,10 @@
-namespace RizzziGit.EnderBytes.StoragePool;
+namespace RizzziGit.EnderBytes.StoragePools;
 
 using Resources;
 using Buffer;
 using Collections;
 
-public interface IStoragePool
-{
-  public Task<StoragePool.Info?> Get(IEnumerable<string> path, CancellationToken cancellationToken);
-}
-
-public abstract class StoragePool : IStoragePool
+public abstract class StoragePool : EnderBytesServer.StoragePool, IAsyncDisposable
 {
   public abstract class FileHandle
   {
@@ -163,16 +158,14 @@ public abstract class StoragePool : IStoragePool
     public async Task<Info?> GetInfo(CancellationToken cancellationToken) => await StoragePool.Get(Path, cancellationToken);
   }
 
-  public StoragePool(EnderBytesServer server, uint requireType, StoragePoolResource resource)
+  public StoragePool(EnderBytesServer server, uint requireType, StoragePoolResource resource) : base(server, resource)
   {
     if (requireType != resource.Type)
     {
       throw new ArgumentException("Invalid type.", nameof(resource));
     }
 
-    Server = server;
     Type = requireType;
-    Resource = resource;
 
     Infos = new();
     FileHandles = new();
@@ -180,9 +173,6 @@ public abstract class StoragePool : IStoragePool
   }
 
   public readonly uint Type;
-  public readonly EnderBytesServer Server;
-  public readonly StoragePoolResource Resource;
-
   private readonly WeakDictionary<uint, Info> Infos;
   private readonly WeakKeyDictionary<FileInfo, FileHandle> FileHandles;
   private readonly WeakKeyDictionary<DirectoryInfo, DirectoryHandle> DirectoryHandles;
@@ -196,4 +186,7 @@ public abstract class StoragePool : IStoragePool
   protected abstract Task Delete(Info info, CancellationToken cancellationToken);
 
   public abstract Task<Info?> Get(IEnumerable<string> path, CancellationToken cancellationToken);
+
+  public abstract bool IsDisposed { get; protected set; }
+  public abstract ValueTask DisposeAsync();
 }

@@ -1,9 +1,17 @@
-namespace RizzziGit.EnderBytes.StoragePool;
+namespace RizzziGit.EnderBytes.StoragePools;
 
 using Resources;
+using Database;
 
-public sealed class SharedStoragePool(EnderBytesServer server, StoragePoolResource resource) : StoragePool(server, StoragePoolResource.TYPE_SHARED_POOL, resource)
+public sealed class VirtualStoragePool : StoragePool
 {
+  public VirtualStoragePool(EnderBytesServer server, StoragePoolResource resource) : base(server, StoragePoolResource.TYPE_VIRTUAL_POOL, resource)
+  {
+    IsDisposed = false;
+  }
+
+  public override bool IsDisposed { get; protected set; }
+
   public override Task<Info?> Get(IEnumerable<string> path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
@@ -27,5 +35,12 @@ public sealed class SharedStoragePool(EnderBytesServer server, StoragePoolResour
   protected override Task<FileHandle> OpenFileHandle(FileInfo info, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
+  }
+
+  public override ValueTask DisposeAsync()
+  {
+    IsDisposed = true;
+
+    return new ValueTask();
   }
 }

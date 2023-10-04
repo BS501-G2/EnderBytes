@@ -1,4 +1,4 @@
-namespace RizzziGit.EnderBytes.StoragePool;
+namespace RizzziGit.EnderBytes.StoragePools;
 
 using Resources;
 

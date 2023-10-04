@@ -2,6 +2,7 @@
 
 using Collections;
 using Resources;
+using StoragePools;
 
 public struct EnderBytesConfig()
 {
@@ -88,6 +89,83 @@ public sealed class EnderBytesServer
     public readonly ulong ID;
   }
 
+  public abstract class StoragePool
+  {
+    protected StoragePool(EnderBytesServer server, StoragePoolResource resource)
+    {
+      lock (server.StoragePools)
+      {
+        if (this is StoragePools.StoragePool storagePool)
+        {
+          if (server.StoragePools.TryGetValue(resource, out WeakReference<StoragePools.StoragePool>? weakRef))
+          {
+            if (weakRef.TryGetTarget(out StoragePools.StoragePool? target))
+            {
+              if (target.IsDisposed)
+              {
+                weakRef.SetTarget(storagePool);
+              }
+              else
+              {
+                throw new InvalidOperationException($"Storage pool already open.");
+              }
+            }
+            else
+            {
+              weakRef.SetTarget(storagePool);
+            }
+          }
+          else
+          {
+            server.StoragePools.Add(resource, new(storagePool));
+          }
+        }
+        else
+        {
+          throw new InvalidOperationException($"Must inherit {nameof(EnderBytes.StoragePools.StoragePool)} class.");
+        }
+      }
+
+      Server = server;
+      Resource = resource;
+    }
+
+    ~StoragePool() => Server.StoragePools.Remove(Resource);
+
+    public readonly EnderBytesServer Server;
+    public readonly StoragePoolResource Resource;
+  }
+
+  public EnderBytesServer(EnderBytesConfig? config = null)
+  {
+    Logger = new("Server");
+    Resources = new(this);
+    Config = config ?? new();
+  }
+
+  public readonly MainResourceManager Resources;
+
+  public readonly Logger Logger;
+  public readonly EnderBytesConfig Config;
+
+  private readonly Dictionary<ulong, WeakReference<ProtocolWrappers.ProtocolWrapper>> ProtocolWrappers = [];
+  private readonly Dictionary<ulong, WeakReference<EnderBytes.Context>> Contexts = [];
+  private readonly Dictionary<StoragePoolResource, WeakReference<StoragePools.StoragePool>> StoragePools = [];
+
+  private readonly WaitQueue<TaskCompletionSource<(TaskCompletionSource<EnderBytes.Context> source, CancellationToken cancellationToken)>> ListenQueue = new(0);
+
+  public Task RunTransaction(Database.Database.TransactionCallback callback, CancellationToken cancellationToken) => Resources.RunTransaction(callback, cancellationToken);
+  public Task<T> RunTransaction<T>(Database.Database.TransactionCallback<T> callback, CancellationToken cancellationToken) => Resources.RunTransaction(callback, cancellationToken);
+
+  public UserResource.ResourceManager Users => Resources.Users;
+  public UserAuthenticationResource.ResourceManager UserAuthentications => Resources.UserAuthentications;
+  public GuildResource.ResourceManager Guilds => Resources.Guilds;
+
+  public async Task Run(CancellationToken cancellationToken)
+  {
+    await Resources.Init(cancellationToken);
+  }
+
   public async Task Listen(CancellationToken cancelationToken)
   {
     while (true)
@@ -111,34 +189,5 @@ public sealed class EnderBytesServer
 
       remoteSource.SetResult(new(this, linkedCancellationTokenSource.Token));
     }
-  }
-
-  public EnderBytesServer(EnderBytesConfig? config = null)
-  {
-    Logger = new("Server");
-    Resources = new(this);
-    Config = config ?? new();
-  }
-
-  public readonly MainResourceManager Resources;
-
-  public readonly Logger Logger;
-  public readonly EnderBytesConfig Config;
-
-  private readonly Dictionary<ulong, WeakReference<ProtocolWrappers.ProtocolWrapper>> ProtocolWrappers = [];
-  private readonly Dictionary<ulong, WeakReference<EnderBytes.Context>> Contexts = [];
-
-  private readonly WaitQueue<TaskCompletionSource<(TaskCompletionSource<EnderBytes.Context> source, CancellationToken cancellationToken)>> ListenQueue = new(0);
-
-  public Task RunTransaction(Database.Database.TransactionCallback callback, CancellationToken cancellationToken) => Resources.RunTransaction(callback, cancellationToken);
-  public Task<T> RunTransaction<T>(Database.Database.TransactionCallback<T> callback, CancellationToken cancellationToken) => Resources.RunTransaction(callback, cancellationToken);
-
-  public UserResource.ResourceManager Users => Resources.Users;
-  public UserAuthenticationResource.ResourceManager UserAuthentications => Resources.UserAuthentications;
-  public GuildResource.ResourceManager Guilds => Resources.Guilds;
-
-  public async Task Run(CancellationToken cancellationToken)
-  {
-    await Resources.Init(cancellationToken);
   }
 }

@@ -27,9 +27,9 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
   public const string JSON_KEY_OWNER_USER_ID = "ownerUserId";
   public const string JSON_KEY_PAYLOAD = "payload";
 
-  public const uint TYPE_SHARED_POOL = 0;
+  public const uint TYPE_VIRTUAL_POOL = 0;
   public const uint TYPE_PHYSICAL_POOL = 1;
-  public const uint TYPE_NESTED_REMOTE_POOL = 2;
+  public const uint TYPE_REMOTE_POOL = 2;
 
   public const byte FLAG_SESSION_TEMPORAL = 1 << 0;
   public const byte FLAG_USER_TEMPORAL = 1 << 1;
@@ -124,11 +124,11 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     );
 
     public Task<StoragePoolResource> CreateSharedPool(SQLiteConnection connection, string name, byte flags, CancellationToken cancellationToken) => Create(
-      connection, name, TYPE_SHARED_POOL, flags, [], cancellationToken
+      connection, name, TYPE_VIRTUAL_POOL, flags, [], cancellationToken
     );
 
     public Task<StoragePoolResource> CreateNestedRemotePool(SQLiteConnection connection, string name, string location, string username, string password, byte flags, CancellationToken cancellationToken) => Create(
-      connection, name, TYPE_NESTED_REMOTE_POOL, flags,
+      connection, name, TYPE_REMOTE_POOL, flags,
       new JObject()
       {
         { KEY_PAYLOAD_KEY_LOCATION, location },

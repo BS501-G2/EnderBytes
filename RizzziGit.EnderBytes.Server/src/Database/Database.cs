@@ -10,15 +10,15 @@ public sealed class Database
 {
   public delegate Task TransactionCompleteHandler(SQLiteConnection connection);
 
-  public static async Task<Database> Open(MainResourceManager resourceManager, string name, CancellationToken cancellationToken)
+  public static async Task<Database> Open(string name, CancellationToken cancellationToken)
   {
-    Database database = new(resourceManager, name);
+    Database database = new(name);
     await database.Connection.OpenAsync(cancellationToken);
 
     return database;
   }
 
-  private Database(MainResourceManager resourceManager, string name)
+  private Database(string name)
   {
     Connection = new()
     {
@@ -31,11 +31,10 @@ public sealed class Database
     Name = name;
     Logger = new("Database");
 
-    resourceManager.Logger.Subscribe(Logger);
     WaitQueue = new();
   }
 
-  private readonly Logger Logger;
+  public readonly Logger Logger;
   private readonly SQLiteConnection Connection;
   private readonly WaitQueue<(TaskCompletionSource source, TransactionCallback callback, CancellationToken cancellationToken)> WaitQueue;
 
@@ -364,5 +363,6 @@ public sealed class Database
   {
     await Connection.CloseAsync();
     await (WaitQueueTask ?? Task.CompletedTask);
+    WaitQueue.Dispose();
   }
 }

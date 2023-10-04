@@ -116,7 +116,7 @@ public sealed class VirtualStorageBlobResource(VirtualStorageBlobResource.Resour
         throw new InvalidOperationException();
       }
 
-      return await DbSelect(connection, new() { { KEY_NODE_ID, ("=", node.ID) } }, limit, null, cancellationToken);
+      return await DbSelect(connection, new() { { KEY_NODE_ID, ("=", node.ID) } }, limit, (KEY_INDEX, "asc"), cancellationToken);
     }
 
     public async Task<ulong> FindFreeBlobArea(SQLiteConnection connection, VirtualStorageNodeResource node, ulong length, CancellationToken cancellationToken)
@@ -165,9 +165,9 @@ public sealed class VirtualStorageBlobResource(VirtualStorageBlobResource.Resour
 
         for (ulong offset = 0; offset < length; offset += 4096)
         {
-          byte[] oldBytes = new byte[length];
+          byte[] oldBytes = new byte[4096];
 
-          int oldBytesLength = fileStream.Read(oldBytes, 0, oldBytes.Length);
+          int oldBytesLength = fileStream.Read(oldBytes);
           if (oldBytesLength == 0)
           {
             break;
@@ -240,7 +240,7 @@ public sealed class VirtualStorageBlobResource(VirtualStorageBlobResource.Resour
 
       Buffer newBuffer = Buffer.Empty();
       {
-        ulong bufferOffset = 0;
+        ulong bufferOffset = offset;
         for (int index = 0; index < virtualStorageBlobResources.Count; index++)
         {
           VirtualStorageBlobResource blob = virtualStorageBlobResources[index];
@@ -253,14 +253,14 @@ public sealed class VirtualStorageBlobResource(VirtualStorageBlobResource.Resour
               continue;
             }
 
-            newBuffer.Append(buffer.Slice((long)bufferOffset));
             newBuffer.Append(ReadFromBlobFile(blob.StoragePoolID, blob.BufferStart + bufferOffset, bufferOffset));
-
             WriteToBlobFile(blob.StoragePoolID, blob.BufferStart + bufferOffset, buffer.Slice(0, (long)bufferOffset));
           }
 
           break;
         }
+
+        newBuffer.Prepend(buffer.Slice((long)bufferOffset));
       }
 
       {

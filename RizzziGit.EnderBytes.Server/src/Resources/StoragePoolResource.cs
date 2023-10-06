@@ -69,8 +69,18 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     }
   }
 
-  public new sealed class ResourceManager(MainResourceManager main) : Resource<ResourceManager, ResourceData, StoragePoolResource>.ResourceManager(main, VERSION, NAME)
+  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, StoragePoolResource>.ResourceManager
   {
+    public ResourceManager(MainResourceManager main) : base(main, VERSION, NAME)
+    {
+      main.Users.ResourceDeleteListeners.Add(async (connection, resource, cancellationToken) => {
+        await DbDelete(connection, new()
+        {
+          { KEY_OWNER_USER_ID, ("=", resource.ID) }
+        }, cancellationToken);
+      });
+    }
+
     protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 

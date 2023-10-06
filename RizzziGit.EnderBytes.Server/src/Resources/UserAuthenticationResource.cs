@@ -157,8 +157,6 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       byte[] newHash = GeneratePasswordHash(password, iterations, payload[20..36]);
       Array.Copy(GenerateChallengeFromHash(newHash, payload[4..20], payload[36..52]), 0, payload, 52, 32);
 
-      Console.WriteLine(Convert.ToHexString(payload));
-
       UserAuthenticationResource newAuthentication = await DbInsert(connection, new()
       {
         { KEY_USER_ID, user.ID },
@@ -199,60 +197,6 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
       return false;
     }
-
-    // public async Task<UserAuthenticationResource> CreatePasswordHashIV(SQLiteConnection connection, UserResource user, string? oldPassword, string newPassword, CancellationToken cancellationToken)
-    // {
-    //   if (!ValidPasswordRegex.IsMatch(newPassword))
-    //   {
-    //     throw new ArgumentException("Password is invalid.", nameof(newPassword));
-    //   }
-    //   (UserAuthenticationResource oldAuthentication, byte[] oldHash)? old = null;
-
-    //   List<UserAuthenticationResource> toDelete = await (await DbSelect(connection, new()
-    //   {
-    //     { KEY_USER_ID, ("=", user.ID) },
-    //     { KEY_TYPE, ("=", TYPE_PASSWORD_HASH_IV) }
-    //   }, null, null, cancellationToken)).ToList(cancellationToken);
-
-    //   if (toDelete.Count != 0)
-    //   {
-    //     if (oldPassword == null)
-    //     {
-    //       throw new ArgumentException("Old password is required.", nameof(oldPassword));
-    //     }
-
-    //     UserAuthenticationResource oldAuthentication = toDelete.Last();
-    //     byte[] oldPayload = oldAuthentication.Payload;
-    //     byte[] oldSalt = oldPayload[16..32];
-    //     int oldIterations = BitConverter.ToInt32(oldPayload[32..36]);
-    //     byte[] oldHash = new byte[32];
-    //     Array.Copy(GeneratePasswordHash(oldPassword, oldIterations, oldSalt), 0, oldHash, 0, 20);
-
-    //     old = (oldAuthentication, oldHash);
-    //   }
-
-
-    //   byte[] salt = new byte[16];
-    //   int iterations = Main.Server.Config.DefaultPasswordIterations;
-
-    //   byte[] payload = GeneratePasswordHashIV(newPassword, iterations, salt);
-    //   byte[] hash = new byte[32];
-    //   Array.Copy(GeneratePasswordHash(newPassword, iterations, salt), 0, hash, 0, 20);
-    //   UserAuthenticationResource newAuthentication = await DbInsert(connection, new()
-    //   {
-    //     { KEY_USER_ID, user.ID },
-    //     { KEY_TYPE, TYPE_PASSWORD_HASH_IV },
-    //     { KEY_PAYLOAD, payload }
-    //   }, cancellationToken);
-
-    //   if (old != null)
-    //   {
-    //     (UserAuthenticationResource oldAuthentication, byte[] oldHash) = old.Value;
-    //     await Main.BlobStorageFileKeys.Clone(connection, oldAuthentication, oldHash, newAuthentication, hash, cancellationToken);
-    //   }
-
-    //   return newAuthentication;
-    // }
   }
 
   public ulong UserID => Data.UserID;

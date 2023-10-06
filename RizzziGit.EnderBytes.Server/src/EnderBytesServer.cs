@@ -2,11 +2,10 @@
 
 using Collections;
 using Resources;
-using StoragePools;
 
 public struct EnderBytesConfig()
 {
-  public int DefaultPasswordIterations = 100000;
+  public int DefaultPasswordIterations = 1000;
   public long ObsolescenceTimeSpan = 1000L * 60 * 60 * 24 * 30;
 
   public string DatabaseDir = Path.Join(Environment.CurrentDirectory, ".db");

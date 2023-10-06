@@ -49,18 +49,22 @@ public static class Program
         Console.WriteLine($"[{time}][{levelString}][{scope}] {message}");
       };
 
-      // try
-      // {
-      //   await server.RunTransaction(async (connection, cancellationToken) =>
-      //   {
-      //     UserResource user = await server.Resources.Users.Create(connection, Buffer.Random(4).ToHexString(), cancellationToken);
-      //     StoragePoolResource BlobStoragePool = await server.Resources.StoragePools.CreateVirtualPool(connection, user, Buffer.Random(4).ToHexString(), 0, cancellationToken);
-      //   }, cancellationToken);
-      // }
-      // catch (Exception exception)
-      // {
-      //   Console.Error.WriteLine(exception);
-      // }
+      try
+      {
+        await server.RunTransaction(async (connection, cancellationToken) =>
+        {
+          UserResource user = await server.Resources.Users.Create(connection, Buffer.Random(4).ToHexString(), cancellationToken);
+          StoragePoolResource BlobStoragePool = await server.Resources.StoragePools.CreateVirtualPool(connection, user, Buffer.Random(4).ToHexString(), 0, cancellationToken);
+          await server.Resources.UserAuthentications.CreatePassword(connection, user, null, "TEST@1023a", cancellationToken);
+          await server.Resources.UserAuthentications.CreatePassword(connection, user, "TEST@1023a", "TEST@1023f", cancellationToken);
+
+          await server.Resources.Users.Delete(connection, user, cancellationToken);
+        }, cancellationToken);
+      }
+      catch (Exception exception)
+      {
+        Console.Error.WriteLine(exception);
+      }
     }
     finally
     {

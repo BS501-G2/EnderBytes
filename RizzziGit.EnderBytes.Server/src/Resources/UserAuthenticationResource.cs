@@ -105,7 +105,13 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
     {
       try
       {
-        return ComapreChallengeFromHash(GeneratePasswordHash(password, BitConverter.ToInt32(payload.AsSpan()[32..36]), payload[16..32]), payload[0..16], payload[36..52], payload[52..84]);
+        int iterations = BitConverter.ToInt32(payload[0..4]);
+        byte[] iv = payload[4..20];
+        byte[] salt = payload[20..36];
+        byte[] raw = payload[36..52];
+        byte[] encrypted = payload[52..84];
+
+        return ComapreChallengeFromHash(GeneratePasswordHash(password, iterations, salt), iv, raw, encrypted);
       }
       catch (CryptographicException)
       {
@@ -135,23 +141,23 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
         }
 
         UserAuthenticationResource oldAuthentication = toDelete.Last();
-        if (!ComparePasswordHash(oldAuthentication.Payload, password))
+        if (!ComparePasswordHash(oldAuthentication.Payload, oldPassword))
         {
           throw new ArgumentException("Invalid old password.", nameof(oldPassword));
         }
 
-        old = (oldAuthentication, GeneratePasswordHash(password, BitConverter.ToInt32(oldAuthentication.Payload.AsSpan()[32..36]), oldAuthentication.Payload[16..32]));
+        old = (oldAuthentication, GeneratePasswordHash(password, BitConverter.ToInt32(oldAuthentication.Payload.AsSpan()[0..4]), oldAuthentication.Payload[20..36]));
       }
 
       byte[] payload = new byte[84];
       int iterations = Main.Server.Config.DefaultPasswordIterations;
-      Array.Copy(BitConverter.GetBytes(iterations), 0, payload, 32, 4);
-      Generator.GetBytes(payload, 16, 16);
-      Generator.GetBytes(payload, 36, 16);
-      Generator.GetBytes(payload, 0, 16);
+      Array.Copy(BitConverter.GetBytes(iterations), 0, payload, 0, 4);
+      Generator.GetBytes(payload, 4, 48);
 
-      byte[] newHash = GeneratePasswordHash(password, iterations, payload[16..32]);
-      Array.Copy(GenerateChallengeFromHash(newHash, payload[0..16], payload[36..52]), 0, payload, 52, 32);
+      byte[] newHash = GeneratePasswordHash(password, iterations, payload[20..36]);
+      Array.Copy(GenerateChallengeFromHash(newHash, payload[4..20], payload[36..52]), 0, payload, 52, 32);
+
+      Console.WriteLine(Convert.ToHexString(payload));
 
       UserAuthenticationResource newAuthentication = await DbInsert(connection, new()
       {

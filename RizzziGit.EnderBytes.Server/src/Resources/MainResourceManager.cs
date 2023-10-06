@@ -12,8 +12,10 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
     UserAuthentications = new(this);
     Guilds = new(this);
     StoragePools = new(this);
-    VirtualStorageNodes = new(this);
-    VirtualStorageBlobs = new(this);
+    BlobStorageFiles = new(this);
+    BlobStorageFileVersions = new(this);
+    BlobStorageFileBlobs = new(this);
+    BlobStorageFileKeys = new(this);
 
     Server.Logger.Subscribe(Logger);
   }
@@ -31,8 +33,10 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
   public readonly GuildResource.ResourceManager Guilds;
   public readonly StoragePoolResource.ResourceManager StoragePools;
-  public readonly VirtualStorageNodeResource.ResourceManager VirtualStorageNodes;
-  public readonly VirtualStorageBlobResource.ResourceManager VirtualStorageBlobs;
+  public readonly BlobStorageFileResource.ResourceManager BlobStorageFiles;
+  public readonly BlobStorageFileVersionResource.ResourceManager BlobStorageFileVersions;
+  public readonly BlobStorageFileBlobResource.ResourceManager BlobStorageFileBlobs;
+  public readonly BlobStorageFileKeyResource.ResourceManager BlobStorageFileKeys;
 
   public Database RequireDatabase() => Database ?? throw new InvalidOperationException("Database is not open.");
 

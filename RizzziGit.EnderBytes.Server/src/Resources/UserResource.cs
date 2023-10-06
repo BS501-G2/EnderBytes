@@ -22,19 +22,12 @@ public sealed class UserResource(UserResource.ResourceManager manager, UserResou
 
   public new sealed class ResourceData(
     ulong id,
-    ulong createTime,
-    ulong updateTime,
+    long createTime,
+    long updateTime,
     string username
   ) : Resource<ResourceManager, ResourceData, UserResource>.ResourceData(id, createTime, updateTime)
   {
     public string Username = username;
-
-    public override void CopyFrom(ResourceData data)
-    {
-      base.CopyFrom(data);
-
-      Username = data.Username;
-    }
 
     public override JObject ToJSON()
     {
@@ -54,7 +47,7 @@ public sealed class UserResource(UserResource.ResourceManager manager, UserResou
     private static readonly Regex ValidUsernameRegex = new("^[A-Za-z0-9_\\-\\.]{6,16}$");
 
     protected override UserResource CreateResource(ResourceData data) => new(this, data);
-    protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, ulong createTime, ulong updateTime) => new(
+    protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
       (string)reader[KEY_USERNAME]

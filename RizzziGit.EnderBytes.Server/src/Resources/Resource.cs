@@ -21,7 +21,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
 
   public new abstract class ResourceData : Shared.Resources.Resource<M, D, R>.ResourceData, Shared.Resources.IResourceData
   {
-    protected ResourceData(ulong id, ulong createTime, ulong updateTime) : base(id, createTime, updateTime)
+    protected ResourceData(ulong id, long createTime, long updateTime) : base(id, createTime, updateTime)
     {
     }
   }
@@ -43,6 +43,19 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       public override R GetCurrent() => Manager.AsResource(Manager.CreateData(Reader));
       public override Task<bool> MoveNext(CancellationToken cancellationToken) => Reader.ReadAsync(cancellationToken);
       protected override ResourceEnumerator GetAsyncEnumerator(CancellationToken cancellationToken = default) => new(this, cancellationToken);
+
+      public async Task<List<R>> ToList(CancellationToken cancellationToken)
+      {
+        List<R> list = [];
+
+        while (await MoveNext(cancellationToken))
+        {
+          list.Add(GetCurrent());
+        }
+
+        await DisposeAsync();
+        return list;
+      }
     }
 
     private static Task<int> InitVersioningTable(SQLiteConnection connection, CancellationToken cancellationToken) => connection.ExecuteNonQueryAsync(@$"create table if not exists {RV_TABLE}({RV_COLUMN_NAME} varchar(128) primary key, {RV_COLUMN_VERSION} integer not null);", cancellationToken);
@@ -66,27 +79,26 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
 
       Main.Logger.Subscribe(Logger);
 
-      ResourceDeleteHandlers = [];
-    }
-
-    ~ResourceManager()
-    {
-      Main.Logger.Unsubscribe(Logger);
+      ResourceDeleteListeners = [];
+      ResourceUpdateListeners = [];
+      ResourceCreateListeners = [];
     }
 
     public new readonly MainResourceManager Main;
     public readonly Logger Logger;
 
-    public delegate Task ResourceDeleteHandle(SQLiteConnection connection, R resource, CancellationToken cancellationToken);
-    public readonly List<ResourceDeleteHandle> ResourceDeleteHandlers;
+    public delegate Task ResourceEventListener(SQLiteConnection connection, R resource, CancellationToken cancellationToken);
+    public readonly List<ResourceEventListener> ResourceDeleteListeners;
+    public readonly List<ResourceEventListener> ResourceUpdateListeners;
+    public readonly List<ResourceEventListener> ResourceCreateListeners;
 
     public Database Database => Main.RequireDatabase();
 
-    protected ulong GenerateTimestamp() => (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    protected long GenerateTimestamp() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     protected async Task<R> DbInsert(SQLiteConnection connection, Dictionary<string, object?> data, CancellationToken cancellationToken)
     {
-      ulong timestamp = GenerateTimestamp();
+      long timestamp = GenerateTimestamp();
 
       data.Add(KEY_CREATE_TIME, timestamp);
       data.Add(KEY_UPDATE_TIME, timestamp);
@@ -106,10 +118,15 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
         });
 
         Logger.Log(Logger.LOGLEVEL_VERBOSE, $"#{resource.ID} inserted to the database.");
+
+        foreach (ResourceEventListener handle in ResourceCreateListeners)
+        {
+          await handle(connection, resource, cancellationToken);
+        }
         return resource;
       }
 
-      throw new InvalidOperationException("Failed to get new inserted resource.");
+      throw new InvalidOperationException("Failed to get new inserted resource. Possibly a race condition.");
     }
 
     protected async Task<ResourceStream> DbSelect(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, (int? offset, int length)? limit, (string column, string orderBy)? order, CancellationToken cancellationToken) => new ResourceStream((M)this, await Database.Select(connection, Name, where, limit, order, cancellationToken));
@@ -126,17 +143,32 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
 
     protected async Task<bool> DbUpdate(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, Dictionary<string, object?> newData, CancellationToken cancellationToken)
     {
-      int output = 0;
+      newData.TryAdd(KEY_UPDATE_TIME, GenerateTimestamp());
 
+      int output = 0;
       await using var stream = await DbSelect(connection, where, null, null, cancellationToken);
       await foreach (R resource in stream)
       {
+        D oldData = resource.Data;
+
+        Database.RegisterOnTransactionCompleteHandlers(null, (connection) =>
+        {
+          resource.UpdateData(oldData);
+
+          return Task.CompletedTask;
+        });
+
         if (!await Database.Update(connection, Name, new() { { KEY_ID, ("=", resource.ID) } }, newData, cancellationToken))
         {
           continue;
         }
 
         Logger.Log(Logger.LOGLEVEL_VERBOSE, $"#{resource.ID} updated on the database.");
+        await GetByID(connection, resource.ID, cancellationToken);
+        foreach (ResourceEventListener handle in ResourceUpdateListeners)
+        {
+          await handle(connection, resource, cancellationToken);
+        }
         output++;
       }
 
@@ -197,11 +229,11 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
 
     private D CreateData(SQLiteDataReader reader) => CreateData(reader,
       (ulong)(long)reader[KEY_ID],
-      (ulong)(long)reader[KEY_CREATE_TIME],
-      (ulong)(long)reader[KEY_UPDATE_TIME]
+      (long)reader[KEY_CREATE_TIME],
+      (long)reader[KEY_UPDATE_TIME]
     );
 
-    protected abstract D CreateData(SQLiteDataReader reader, ulong id, ulong createTime, ulong updateTime);
+    protected abstract D CreateData(SQLiteDataReader reader, ulong id, long createTime, long updateTime);
     protected abstract Task OnInit(SQLiteConnection connection, CancellationToken cancellationToken);
     protected abstract Task OnInit(SQLiteConnection connection, int previousVersion, CancellationToken cancellationToken);
 
@@ -212,7 +244,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
         return false;
       }
 
-      foreach (ResourceDeleteHandle handle in ResourceDeleteHandlers)
+      foreach (ResourceEventListener handle in ResourceDeleteListeners)
       {
         await handle(connection, resource, cancellationToken);
       }
@@ -223,6 +255,13 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       {
         return false;
       }
+
+      Database.RegisterOnTransactionCompleteHandlers(null, (connection) =>
+      {
+        PutToMemoryByID(resource);
+        resource.IsDeleted = false;
+        return Task.CompletedTask;
+      });
 
       Logger.Log(Logger.LOGLEVEL_VERBOSE, $"#{resource.ID} deleted from the database.");
       return true;
@@ -235,19 +274,19 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
     IsDeleted = false;
 
     manager.Logger.Subscribe(Logger);
-    Logger.Log(Logger.LOGLEVEL_VERBOSE, "Resource Constructed");
+    Logger.Log(Logger.LOGLEVEL_VERBOSE, "Resource Retrieved");
   }
 
   ~Resource()
   {
-    Logger.Log(Logger.LOGLEVEL_VERBOSE, "Resource Destroyed");
+    Logger.Log(Logger.LOGLEVEL_VERBOSE, "Resource Released");
   }
 
   public readonly Logger Logger;
 
   protected override void UpdateData(D data)
   {
-    Logger.Log(Logger.LOGLEVEL_VERBOSE, "Resource Updated");
+    Logger.Log(Logger.LOGLEVEL_VERBOSE, "Resource Refreshed");
   }
 
   public bool IsDeleted { get; private set; }

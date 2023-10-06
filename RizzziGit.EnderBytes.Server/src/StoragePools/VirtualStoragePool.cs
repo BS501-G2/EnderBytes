@@ -1,9 +1,12 @@
+using System.Data.SQLite;
+
 namespace RizzziGit.EnderBytes.StoragePools;
 
 using Resources;
+using Database;
 using Buffer;
 
-public sealed class PhysicalStoragePool(EnderBytesServer server, StoragePoolResource resource) : StoragePool(server, StoragePoolResource.TYPE_PHYSICAL_POOL, resource)
+public sealed class BlobStoragePool(EnderBytesServer server, uint requireType, StoragePoolResource resource) : StoragePool(server, requireType, resource)
 {
   public override Task ChangeMode(IEnumerable<string> path, int mode, CancellationToken cancellationToken)
   {

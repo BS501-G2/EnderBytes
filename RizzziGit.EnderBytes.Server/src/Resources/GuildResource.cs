@@ -22,8 +22,8 @@ public sealed class GuildResource(GuildResource.ResourceManager manager, GuildRe
 
   public new sealed class ResourceData(
     ulong id,
-    ulong createTime,
-    ulong updateTime,
+    long createTime,
+    long updateTime,
     ulong ownerUserId,
     string name,
     string? description
@@ -32,15 +32,6 @@ public sealed class GuildResource(GuildResource.ResourceManager manager, GuildRe
     public ulong OwnerUserID = ownerUserId;
     public string Name = name;
     public string? Description = description;
-
-    public override void CopyFrom(ResourceData data)
-    {
-      base.CopyFrom(data);
-
-      OwnerUserID = data.OwnerUserID;
-      Name = data.Name;
-      Description = data.Description;
-    }
 
     public override JObject ToJSON()
     {
@@ -61,10 +52,10 @@ public sealed class GuildResource(GuildResource.ResourceManager manager, GuildRe
   {
     public ResourceManager(MainResourceManager main) : base(main, VERSION, NAME)
     {
-      main.Users.ResourceDeleteHandlers.Add(DeleteAllFromUser);
+      main.Users.ResourceDeleteListeners.Add(DeleteAllFromUser);
     }
 
-    protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, ulong createTime, ulong updateTime) => new(
+    protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
       (ulong)(long)reader[KEY_OWNER_USER_ID],

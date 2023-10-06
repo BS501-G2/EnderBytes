@@ -27,41 +27,30 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
   public const string JSON_KEY_OWNER_USER_ID = "ownerUserId";
   public const string JSON_KEY_PAYLOAD = "payload";
 
-  public const uint TYPE_VIRTUAL_POOL = 0;
-  public const uint TYPE_PHYSICAL_POOL = 1;
-  public const uint TYPE_REMOTE_POOL = 2;
+  public const byte TYPE_VIRTUAL_POOL = 0;
+  public const byte TYPE_PHYSICAL_POOL = 1;
+  public const byte TYPE_REMOTE_POOL = 2;
 
-  public const byte FLAG_SESSION_TEMPORAL = 1 << 0;
-  public const byte FLAG_USER_TEMPORAL = 1 << 1;
-  public const byte FLAG_IGNORE_CASE = 1 << 2;
+  public const int FLAG_SESSION_TEMPORAL = 1 << 0;
+  public const int FLAG_USER_TEMPORAL = 1 << 1;
+  public const int FLAG_IGNORE_CASE = 1 << 2;
 
   public new sealed class ResourceData(
     ulong id,
-    ulong createTime,
-    ulong updateTime,
+    long createTime,
+    long updateTime,
     string name,
-    uint type,
-    byte flags,
+    byte type,
+    int flags,
     ulong ownerUserId,
     string payload
   ) : Resource<ResourceManager, ResourceData, StoragePoolResource>.ResourceData(id, createTime, updateTime)
   {
     public string Name = name;
-    public uint Type = type;
-    public byte Flags = flags;
+    public byte Type = type;
+    public int Flags = flags;
     public ulong OwnerUserID = ownerUserId;
     public string Payload = payload;
-
-    public override void CopyFrom(ResourceData data)
-    {
-      base.CopyFrom(data);
-
-      Name = data.Name;
-      Type = data.Type;
-      Flags = data.Flags;
-      OwnerUserID = data.OwnerUserID;
-      Payload = data.Payload;
-    }
 
     public override JObject ToJSON()
     {
@@ -82,12 +71,12 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
 
   public new sealed class ResourceManager(MainResourceManager main) : Resource<ResourceManager, ResourceData, StoragePoolResource>.ResourceManager(main, VERSION, NAME)
   {
-    protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, ulong createTime, ulong updateTime) => new(
+    protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
       (string)reader[KEY_NAME],
-      (uint)(long)reader[KEY_TYPE],
-      (byte)(long)reader[KEY_FLAGS],
+      (byte)(long)reader[KEY_TYPE],
+      (int)(long)reader[KEY_FLAGS],
       (ulong)(long)reader[KEY_OWNER_USER_ID],
       (string)reader[KEY_PAYLOAD]
     );
@@ -142,7 +131,7 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
   }
 
   public string Name => Data.Name;
-  public uint Type => Data.Type;
-  public byte Flags => Data.Flags;
+  public byte Type => Data.Type;
+  public int Flags => Data.Flags;
   public ulong OwnerUserID => Data.OwnerUserID;
 }

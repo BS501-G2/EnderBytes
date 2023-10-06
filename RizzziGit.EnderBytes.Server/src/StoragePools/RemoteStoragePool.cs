@@ -8,17 +8,32 @@ public sealed class RemoteStoragePool : StoragePool
   {
   }
 
+  public override Task ChangeMode(IEnumerable<string> path, int mode, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task ChangeOwnership(IEnumerable<string> path, UserResource userResource, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
   public override Task CloseFileHandle(uint handle, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task CreateDirectory(IEnumerable<string> path, CancellationToken cancellationToken)
+  public override Task CreateDirectory(IEnumerable<string> path, int mode, UserResource owner, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task CreateFile(IEnumerable<string> path, CancellationToken cancellationToken)
+  public override Task CreateFile(IEnumerable<string> path, int mode, UserResource owner, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task CreateSymbolicLink(IEnumerable<string> path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
@@ -38,7 +53,7 @@ public sealed class RemoteStoragePool : StoragePool
     throw new NotImplementedException();
   }
 
-  public override Task<IEnumerable<string>> ReadDirectory(IEnumerable<string> path, CancellationToken cancellationToken)
+  public override Task<IEnumerable<FileInfo>> ReadDirectory(IEnumerable<string> path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
@@ -48,7 +63,17 @@ public sealed class RemoteStoragePool : StoragePool
     throw new NotImplementedException();
   }
 
+  public override Task<string> ReadSymbolicLink(IEnumerable<string> path, string target, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
   public override Task RemoveDirectory(IEnumerable<string> path, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task SeekFileHandle(uint handle, long offset, SeekOrigin seekOrigin, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }

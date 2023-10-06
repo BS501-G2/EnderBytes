@@ -7,6 +7,8 @@ using StoragePools;
 public struct EnderBytesConfig()
 {
   public int DefaultPasswordIterations = 100000;
+  public long ObsolescenceTimeSpan = 1000L * 60 * 60 * 24 * 30;
+
   public string DatabaseDir = Path.Join(Environment.CurrentDirectory, ".db");
 }
 

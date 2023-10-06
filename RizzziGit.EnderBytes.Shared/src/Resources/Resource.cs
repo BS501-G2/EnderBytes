@@ -22,29 +22,13 @@ public abstract class Resource<M, D, R>(M manager, D data) : IResource
 
   public abstract class ResourceData(
     ulong id,
-    ulong createTime,
-    ulong updateTime
+    long createTime,
+    long updateTime
   ) : IResourceData
   {
     public ulong ID = id;
-    public ulong CreateTime = createTime;
-    public ulong UpdateTime = updateTime;
-
-    public virtual void CopyFrom(D data)
-    {
-      if (this == data)
-      {
-        return;
-      }
-
-      if (ID != data.ID)
-      {
-        throw new InvalidOperationException("Inconsistent data ID.");
-      }
-
-      CreateTime = data.CreateTime;
-      UpdateTime = data.UpdateTime;
-    }
+    public long CreateTime = createTime;
+    public long UpdateTime = updateTime;
 
     public virtual JObject ToJSON() => new()
     {
@@ -120,17 +104,31 @@ public abstract class Resource<M, D, R>(M manager, D data) : IResource
       return null;
     }
 
+    protected R? PutToMemoryByID(R resource)
+    {
+      if (Resources.TryGetValue(resource.ID, out R? value))
+      {
+        throw new InvalidOperationException("Resource already exists.");
+      }
+      else
+      {
+        Resources.Add(resource.ID, resource);
+      }
+
+      return null;
+    }
+
     protected abstract R CreateResource(D data);
     public abstract Task Init(CancellationToken cancellationToken);
   }
 
   protected readonly M Manager = manager;
-  protected readonly D Data = data;
+  protected D Data = data;
 
   public ulong ID => Data.ID;
-  public ulong CreateTime => Data.CreateTime;
-  public ulong UpdateTime => Data.UpdateTime;
+  public long CreateTime => Data.CreateTime;
+  public long UpdateTime => Data.UpdateTime;
 
   public JObject ToJSON() => Data.ToJSON();
-  protected virtual void UpdateData(D data) => Data.CopyFrom(data);
+  protected virtual void UpdateData(D data) => Data = data;
 }

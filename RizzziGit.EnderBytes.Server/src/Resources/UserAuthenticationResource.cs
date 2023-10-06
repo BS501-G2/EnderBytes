@@ -2,9 +2,11 @@ using System.Data.SQLite;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
-using RizzziGit.EnderBytes.Database;
 
 namespace RizzziGit.EnderBytes.Resources;
+
+using Buffer;
+using Database;
 
 public sealed class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
@@ -21,14 +23,12 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
   public const string JSON_KEY_USER_ID = "userId";
   public const string JSON_KEY_TYPE = "type";
 
-  public const int TYPE_PASSWORD = 0;
-
-  public const int EXCEPTION_CREATE_RESOURCE_PASSWORD_INVALID = 1 << 0;
+  public const byte TYPE_PASSWORD_HASH_IV = 0;
 
   public new sealed class ResourceData(
     ulong id,
-    ulong createTime,
-    ulong updateTime,
+    long createTime,
+    long updateTime,
     ulong userId,
     byte type,
     byte[] payload
@@ -37,15 +37,6 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
     public ulong UserID = userId;
     public byte Type = type;
     public byte[] Payload = payload;
-
-    public override void CopyFrom(ResourceData data)
-    {
-      base.CopyFrom(data);
-
-      UserID = data.UserID;
-      Type = data.Type;
-      Payload = data.Payload;
-    }
 
     public override JObject ToJSON()
     {
@@ -69,13 +60,13 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
     {
       Generator = RandomNumberGenerator.Create();
 
-      main.Users.ResourceDeleteHandlers.Add(DeleteAllFromUser);
+      main.Users.ResourceDeleteListeners.Add(DeleteAllFromUser);
     }
 
     public readonly RandomNumberGenerator Generator;
 
     protected override UserAuthenticationResource CreateResource(ResourceData data) => new(this, data);
-    protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, ulong createTime, ulong updateTime) => new(
+    protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
       (ulong)(long)reader[KEY_USER_ID],
@@ -106,67 +97,156 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       { KEY_USER_ID, ("=", user.ID) }
     }, cancellationToken);
 
-    private byte[] GeneratePasswordHash(string password) => GeneratePasswordHash(password, Main.Server.Config.DefaultPasswordIterations);
-    private byte[] GeneratePasswordHash(string password, int iterations) => GeneratePasswordHash(password, iterations, null);
-    private byte[] GeneratePasswordHash(string password, int iterations, Span<byte> customSalt) => GeneratePasswordHash(password, iterations, customSalt.ToArray());
-    private byte[] GeneratePasswordHash(string password, int iterations, byte[]? customSalt)
+    private static byte[] GeneratePasswordHash(string password, int iterations, byte[] salt) => new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256).GetBytes(32);
+    private static byte[] GenerateChallengeFromHash(byte[] hash, byte[] iv, byte[] raw) => Aes.Create().CreateEncryptor(hash, iv).TransformFinalBlock(raw, 0, raw.Length);
+    private static bool ComapreChallengeFromHash(byte[] hash, byte[] iv, byte[] raw, byte[] encrypted) => Aes.Create().CreateDecryptor(hash, iv).TransformFinalBlock(encrypted, 0, encrypted.Length).SequenceEqual(raw);
+
+    public static bool ComparePasswordHash(in byte[] payload, string password)
     {
-      byte[] output = new byte[40];
-
-      Span<byte> salt = new(output, 0, 16);
-      Span<byte> hash = new(output, 16, 20);
-
-      if (customSalt != null)
+      try
       {
-        customSalt.CopyTo(salt);
+        return ComapreChallengeFromHash(GeneratePasswordHash(password, BitConverter.ToInt32(payload.AsSpan()[32..36]), payload[16..32]), payload[0..16], payload[36..52], payload[52..84]);
       }
-      else
+      catch (CryptographicException)
       {
-        Generator.GetBytes(salt);
+        return false;
       }
-
-      Rfc2898DeriveBytes rfc2898DeriveBytes = new(password, salt.ToArray(), iterations, HashAlgorithmName.SHA256);
-      rfc2898DeriveBytes.GetBytes(20).CopyTo(hash);
-      Array.Copy(BitConverter.GetBytes(iterations), 0, output, 36, 4);
-
-      return output;
     }
 
-    public async Task<UserAuthenticationResource> CreatePassword(SQLiteConnection connection, UserResource user, string password, CancellationToken cancellationToken)
+    public async Task<UserAuthenticationResource> CreatePassword(SQLiteConnection connection, UserResource user, string? oldPassword, string password, CancellationToken cancellationToken)
     {
       if (!ValidPasswordRegex.IsMatch(password))
       {
         throw new ArgumentException("Password is invalid.", nameof(password));
       }
 
-      return await DbInsert(connection, new()
+      (UserAuthenticationResource oldAuthentication, byte[] oldHash)? old = null;
+      List<UserAuthenticationResource> toDelete = await (await DbSelect(connection, new()
+      {
+        { KEY_USER_ID, ("=", user.ID) },
+        { KEY_TYPE, ("=", TYPE_PASSWORD_HASH_IV) }
+      }, null, null, cancellationToken)).ToList(cancellationToken);
+
+      if (toDelete.Count != 0)
+      {
+        if (oldPassword == null)
+        {
+          throw new ArgumentException("Old existing password is required.", nameof(oldPassword));
+        }
+
+        UserAuthenticationResource oldAuthentication = toDelete.Last();
+        if (!ComparePasswordHash(oldAuthentication.Payload, password))
+        {
+          throw new ArgumentException("Invalid old password.", nameof(oldPassword));
+        }
+
+        old = (oldAuthentication, GeneratePasswordHash(password, BitConverter.ToInt32(oldAuthentication.Payload.AsSpan()[32..36]), oldAuthentication.Payload[16..32]));
+      }
+
+      byte[] payload = new byte[84];
+      int iterations = Main.Server.Config.DefaultPasswordIterations;
+      Array.Copy(BitConverter.GetBytes(iterations), 0, payload, 32, 4);
+      Generator.GetBytes(payload, 16, 16);
+      Generator.GetBytes(payload, 36, 16);
+      Generator.GetBytes(payload, 0, 16);
+
+      byte[] newHash = GeneratePasswordHash(password, iterations, payload[16..32]);
+      Array.Copy(GenerateChallengeFromHash(newHash, payload[0..16], payload[36..52]), 0, payload, 52, 32);
+
+      UserAuthenticationResource newAuthentication = await DbInsert(connection, new()
       {
         { KEY_USER_ID, user.ID },
-        { KEY_TYPE, TYPE_PASSWORD },
-        { KEY_PAYLOAD, GeneratePasswordHash(password) }
+        { KEY_TYPE, TYPE_PASSWORD_HASH_IV },
+        { KEY_PAYLOAD, payload }
       }, cancellationToken);
+
+      if (old != null)
+      {
+        var (oldAuthentication, oldHash) = old.Value;
+
+        await Main.BlobStorageFileKeys.Clone(connection, oldAuthentication, oldHash, newAuthentication, newHash, cancellationToken);
+        foreach (UserAuthenticationResource userAuthentication in toDelete)
+        {
+          await Delete(connection, userAuthentication, cancellationToken);
+        }
+      }
+
+      return newAuthentication;
     }
 
-    public async Task<bool> ComparePasswordHash(SQLiteConnection connection, UserResource user, string rawPassword, CancellationToken cancellationToken)
+    public async Task<bool> ComparePassword(SQLiteConnection connection, UserResource user, string password, CancellationToken cancellationToken)
     {
       await using var stream = await Stream(connection, user, null, cancellationToken);
       await foreach (UserAuthenticationResource authentication in stream)
       {
-        if (
-          (authentication.Type != TYPE_PASSWORD) ||
-          (!ComparePasswordHash(rawPassword, authentication.Payload))
-        )
+        switch (authentication.Type)
         {
-          continue;
-        }
+          case TYPE_PASSWORD_HASH_IV:
+            if (!ComparePasswordHash(authentication.Payload, password))
+            {
+              continue;
+            }
 
-        return true;
+            return true;
+        }
       }
 
       return false;
     }
 
-    public bool ComparePasswordHash(string rawPassword, byte[] encryptedPassword) => GeneratePasswordHash(rawPassword, BitConverter.ToInt32(encryptedPassword, 36), new Span<byte>(encryptedPassword, 0, 16)).SequenceEqual(encryptedPassword);
+    // public async Task<UserAuthenticationResource> CreatePasswordHashIV(SQLiteConnection connection, UserResource user, string? oldPassword, string newPassword, CancellationToken cancellationToken)
+    // {
+    //   if (!ValidPasswordRegex.IsMatch(newPassword))
+    //   {
+    //     throw new ArgumentException("Password is invalid.", nameof(newPassword));
+    //   }
+    //   (UserAuthenticationResource oldAuthentication, byte[] oldHash)? old = null;
+
+    //   List<UserAuthenticationResource> toDelete = await (await DbSelect(connection, new()
+    //   {
+    //     { KEY_USER_ID, ("=", user.ID) },
+    //     { KEY_TYPE, ("=", TYPE_PASSWORD_HASH_IV) }
+    //   }, null, null, cancellationToken)).ToList(cancellationToken);
+
+    //   if (toDelete.Count != 0)
+    //   {
+    //     if (oldPassword == null)
+    //     {
+    //       throw new ArgumentException("Old password is required.", nameof(oldPassword));
+    //     }
+
+    //     UserAuthenticationResource oldAuthentication = toDelete.Last();
+    //     byte[] oldPayload = oldAuthentication.Payload;
+    //     byte[] oldSalt = oldPayload[16..32];
+    //     int oldIterations = BitConverter.ToInt32(oldPayload[32..36]);
+    //     byte[] oldHash = new byte[32];
+    //     Array.Copy(GeneratePasswordHash(oldPassword, oldIterations, oldSalt), 0, oldHash, 0, 20);
+
+    //     old = (oldAuthentication, oldHash);
+    //   }
+
+
+    //   byte[] salt = new byte[16];
+    //   int iterations = Main.Server.Config.DefaultPasswordIterations;
+
+    //   byte[] payload = GeneratePasswordHashIV(newPassword, iterations, salt);
+    //   byte[] hash = new byte[32];
+    //   Array.Copy(GeneratePasswordHash(newPassword, iterations, salt), 0, hash, 0, 20);
+    //   UserAuthenticationResource newAuthentication = await DbInsert(connection, new()
+    //   {
+    //     { KEY_USER_ID, user.ID },
+    //     { KEY_TYPE, TYPE_PASSWORD_HASH_IV },
+    //     { KEY_PAYLOAD, payload }
+    //   }, cancellationToken);
+
+    //   if (old != null)
+    //   {
+    //     (UserAuthenticationResource oldAuthentication, byte[] oldHash) = old.Value;
+    //     await Main.BlobStorageFileKeys.Clone(connection, oldAuthentication, oldHash, newAuthentication, hash, cancellationToken);
+    //   }
+
+    //   return newAuthentication;
+    // }
   }
 
   public ulong UserID => Data.UserID;

@@ -41,10 +41,10 @@ public static class Program
           _ => "Unknown"
         };
 
-        if (level >= Logger.LOGLEVEL_VERBOSE)
-        {
-          return;
-        }
+        // if (level >= Logger.LOGLEVEL_VERBOSE)
+        // {
+        //   return;
+        // }
 
         Console.WriteLine($"[{time}][{levelString}][{scope}] {message}");
       };
@@ -57,14 +57,16 @@ public static class Program
           {
             UserResource user = await server.Resources.Users.Create(connection, Buffer.Random(4).ToHexString(), cancellationToken);
             StoragePoolResource BlobStoragePool = await server.Resources.StoragePools.CreateVirtualPool(connection, user, Buffer.Random(4).ToHexString(), 0, cancellationToken);
-            UserAuthenticationResource userAuthentication = await server.Resources.UserAuthentications.CreatePassword(connection, user, null, "TEST@1023a", cancellationToken);
-            for (int index = 0; index < 1000; index++)
+
+            var (userAuthentication, hash) = await server.Resources.UserAuthentications.CreatePassword(connection, user, null, "TEST@1023a", cancellationToken);
+            await server.Resources.BlobStorageFileKeys.Create(connection, userAuthentication, hash, cancellationToken);
+
+            for (int index = 0; index < 10; index++)
             {
-              await server.Resources.UserAuthentications.CreatePassword(connection, user, "TEST@1023a", "TEST@1023a", cancellationToken);
+              (userAuthentication, hash) = await server.Resources.UserAuthentications.CreatePassword(connection, user, "TEST@1023a", "TEST@1023a", cancellationToken);
             }
 
             await server.Resources.Users.Delete(connection, user, cancellationToken);
-            Console.WriteLine(userAuthentication.ID);
           }, cancellationToken);
         }
       }

@@ -97,21 +97,27 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       { KEY_USER_ID, ("=", user.ID) }
     }, cancellationToken);
 
-    private static byte[] GeneratePasswordHash(string password, int iterations, byte[] salt) => new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256).GetBytes(32);
-    private static byte[] GenerateChallengeFromHash(byte[] hash, byte[] iv, byte[] raw) => Aes.Create().CreateEncryptor(hash, iv).TransformFinalBlock(raw, 0, raw.Length);
-    private static bool ComapreChallengeFromHash(byte[] hash, byte[] iv, byte[] raw, byte[] encrypted) => Aes.Create().CreateDecryptor(hash, iv).TransformFinalBlock(encrypted, 0, encrypted.Length).SequenceEqual(raw);
+    public static byte[] GeneratePasswordHash(string password, int iterations, byte[] salt) => new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256).GetBytes(32);
+    public static byte[] GenerateChallengeFromHash(byte[] hash, byte[] iv, byte[] raw) => Aes.Create().CreateEncryptor(hash, iv).TransformFinalBlock(raw, 0, raw.Length);
+    public static bool ComapreChallengeFromHash(byte[] hash, byte[] iv, byte[] raw, byte[] encrypted) => Aes.Create().CreateDecryptor(hash, iv).TransformFinalBlock(encrypted, 0, encrypted.Length).SequenceEqual(raw);
+
+    public static byte[] GeneratePasswordHash(in byte[] payload, string password)
+    {
+      int iterations = BitConverter.ToInt32(payload[0..4]);
+      byte[] salt = payload[20..36];
+
+      return GeneratePasswordHash(password, iterations, salt);
+    }
 
     public static bool ComparePasswordHash(in byte[] payload, string password)
     {
       try
       {
-        int iterations = BitConverter.ToInt32(payload[0..4]);
         byte[] iv = payload[4..20];
-        byte[] salt = payload[20..36];
         byte[] raw = payload[36..52];
         byte[] encrypted = payload[52..84];
 
-        return ComapreChallengeFromHash(GeneratePasswordHash(password, iterations, salt), iv, raw, encrypted);
+        return ComapreChallengeFromHash(GeneratePasswordHash(payload, password), iv, raw, encrypted);
       }
       catch (CryptographicException)
       {
@@ -119,7 +125,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       }
     }
 
-    public async Task<UserAuthenticationResource> CreatePassword(SQLiteConnection connection, UserResource user, string? oldPassword, string password, CancellationToken cancellationToken)
+    public async Task<(UserAuthenticationResource newAuthentication, byte[] newPasswordHash)> CreatePassword(SQLiteConnection connection, UserResource user, string? oldPassword, string password, CancellationToken cancellationToken)
     {
       if (!ValidPasswordRegex.IsMatch(password))
       {
@@ -175,27 +181,26 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
         }
       }
 
-      return newAuthentication;
+      return (newAuthentication, newHash);
     }
 
-    public async Task<bool> ComparePassword(SQLiteConnection connection, UserResource user, string password, CancellationToken cancellationToken)
+    public async Task<(UserAuthenticationResource userAuthentication, byte[] passwordhash)?> GetByPassword(SQLiteConnection connection, UserResource user, string password, CancellationToken cancellationToken)
     {
       await using var stream = await Stream(connection, user, null, cancellationToken);
       await foreach (UserAuthenticationResource authentication in stream)
       {
-        switch (authentication.Type)
+        if (authentication.Type == TYPE_PASSWORD_HASH_IV)
         {
-          case TYPE_PASSWORD_HASH_IV:
-            if (!ComparePasswordHash(authentication.Payload, password))
-            {
-              continue;
-            }
+          if (!ComparePasswordHash(authentication.Payload, password))
+          {
+            continue;
+          }
 
-            return true;
+          return (authentication, GeneratePasswordHash(authentication.Payload, password));
         }
       }
 
-      return false;
+      return null;
     }
   }
 

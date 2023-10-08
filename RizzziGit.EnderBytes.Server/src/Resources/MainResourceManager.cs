@@ -36,7 +36,7 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
   public readonly BlobStorageFileResource.ResourceManager BlobStorageFiles;
   public readonly BlobStorageFileVersionResource.ResourceManager BlobStorageFileVersions;
   public readonly BlobStorageFileBlobResource.ResourceManager BlobStorageFileBlobs;
-  public readonly BlobStorageFileKeyResource.ResourceManager BlobStorageFileKeys;
+  public readonly BlobStorageKeyResource.ResourceManager BlobStorageFileKeys;
 
   public Database RequireDatabase() => Database ?? throw new InvalidOperationException("Database is not open.");
 

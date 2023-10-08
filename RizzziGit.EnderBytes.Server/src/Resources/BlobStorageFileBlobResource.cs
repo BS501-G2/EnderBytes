@@ -1,4 +1,5 @@
 using System.Data.SQLite;
+using System.Security.Cryptography;
 
 namespace RizzziGit.EnderBytes.Resources;
 
@@ -40,6 +41,8 @@ public sealed class BlobStorageFileBlobResource(BlobStorageFileBlobResource.Reso
 
   public new sealed class ResourceManager(MainResourceManager main) : Resource<ResourceManager, ResourceData, BlobStorageFileBlobResource>.ResourceManager(main, VERSION, NAME)
   {
+    private readonly RandomNumberGenerator Generator = RandomNumberGenerator.Create();
+
     protected override ResourceData CreateData(SQLiteDataReader reader, ulong id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
       (ulong)(long)reader[KEY_FILE_VERSION_ID],
@@ -67,6 +70,13 @@ public sealed class BlobStorageFileBlobResource(BlobStorageFileBlobResource.Reso
         await connection.ExecuteNonQueryAsync($"create index {INDEX_UNIQUENESS} on {NAME}({KEY_FILE_VERSION_ID},{KEY_BLOB_BUFFER_INDEX})", cancellationToken);
       }
     }
+
+    // public async Task<BlobStorageFileBlobResource> Create(SQLiteConnection connection, BlobStorageKeyResource blobStorageKey, byte[] passwordHash, byte[] buffer)
+    // {
+    //   byte[] iv = new byte[16];
+    //   byte[] key = Main.BlobStorageFileKeys.GetKey(blobStorageKey, passwordHash);
+    //   Generator.GetBytes(iv);
+    // }
   }
 
   public ulong FileVersionID => Data.FileVersionID;

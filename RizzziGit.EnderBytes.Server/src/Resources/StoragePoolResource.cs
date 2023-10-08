@@ -17,7 +17,6 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
   private const string KEY_PAYLOAD = "Payload";
 
   private const string KEY_PAYLOAD_KEY_LOCATION = "location";
-  private const string KEY_PAYLOAD_KEY_DIFFERENTIATOR = "differentiator";
   private const string KEY_PAYLOAD_KEY_USERNAME = "username";
   private const string KEY_PAYLOAD_KEY_PASSWORD = "password";
 

@@ -5,7 +5,7 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Database;
 
-public sealed class BlobStorageFileKeyResource(BlobStorageFileKeyResource.ResourceManager manager, BlobStorageFileKeyResource.ResourceData data) : Resource<BlobStorageFileKeyResource.ResourceManager, BlobStorageFileKeyResource.ResourceData, BlobStorageFileKeyResource>(manager, data)
+public sealed class BlobStorageKeyResource(BlobStorageKeyResource.ResourceManager manager, BlobStorageKeyResource.ResourceData data) : Resource<BlobStorageKeyResource.ResourceManager, BlobStorageKeyResource.ResourceData, BlobStorageKeyResource>(manager, data)
 {
   public const string NAME = "VSFKey";
   public const int VERSION = 1;
@@ -27,7 +27,7 @@ public sealed class BlobStorageFileKeyResource(BlobStorageFileKeyResource.Resour
     ulong passwordId,
     byte[] iv,
     byte[] payload
-  ) : Resource<ResourceManager, ResourceData, BlobStorageFileKeyResource>.ResourceData(id, createTime, updateTime)
+  ) : Resource<ResourceManager, ResourceData, BlobStorageKeyResource>.ResourceData(id, createTime, updateTime)
   {
     public long ObsolescenceTime = obsolescenceTime;
     public uint Index = index;
@@ -36,7 +36,7 @@ public sealed class BlobStorageFileKeyResource(BlobStorageFileKeyResource.Resour
     public byte[] Payload = payload;
   }
 
-  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, BlobStorageFileKeyResource>.ResourceManager
+  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, BlobStorageKeyResource>.ResourceManager
   {
     public ResourceManager(MainResourceManager main) : base(main, VERSION, NAME)
     {
@@ -63,13 +63,14 @@ public sealed class BlobStorageFileKeyResource(BlobStorageFileKeyResource.Resour
       (byte[])reader[KEY_PAYLOAD]
     );
 
-    protected override BlobStorageFileKeyResource CreateResource(ResourceData data) => new(this, data);
+    protected override BlobStorageKeyResource CreateResource(ResourceData data) => new(this, data);
 
     protected override Task OnInit(SQLiteConnection connection, CancellationToken cancellationToken) => OnInit(connection, 0, cancellationToken);
     protected override async Task OnInit(SQLiteConnection connection, int previousVersion, CancellationToken cancellationToken)
     {
       if (previousVersion < 1)
       {
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_OBSOLESCENCE_TIME} integer not null;", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_INDEX} integer not null;", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_PASSWORD_ID} integer not null;", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_IV} blob not null;", cancellationToken);
@@ -84,7 +85,7 @@ public sealed class BlobStorageFileKeyResource(BlobStorageFileKeyResource.Resour
       { KEY_PASSWORD_ID, ("=", userAuthentication.ID) }
     }, null, null, cancellationToken);
 
-    public async Task<BlobStorageFileKeyResource> Create(SQLiteConnection connection, UserAuthenticationResource userAuthentication, byte[] passwordHash, CancellationToken cancellationToken)
+    public async Task<BlobStorageKeyResource> Create(SQLiteConnection connection, UserAuthenticationResource userAuthentication, byte[] passwordHash, CancellationToken cancellationToken)
     {
       if (userAuthentication.Type != UserAuthenticationResource.TYPE_PASSWORD_HASH_IV)
       {
@@ -115,7 +116,7 @@ public sealed class BlobStorageFileKeyResource(BlobStorageFileKeyResource.Resour
       }, cancellationToken);
     }
 
-    public async Task<List<BlobStorageFileKeyResource>> Clone(
+    public async Task<List<BlobStorageKeyResource>> Clone(
       SQLiteConnection connection,
       UserAuthenticationResource oldUserAuthentication,
       byte[] oldPasswordHash,
@@ -128,8 +129,8 @@ public sealed class BlobStorageFileKeyResource(BlobStorageFileKeyResource.Resour
       Generator.GetBytes(iv);
 
       await using var stream = await DbSelect(connection, new() { { KEY_PASSWORD_ID, ("=", oldUserAuthentication.ID) } }, null, null, cancellationToken);
-      List<BlobStorageFileKeyResource> list = [];
-      await foreach (BlobStorageFileKeyResource resource in stream)
+      List<BlobStorageKeyResource> list = [];
+      await foreach (BlobStorageKeyResource resource in stream)
       {
         byte[] key = Aes.Create().CreateDecryptor(oldPasswordHash, resource.IV).TransformFinalBlock(resource.Payload, 0, resource.Payload.Length);
         byte[] payload = Aes.Create().CreateEncryptor(newPasswordHash, iv).TransformFinalBlock(key, 0, key.Length);
@@ -146,6 +147,8 @@ public sealed class BlobStorageFileKeyResource(BlobStorageFileKeyResource.Resour
 
       return list;
     }
+
+    public byte[] GetKey(BlobStorageKeyResource blobStorageKey, byte[] passwordHash) => Aes.Create().CreateDecryptor(passwordHash, blobStorageKey.IV).TransformFinalBlock(blobStorageKey.Payload, 0, blobStorageKey.Payload.Length);
   }
 
   public long ObsolescenceTime => Data.ObsolescenceTime;

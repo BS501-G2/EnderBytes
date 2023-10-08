@@ -51,24 +51,21 @@ public static class Program
 
       try
       {
-        while (true)
+        await server.RunTransaction(async (connection, cancellationToken) =>
         {
-          await server.RunTransaction(async (connection, cancellationToken) =>
+          UserResource user = await server.Resources.Users.Create(connection, Buffer.Random(4).ToHexString(), cancellationToken);
+          StoragePoolResource BlobStoragePool = await server.Resources.StoragePools.CreateVirtualPool(connection, user, Buffer.Random(4).ToHexString(), 0, cancellationToken);
+
+          var (userAuthentication, hash) = await server.Resources.UserAuthentications.CreatePassword(connection, user, null, "TEST@1023a", cancellationToken);
+          await server.Resources.BlobStorageFileKeys.Create(connection, userAuthentication, hash, cancellationToken);
+
+          for (int index = 0; index < 10; index++)
           {
-            UserResource user = await server.Resources.Users.Create(connection, Buffer.Random(4).ToHexString(), cancellationToken);
-            StoragePoolResource BlobStoragePool = await server.Resources.StoragePools.CreateVirtualPool(connection, user, Buffer.Random(4).ToHexString(), 0, cancellationToken);
+            (userAuthentication, hash) = await server.Resources.UserAuthentications.CreatePassword(connection, user, "TEST@1023a", "TEST@1023a", cancellationToken);
+          }
 
-            var (userAuthentication, hash) = await server.Resources.UserAuthentications.CreatePassword(connection, user, null, "TEST@1023a", cancellationToken);
-            await server.Resources.BlobStorageFileKeys.Create(connection, userAuthentication, hash, cancellationToken);
-
-            for (int index = 0; index < 10; index++)
-            {
-              (userAuthentication, hash) = await server.Resources.UserAuthentications.CreatePassword(connection, user, "TEST@1023a", "TEST@1023a", cancellationToken);
-            }
-
-            await server.Resources.Users.Delete(connection, user, cancellationToken);
-          }, cancellationToken);
-        }
+          // await server.Resources.Users.Delete(connection, user, cancellationToken);
+        }, cancellationToken);
       }
       catch (Exception exception)
       {

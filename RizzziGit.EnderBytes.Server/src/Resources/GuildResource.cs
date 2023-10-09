@@ -62,7 +62,6 @@ public sealed class GuildResource(GuildResource.ResourceManager manager, GuildRe
       (string)reader[KEY_NAME],
       reader[KEY_DESCRIPTION] is not DBNull ? (string)reader[KEY_DESCRIPTION] : null
     );
-
     protected override GuildResource CreateResource(ResourceData data) => new(this, data);
 
     protected override Task OnInit(SQLiteConnection connection, CancellationToken cancellationToken) => OnInit(connection, 0, cancellationToken);
@@ -80,12 +79,12 @@ public sealed class GuildResource(GuildResource.ResourceManager manager, GuildRe
 
     public Task<ResourceStream> Stream(SQLiteConnection connection, UserResource owner, (int? offset, int length)? limit, CancellationToken cancellationToken) => DbSelect(connection, new()
     {
-      { KEY_OWNER_USER_ID, ("=", owner.ID) }
+      { KEY_OWNER_USER_ID, ("=", owner.ID, null) }
     }, limit, null, cancellationToken);
 
     public Task<bool> DeleteAllFromUser(SQLiteConnection connection, UserResource owner, CancellationToken cancellationToken) => DbDelete(connection, new()
     {
-      { KEY_OWNER_USER_ID, ("=", owner.ID) }
+      { KEY_OWNER_USER_ID, ("=", owner.ID, null) }
     }, cancellationToken);
 
     public Task<GuildResource> Create(SQLiteConnection connection, UserResource owner, string name, string? description, CancellationToken cancellationToken) => DbInsert(connection, new()

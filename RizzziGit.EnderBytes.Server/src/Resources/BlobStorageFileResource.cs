@@ -175,6 +175,25 @@ public sealed class BlobStorageFileResource(BlobStorageFileResource.ResourceMana
       }
     }
 
+    public Task<ResourceStream> Stream(SQLiteConnection connection, BlobStorageFileResource? folder, CancellationToken cancellationToken) => DbSelect(connection, new()
+    {
+      { KEY_FOLDER_ID, ("=", folder?.ID, null) }
+    }, null, null, cancellationToken);
+
+    public Task<BlobStorageFileResource?> GetByName(
+      SQLiteConnection connection,
+      StoragePoolResource storagePool,
+      string name,
+      BlobStorageFileResource? parentFolder,
+      CancellationToken cancellationToken
+    ) => DbSelectOne(connection, new()
+    {
+      { KEY_NAME, ("=", name, (storagePool.Flags & StoragePoolResource.FLAG_IGNORE_CASE) == StoragePoolResource.FLAG_IGNORE_CASE ? "nocase" : null) },
+      { KEY_FOLDER_ID, ("=", parentFolder?.ID, null) },
+      { KEY_STORAGE_POOL_ID, ("=", storagePool.ID, null) },
+      { KEY_TRASH_TIME, ("=", storagePool.ID, null) }
+    }, null, null, cancellationToken);
+
     public async Task<BlobStorageFileResource> Create(
       SQLiteConnection connection,
       StoragePoolResource storagePool,
@@ -211,22 +230,58 @@ public sealed class BlobStorageFileResource(BlobStorageFileResource.ResourceMana
       long? trashTime,
       UserResource owner,
       BlobStorageFileResource? folder,
-      byte type,
       string name,
       int mode,
       CancellationToken cancellationToken
     )
     {
-      ValidateFileType(type);
+      ValidateFolder(folder);
 
-      await DbUpdate(connection, new() { { KEY_ID, ("=", file.ID) } }, new()
+      await DbUpdate(connection, new() { { KEY_ID, ("=", file.ID, null) } }, new()
       {
         { KEY_TRASH_TIME, trashTime },
         { KEY_OWNER_USER_ID, owner.ID },
         { KEY_FOLDER_ID, folder?.ID },
-        { KEY_TYPE, type },
         { KEY_NAME, name },
         { KEY_MODE, SanitizeMode(mode) }
+      }, cancellationToken);
+    }
+
+    public async Task<bool> Trash(
+      SQLiteConnection connection,
+      BlobStorageFileResource file,
+      CancellationToken cancellationToken
+    )
+    {
+      if (file.TrashTime != null)
+      {
+        return false;
+      }
+
+      return await DbUpdate(connection, new() { { KEY_ID, ("=", file.ID, null) } }, new()
+      {
+        { KEY_TRASH_TIME, GenerateTimestamp() },
+        { KEY_FOLDER_ID, null }
+      }, cancellationToken);
+    }
+
+    public async Task<bool> Restore(
+      SQLiteConnection connection,
+      BlobStorageFileResource file,
+      BlobStorageFileResource? destinationFolder,
+      CancellationToken cancellationToken
+    )
+    {
+      if (file.TrashTime == null)
+      {
+        return false;
+      }
+
+      ValidateFolder(destinationFolder);
+      return await DbUpdate(connection, new() { { KEY_ID, ("=", file.ID, null) } }, new()
+      {
+        { KEY_TRASH_TIME, null },
+        { KEY_FOLDER_ID, destinationFolder?.ID }
       }, cancellationToken);
     }
   }

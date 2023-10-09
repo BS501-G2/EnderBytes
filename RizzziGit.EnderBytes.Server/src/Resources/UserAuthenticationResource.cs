@@ -90,11 +90,11 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
     public Task<ResourceStream> Stream(SQLiteConnection connection, UserResource user, (int? offset, int length)? limit, CancellationToken cancellationToken) => DbSelect(connection, new()
     {
-      { KEY_USER_ID, ("=", user.ID) }
+      { KEY_USER_ID, ("=", user.ID, null) }
     }, limit, null, cancellationToken);
 
     public Task<bool> DeleteAllFromUser(SQLiteConnection connection, UserResource user, CancellationToken cancellationToken) => DbDelete(connection, new() {
-      { KEY_USER_ID, ("=", user.ID) }
+      { KEY_USER_ID, ("=", user.ID, null) }
     }, cancellationToken);
 
     public static byte[] GeneratePasswordHash(string password, int iterations, byte[] salt) => new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256).GetBytes(32);
@@ -135,8 +135,8 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       (UserAuthenticationResource oldAuthentication, byte[] oldHash)? old = null;
       List<UserAuthenticationResource> toDelete = await (await DbSelect(connection, new()
       {
-        { KEY_USER_ID, ("=", user.ID) },
-        { KEY_TYPE, ("=", TYPE_PASSWORD_HASH_IV) }
+        { KEY_USER_ID, ("=", user.ID, null) },
+        { KEY_TYPE, ("=", TYPE_PASSWORD_HASH_IV, null) }
       }, null, null, cancellationToken)).ToList(cancellationToken);
 
       if (toDelete.Count != 0)
@@ -174,7 +174,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       {
         var (oldAuthentication, oldHash) = old.Value;
 
-        await Main.BlobStorageFileKeys.Clone(connection, oldAuthentication, oldHash, newAuthentication, newHash, cancellationToken);
+        await Main.BlobStorageKeys.Clone(connection, oldAuthentication, oldHash, newAuthentication, newHash, cancellationToken);
         foreach (UserAuthenticationResource userAuthentication in toDelete)
         {
           await Delete(connection, userAuthentication, cancellationToken);

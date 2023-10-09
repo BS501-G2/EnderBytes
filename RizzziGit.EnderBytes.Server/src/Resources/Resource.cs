@@ -6,6 +6,9 @@ namespace RizzziGit.EnderBytes.Resources;
 using Database;
 using RizzziGit.Buffer;
 
+using WhereClause = Dictionary<string, (string condition, object? value, string? collate)>;
+using ValueClause = Dictionary<string, object?>;
+
 public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Shared.Resources.IResource
   where M : Resource<M, D, R>.ResourceManager
   where D : Resource<M, D, R>.ResourceData
@@ -96,7 +99,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
 
     protected long GenerateTimestamp() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-    protected async Task<R> DbInsert(SQLiteConnection connection, Dictionary<string, object?> data, CancellationToken cancellationToken)
+    protected async Task<R> DbInsert(SQLiteConnection connection, ValueClause data, CancellationToken cancellationToken)
     {
       long timestamp = GenerateTimestamp();
 
@@ -105,7 +108,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
 
       ulong newId = await Database.Insert(connection, Name, data, cancellationToken);
 
-      await using var a = await DbSelect(connection, new() { { KEY_ID, ("=", newId) } }, null, null, cancellationToken);
+      await using var a = await DbSelect(connection, new() { { KEY_ID, ("=", newId, null) } }, null, null, cancellationToken);
       await foreach (R resource in a)
       {
         Database.RegisterOnTransactionCompleteHandlers(null, (_) =>
@@ -129,8 +132,8 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       throw new InvalidOperationException("Failed to get new inserted resource. Possibly a race condition.");
     }
 
-    protected async Task<ResourceStream> DbSelect(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, (int? offset, int length)? limit, (string column, string orderBy)? order, CancellationToken cancellationToken) => new ResourceStream((M)this, await Database.Select(connection, Name, where, limit, order, cancellationToken));
-    protected async Task<R?> DbSelectOne(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, int? offset, (string column, string orderBy)? order, CancellationToken cancellationToken)
+    protected async Task<ResourceStream> DbSelect(SQLiteConnection connection, WhereClause where, (int? offset, int length)? limit, (string column, string orderBy)? order, CancellationToken cancellationToken) => new ResourceStream((M)this, await Database.Select(connection, Name, where, limit, order, cancellationToken));
+    protected async Task<R?> DbSelectOne(SQLiteConnection connection, WhereClause where, int? offset, (string column, string orderBy)? order, CancellationToken cancellationToken)
     {
       await using var stream = await DbSelect(connection, where, (offset, 1), order, cancellationToken);
       await foreach (R resource in stream)
@@ -141,7 +144,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       return null;
     }
 
-    protected async Task<bool> DbUpdate(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> where, Dictionary<string, object?> newData, CancellationToken cancellationToken)
+    protected async Task<bool> DbUpdate(SQLiteConnection connection, WhereClause where, ValueClause newData, CancellationToken cancellationToken)
     {
       newData.TryAdd(KEY_UPDATE_TIME, GenerateTimestamp());
 
@@ -158,7 +161,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
           return Task.CompletedTask;
         });
 
-        if (!await Database.Update(connection, Name, new() { { KEY_ID, ("=", resource.ID) } }, newData, cancellationToken))
+        if (!await Database.Update(connection, Name, new() { { KEY_ID, ("=", resource.ID, null) } }, newData, cancellationToken))
         {
           continue;
         }
@@ -175,7 +178,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
       return output != 0;
     }
 
-    protected virtual async Task<bool> DbDelete(SQLiteConnection connection, Dictionary<string, (string condition, object? value)> data, CancellationToken cancellationToken)
+    protected virtual async Task<bool> DbDelete(SQLiteConnection connection, WhereClause data, CancellationToken cancellationToken)
     {
       int output = 0;
 
@@ -194,38 +197,30 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
     }
 
     public Task<R?> GetByID(SQLiteConnection connection, string idHex, CancellationToken cancellationToken) => GetByID(connection, Buffer.From(idHex, StringEncoding.Hex).ToUInt64(), cancellationToken);
-    public Task<R?> GetByID(SQLiteConnection connection, ulong id, CancellationToken cancellationToken) => DbSelectOne(connection, new() { { KEY_ID, ("=", id) } }, null, null, cancellationToken);
+    public Task<R?> GetByID(SQLiteConnection connection, ulong id, CancellationToken cancellationToken) => DbSelectOne(connection, new() { { KEY_ID, ("=", id, null) } }, null, null, cancellationToken);
 
-    public async override Task Init(CancellationToken cancellationToken)
+    public override Task Init(CancellationToken cancellationToken) => Database.RunTransaction(async (connection, cancellationToken) =>
     {
-      int? version = null;
+      await InitVersioningTable(connection, cancellationToken);
 
-      await Database.RunTransaction(async (connection, cancellationToken) =>
+      int? version = await GetResourceVersion(connection, Name, cancellationToken);
+      if (version == null)
       {
-        await InitVersioningTable(connection, cancellationToken);
-        version = await GetResourceVersion(connection, Name, cancellationToken);
-      }, cancellationToken);
+        await connection.ExecuteNonQueryAsync(@$"create table {Name}(
+          {KEY_ID} integer primary key autoincrement,
+          {KEY_CREATE_TIME} integer not null,
+          {KEY_UPDATE_TIME} integer not null
+        );", cancellationToken);
 
-      await Database.RunTransaction(async (connection, cancellationToken) =>
+        await OnInit(connection, cancellationToken);
+      }
+      else
       {
-        if (version == null)
-        {
-          await connection.ExecuteNonQueryAsync(@$"create table {Name}(
-            {KEY_ID} integer primary key autoincrement,
-            {KEY_CREATE_TIME} integer not null,
-            {KEY_UPDATE_TIME} integer not null
-          );", cancellationToken);
+        await OnInit(connection, (int)version, cancellationToken);
+      }
 
-          await OnInit(connection, cancellationToken);
-        }
-        else
-        {
-          await OnInit(connection, (int)version, cancellationToken);
-        }
-      }, cancellationToken);
-
-      await Database.RunTransaction((connection, cancellationToken) => SetResourceVersion(connection, Name, Version, cancellationToken), cancellationToken);
-    }
+      await SetResourceVersion(connection, Name, Version, cancellationToken);
+    }, cancellationToken);
 
     private D CreateData(SQLiteDataReader reader) => CreateData(reader,
       (ulong)(long)reader[KEY_ID],
@@ -251,7 +246,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>, Sh
 
       RemoveFromMemory(resource.ID);
       resource.IsDeleted = true;
-      if (!await Database.Delete(connection, Name, new() { { KEY_ID, ("=", resource.ID) } }, cancellationToken))
+      if (!await Database.Delete(connection, Name, new() { { KEY_ID, ("=", resource.ID, null) } }, cancellationToken))
       {
         return false;
       }

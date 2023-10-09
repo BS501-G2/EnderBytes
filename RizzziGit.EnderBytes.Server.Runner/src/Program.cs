@@ -41,10 +41,10 @@ public static class Program
           _ => "Unknown"
         };
 
-        // if (level >= Logger.LOGLEVEL_VERBOSE)
-        // {
-        //   return;
-        // }
+        if (level >= Logger.LOGLEVEL_VERBOSE)
+        {
+          return;
+        }
 
         Console.WriteLine($"[{time}][{levelString}][{scope}] {message}");
       };
@@ -57,11 +57,16 @@ public static class Program
           StoragePoolResource BlobStoragePool = await server.Resources.StoragePools.CreateVirtualPool(connection, user, Buffer.Random(4).ToHexString(), 0, cancellationToken);
 
           var (userAuthentication, hash) = await server.Resources.UserAuthentications.CreatePassword(connection, user, null, "TEST@1023a", cancellationToken);
-          await server.Resources.BlobStorageFileKeys.Create(connection, userAuthentication, hash, cancellationToken);
+          await server.Resources.BlobStorageKeys.Create(connection, userAuthentication, hash, cancellationToken);
 
-          for (int index = 0; index < 10; index++)
+          for (int index = 0; index < 1024; index++)
           {
             (userAuthentication, hash) = await server.Resources.UserAuthentications.CreatePassword(connection, user, "TEST@1023a", "TEST@1023a", cancellationToken);
+
+            await foreach (var a in await server.Resources.BlobStorageKeys.Stream(connection, userAuthentication, cancellationToken))
+            {
+              Console.WriteLine(a.Index);
+            }
           }
 
           // await server.Resources.Users.Delete(connection, user, cancellationToken);

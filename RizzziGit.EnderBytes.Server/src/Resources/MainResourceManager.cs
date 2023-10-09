@@ -15,7 +15,7 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
     BlobStorageFiles = new(this);
     BlobStorageFileVersions = new(this);
     BlobStorageFileBlobs = new(this);
-    BlobStorageFileKeys = new(this);
+    BlobStorageKeys = new(this);
 
     Server.Logger.Subscribe(Logger);
   }
@@ -36,7 +36,7 @@ public sealed class MainResourceManager : Shared.Resources.MainResourceManager
   public readonly BlobStorageFileResource.ResourceManager BlobStorageFiles;
   public readonly BlobStorageFileVersionResource.ResourceManager BlobStorageFileVersions;
   public readonly BlobStorageFileBlobResource.ResourceManager BlobStorageFileBlobs;
-  public readonly BlobStorageKeyResource.ResourceManager BlobStorageFileKeys;
+  public readonly BlobStorageKeyResource.ResourceManager BlobStorageKeys;
 
   public Database RequireDatabase() => Database ?? throw new InvalidOperationException("Database is not open.");
 

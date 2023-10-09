@@ -75,7 +75,7 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
       main.Users.ResourceDeleteListeners.Add(async (connection, resource, cancellationToken) => {
         await DbDelete(connection, new()
         {
-          { KEY_OWNER_USER_ID, ("=", resource.ID) }
+          { KEY_OWNER_USER_ID, ("=", resource.ID, null) }
         }, cancellationToken);
       });
     }

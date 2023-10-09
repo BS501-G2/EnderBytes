@@ -23,16 +23,16 @@ public sealed class BlobStorageFileBlobResource(BlobStorageFileBlobResource.Reso
     ulong id,
     long createTime,
     long updateTime,
-    ulong fileVersionId,
-    long blobBufferIndex,
+    ulong? fileVersionId,
+    long? blobBufferIndex,
     long encryptionKeyIndex,
     byte[] encryptionIv,
     long blobBegin,
     long blobEnd
   ) : Resource<ResourceManager, ResourceData, BlobStorageFileBlobResource>.ResourceData(id, createTime, updateTime)
   {
-    public ulong FileVersionID = fileVersionId;
-    public long BlobBufferIndex = blobBufferIndex;
+    public ulong? FileVersionID = fileVersionId;
+    public long? BlobBufferIndex = blobBufferIndex;
     public long EncryptionKeyIndex = encryptionKeyIndex;
     public byte[] EncryptionIV = encryptionIv;
     public long BlobBegin = blobBegin;
@@ -60,27 +60,55 @@ public sealed class BlobStorageFileBlobResource(BlobStorageFileBlobResource.Reso
     {
       if (previousVersion < 1)
       {
-        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_FILE_VERSION_ID} integer not null;", cancellationToken);
-        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_BLOB_BUFFER_INDEX} integer not null;", cancellationToken);
-        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_ENCRYPTION_KEY_INDEX} blob not null;", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_FILE_VERSION_ID} integer;", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_BLOB_BUFFER_INDEX} integer;", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_ENCRYPTION_KEY_INDEX} integer not null;", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_ENCRYPTION_IV} blob not null;", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_BLOB_BEGIN} integer not null;", cancellationToken);
         await connection.ExecuteNonQueryAsync($"alter table {NAME} add column {KEY_BLOB_END} integer not null;", cancellationToken);
 
-        await connection.ExecuteNonQueryAsync($"create index {INDEX_UNIQUENESS} on {NAME}({KEY_FILE_VERSION_ID},{KEY_BLOB_BUFFER_INDEX})", cancellationToken);
+        await connection.ExecuteNonQueryAsync($"create unique index {INDEX_UNIQUENESS} on {NAME}({KEY_FILE_VERSION_ID},{KEY_BLOB_BUFFER_INDEX})", cancellationToken);
       }
     }
 
-    // public async Task<BlobStorageFileBlobResource> Create(SQLiteConnection connection, BlobStorageKeyResource blobStorageKey, byte[] passwordHash, byte[] buffer)
-    // {
-    //   byte[] iv = new byte[16];
-    //   byte[] key = Main.BlobStorageFileKeys.GetKey(blobStorageKey, passwordHash);
-    //   Generator.GetBytes(iv);
-    // }
+    public Task<ResourceStream> StreamByIndex(
+      SQLiteConnection connection,
+      (BlobStorageFileVersionResource fileVersion, long index)? search,
+      (int? offset, int count)? limit,
+      (string column, string orderBy)? order,
+      CancellationToken cancellationToken
+    ) => DbSelect(connection, new()
+    {
+      { KEY_FILE_VERSION_ID, ("=", search?.fileVersion.ID, null) },
+      { KEY_BLOB_BUFFER_INDEX, ("=", search?.index, null) }
+    }, limit, order, cancellationToken);
+
+    public Task<BlobStorageFileBlobResource?> GetByIndex(
+      SQLiteConnection connection,
+      (BlobStorageFileVersionResource fileVersion, long index)? search,
+      int? offset,
+      (string column, string orderBy)? order,
+      CancellationToken cancellationToken
+    ) => DbSelectOne(
+      connection, new() {
+      { KEY_FILE_VERSION_ID, ("=", search?.fileVersion.ID, null) },
+      { KEY_BLOB_BUFFER_INDEX, ("=", search?.index, null) }
+      }, offset, order, cancellationToken
+    );
+
+    public Task<BlobStorageFileBlobResource> Create(SQLiteConnection connection, BlobStorageFileVersionResource fileVersion, BlobStorageKeyResource storageKey, long index, long bufferBegin, long bufferEnd, byte[] iv, CancellationToken cancellationToken) => DbInsert(connection, new()
+    {
+      { KEY_FILE_VERSION_ID, fileVersion.ID },
+      { KEY_BLOB_BUFFER_INDEX, index },
+      { KEY_ENCRYPTION_KEY_INDEX, storageKey.Index },
+      { KEY_ENCRYPTION_IV, iv },
+      { KEY_BLOB_BEGIN, bufferBegin },
+      { KEY_BLOB_BEGIN, bufferEnd }
+    }, cancellationToken);
   }
 
-  public ulong FileVersionID => Data.FileVersionID;
-  public long BlobBufferIndex => Data.BlobBufferIndex;
+  public ulong? FileVersionID => Data.FileVersionID;
+  public long? BlobBufferIndex => Data.BlobBufferIndex;
   public long EncryptionKeyIndex => Data.EncryptionKeyIndex;
   public byte[] EncryptionIV => Data.EncryptionIV;
   public long BlobBegin => Data.BlobBegin;

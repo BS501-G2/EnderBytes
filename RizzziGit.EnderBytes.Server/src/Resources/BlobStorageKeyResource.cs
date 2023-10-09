@@ -46,7 +46,7 @@ public sealed class BlobStorageKeyResource(BlobStorageKeyResource.ResourceManage
       {
         await DbDelete(connection, new()
         {
-          { KEY_PASSWORD_ID, ("=", resource.ID) }
+          { KEY_PASSWORD_ID, ("=", resource.ID, null) }
         }, cancellationToken);
       });
     }
@@ -82,7 +82,7 @@ public sealed class BlobStorageKeyResource(BlobStorageKeyResource.ResourceManage
 
     public Task<ResourceStream> Stream(SQLiteConnection connection, UserAuthenticationResource userAuthentication, CancellationToken cancellationToken) => DbSelect(connection, new()
     {
-      { KEY_PASSWORD_ID, ("=", userAuthentication.ID) }
+      { KEY_PASSWORD_ID, ("=", userAuthentication.ID, null) }
     }, null, null, cancellationToken);
 
     public async Task<BlobStorageKeyResource> Create(SQLiteConnection connection, UserAuthenticationResource userAuthentication, byte[] passwordHash, CancellationToken cancellationToken)
@@ -105,7 +105,7 @@ public sealed class BlobStorageKeyResource(BlobStorageKeyResource.ResourceManage
       {
         index = (uint)Random.Shared.Next();
       }
-      while (await DbSelectOne(connection, new() { { KEY_INDEX, ("=", index) } }, null, null, cancellationToken) != null);
+      while (await DbSelectOne(connection, new() { { KEY_INDEX, ("=", index, null) } }, null, null, cancellationToken) != null);
       return await DbInsert(connection, new()
       {
         { KEY_OBSOLESCENCE_TIME, GenerateTimestamp() + Main.Server.Config.ObsolescenceTimeSpan },
@@ -128,7 +128,7 @@ public sealed class BlobStorageKeyResource(BlobStorageKeyResource.ResourceManage
       byte[] iv = new byte[16];
       Generator.GetBytes(iv);
 
-      await using var stream = await DbSelect(connection, new() { { KEY_PASSWORD_ID, ("=", oldUserAuthentication.ID) } }, null, null, cancellationToken);
+      await using var stream = await DbSelect(connection, new() { { KEY_PASSWORD_ID, ("=", oldUserAuthentication.ID, null) } }, null, null, cancellationToken);
       List<BlobStorageKeyResource> list = [];
       await foreach (BlobStorageKeyResource resource in stream)
       {

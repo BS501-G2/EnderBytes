@@ -4,7 +4,9 @@ namespace RizzziGit.EnderBytes.Database;
 
 using System.Text;
 using Collections;
-using Resources;
+
+using WhereClause = Dictionary<string, (string condition, object? value, string? collate)>;
+using ValueClause = Dictionary<string, object?>;
 
 public sealed class Database
 {
@@ -197,7 +199,7 @@ public sealed class Database
     return await source.Task;
   }
 
-  public async Task<ulong> Insert(SQLiteConnection connection, string table, Dictionary<string, object?> data, CancellationToken cancellationToken)
+  public async Task<ulong> Insert(SQLiteConnection connection, string table, ValueClause data, CancellationToken cancellationToken)
   {
     string commandString;
     {
@@ -232,7 +234,7 @@ public sealed class Database
     return (ulong)connection.LastInsertRowId;
   }
 
-  public async Task<bool> Delete(SQLiteConnection connection, string table, Dictionary<string, (string condition, object? value)> where, CancellationToken cancellationToken)
+  public async Task<bool> Delete(SQLiteConnection connection, string table, WhereClause where, CancellationToken cancellationToken)
   {
     List<object?> parameters = [];
 
@@ -253,7 +255,7 @@ public sealed class Database
             commandStringBuilder.Append(" and ");
           }
 
-          KeyValuePair<string, (string condition, object? value)> whereEntry = where.ElementAt(index);
+          var whereEntry = where.ElementAt(index);
           commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
           parameters.Add(whereEntry.Value.value);
         }
@@ -266,7 +268,14 @@ public sealed class Database
     return (await connection.ExecuteNonQueryAsync(commandString, cancellationToken, [.. parameters])) != 0;
   }
 
-  public async Task<SQLiteDataReader> Select(SQLiteConnection connection, string table, Dictionary<string, (string condition, object? value)> where, (int? offset, int length)? limit, (string column, string orderBy)? order, CancellationToken cancellationToken)
+  public async Task<SQLiteDataReader> Select(
+    SQLiteConnection connection,
+    string table,
+    WhereClause where,
+    (int? offset, int length)? limit,
+    (string column, string orderBy)? order,
+    CancellationToken cancellationToken
+  )
   {
     List<object?> parameters = [];
 
@@ -287,8 +296,11 @@ public sealed class Database
             commandStringBuilder.Append(" and ");
           }
 
-          KeyValuePair<string, (string condition, object? value)> whereEntry = where.ElementAt(index);
+          var whereEntry = where.ElementAt(index);
           commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
+          if (whereEntry.Value.collate != null) {
+            commandStringBuilder.AppendLine($" collate {whereEntry.Value.collate}");
+          }
           parameters.Add(whereEntry.Value.value);
         }
       }
@@ -317,7 +329,7 @@ public sealed class Database
     return await connection.ExecuteReaderAsync($"{commandString};", cancellationToken, [.. parameters]);
   }
 
-  public async Task<bool> Update(SQLiteConnection connection, string table, Dictionary<string, (string condition, object? value)> where, Dictionary<string, object?> data, CancellationToken cancellationToken)
+  public async Task<bool> Update(SQLiteConnection connection, string table, WhereClause where, ValueClause data, CancellationToken cancellationToken)
   {
     if (data.Count == 0)
     {
@@ -359,7 +371,7 @@ public sealed class Database
             commandStringBuilder.Append(" and ");
           }
 
-          KeyValuePair<string, (string condition, object? value)> whereEntry = where.ElementAt(index);
+          var whereEntry = where.ElementAt(index);
           commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
           parameters.Add(whereEntry.Value.value);
         }

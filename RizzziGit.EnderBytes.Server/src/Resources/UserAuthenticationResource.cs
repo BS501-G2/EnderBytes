@@ -174,7 +174,6 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       {
         var (oldAuthentication, oldHash) = old.Value;
 
-        await Main.BlobStorageKeys.Clone(connection, oldAuthentication, oldHash, newAuthentication, newHash, cancellationToken);
         foreach (UserAuthenticationResource userAuthentication in toDelete)
         {
           await Delete(connection, userAuthentication, cancellationToken);

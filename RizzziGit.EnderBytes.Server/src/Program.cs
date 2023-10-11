@@ -1,7 +1,7 @@
 ﻿namespace RizzziGit.EnderBytes;
 
 using Buffer;
-using RizzziGit.EnderBytes.Resources;
+using Resources;
 
 public static class Program
 {
@@ -51,25 +51,11 @@ public static class Program
 
       try
       {
-        await server.RunTransaction(async (connection, cancellationToken) =>
+        await server.Resources.RequireDatabase().RunTransaction(async (connection, cancellationToken) =>
         {
           UserResource user = await server.Resources.Users.Create(connection, Buffer.Random(4).ToHexString(), cancellationToken);
-          StoragePoolResource BlobStoragePool = await server.Resources.StoragePools.CreateVirtualPool(connection, user, Buffer.Random(4).ToHexString(), 0, cancellationToken);
 
           var (userAuthentication, hash) = await server.Resources.UserAuthentications.CreatePassword(connection, user, null, "TEST@1023a", cancellationToken);
-          await server.Resources.BlobStorageKeys.Create(connection, userAuthentication, hash, cancellationToken);
-
-          for (int index = 0; index < 1024; index++)
-          {
-            (userAuthentication, hash) = await server.Resources.UserAuthentications.CreatePassword(connection, user, "TEST@1023a", "TEST@1023a", cancellationToken);
-
-            await foreach (var a in await server.Resources.BlobStorageKeys.Stream(connection, userAuthentication, cancellationToken))
-            {
-              Console.WriteLine(a.Index);
-            }
-          }
-
-          // await server.Resources.Users.Delete(connection, user, cancellationToken);
         }, cancellationToken);
       }
       catch (Exception exception)

@@ -1,59 +1,9 @@
 namespace RizzziGit.EnderBytes.Shared.Resources;
 
-public abstract class MainResourceManager()
+public abstract class MainResourceManager
 {
-  public abstract class ResourceManager
+  protected MainResourceManager()
   {
-    private static ulong GenerateAndRegisterID(IResourceManager manager, MainResourceManager main)
-    {
-      ulong id;
 
-      do
-      {
-        id = (ulong)Random.Shared.NextInt64();
-      }
-      while (!main.ResourceManagers.TryAdd(id, new(manager)));
-
-      return id;
-    }
-
-    protected ResourceManager(MainResourceManager main)
-    {
-      Main = main;
-
-      if (this is IResourceManager manager)
-      {
-        ID = GenerateAndRegisterID(manager, main);
-      }
-      else
-      {
-        throw new InvalidOperationException($"Must implement {nameof(IResourceManager)} interface.");
-      }
-    }
-
-    ~ResourceManager() => Main.ResourceManagers.Remove(ID);
-
-    public readonly MainResourceManager Main;
-
-    private readonly ulong ID;
-  }
-
-  private readonly Dictionary<ulong, WeakReference<IResourceManager>> ResourceManagers = [];
-
-  private async Task InitResourceManagers(CancellationToken cancellationToken)
-  {
-    foreach (WeakReference<IResourceManager> manager in ResourceManagers.Values)
-    {
-      if (manager.TryGetTarget(out IResourceManager? target))
-      {
-        await target.Init(cancellationToken);
-        // initTasks.Add();
-      }
-    }
-  }
-
-  public async virtual Task Init(CancellationToken cancellationToken)
-  {
-    await InitResourceManagers(cancellationToken);
   }
 }

@@ -1,393 +1,260 @@
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 
 namespace RizzziGit.EnderBytes.Database;
 
-using System.Text;
+using System.Data;
+using System.Runtime.CompilerServices;
 using Collections;
+using Resources;
 
-using WhereClause = Dictionary<string, (string condition, object? value, string? collate)>;
-using ValueClause = Dictionary<string, object?>;
-
-public sealed class Database
+public sealed class DatabaseTransaction(Database database, SqliteConnection connection)
 {
-  public delegate Task TransactionCompleteHandler(SQLiteConnection connection);
+  public delegate Task TransactionFailureHandler(DatabaseTransaction transaction, Exception exception);
+  public delegate Task TransactionSuccessHandler(DatabaseTransaction transaction);
 
-  public static async Task<Database> Open(string dir, string name, CancellationToken cancellationToken)
+  public readonly Database Database = database;
+  public readonly SqliteConnection Connection = connection;
+  public Logger Logger => Database.Logger;
+
+  private readonly List<TransactionFailureHandler> OnFailure = [];
+  private readonly List<TransactionSuccessHandler> OnSuccess = [];
+
+  public async Task Run(Database.AsyncTransactionHandler handler, CancellationToken cancellationToken)
   {
-    if (!Directory.Exists(dir))
-    {
-      Directory.CreateDirectory(dir);
-    }
-
-    Database database = new(dir, name);
-    await database.Connection.OpenAsync(cancellationToken);
-
-    return database;
-  }
-
-  private Database(string dir, string name)
-  {
-    Connection = new()
-    {
-      ConnectionString = new SQLiteConnectionStringBuilder
-      {
-        DataSource = Path.Join(dir, $"{name}.sqlite3"),
-        JournalMode = SQLiteJournalModeEnum.Memory
-      }.ConnectionString
-    };
-
-    Name = name;
-    Logger = new("Database");
-
-    WaitQueue = new();
-  }
-
-  public readonly Logger Logger;
-  private readonly SQLiteConnection Connection;
-  private readonly WaitQueue<(TaskCompletionSource source, TransactionCallback callback, CancellationToken cancellationToken)> WaitQueue;
-
-  public delegate Task TransactionCallback(SQLiteConnection connection, CancellationToken cancellationToken);
-  public delegate Task<T> TransactionCallback<T>(SQLiteConnection connection, CancellationToken cancellationToken);
-
-  private Task? WaitQueueTask;
-  private SQLiteTransaction? Transaction;
-  private readonly WeakKeyDictionary<SQLiteTransaction, List<TransactionCompleteHandler>> TransactionFailureHandlers = new();
-  private readonly WeakKeyDictionary<SQLiteTransaction, List<TransactionCompleteHandler>> TransactionSuccessHandlers = new();
-
-  public readonly string Name;
-
-  public void RegisterOnTransactionCompleteHandlers(TransactionCompleteHandler? onSuccessHandler, TransactionCompleteHandler? onFailureHandler)
-  {
-    lock (this)
-    {
-      if (Transaction == null)
-      {
-        return;
-      }
-
-      if (TransactionSuccessHandlers.TryGetValue(Transaction, out List<TransactionCompleteHandler>? onSuccessHandlers) && onSuccessHandler != null)
-      {
-        onSuccessHandlers.Add(onSuccessHandler);
-      }
-
-      if (TransactionFailureHandlers.TryGetValue(Transaction, out List<TransactionCompleteHandler>? onFailureHandlers) && onFailureHandler != null)
-      {
-        onFailureHandlers.Add(onFailureHandler);
-      }
-    }
-  }
-
-  private async Task RunTransactionWaitQueue(CancellationToken waitQueueCancellationToken)
-  {
-    while (true)
-    {
-      var (source, callback, cancellationToken) = await WaitQueue.Dequeue(waitQueueCancellationToken);
-      try
-      {
-        List<TransactionCompleteHandler> transactionFailureHandlers = [];
-        List<TransactionCompleteHandler> transactionSuccessHandlers = [];
-
-        try
-        {
-          Logger.Log(Logger.LOGLEVEL_VERBOSE, "Begin transaction.");
-          await using SQLiteTransaction transaction = (SQLiteTransaction)await Connection.BeginTransactionAsync(cancellationToken);
-
-          lock (this)
-          {
-            Transaction = transaction;
-            TransactionFailureHandlers.Add(transaction, transactionFailureHandlers);
-            TransactionSuccessHandlers.Add(transaction, transactionSuccessHandlers);
-          }
-
-          try
-          {
-            await callback(Connection, cancellationToken);
-          }
-          catch
-          {
-            Logger.Log(Logger.LOGLEVEL_WARN, "Rollback failed transaction.");
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-          }
-
-          Logger.Log(Logger.LOGLEVEL_VERBOSE, "Commit successful transaction.");
-          await transaction.CommitAsync(cancellationToken);
-
-          transactionSuccessHandlers.Reverse();
-          foreach (TransactionCompleteHandler handler in transactionSuccessHandlers)
-          {
-            await handler(Connection);
-          }
-          source.SetResult();
-        }
-        catch (Exception exception)
-        {
-          transactionFailureHandlers.Reverse();
-          foreach (TransactionCompleteHandler handler in transactionFailureHandlers)
-          {
-            await handler(Connection);
-          }
-          source.SetException(exception);
-        }
-      }
-      finally
-      {
-        lock (this)
-        {
-          Transaction = null;
-        }
-      }
-    }
-  }
-
-  public async Task RunTransactionQueue(CancellationToken waitQueueCancellationToken)
-  {
-    if (WaitQueueTask != null)
-    {
-      return;
-    }
-
-    TaskCompletionSource source = new();
-    WaitQueueTask = source.Task;
-
-    new Thread(() =>
-    {
-      try
-      {
-        RunTransactionWaitQueue(waitQueueCancellationToken).Wait();
-      }
-      catch (AggregateException exception)
-      {
-        source.SetException(exception.GetBaseException());
-      }
-      catch (Exception exception)
-      {
-        source.SetException(exception);
-      }
-      finally
-      {
-        source.SetResult();
-      }
-    }).Start();
+    using SqliteTransaction transaction = Connection.BeginTransaction(IsolationLevel.Serializable, false);
 
     try
     {
-      await source.Task;
+      await handler(this, cancellationToken);
+
+      cancellationToken.ThrowIfCancellationRequested();
+      transaction.Commit();
+      foreach (TransactionSuccessHandler onSuccess in OnSuccess.Reverse<TransactionSuccessHandler>())
+      {
+        await onSuccess(this);
+      }
+    }
+    catch (Exception exception)
+    {
+      transaction.Rollback();
+      foreach (TransactionFailureHandler onFailure in OnFailure.Reverse<TransactionFailureHandler>())
+      {
+        await onFailure(this, exception);
+      }
+      throw;
+    }
+  }
+
+  private static void CommandText(SqliteCommand command, string sql, params object?[] sqlParams)
+  {
+    string[] paramStrings = new string[sqlParams.Length];
+    for (int paramIndex = 0; paramIndex < paramStrings.Length; paramIndex++)
+    {
+      string paramName = paramStrings[paramIndex] = $"${paramIndex}";
+      object? paramValue = sqlParams[paramIndex];
+
+      int existing = command.Parameters.IndexOf(paramName);
+      if (existing > -1)
+      {
+        command.Parameters.RemoveAt(existing);
+      }
+
+      command.Parameters.Add(new(paramName, paramValue));
+    }
+
+    command.CommandText = string.Format(sql, paramStrings);
+  }
+
+  public string ParamList(int count) => ParamList(new Range(0, count));
+  public string ParamList(Range range)
+  {
+    DefaultInterpolatedStringHandler builder = new();
+    for (int iter = range.Start.Value; iter < range.End.Value; iter++)
+    {
+      if (iter != range.Start.Value)
+      {
+        builder.AppendLiteral($",");
+      }
+      builder.AppendLiteral($"{{{iter}}}");
+    }
+    return builder.ToStringAndClear();
+  }
+
+  public int ExecuteNonQuery(string sql, params object?[] sqlParams)
+  {
+    using SqliteCommand command = Connection.CreateCommand();
+    CommandText(command, sql, sqlParams);
+    Logger.Log(LogLevel.Verbose, $"Non-Query: {string.Format(sql, sqlParams)}");
+    return command.ExecuteNonQuery();
+  }
+
+  public SqliteDataReader ExecuteReader(string sql, params object?[] sqlParams) => ExecuteReader(sql, CommandBehavior.Default, sqlParams);
+  public SqliteDataReader ExecuteReader(string sql, CommandBehavior behavior, params object?[] sqlParams)
+  {
+    using SqliteCommand command = Connection!.CreateCommand();
+    CommandText(command, sql, sqlParams);
+    Logger.Log(LogLevel.Verbose, $"Query: {string.Format(sql, sqlParams)}");
+    return command.ExecuteReader(behavior);
+  }
+
+  public object? ExecuteScalar(string sql, params object?[] sqlParams)
+  {
+    using SqliteCommand command = Connection!.CreateCommand();
+    CommandText(command, sql, sqlParams);
+    Logger.Log(LogLevel.Verbose, $"Scalar: {string.Format(sql, sqlParams)}");
+    return command.ExecuteScalar();
+  }
+}
+
+public sealed class Database
+{
+  public delegate Task AsyncTransactionHandler(DatabaseTransaction transaction, CancellationToken cancellationToken);
+  public delegate Task<T> AsyncTransactionHandler<T>(DatabaseTransaction transaction, CancellationToken cancellationToken);
+  public delegate void TransactionHandler(DatabaseTransaction transaction);
+  public delegate T TransactionHandler<T>(DatabaseTransaction transaction);
+
+  public Database(Server server, string path, string name)
+  {
+    Logger = new($"DB: {name}");
+    Server = server;
+    Path = path;
+    Name = name;
+
+    Server.Logger.Subscribe(Logger);
+  }
+
+  public readonly Server Server;
+  public readonly string Path;
+  public readonly string Name;
+  public readonly Logger Logger;
+
+  private SqliteConnection? Connection;
+  private readonly WaitQueue<TaskCompletionSource<(TaskCompletionSource source, CancellationToken cancellationToken)>> WaitQueue = new();
+
+  public void ValidateTransaction(SqliteTransaction transaction)
+  {
+    if (transaction.Connection != Connection)
+    {
+      throw new ArgumentException("Invalid transaction.", nameof(transaction));
+    }
+  }
+
+  public async Task RunDatabase(TaskCompletionSource onReady, CancellationToken cancellationToken)
+  {
+    try
+    {
+      lock (this)
+      {
+        if (Connection != null)
+        {
+          throw new InvalidOperationException("Database is already open.");
+        }
+
+        if (!Directory.Exists(Path))
+        {
+          Directory.CreateDirectory(Path);
+        }
+
+        Connection = new()
+        {
+          ConnectionString = new SqliteConnectionStringBuilder()
+          {
+            DataSource = System.IO.Path.Join(Path, $"{Name}.sqlite3")
+          }.ConnectionString
+        };
+
+        Connection.Open();
+      }
+    }
+    catch (Exception exception)
+    {
+      onReady.SetException(exception);
+    }
+
+    try
+    {
+      onReady.SetResult();
+
+      while (true)
+      {
+        var source = await WaitQueue.Dequeue(cancellationToken);
+        TaskCompletionSource innerSource = new();
+        source.SetResult((innerSource, cancellationToken));
+        await innerSource.Task;
+      }
     }
     finally
     {
-      WaitQueueTask = null;
+      lock (this)
+      {
+        Connection!.Dispose();
+        Connection = null;
+      }
     }
   }
 
-  public async Task RunTransaction(TransactionCallback callback, CancellationToken cancellationToken)
+  public async Task RunTransaction(AsyncTransactionHandler handler, CancellationToken cancellationToken)
   {
-    TaskCompletionSource source = new();
+    TaskCompletionSource<(TaskCompletionSource source, CancellationToken cancellationToken)> source = new();
+    await WaitQueue.Enqueue(source, cancellationToken);
+    var innerSource = await source.Task;
 
-    Task waitTask = WaitQueue.Enqueue((source, callback, cancellationToken), cancellationToken);
-    await waitTask;
-    await source.Task;
+    CancellationTokenSource cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, innerSource.cancellationToken);
+    DatabaseTransaction transaction = new(this, Connection!);
+
+    try
+    {
+      await transaction.Run(handler, cancellationTokenSource.Token);
+    }
+    finally
+    {
+      innerSource.source.SetResult();
+      cancellationTokenSource.Dispose();
+    }
   }
 
-  public async Task<T> RunTransaction<T>(TransactionCallback<T> callback, CancellationToken cancellationToken)
+  public async Task<T> RunTransaction<T>(AsyncTransactionHandler<T> handler, CancellationToken cancellationToken)
   {
     TaskCompletionSource<T> source = new();
 
-    try { await RunTransaction(async (connection, cancellationToken) => source.SetResult(await callback(connection, cancellationToken)), cancellationToken); }
-    catch (Exception exception) { source.SetException(exception); }
+    try
+    {
+      await RunTransaction(async (transaction, cancellationToken) =>
+      {
+        source.SetResult(await handler(transaction, cancellationToken));
+      }, cancellationToken);
+    }
+    catch (Exception exception)
+    {
+      source.SetException(exception);
+    }
 
     return await source.Task;
   }
 
-  public async Task<ulong> Insert(SQLiteConnection connection, string table, ValueClause data, CancellationToken cancellationToken)
+  public Task RunTransaction(TransactionHandler handler, CancellationToken cancellationToken) => RunTransaction((transaction, cancellationToken) =>
   {
-    string commandString;
+    handler(transaction);
+    return Task.CompletedTask;
+  }, cancellationToken);
+
+  public async Task<T> RunTransaction<T>(TransactionHandler<T> handler, CancellationToken cancellationToken)
+  {
+    TaskCompletionSource<T> source = new();
+
+    try
     {
-      StringBuilder commandStringBuilder = new();
-
-      commandStringBuilder.Append($"insert into {table}");
-      if (data.Count != 0)
+      await RunTransaction((transaction, cancellationToken) =>
       {
-        lock (data)
-        {
-          commandStringBuilder.Append('(');
-
-          for (int index = 0; index < data.Count; index++)
-          {
-            if (index != 0)
-            {
-              commandStringBuilder.Append(',');
-            }
-
-            commandStringBuilder.Append(data.ElementAt(index).Key);
-          }
-
-          commandStringBuilder.Append($") values ({connection.ParamList(data.Count)});");
-        }
-      }
-
-      commandString = commandStringBuilder.ToString();
-      commandStringBuilder.Clear();
+        source.SetResult(handler(transaction));
+        return Task.CompletedTask;
+      }, cancellationToken);
+    }
+    catch (Exception exception)
+    {
+      source.SetException(exception);
     }
 
-    await connection.ExecuteNonQueryAsync(commandString, cancellationToken, [.. data.Values]);
-    return (ulong)connection.LastInsertRowId;
-  }
-
-  public async Task<bool> Delete(SQLiteConnection connection, string table, WhereClause where, CancellationToken cancellationToken)
-  {
-    List<object?> parameters = [];
-
-    string commandString;
-    {
-      StringBuilder commandStringBuilder = new();
-
-      commandStringBuilder.Append($"delete from {table}");
-
-      if (where.Count != 0)
-      {
-        commandStringBuilder.Append($" where ");
-
-        for (int index = 0; index < where.Count; index++)
-        {
-          if (index != 0)
-          {
-            commandStringBuilder.Append(" and ");
-          }
-
-          var whereEntry = where.ElementAt(index);
-          commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
-          parameters.Add(whereEntry.Value.value);
-        }
-      }
-
-      commandString = commandStringBuilder.ToString();
-      commandStringBuilder.Clear();
-    }
-
-    return (await connection.ExecuteNonQueryAsync(commandString, cancellationToken, [.. parameters])) != 0;
-  }
-
-  public async Task<SQLiteDataReader> Select(
-    SQLiteConnection connection,
-    string table,
-    WhereClause where,
-    (int? offset, int length)? limit,
-    (string column, string orderBy)? order,
-    CancellationToken cancellationToken
-  )
-  {
-    List<object?> parameters = [];
-
-    string commandString;
-    {
-      StringBuilder commandStringBuilder = new();
-
-      commandStringBuilder.Append($"select * from {table}");
-
-      if (where.Count != 0)
-      {
-        commandStringBuilder.Append($" where ");
-
-        for (int index = 0; index < where.Count; index++)
-        {
-          if (index != 0)
-          {
-            commandStringBuilder.Append(" and ");
-          }
-
-          var whereEntry = where.ElementAt(index);
-          commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
-          if (whereEntry.Value.collate != null) {
-            commandStringBuilder.AppendLine($" collate {whereEntry.Value.collate}");
-          }
-          parameters.Add(whereEntry.Value.value);
-        }
-      }
-
-      if (limit != null)
-      {
-        if (limit.Value.offset != null)
-        {
-          commandStringBuilder.Append($" limit {limit.Value.offset} {limit.Value.length}");
-        }
-        else
-        {
-          commandStringBuilder.Append($" limit {limit.Value.length}");
-        }
-      }
-
-      if (order != null)
-      {
-        commandStringBuilder.Append($" order by {order.Value.column} {order.Value.orderBy}");
-      }
-
-      commandString = commandStringBuilder.ToString();
-      commandStringBuilder.Clear();
-    }
-
-    return await connection.ExecuteReaderAsync($"{commandString};", cancellationToken, [.. parameters]);
-  }
-
-  public async Task<bool> Update(SQLiteConnection connection, string table, WhereClause where, ValueClause data, CancellationToken cancellationToken)
-  {
-    if (data.Count == 0)
-    {
-      return false;
-    }
-
-    List<object?> parameters = [];
-
-    string commandString;
-    {
-      StringBuilder commandStringBuilder = new();
-
-      commandStringBuilder.Append($"update {table}");
-      if (data.Count != 0)
-      {
-        commandStringBuilder.Append(" set ");
-
-        for (int index = 0; index < data.Count; index++)
-        {
-          if (index != 0)
-          {
-            commandStringBuilder.Append(", ");
-          }
-
-          KeyValuePair<string, object?> dataEntry = data.ElementAt(index);
-          commandStringBuilder.Append($"{dataEntry.Key} = ({{{parameters.Count}}})");
-          parameters.Add(dataEntry.Value);
-        }
-      }
-
-      if (where.Count != 0)
-      {
-        commandStringBuilder.Append($" where ");
-
-        for (int index = 0; index < where.Count; index++)
-        {
-          if (index != 0)
-          {
-            commandStringBuilder.Append(" and ");
-          }
-
-          var whereEntry = where.ElementAt(index);
-          commandStringBuilder.Append($"{whereEntry.Key} {whereEntry.Value.condition} ({{{parameters.Count}}})");
-          parameters.Add(whereEntry.Value.value);
-        }
-      }
-
-      commandString = commandStringBuilder.ToString();
-      commandStringBuilder.Clear();
-    }
-
-    return (await connection.ExecuteNonQueryAsync(commandString, cancellationToken, [.. parameters])) != 0;
-  }
-
-  public async Task Close()
-  {
-    await Connection.CloseAsync();
-    await (WaitQueueTask ?? Task.CompletedTask);
-    WaitQueue.Dispose();
+    return await source.Task;
   }
 }

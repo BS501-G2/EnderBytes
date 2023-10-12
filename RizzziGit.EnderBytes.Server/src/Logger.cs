@@ -1,15 +1,18 @@
 namespace RizzziGit.EnderBytes;
 
-public delegate void LoggerHandler(byte level, string scope, string message, ulong timestamp);
+public delegate void LoggerHandler(LogLevel level, string scope, string message, ulong timestamp);
+
+public enum LogLevel : byte
+{
+  Verbose = 5,
+  Info = 4,
+  Warn = 3,
+  Error = 2,
+  Fatal = 1
+}
 
 public sealed class Logger(string name)
 {
-  public const byte LOGLEVEL_VERBOSE = 5;
-  public const byte LOGLEVEL_INFO = 4;
-  public const byte LOGLEVEL_WARN = 3;
-  public const byte LOGLEVEL_ERROR = 2;
-  public const byte LOGLEVEL_FATAL = 1;
-
   private readonly string Name = name;
   private readonly List<Logger> SubscribedLoggers = [];
 
@@ -43,7 +46,7 @@ public sealed class Logger(string name)
     }
   }
 
-  private void InternalLog(byte level, string? scope, string message, ulong timestamp)
+  private void InternalLog(LogLevel level, string? scope, string message, ulong timestamp)
   {
     scope = $"{Name}{(scope != null ? $" / {scope}" : "")}";
 
@@ -55,9 +58,9 @@ public sealed class Logger(string name)
     }
   }
 
-  public void Log(byte level, string message)
+  public void Log(LogLevel level, string message)
   {
-    if (level < 0 || level > 5)
+    if (!Enum.IsDefined(typeof(LogLevel), level))
     {
       throw new ArgumentOutOfRangeException(nameof(level));
     }

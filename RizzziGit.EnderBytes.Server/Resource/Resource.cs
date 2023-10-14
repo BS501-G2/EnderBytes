@@ -5,18 +5,19 @@ using System.Text;
 namespace RizzziGit.EnderBytes.Resources;
 
 using Database;
+using Collections;
 
 using WhereClause = Dictionary<string, (string condition, object? value, string? collate)>;
 using ValueClause = Dictionary<string, object?>;
 using LimitClause = (int count, int? offset);
 using OrderClause = (string column, string orderBy);
 
-public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>
+public abstract class Resource<M, D, R>
   where M : Resource<M, D, R>.ResourceManager
   where D : Resource<M, D, R>.ResourceData
   where R : Resource<M, D, R>
 {
-  public new abstract class ResourceManager : Shared.Resources.Resource<M, D, R>.ResourceManager
+  public abstract class ResourceManager
   {
     private const string KEY_ID = "ID";
     private const string KEY_CREATE_TIME = "CreateTime";
@@ -31,7 +32,25 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>
     public delegate void ResourceUpdateHandler(DatabaseTransaction transaction, R resource, D oldData);
     public delegate Task AsyncResourceUpdateHandler(DatabaseTransaction transaction, R resource, D oldData, CancellationToken cancellationToken);
 
-    protected ResourceManager(MainResourceManager main, Database database, string name, int version) : base(main)
+    public sealed class ResourceMemory(ResourceManager manager) : WeakDictionary<long, R>
+    {
+      public readonly ResourceManager Manager = manager;
+
+      public R ResolveFromData(D data)
+      {
+        if (TryGetValue(data.Id, out var value))
+        {
+          value.Data = data;
+          return value;
+        }
+
+        R resource = Manager.CreateResource(data);
+        TryAdd(data.Id, resource);
+        return resource;
+      }
+    }
+
+    protected ResourceManager(MainResourceManager main, Database database, string name, int version)
     {
       Logger = new(name);
       Main = main;
@@ -39,6 +58,7 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>
       Name = name;
       Version = version;
 
+      Memory = new(this);
       ResourceUpdateHandlers = [];
       ResourceDeleteHandlers = [];
 
@@ -46,13 +66,16 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>
     }
 
     public readonly Logger Logger;
-    public new readonly MainResourceManager Main;
+    public readonly MainResourceManager Main;
     protected readonly Database Database;
     public readonly string Name;
     public readonly int Version;
 
+    protected readonly ResourceMemory Memory;
     private readonly List<AsyncResourceUpdateHandler> ResourceUpdateHandlers;
     private readonly List<AsyncResourceDeleteHandler> ResourceDeleteHandlers;
+
+    public bool IsValid(R resource) => Memory.TryGetValue(resource.Id, out var value) && resource == value;
 
     public void OnResourceUpdate(AsyncResourceUpdateHandler handler) => ResourceUpdateHandlers.Add(handler);
     public void OnResourceUpdate(ResourceUpdateHandler handler) => OnResourceUpdate((transaction, id, oldData, _) =>
@@ -75,7 +98,8 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>
     );
 
     protected abstract D CreateData(SqliteDataReader reader, long id, long createTime, long updateTime);
-    protected override abstract R CreateResource(D data);
+
+    protected abstract R CreateResource(D data);
 
     protected abstract void OnInit(int oldVersion, DatabaseTransaction transaction);
     protected abstract void OnInit(DatabaseTransaction transaction);
@@ -360,8 +384,12 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>
     }, cancellationToken);
   }
 
-  public new abstract record ResourceData(long Id, long CreateTime, long UpdateTime) : Shared.Resources.Resource<M, D, R>.ResourceData(Id)
+  public abstract record ResourceData(long Id, long CreateTime, long UpdateTime)
   {
+    public const string KEY_ID = "id";
+    [JsonPropertyName(KEY_ID)]
+    public long Id = Id;
+
     public const string KEY_CREATE_TIME = "createTime";
     [JsonPropertyName(KEY_CREATE_TIME)]
     public long CreateTime = CreateTime;
@@ -371,10 +399,17 @@ public abstract class Resource<M, D, R> : Shared.Resources.Resource<M, D, R>
     public long UpdateTime = UpdateTime;
   }
 
-  protected Resource(M manager, D data) : base(manager, data)
+  protected Resource(M manager, D data)
   {
+    Manager = manager;
+    Data = data;
   }
 
+  public readonly M Manager;
+  protected D Data { get; private set; }
+
+  public bool IsValid => Manager.IsValid((R)this);
+  public long Id => Data.Id;
   public long CreateTime => Data.CreateTime;
   public long UpdateTime => Data.UpdateTime;
 }

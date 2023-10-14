@@ -2,7 +2,7 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Database;
 
-public sealed class MainResourceManager : Shared.Resources.MainResourceManager
+public sealed class MainResourceManager
 {
   public MainResourceManager(Server server)
   {

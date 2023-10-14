@@ -1,1 +1,0 @@
-namespace RizzziGit.EnderBytes.Resources;

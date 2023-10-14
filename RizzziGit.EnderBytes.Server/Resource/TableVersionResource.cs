@@ -5,27 +5,26 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Database;
 
-public sealed class TableVersion(TableVersion.ResourceManager manager, TableVersion.ResourceData data) : Resource<TableVersion.ResourceManager, TableVersion.ResourceData, TableVersion>(manager, data)
+public sealed class TableVersionResource(TableVersionResource.ResourceManager manager, TableVersionResource.ResourceData data) : Resource<TableVersionResource.ResourceManager, TableVersionResource.ResourceData, TableVersionResource>(manager, data)
 {
-  public new sealed record ResourceData(long Id, long CreateTime, long UpdateTime, string Name, int Version) : Resource<ResourceManager, ResourceData, TableVersion>.ResourceData(Id, CreateTime, UpdateTime)
+  public new sealed record ResourceData(long Id, long CreateTime, long UpdateTime, string Name, int Version) : Resource<ResourceManager, ResourceData, TableVersionResource>.ResourceData(Id, CreateTime, UpdateTime)
   {
     public const string KEY_NAME = "name";
-    public const string KEY_VERSION = "version";
-
     [JsonPropertyName(KEY_NAME)]
     public readonly string Name = Name;
 
+    public const string KEY_VERSION = "version";
     [JsonPropertyName(KEY_VERSION)]
     public readonly int Version = Version;
   }
 
-  public new sealed class ResourceManager(MainResourceManager main, Database database) : Resource<ResourceManager, ResourceData, TableVersion>.ResourceManager(main, database, NAME, VERSION)
+  public new sealed class ResourceManager(MainResourceManager main, Database database) : Resource<ResourceManager, ResourceData, TableVersionResource>.ResourceManager(main, database, NAME, VERSION)
   {
     public const string NAME = "TableVersion";
     public const int VERSION = 1;
 
-    public const string KEY_NAME = "Name";
-    public const string KEY_VERSION = "Version";
+    private const string KEY_NAME = "Name";
+    private const string KEY_VERSION = "Version";
 
     protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
@@ -33,7 +32,7 @@ public sealed class TableVersion(TableVersion.ResourceManager manager, TableVers
       (int)(long)reader[KEY_VERSION]
     );
 
-    protected override TableVersion CreateResource(ResourceData data) => new(this, data);
+    protected override TableVersionResource CreateResource(ResourceData data) => new(this, data);
 
     protected override void OnInit(DatabaseTransaction transaction) => OnInit(0, transaction);
     protected override void OnInit(int oldVersion, DatabaseTransaction transaction) => throw new NotImplementedException("Method not implemented.");

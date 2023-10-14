@@ -18,6 +18,7 @@ public abstract class Resource<M, D, R>
       {
         if (TryGetValue(data.Id, out var value))
         {
+          value.Data = data;
           return value;
         }
 
@@ -37,25 +38,28 @@ public abstract class Resource<M, D, R>
 
     protected ResourceMemory Memory;
 
+    public bool IsValid(R resource) => Memory.TryGetValue(resource.Id, out var value) && resource == value;
+
     protected abstract R CreateResource(D data);
   }
 
   public abstract record ResourceData(long Id)
   {
     public const string KEY_ID = "id";
-
     [JsonPropertyName(KEY_ID)]
     public long Id = Id;
   }
 
-  protected Resource(ResourceManager manager, D data)
+  protected Resource(M manager, D data)
   {
     Manager = manager;
     Data = data;
   }
 
-  public readonly ResourceManager Manager;
-  protected D Data;
+  public readonly M Manager;
+  public D Data { get; protected set; }
+
+  public bool IsValid => Manager.IsValid((R)this);
 
   public long Id => Data.Id;
 }

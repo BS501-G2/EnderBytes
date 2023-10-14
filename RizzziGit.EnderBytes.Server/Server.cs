@@ -5,6 +5,7 @@ using Resources;
 public struct ServerConfig()
 {
   public string DatabasePath = Path.Join(Environment.CurrentDirectory, ".db");
+  public int DefaultUserAuthenticationResourceIterationCount = 1000;
 }
 
 public sealed class Server
@@ -21,8 +22,8 @@ public sealed class Server
   public readonly ServerConfig Config;
   public readonly MainResourceManager Resources;
 
-  public async Task Run(CancellationToken cancellationToken)
+  public async Task Run(TaskCompletionSource onReady, CancellationToken cancellationToken)
   {
-    await Resources.Run(cancellationToken);
+    await Resources.Run(onReady, cancellationToken);
   }
 }

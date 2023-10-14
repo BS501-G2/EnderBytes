@@ -1,11 +1,10 @@
 using Microsoft.Data.Sqlite;
+using System.Data;
+using System.Runtime.CompilerServices;
 
 namespace RizzziGit.EnderBytes.Database;
 
-using System.Data;
-using System.Runtime.CompilerServices;
 using Collections;
-using Resources;
 
 public sealed class DatabaseTransaction(Database database, SqliteConnection connection)
 {
@@ -16,8 +15,11 @@ public sealed class DatabaseTransaction(Database database, SqliteConnection conn
   public readonly SqliteConnection Connection = connection;
   public Logger Logger => Database.Logger;
 
-  private readonly List<TransactionFailureHandler> OnFailure = [];
-  private readonly List<TransactionSuccessHandler> OnSuccess = [];
+  private readonly List<TransactionFailureHandler> OnFailureHandlers = [];
+  private readonly List<TransactionSuccessHandler> OnSuccessHandlers = [];
+
+  public void OnFailure(TransactionFailureHandler handler) => OnFailureHandlers.Add(handler);
+  public void OnSuccess(TransactionSuccessHandler handler) => OnSuccessHandlers.Add(handler);
 
   public async Task Run(Database.AsyncTransactionHandler handler, CancellationToken cancellationToken)
   {
@@ -29,7 +31,7 @@ public sealed class DatabaseTransaction(Database database, SqliteConnection conn
 
       cancellationToken.ThrowIfCancellationRequested();
       transaction.Commit();
-      foreach (TransactionSuccessHandler onSuccess in OnSuccess.Reverse<TransactionSuccessHandler>())
+      foreach (TransactionSuccessHandler onSuccess in OnSuccessHandlers.Reverse<TransactionSuccessHandler>())
       {
         await onSuccess(this);
       }
@@ -37,7 +39,7 @@ public sealed class DatabaseTransaction(Database database, SqliteConnection conn
     catch (Exception exception)
     {
       transaction.Rollback();
-      foreach (TransactionFailureHandler onFailure in OnFailure.Reverse<TransactionFailureHandler>())
+      foreach (TransactionFailureHandler onFailure in OnFailureHandlers.Reverse<TransactionFailureHandler>())
       {
         await onFailure(this, exception);
       }
@@ -82,7 +84,7 @@ public sealed class DatabaseTransaction(Database database, SqliteConnection conn
 
   public int ExecuteNonQuery(string sql, params object?[] sqlParams)
   {
-    using SqliteCommand command = Connection.CreateCommand();
+    SqliteCommand command = Connection.CreateCommand();
     CommandText(command, sql, sqlParams);
     Logger.Log(LogLevel.Verbose, $"Non-Query: {string.Format(sql, sqlParams)}");
     return command.ExecuteNonQuery();
@@ -91,7 +93,7 @@ public sealed class DatabaseTransaction(Database database, SqliteConnection conn
   public SqliteDataReader ExecuteReader(string sql, params object?[] sqlParams) => ExecuteReader(sql, CommandBehavior.Default, sqlParams);
   public SqliteDataReader ExecuteReader(string sql, CommandBehavior behavior, params object?[] sqlParams)
   {
-    using SqliteCommand command = Connection!.CreateCommand();
+    SqliteCommand command = Connection!.CreateCommand();
     CommandText(command, sql, sqlParams);
     Logger.Log(LogLevel.Verbose, $"Query: {string.Format(sql, sqlParams)}");
     return command.ExecuteReader(behavior);
@@ -99,7 +101,7 @@ public sealed class DatabaseTransaction(Database database, SqliteConnection conn
 
   public object? ExecuteScalar(string sql, params object?[] sqlParams)
   {
-    using SqliteCommand command = Connection!.CreateCommand();
+    SqliteCommand command = Connection!.CreateCommand();
     CommandText(command, sql, sqlParams);
     Logger.Log(LogLevel.Verbose, $"Scalar: {string.Format(sql, sqlParams)}");
     return command.ExecuteScalar();

@@ -10,6 +10,7 @@ public abstract class Connection
   public abstract record Request()
   {
     public record Login(string Username, string Password) : Request();
+    public record Logout() : Request();
   }
 
   public abstract record Response(string? Message = null)
@@ -18,7 +19,8 @@ public abstract class Connection
     public record InvalidCommand() : Response(Message: "Invalid command provided.");
     public record InvalidCredentials() : Response(Message: "Invalid username or password.");
     public record SessionExists() : Response(Message: "Already logged in.");
-    public record AbruptConnection(Exception? Exception) : Response();
+    public record Disconnected(Exception? Exception) : Response("Not connected.");
+    public record SessionInvalidated() : Response("Session has been invalidated.");
   }
 
   public Connection(ConnectionManager manager, ulong id, CancellationTokenSource cancellationTokenSource)
@@ -53,7 +55,7 @@ public abstract class Connection
     var (username, password) = loginRequest;
     return await Resources.MainDatabase.RunTransaction<Response>(async (transaction, cancellationToken) =>
     {
-      UserResource? user = Resources.Users.GetByUsername(transaction, loginRequest.Password);
+      UserResource? user = Resources.Users.GetByUsername(transaction, username);
       if (user == null)
       {
         return new Response.InvalidCredentials();
@@ -77,7 +79,16 @@ public abstract class Connection
   {
     if (!IsRunning)
     {
-      return new Response.AbruptConnection(Exception);
+      return new Response.Disconnected(Exception);
+    }
+    else if (
+      Session.TryGetValue(out var session) &&
+      (!session.session.User.IsValid) &&
+      request is not Request.Login &&
+      request is not Request.Logout
+    )
+    {
+      return new Response.SessionInvalidated();
     }
 
     return request switch
@@ -98,6 +109,7 @@ public abstract class Connection
   public bool IsRunning { get; private set; }
   public async Task Run(CancellationToken cancellationToken)
   {
+    IsRunning = true;
     try
     {
       try

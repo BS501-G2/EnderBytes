@@ -41,7 +41,16 @@ public abstract class Service
       return;
     }
 
-    Logger.Log(LogLevel.Verbose, $"State Changed: {State} -> {state}");
+    Logger.Log(LogLevel.Verbose, state switch
+    {
+      ServiceState.Starting => "Starting...",
+      ServiceState.Started => "Started",
+      ServiceState.Stopping => "Stopping...",
+      ServiceState.Stopped => "Stopped.",
+      ServiceState.Crashed => "Crashed.",
+
+      _ => throw new NotImplementedException()
+    });
     State = state;
     StateChanged?.Invoke(this, state);
   }

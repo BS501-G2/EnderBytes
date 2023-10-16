@@ -52,6 +52,7 @@ public sealed class Server : Service
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
+    Logger.Log(LogLevel.Info, "Server is now running.");
     await Task.Delay(-1, cancellationToken);
   }
 
@@ -60,5 +61,6 @@ public sealed class Server : Service
     await Connections.Stop();
     await Sessions.Stop();
     await Resources.Stop();
+    Logger.Log(LogLevel.Info, "Server has shut down.");
   }
 }

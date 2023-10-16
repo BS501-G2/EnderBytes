@@ -220,7 +220,7 @@ public abstract class Resource<M, D, R>
             firstEntry = false;
           }
 
-          setCommand.Append($"{key}={{{sqlParams.Count}}}");
+          setCommand.Append($"{key} = {{{sqlParams.Count}}}");
           sqlParams.Add(value);
         }
       }
@@ -232,14 +232,14 @@ public abstract class Resource<M, D, R>
       {
         R resource = Memory.ResolveFromData(CreateData(reader));
         D oldData = resource.Data;
-        transaction.ExecuteNonQuery($"update set {setSql} {Name} where {KEY_ID}={{{sqlParams.Count}}};", [.. sqlParams, resource.Id]);
+        transaction.ExecuteNonQuery($"update set {setSql} {Name} where {KEY_ID} = {{{sqlParams.Count}}};", [.. sqlParams, resource.Id]);
         transaction.OnFailure((_, _) =>
         {
           resource.Data = oldData;
           return Task.CompletedTask;
         });
 
-        using SqliteDataReader newReader = transaction.ExecuteReader($"select * from {Name} where {KEY_ID}={{0}} limit 1;", [resource.Id]);
+        using SqliteDataReader newReader = transaction.ExecuteReader($"select * from {Name} where {KEY_ID} = {{0}} limit 1;", [resource.Id]);
         if (!newReader.Read())
         {
           throw new InvalidOperationException("Failed to read new resource data.");
@@ -267,7 +267,7 @@ public abstract class Resource<M, D, R>
       {
         R resource = Memory.ResolveFromData(CreateData(reader));
 
-        transaction.ExecuteNonQuery($"delete from {Name} where {KEY_ID}={{0}}", resource.Id);
+        transaction.ExecuteNonQuery($"delete from {Name} where {KEY_ID} = {{0}}", resource.Id);
         Memory.Remove(resource.Id);
         transaction.OnFailure((_, _) =>
         {
@@ -373,7 +373,7 @@ public abstract class Resource<M, D, R>
       }
 
       sql.Append(';');
-      return transaction.ExecuteReader(sql.ToString(), [..sqlParams]);
+      return transaction.ExecuteReader(sql.ToString(), [.. sqlParams]);
     }
 
     public Task Delete(DatabaseTransaction transaction, R resource, CancellationToken cancellationToken) => DbDelete(transaction, new()

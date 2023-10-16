@@ -14,9 +14,13 @@ public sealed class SessionManager : Service
 
     Server.Resources.Users.OnResourceDelete((transaction, resource) =>
     {
-      if (Sessions.TryGetValue(resource, out var session))
+      lock (Sessions)
       {
-        Sessions.Remove(resource);
+        if (Sessions.TryGetValue(resource, out var session))
+        {
+          Sessions.Remove(resource);
+          session.Close();
+        }
       }
     });
 
@@ -43,7 +47,6 @@ public sealed class SessionManager : Service
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    Logger.Log(LogLevel.Info, "Session factory is now running.");
     ulong id = 0;
     while (true)
     {
@@ -97,7 +100,6 @@ public sealed class SessionManager : Service
 
   protected override Task OnStop(Exception? exception)
   {
-    Logger.Log(LogLevel.Info, "Session factory has stopped.");
     try { WaitQueue.Dispose(exception); } catch { }
     return Task.CompletedTask;
   }

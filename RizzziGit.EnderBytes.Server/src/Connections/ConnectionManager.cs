@@ -79,7 +79,6 @@ public sealed class ConnectionManager : Service
 
   protected override Task OnStop(Exception? exception)
   {
-    Logger.Log(LogLevel.Info, "Connection factory has stopped.");
     try { WaitQueue.Dispose(exception); } catch { }
     return Task.CompletedTask;
   }

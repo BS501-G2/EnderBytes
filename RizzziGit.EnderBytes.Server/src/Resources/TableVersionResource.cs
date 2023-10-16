@@ -39,9 +39,9 @@ public sealed class TableVersionResource(TableVersionResource.ResourceManager ma
 
     public bool SetVersion(DatabaseTransaction transaction, string name, int version)
     {
-      if (transaction.ExecuteNonQuery($"update {NAME} set {KEY_VERSION}={{0}} where {KEY_NAME}={{1}};", version, name) == 0)
+      if (transaction.ExecuteNonQuery($"update {NAME} set {KEY_VERSION} = {{0}} where {KEY_NAME} = {{1}};", version, name) == 0)
       {
-        transaction.ExecuteNonQuery($"insert into {NAME}({KEY_NAME},{KEY_VERSION})values({{0}},{{1}});", name, version);
+        transaction.ExecuteNonQuery($"insert into {NAME}({KEY_NAME},{KEY_VERSION}) values ({{0}},{{1}});", name, version);
       }
 
       return true;
@@ -49,7 +49,7 @@ public sealed class TableVersionResource(TableVersionResource.ResourceManager ma
 
     public int? GetVersion(DatabaseTransaction transaction, string name)
     {
-      return (int?)(long?)transaction.ExecuteScalar($"select {KEY_VERSION} from {NAME} where {KEY_NAME}={{0}} limit 1;", name);
+      return (int?)(long?)transaction.ExecuteScalar($"select {KEY_VERSION} from {NAME} where {KEY_NAME} = {{0}} limit 1;", name);
     }
 
     public new void Init(DatabaseTransaction transaction)

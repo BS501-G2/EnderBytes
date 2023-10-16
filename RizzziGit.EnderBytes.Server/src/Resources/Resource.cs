@@ -127,8 +127,6 @@ public abstract class Resource<M, D, R>
       return oldVersion != Version;
     }
 
-    public Task<bool> Init(CancellationToken cancellationToken) => Database.RunTransaction(Init, cancellationToken);
-
     public void Validate(DatabaseTransaction transaction)
     {
       if (transaction.Database != Database)

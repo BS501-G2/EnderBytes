@@ -7,6 +7,7 @@ using Microsoft.Data.Sqlite;
 namespace RizzziGit.EnderBytes.Resources;
 
 using Database;
+using Extensions;
 
 public enum UserAuthenticationType : byte
 {
@@ -15,8 +16,18 @@ public enum UserAuthenticationType : byte
 
 public sealed class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
-  public new sealed class ResourceManager(MainResourceManager main, Database database) : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager(main, database, NAME, VERSION)
+  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager
   {
+    public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
+    {
+      main.Users.OnResourceDelete(async (transaction, resource, cancellationToken) =>
+      {
+        await DbDelete(transaction, new() {
+          { KEY_USER_ID, ("=", resource.Id, null) }
+        }, cancellationToken);
+      });
+    }
+
     private static readonly Regex ValidPasswordRegex = new("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[\\W_])[a-zA-Z0-9\\W_]{8,64}$");
 
     public const string NAME = "UserAuthentication";
@@ -70,7 +81,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       int iterations = Main.Server.Config.DefaultUserAuthenticationResourceIterationCount;
 
       byte[] salt = RNG.GetBytes(16);
-      byte[] hash = new Rfc2898DeriveBytes(payload, salt, iterations).GetBytes(32);
+      byte[] hash = new Rfc2898DeriveBytes(payload, salt, iterations, HashAlgorithmName.SHA256).GetBytes(32);
       byte[] iv = RNG.GetBytes(16);
       byte[] challengeBytes = RNG.GetBytes(32);
       byte[] encryptedBytes = Aes.Create().CreateEncryptor(hash, iv).TransformFinalBlock(challengeBytes, 0, challengeBytes.Length);
@@ -97,7 +108,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       return Create(transaction, userId, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
     }
 
-    public UserAuthenticationResource? GetByPassword(DatabaseTransaction transaction, long userId, string password)
+    public (UserAuthenticationResource userAuthentication, byte[] hashCache)? GetByPassword(DatabaseTransaction transaction, long userId, string password)
     {
       if (!ValidPasswordRegex.IsMatch(password))
       {
@@ -117,14 +128,14 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
         if (userAuthentication.IsMatch(passwordBytes))
         {
-          return userAuthentication;
+          return (userAuthentication, userAuthentication.GetHash(passwordBytes));
         }
       }
 
       return null;
     }
 
-    public UserAuthenticationResource? GetByPayload(DatabaseTransaction transaction, byte[] payload)
+    public (UserAuthenticationResource userAuthentication, byte[] hashCache)? GetByPayload(DatabaseTransaction transaction, byte[] payload)
     {
       using SqliteDataReader reader = DbSelect(transaction, [], []);
 
@@ -134,7 +145,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
         if (userAuthentication.IsMatch(payload))
         {
-          return userAuthentication;
+          return (userAuthentication, userAuthentication.GetHash(payload));
         }
       }
 
@@ -172,26 +183,17 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
   public byte[] ChallengeBytes => Data.ChallengeBytes;
   public byte[] EncryptedBytes => Data.EncryptedBytes;
 
+  public byte[] GetHash(byte[] payload) => new Rfc2898DeriveBytes(payload, Salt, Iterations, HashAlgorithmName.SHA256).GetBytes(32);
   public bool IsMatch(byte[] payload)
   {
-    byte[] hash = new Rfc2898DeriveBytes(payload, Salt, Iterations).GetBytes(32);
+    ;
     try
     {
-      return Aes.Create().CreateDecryptor(hash, IV).TransformFinalBlock(EncryptedBytes, 0, EncryptedBytes.Length).SequenceEqual(ChallengeBytes);
+      return Aes.Create().CreateDecryptor(GetHash(payload), IV).TransformFinalBlock(EncryptedBytes, 0, EncryptedBytes.Length).SequenceEqual(ChallengeBytes);
     }
     catch
     {
       return false;
     }
-  }
-}
-
-public static class RandomNumberGeneratorExtensions
-{
-  public static byte[] GetBytes(this RandomNumberGenerator rng, int length)
-  {
-    byte[] bytes = new byte[length];
-    rng.GetBytes(bytes);
-    return bytes;
   }
 }

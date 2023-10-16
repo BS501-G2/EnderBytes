@@ -14,14 +14,12 @@ public static class Program
       Console.WriteLine($"[{dateTimeOffset} {Enum.GetName(level)?.ToUpper()}] [{scope}] {message}");
     };
 
-    TaskCompletionSource onReady = new();
-    Task task = server.Run(onReady, CancellationToken.None);
-    await onReady.Task;
+    await server.Start();
     await server.Resources.MainDatabase.RunTransaction((transaction) =>
     {
       UserResource user = server.Resources.Users.Create(transaction, "Ajsdoimsdfg", "Test");
       UserAuthenticationResource userAuthentication = server.Resources.UserAuthentications.CreatePassword(transaction, user.Id, "testT@3123");
     }, CancellationToken.None);
-    await task;
+    await server.Join();
   }
 }

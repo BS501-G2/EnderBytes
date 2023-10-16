@@ -39,6 +39,21 @@ public sealed class UserResource(UserResource.ResourceManager manager, UserResou
       }
     }
 
+    public UserResource? GetByUsername(DatabaseTransaction transaction, string username)
+    {
+      using var reader = DbSelect(transaction, new()
+      {
+        { KEY_USERNAME, ("=", username, null) }
+      }, [], (1, null), null);
+
+      while (reader.Read())
+      {
+        return Memory.ResolveFromData(CreateData(reader));
+      }
+
+      return null;
+    }
+
     public UserResource Create(DatabaseTransaction transaction, string username, string name)
     {
       if (!ValidUsernameRegex.IsMatch(username))

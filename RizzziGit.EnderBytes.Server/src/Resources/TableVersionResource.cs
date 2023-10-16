@@ -56,8 +56,6 @@ public sealed class TableVersionResource(TableVersionResource.ResourceManager ma
     {
       transaction.ExecuteNonQuery($"create table if not exists {NAME}({KEY_NAME} varchar(128) primary key,{KEY_VERSION} integer not null);");
     }
-
-    public new Task Init(CancellationToken cancellationToken) => Database.RunTransaction(Init, cancellationToken);
   }
 
   public string Name => Data.Name;

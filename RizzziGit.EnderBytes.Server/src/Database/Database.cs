@@ -108,27 +108,25 @@ public sealed class DatabaseTransaction(Database database, SqliteConnection conn
   }
 }
 
-public sealed class Database
+public sealed class Database : Service
 {
   public delegate Task AsyncTransactionHandler(DatabaseTransaction transaction, CancellationToken cancellationToken);
   public delegate Task<T> AsyncTransactionHandler<T>(DatabaseTransaction transaction, CancellationToken cancellationToken);
   public delegate void TransactionHandler(DatabaseTransaction transaction);
   public delegate T TransactionHandler<T>(DatabaseTransaction transaction);
 
-  public Database(Server server, string path, string name)
+  public Database(Server server, string path, string name) : base("Database")
   {
-    Logger = new($"DB: {name}");
     Server = server;
     Path = path;
-    Name = name;
+    DatabaseFile = System.IO.Path.Join(Path, $"{name}.sqlite3");
 
     Server.Logger.Subscribe(Logger);
   }
 
   public readonly Server Server;
   public readonly string Path;
-  public readonly string Name;
-  public readonly Logger Logger;
+  public readonly string DatabaseFile;
 
   private SqliteConnection? Connection;
   private readonly WaitQueue<TaskCompletionSource<(TaskCompletionSource source, CancellationToken cancellationToken)>> WaitQueue = new();
@@ -141,42 +139,38 @@ public sealed class Database
     }
   }
 
-  public async Task RunDatabase(TaskCompletionSource onReady, CancellationToken cancellationToken)
+  protected override Task OnStart(CancellationToken cancellationToken)
   {
-    try
+    lock (this)
     {
-      lock (this)
+      if (Connection != null)
       {
-        if (Connection != null)
-        {
-          throw new InvalidOperationException("Database is already open.");
-        }
-
-        if (!Directory.Exists(Path))
-        {
-          Directory.CreateDirectory(Path);
-        }
-
-        Connection = new()
-        {
-          ConnectionString = new SqliteConnectionStringBuilder()
-          {
-            DataSource = System.IO.Path.Join(Path, $"{Name}.sqlite3")
-          }.ConnectionString
-        };
-
-        Connection.Open();
+        throw new InvalidOperationException("Database is already open.");
       }
-    }
-    catch (Exception exception)
-    {
-      onReady.SetException(exception);
+
+      if (!Directory.Exists(Path))
+      {
+        Directory.CreateDirectory(Path);
+      }
+
+      Connection = new()
+      {
+        ConnectionString = new SqliteConnectionStringBuilder()
+        {
+          DataSource = DatabaseFile
+        }.ConnectionString
+      };
+
+      Connection.Open();
     }
 
-    try
-    {
-      onReady.SetResult();
+    return Task.CompletedTask;
+  }
 
+  protected override async Task OnRun(CancellationToken cancellationToken)
+  {
+    await Task.Run(async () =>
+    {
       while (true)
       {
         var source = await WaitQueue.Dequeue(cancellationToken);
@@ -184,15 +178,23 @@ public sealed class Database
         source.SetResult((innerSource, cancellationToken));
         await innerSource.Task;
       }
-    }
-    finally
+    }, CancellationToken.None);
+
+    while (WaitQueue.Count != 0)
     {
-      lock (this)
-      {
-        Connection!.Dispose();
-        Connection = null;
-      }
+      (await WaitQueue.Dequeue(CancellationToken.None)).SetCanceled(CancellationToken.None);
     }
+  }
+
+  protected override Task OnStop(Exception? exception)
+  {
+    lock (this)
+    {
+      Connection!.Dispose();
+      Connection = null;
+    }
+
+    return Task.CompletedTask;
   }
 
   public async Task RunTransaction(AsyncTransactionHandler handler, CancellationToken cancellationToken)

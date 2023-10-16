@@ -38,6 +38,7 @@ internal class TaskQueue : IDisposable
   {
     while (true)
     {
+      cancellationToken.ThrowIfCancellationRequested();
       var (callback, remoteCancellationToken, taskCompletionSource) = await WaitQueue.Dequeue(cancellationToken);
 
       CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(

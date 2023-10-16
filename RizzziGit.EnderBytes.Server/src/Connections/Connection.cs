@@ -29,6 +29,8 @@ public abstract class Connection
     CancellationTokenSource = cancellationTokenSource;
     TaskQueue = new();
     IsRunning = false;
+
+    Manager.Logger.Subscribe(Logger);
   }
 
   ~Connection() => Close();
@@ -41,7 +43,7 @@ public abstract class Connection
   private readonly TaskQueue TaskQueue;
   private (UserSession session, UserAuthenticationResource userAuthentication, byte[] hashCache)? Session;
 
-  private async Task<Response> Handle(Request.Login loginRequest)
+  private async Task<Response> Handle(Request.Login loginRequest, CancellationToken cancellationToken)
   {
     if (Session != null)
     {
@@ -68,7 +70,7 @@ public abstract class Connection
       }
 
       return new Response.Ok();
-    }, CancellationToken.None);
+    }, cancellationToken);
   }
 
   public virtual Task<Response> Execute(Request request) => TaskQueue.RunTask(async (cancellationToken) =>
@@ -80,19 +82,20 @@ public abstract class Connection
 
     return request switch
     {
-      Request.Login loginRequest => await Handle(loginRequest),
+      Request.Login loginRequest => await Handle(loginRequest, cancellationToken),
 
       _ => new Response.InvalidCommand()
     };
   }, CancellationToken.None);
 
-  private Exception? Exception;
-  public bool IsRunning { get; private set; }
 
   public void Close()
   {
     try { CancellationTokenSource.Cancel(); } catch { }
   }
+
+  private Exception? Exception;
+  public bool IsRunning { get; private set; }
   public async Task Run(CancellationToken cancellationToken)
   {
     try

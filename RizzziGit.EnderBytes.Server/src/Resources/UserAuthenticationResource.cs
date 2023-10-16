@@ -76,7 +76,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       }
     }
 
-    private UserAuthenticationResource Create(DatabaseTransaction transaction, long userId, UserAuthenticationType type, byte[] payload)
+    private (UserAuthenticationResource userAuthentication, byte[] hashCache) Create(DatabaseTransaction transaction, long userId, UserAuthenticationType type, byte[] payload)
     {
       int iterations = Main.Server.Config.DefaultUserAuthenticationResourceIterationCount;
 
@@ -86,19 +86,22 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       byte[] challengeBytes = RNG.GetBytes(32);
       byte[] encryptedBytes = Aes.Create().CreateEncryptor(hash, iv).TransformFinalBlock(challengeBytes, 0, challengeBytes.Length);
 
-      return DbInsert(transaction, new()
-      {
-        { KEY_USER_ID, userId },
-        { KEY_TYPE, (byte)type },
-        { KEY_ITERATIONS, iterations },
-        { KEY_SALT, salt },
-        { KEY_IV, iv },
-        { KEY_CHALLENGE_BYTES, challengeBytes },
-        { KEY_ENCRYPTED_BYTES, encryptedBytes }
-      });
+      return (
+        DbInsert(transaction, new()
+        {
+          { KEY_USER_ID, userId },
+          { KEY_TYPE, (byte)type },
+          { KEY_ITERATIONS, iterations },
+          { KEY_SALT, salt },
+          { KEY_IV, iv },
+          { KEY_CHALLENGE_BYTES, challengeBytes },
+          { KEY_ENCRYPTED_BYTES, encryptedBytes }
+        }),
+        hash
+      );
     }
 
-    public UserAuthenticationResource CreatePassword(DatabaseTransaction transaction, long userId, string password)
+    public (UserAuthenticationResource userAuthentication, byte[] hashCache) CreatePassword(DatabaseTransaction transaction, long userId, string password)
     {
       if (!ValidPasswordRegex.IsMatch(password))
       {

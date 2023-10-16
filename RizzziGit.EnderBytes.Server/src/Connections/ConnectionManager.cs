@@ -39,13 +39,14 @@ public sealed class ConnectionManager : Service
 
   protected override async Task OnRun(CancellationToken serviceCancellationToken)
   {
+    Logger.Log(LogLevel.Info, "Connection factory is now running.");
     ulong id = 0;
     while (true)
     {
       serviceCancellationToken.ThrowIfCancellationRequested();
       var (source, isDashboard) = await WaitQueue.Dequeue(serviceCancellationToken);
 
-      Logger.Log(LogLevel.Verbose, $"New connection requested. (#{id})");
+      Logger.Log(LogLevel.Verbose, $"New {(isDashboard ? "dashboard" : "client")} connection requested. (#{id})");
       CancellationTokenSource cancellationTokenSource = new();
       CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
         cancellationTokenSource.Token,
@@ -58,6 +59,7 @@ public sealed class ConnectionManager : Service
 
       Watchdog(connection.Run(linkedCancellationTokenSource.Token), cancellationTokenSource, linkedCancellationTokenSource);
       source.SetResult(connection);
+      id++;
     }
   }
 
@@ -65,8 +67,9 @@ public sealed class ConnectionManager : Service
   {
     try
     {
-      await task.WaitAsync(CancellationToken.None);
+      await task;
     }
+    catch { }
     finally
     {
       linkedCancellationTokenSource.Dispose();
@@ -76,7 +79,8 @@ public sealed class ConnectionManager : Service
 
   protected override Task OnStop(Exception? exception)
   {
-    WaitQueue.Dispose(exception);
+    Logger.Log(LogLevel.Info, "Connection factory has stopped.");
+    try { WaitQueue.Dispose(exception); } catch { }
     return Task.CompletedTask;
   }
 }

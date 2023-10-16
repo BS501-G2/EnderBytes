@@ -43,6 +43,8 @@ public sealed class SessionManager : Service
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
+    Logger.Log(LogLevel.Info, "Session factory is now running.");
+    ulong id = 0;
     while (true)
     {
       cancellationToken.ThrowIfCancellationRequested();
@@ -66,7 +68,7 @@ public sealed class SessionManager : Service
         }
 
         {
-          UserSession session = new(cancellationTokenSource, user);
+          UserSession session = new(this, id, cancellationTokenSource, user);
           Sessions.Add(user, session);
 
           session.Connections.Add(connection);
@@ -74,6 +76,8 @@ public sealed class SessionManager : Service
           source.SetResult(session);
         }
       }
+
+      id++;
     }
   }
 
@@ -81,8 +85,9 @@ public sealed class SessionManager : Service
   {
     try
     {
-      await task.WaitAsync(CancellationToken.None);
+      await task;
     }
+    catch { }
     finally
     {
       linkedCancellationTokenSource.Dispose();
@@ -92,7 +97,8 @@ public sealed class SessionManager : Service
 
   protected override Task OnStop(Exception? exception)
   {
-    WaitQueue.Dispose();
+    Logger.Log(LogLevel.Info, "Session factory has stopped.");
+    try { WaitQueue.Dispose(exception); } catch { }
     return Task.CompletedTask;
   }
 }

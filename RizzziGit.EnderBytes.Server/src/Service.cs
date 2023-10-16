@@ -41,6 +41,7 @@ public abstract class Service
       return;
     }
 
+    Logger.Log(LogLevel.Verbose, $"State Changed: {State} -> {state}");
     State = state;
     StateChanged?.Invoke(this, state);
   }
@@ -165,7 +166,7 @@ public abstract class Service
       return;
     }
 
-    context.CancellationTokenSource.Cancel();
+    try { context.CancellationTokenSource.Cancel(); } catch { }
     try { await context.Task; } catch { }
   }
 

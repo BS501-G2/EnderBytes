@@ -35,6 +35,8 @@ public sealed class MainResourceManager : Service
       TableVersion.Init(transaction);
       Users.Init(transaction);
       UserAuthentications.Init(transaction);
+      StoragePools.Init(transaction);
+      Keys.Init(transaction);
     }, cancellationToken);
   }
 

@@ -44,7 +44,7 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
       });
     }
 
-    public const string NAME = "Name";
+    public const string NAME = "StoragePool";
     public const int VERSION = 1;
 
     private const string KEY_USER_ID = "UserID";

@@ -6,3 +6,7 @@
 </style>
 
 <slot />
+
+<svelte:head>
+  <link rel="stylesheet" href="/styles/themes/{globalThis?.localStorage?.getItem('theme') ?? 'default'}.css">
+</svelte:head>

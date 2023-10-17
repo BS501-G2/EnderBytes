@@ -1,1 +1,2 @@
-<a href="/app/test">NEXT</a>
+<script lang="ts">
+</script>

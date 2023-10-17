@@ -113,7 +113,7 @@ public abstract class Service
     }
     catch (Exception exception)
     {
-      Logger.Log(LogLevel.Fatal, $"Fatal Startup Exception on {Name}: {exception.Message}\n{exception.StackTrace}");
+      Logger.Log(LogLevel.Fatal, $"Fatal Startup Exception on {Name}: {exception.GetType().FullName}: {exception.Message}\n{exception.StackTrace}");
       SetState(ServiceState.Crashed);
       startSource?.SetException(exception);
 
@@ -131,7 +131,7 @@ public abstract class Service
     }
     catch (Exception exception)
     {
-      Logger.Log(LogLevel.Fatal, $"Fatal Exception on {Name}: {exception.Message}\n{exception.StackTrace}");
+      Logger.Log(LogLevel.Fatal, $"Fatal Exception on {Name}: {exception.GetType().FullName}: {exception.Message}\n{exception.StackTrace}");
       SetState(ServiceState.Stopping);
 
       try
@@ -140,7 +140,7 @@ public abstract class Service
       }
       catch (Exception stopException)
       {
-        Logger.Log(LogLevel.Fatal, $"Fatal Exception on {Name}: {stopException.Message}\n{stopException.StackTrace}");
+        Logger.Log(LogLevel.Fatal, $"Fatal Exception on {Name}: {exception.GetType().FullName}: {stopException.Message}\n{stopException.StackTrace}");
         SetState(ServiceState.Crashed);
         throw new AggregateException(exception, stopException);
       }
@@ -182,4 +182,16 @@ public abstract class Service
   protected abstract Task OnStart(CancellationToken cancellationToken);
   protected abstract Task OnRun(CancellationToken cancellationToken);
   protected abstract Task OnStop(Exception? exception);
+
+  protected static async Task<(Service service, Task task)> WatchDog(Service[] services, CancellationToken cancellationToken)
+  {
+    List<Task> tasks = [];
+    foreach (Service service in services)
+    {
+      tasks.Add(service.Join().WaitAsync(cancellationToken));
+    }
+
+    Task task = await Task.WhenAny(tasks);
+    return (services[tasks.IndexOf(task)], task);
+  }
 }

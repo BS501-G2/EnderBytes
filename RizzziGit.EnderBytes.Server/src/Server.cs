@@ -1,63 +1,60 @@
+using System.Net;
+
 namespace RizzziGit.EnderBytes;
 
 using Resources;
-using RizzziGit.EnderBytes.Connections;
-using RizzziGit.EnderBytes.Sessions;
+using Connections;
+using Sessions;
+using RizzziGit.EnderBytes.Protocols;
 
-public struct ServerConfig()
+public struct ServerConfiguration()
 {
   public string DatabasePath = Path.Join(Environment.CurrentDirectory, ".db");
-  public int DefaultUserAuthenticationResourceIterationCount = 1000;
+
+  public IPAddress IpAddress = IPAddress.Parse("0.0.0.0");
+
+  public int FileTransferProtocolPort = 8021;
+
+  public int DefaultUserAuthenticationPayloadHashIterationCount = 1000;
+  public int DefaultBlobStorageFileBufferSize = 256 * 1024;
 }
 
 public sealed class Server : Service
 {
   public Server() : this(new()) { }
-  public Server(ServerConfig config) : base("Server")
+  public Server(ServerConfiguration configuration) : base("Server")
   {
-    Config = config;
+    Configuration = configuration;
     Resources = new(this);
     Sessions = new(this);
     Connections = new(this);
+    Protocols = new(this);
   }
 
-  public readonly ServerConfig Config;
+  public readonly ServerConfiguration Configuration;
   public readonly MainResourceManager Resources;
   public readonly SessionManager Sessions;
   public readonly ConnectionManager Connections;
-
-  private async void WatchDogInternal(Task task, CancellationToken cancellationToken)
-  {
-    await task.WaitAsync(cancellationToken);
-
-    if (task.IsFaulted)
-    {
-      _ = Stop();
-    }
-  }
-
-  private Task WatchDog(Task task, CancellationToken cancellationToken)
-  {
-    WatchDogInternal(task, cancellationToken);
-
-    return task;
-  }
+  public readonly ProtocolManager Protocols;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
-    await WatchDog(Resources.Start(), cancellationToken);
-    await WatchDog(Sessions.Start(), cancellationToken);
-    await WatchDog(Connections.Start(), cancellationToken);
+    await Resources.Start();
+    await Sessions.Start();
+    await Connections.Start();
+    await Protocols.Start();
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
     Logger.Log(LogLevel.Info, "Server is now running.");
-    await Task.Delay(-1, cancellationToken);
+    await (await WatchDog([Resources, Sessions, Connections, Protocols], cancellationToken)).task;
   }
 
   protected override async Task OnStop(Exception? exception)
   {
+    Logger.Log(LogLevel.Info, "server is shutting down.");
+    await Protocols.Stop();
     await Connections.Stop();
     await Sessions.Stop();
     await Resources.Stop();

@@ -8,7 +8,7 @@ public sealed class MainResourceManager : Service
   {
     Server = server;
 
-    MainDatabase = new(Server, server.Config.DatabasePath, "Main");
+    MainDatabase = new(Server, server.Configuration.DatabasePath, "Main");
 
     TableVersion = new(this, MainDatabase);
     Users = new(this, MainDatabase);
@@ -42,7 +42,7 @@ public sealed class MainResourceManager : Service
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    await Task.Delay(-1, cancellationToken);
+    await (await WatchDog([MainDatabase], cancellationToken)).task;
   }
 
   protected override async Task OnStop(Exception? exception)

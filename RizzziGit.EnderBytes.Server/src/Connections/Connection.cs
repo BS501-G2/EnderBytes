@@ -11,16 +11,19 @@ public abstract class Connection
   {
     public record Login(string Username, string Password) : Request();
     public record Logout() : Request();
+    public record WhoAmI() : Request();
   }
 
   public abstract record Response(string? Message = null)
   {
-    public record Ok() : Response(Message: "No errors.");
-    public record InvalidCommand() : Response(Message: "Invalid command provided.");
-    public record InvalidCredentials() : Response(Message: "Invalid username or password.");
-    public record SessionExists() : Response(Message: "Already logged in.");
-    public record Disconnected(Exception? Exception) : Response("Not connected.");
-    public record SessionInvalidated() : Response("Session has been invalidated.");
+    public sealed record Ok<T>(T Data) : Response(Message: "No errors.");
+    public sealed record Ok() : Response(Message: "No errors.");
+    public sealed record InvalidCommand() : Response(Message: "Invalid command provided.");
+    public sealed record InvalidCredentials() : Response(Message: "Invalid username or password.");
+    public sealed record SessionExists() : Response(Message: "Already logged in.");
+    public sealed record SessionNotExistent() : Response(Message: "Not logged in.");
+    public sealed record Disconnected(Exception? Exception) : Response("Not connected.");
+    public sealed record SessionInvalidated() : Response("Session has been invalidated.");
   }
 
   public Connection(ConnectionManager manager, ulong id, CancellationTokenSource cancellationTokenSource)
@@ -75,6 +78,19 @@ public abstract class Connection
     }, cancellationToken);
   }
 
+  private Response Handle(Request.Logout _)
+  {
+    if (Session == null)
+    {
+      return new Response.SessionNotExistent();
+    }
+
+    Session = null;
+    return new Response.Ok();
+  }
+
+  private Response.Ok<string?> Handle(Request.WhoAmI _) => new(Session?.session.User.Username);
+
   public virtual Task<Response> Execute(Request request) => TaskQueue.RunTask(async (cancellationToken) =>
   {
     if (!IsRunning)
@@ -93,7 +109,9 @@ public abstract class Connection
 
     return request switch
     {
-      Request.Login loginRequest => await Handle(loginRequest, cancellationToken),
+      Request.Login request => await Handle(request, cancellationToken),
+      Request.Logout request => Handle(request),
+      Request.WhoAmI request => Handle(request),
 
       _ => new Response.InvalidCommand()
     };

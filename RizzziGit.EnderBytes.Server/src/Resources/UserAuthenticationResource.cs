@@ -78,7 +78,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
     private (UserAuthenticationResource userAuthentication, byte[] hashCache) Create(DatabaseTransaction transaction, long userId, UserAuthenticationType type, byte[] payload)
     {
-      int iterations = Main.Server.Config.DefaultUserAuthenticationResourceIterationCount;
+      int iterations = Main.Server.Configuration.DefaultUserAuthenticationPayloadHashIterationCount;
 
       byte[] salt = RNG.GetBytes(16);
       byte[] hash = new Rfc2898DeriveBytes(payload, salt, iterations, HashAlgorithmName.SHA256).GetBytes(32);

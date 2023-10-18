@@ -14,6 +14,14 @@ export interface ClientConfiguration {
 export class Client {
   static #client?: Client
 
+  public static require(): Client {
+    if (this.#client == null) {
+      throw new Error("Client has not loaded.")
+    }
+
+    return this.#client
+  }
+
   public static async get (configuration: ClientConfiguration): Promise<Client> {
     if (this.#client != null)
     {

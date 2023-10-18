@@ -1,22 +1,14 @@
 <script lang="ts">
   import { page } from '$app/stores'
+	import type { ImageIcon } from 'svelte-feather-icons';
 
-  import { ImageIcon } from 'svelte-feather-icons'
-
-  let paths: [name: string, href: string][] = [
-    ['Admin', `/app/admin`],
-    ['Dashboard', '/app/dashboard'],
-    ['My Files', '/app/files'],
-    ['Favorites', '/app/favorites'],
-    ['Shared', '/app/shared'],
-    ['Trash', '/app/trash']
-  ]
+  export let paths: [name: string, href: string, typeof ImageIcon][]
 </script>
 
 <style lang="postcss">
   :root {
     --panel-width: 172px;
-    --panel-width-contracted: 80px;
+    --panel-width-contracted: 72px;
 
     --panel-side-head-section-height: 72px;
     --panel-side-foot-section-height: 64px;
@@ -42,7 +34,7 @@
   div.side-panel:hover {
     width: var(--panel-width);
 
-    box-shadow: 4px 0px 8px var(--gray-3);
+    box-shadow: 4px 0px 8px var(--gray-6);
   }
 
   div.head-section {
@@ -63,21 +55,26 @@
     display: flex;
 
     transition-duration: --panel-side-hover-transition-duration;
+    transition-duration: 400ms;
+    border-radius: 8px;
+  }
+
+  div.nav-entry-not-active:hover {
+    background-color: var(--color-2-2);
   }
   
   div.nav-entry-active {
     color: var(--gray-1);
 
     background-color: var(--color-2);
-    border-radius: 8px;
   }
 
   div.nav-entry-image {
   }
 
   div.nav-entry-image-flex-container {
-    width: 72px;
-    height: 32px;
+    width: 64px;
+    height: 24px;
 
     justify-content: center;
     align-items: center;
@@ -107,7 +104,7 @@
   }
 
   div.nav-entry-label {
-    height: 32px;
+    height: 24px;
 
     opacity: 0;
     transition-duration: 400ms;
@@ -131,17 +128,16 @@
 
 <div class="side-panel">
   <div class="head-section">
-
   </div>
   <div class="nav-section">
     <ul>
       {#each paths as pathEntry}
       <li class="nav-list-entry">
         <a href={pathEntry[1]}>
-          <div class="nav-entry {$page.url.pathname.startsWith(pathEntry[1]) ? "nav-entry-active" : ""}">
+          <div class="nav-entry nav-entry-{$page.url.pathname.startsWith(pathEntry[1]) ? "" : "not-"}active">
             <div class="nav-entry-image">
               <div class="nav-entry-image-flex-container">
-                <ImageIcon size="32rem"/>
+                <svelte:component this={pathEntry[2]} size="20rem"/>
               </div>
               <p>
                 {#if $page.url.pathname.startsWith(pathEntry[1])}
@@ -170,6 +166,5 @@
     </ul>
   </div>
   <div class="foot-section">
-
   </div>
 </div>

@@ -2,6 +2,7 @@
   /* Accent Colors */
   --color-1: #e7d042;
   --color-2: #5c9254;
+  --color-2-2: #5c925480;
   --color-3: #3c4f49;
   --color-4: #2c3e40;
   --color-5: #111b1c;
@@ -12,4 +13,5 @@
   --gray-3: #808080;
   --gray-4: #000000;
   --gray-5: #ffffffc0;
+  --gray-6: #00000080;
 }

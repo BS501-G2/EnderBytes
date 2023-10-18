@@ -1,5 +1,4 @@
 <script lang="ts">
-
 </script>
 
 <style lang="postcss">
@@ -12,7 +11,7 @@
     left: var(--panel-width-contracted);
     top: 0px;
 
-    background-color: var(--main-panel-panel-background);
+    background-color: var(--main-panel-background);
   }
 </style>
 

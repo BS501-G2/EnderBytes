@@ -6,7 +6,7 @@
 
   :root {
     color: var(--gray-1);
-    background-color: var(--gray-2);
+    /* background-color: var(--gray-2); */
   }
 </style>
 

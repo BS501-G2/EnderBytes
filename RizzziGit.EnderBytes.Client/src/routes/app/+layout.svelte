@@ -3,22 +3,30 @@
 	import { onMount } from "svelte";
 
   import LoadingPage from "../../components/loading-page.svelte";
-	import PanelSide from "./panel-side.svelte";
+	import PanelSideDesktop from "./panel-side-desktop.svelte";
 	import PanelMain from "./panel-main.svelte";
 	import PanelOverlay from "./panel-overlay.svelte";
 
-  let loadMessage: string
-  let loadPromise: Promise<Client>
+  import { FileIcon, HomeIcon, ImageIcon, SettingsIcon, StarIcon, TrashIcon, UsersIcon } from 'svelte-feather-icons'
+
+  let client: Client | undefined = undefined
+
+  let paths: [name: string, href: string, typeof ImageIcon][] = [
+    ['Admin', `/app/admin`, SettingsIcon],
+    ['Dashboard', '/app/dashboard', HomeIcon],
+    ['My Files', '/app/files', FileIcon],
+    ['Favorites', '/app/favorites', StarIcon],
+    ['Shared', '/app/shared', UsersIcon],
+    ['Trash', '/app/trash', TrashIcon]
+  ]
 
   onMount(async () => {
-    loadPromise = Client.get({
+    client = await Client.get({
       browserType: ClientBrowserType.Electron,
-      formFactor: screen.orientation.angle != null
+      formFactor: navigator.userAgent.includes('Mobi')
         ? ClientFormFactor.Mobile
         : ClientFormFactor.PC
     })
-
-    console.log((await loadPromise).configuration.formFactor)
   })
 </script>
 
@@ -34,12 +42,16 @@
   }
 </style>
 
-{#await loadPromise}
-  <LoadingPage message={loadMessage} />
-{:then}
+<title>EnderBytes</title>
+
+{#if client == null}
+  <LoadingPage message="LOADING" />
+{:else}
   <div class="app-container">
+    <PanelMain ><slot /></PanelMain>
+    {#if client.configuration.formFactor == ClientFormFactor.PC}
+    <PanelSideDesktop {paths} />
+    {/if}
     <PanelOverlay />
-    <PanelMain><slot /></PanelMain>
-    <PanelSide />
   </div>
-{/await}
+{/if}

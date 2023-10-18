@@ -3,9 +3,9 @@
 	import { onMount } from "svelte";
 
   import LoadingPage from "../../components/loading-page.svelte";
-	import LeftPanel from "./left-panel.svelte";
-	import RightPanel from "./right-panel.svelte";
-	import OverlayPanel from "./overlay-panel.svelte";
+	import PanelSide from "./panel-side.svelte";
+	import PanelMain from "./panel-main.svelte";
+	import PanelOverlay from "./panel-overlay.svelte";
 
   let loadMessage: string
   let loadPromise: Promise<Client>
@@ -13,8 +13,12 @@
   onMount(async () => {
     loadPromise = Client.get({
       browserType: ClientBrowserType.Electron,
-      formFactor: ClientFormFactor.Mobile
+      formFactor: screen.orientation.angle != null
+        ? ClientFormFactor.Mobile
+        : ClientFormFactor.PC
     })
+
+    console.log((await loadPromise).configuration.formFactor)
   })
 </script>
 
@@ -34,8 +38,8 @@
   <LoadingPage message={loadMessage} />
 {:then}
   <div class="app-container">
-    <LeftPanel />
-    <RightPanel><slot /></RightPanel>
-    <OverlayPanel />
+    <PanelOverlay />
+    <PanelMain><slot /></PanelMain>
+    <PanelSide />
   </div>
 {/await}

@@ -27,24 +27,30 @@ public class UserSession
   public readonly ulong Id;
   private readonly CancellationTokenSource CancellationTokenSource;
   private readonly TaskQueue TaskQueue;
-  public readonly List<Connection> Connections;
+  private readonly List<Connection> Connections;
 
-  public readonly UserResource User;
-
-  private async Task RunChecker(CancellationToken cancellationToken)
+  public void AddConnection(Connection connection)
   {
-    while (true)
+    lock (Manager)
     {
-      cancellationToken.ThrowIfCancellationRequested();
+      Connections.Add(connection);
+    }
+  }
+
+  public void RemoveConnection(Connection connection)
+  {
+    lock (Manager)
+    {
+      Connections.Remove(connection);
 
       if (Connections.Count == 0)
       {
         Close();
       }
-
-      await Task.Delay(1000, cancellationToken);
     }
   }
+
+  public readonly UserResource User;
 
   public void Close()
   {
@@ -58,10 +64,7 @@ public class UserSession
     try
     {
       IsRunning = true;
-      await Task.WhenAll(
-        TaskQueue.Start(cancellationToken),
-        RunChecker(cancellationToken)
-      );
+      await TaskQueue.Start(cancellationToken);
     }
     finally
     {

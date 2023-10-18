@@ -91,7 +91,7 @@ public abstract class Connection
 
   private Response.Ok<string?> Handle(Request.WhoAmI _) => new(Session?.session.User.Username);
 
-  public virtual Task<Response> Execute(Request request) => TaskQueue.RunTask(async (cancellationToken) =>
+  protected virtual Task<Response> OnExecute(Request request) => TaskQueue.RunTask(async (cancellationToken) =>
   {
     if (!IsRunning)
     {
@@ -117,6 +117,14 @@ public abstract class Connection
     };
   }, CancellationToken.None);
 
+  public async Task<Response> Execute(Request request)
+  {
+    Logger.Log(LogLevel.Verbose, $"> {request}");
+    Response response = await OnExecute(request);
+    Logger.Log(LogLevel.Verbose, $"< {response}");
+
+    return response;
+  }
 
   public void Close()
   {
@@ -149,7 +157,7 @@ public abstract class Connection
 
       if (Session.TryGetValue(out var session))
       {
-        session.session.Connections.Remove(this);
+        session.session.RemoveConnection(this);
       }
     }
   }

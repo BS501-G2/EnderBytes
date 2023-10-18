@@ -37,6 +37,17 @@ public abstract record FileTransferProtocolCommand()
 
       return new USER(username);
     }
+    else if (command[0] == "PASS")
+    {
+      string? password = command.ElementAtOrDefault(1);
+
+      if (password == null)
+      {
+        return null;
+      }
+
+      return new PASS(password);
+    }
 
     return new Unknown(string.Join(' ', command));
   }
@@ -108,19 +119,43 @@ public sealed class FileTransferProtocolConnection
 
   private async Task HandleCommand(FileTransferProtocolCommand.USER userCommand, CancellationToken cancellationToken)
   {
+    if (string.Compare(userCommand.Username, "anonymous", true) == 0)
+    {
+      await Reply(332);
+
+      return;
+    }
+
     PendingUsername = userCommand.Username;
     await Reply(331);
   }
 
-  // private async
-
-  private async Task Handle(FileTransferProtocolCommand? command, CancellationToken cancellationToken)
+  private async Task HandleCommand(FileTransferProtocolCommand.PASS passCommand, CancellationToken cancellationToken)
   {
-    Logger.Log(LogLevel.Verbose, $"> {command}");
-
-    switch (command)
+    if (PendingUsername != null)
     {
-      case FileTransferProtocolCommand.USER userCommand: await HandleCommand(userCommand, cancellationToken); break;
+      string username = PendingUsername;
+      string password = passCommand.Password;
+
+      PendingUsername = null;
+      if (await Connection.Execute(new Connection.Request.Login(username, password)) is Connection.Response.Ok)
+      {
+        await Reply(230);
+        return;
+      }
+    }
+
+    await Reply(430);
+  }
+
+  private async Task Handle(FileTransferProtocolCommand? rawCommand, CancellationToken cancellationToken)
+  {
+    Logger.Log(LogLevel.Verbose, $"> {rawCommand}");
+
+    switch (rawCommand)
+    {
+      case FileTransferProtocolCommand.USER command: await HandleCommand(command, cancellationToken); break;
+      case FileTransferProtocolCommand.PASS command: await HandleCommand(command, cancellationToken); break;
       case FileTransferProtocolCommand.Unknown: await Reply(500); break;
       default: await Reply(501); break;
     }
@@ -138,7 +173,7 @@ public sealed class FileTransferProtocolConnection
     var oldReply = ReplyCallback;
     ReplyCallback = async (reply) =>
     {
-      Logger.Log(LogLevel.Verbose, $"< {reply.Code} {reply.Message}");
+      Logger.Log(LogLevel.Verbose, $"< REPLY {{ Code = {reply.Code}, Message = {reply.Message} }}");
 
       await streamWriter.WriteLineAsync($"{reply.Code}{(reply.Message.Any() ? $"{reply.Message}" : "")}\r");
     };
@@ -148,8 +183,7 @@ public sealed class FileTransferProtocolConnection
       string? command = null;
 
       await Reply(220, "Halo.");
-      await Reply(220);
-      while ((command = await streamReader.ReadLineAsync()) != null)
+      while ((command = await streamReader.ReadLineAsync(cancellationToken)) != null)
       {
         await Handle(FileTransferProtocolCommand.Parse(command.Split(' ')), cancellationToken);
       }

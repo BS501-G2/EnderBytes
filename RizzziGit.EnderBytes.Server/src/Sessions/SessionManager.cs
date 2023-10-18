@@ -59,12 +59,12 @@ public sealed class SessionManager : Service
         cancellationToken
       );
 
-      lock (Sessions)
+      lock (this)
       {
         {
           if (Sessions.TryGetValue(user, out var session))
           {
-            session.Connections.Add(connection);
+            session.AddConnection(connection);
             source.SetResult(session);
             continue;
           }
@@ -74,8 +74,8 @@ public sealed class SessionManager : Service
           UserSession session = new(this, id, cancellationTokenSource, user);
           Sessions.Add(user, session);
 
-          session.Connections.Add(connection);
-          Watchdog(session.Run(linkedCancellationTokenSource.Token), cancellationTokenSource, linkedCancellationTokenSource);
+          session.AddConnection(connection);
+          Watchdog(user, session.Run(linkedCancellationTokenSource.Token), cancellationTokenSource, linkedCancellationTokenSource);
           source.SetResult(session);
         }
       }
@@ -84,7 +84,7 @@ public sealed class SessionManager : Service
     }
   }
 
-  private static async void Watchdog(Task task, CancellationTokenSource cancellationTokenSource, CancellationTokenSource linkedCancellationTokenSource)
+  private async void Watchdog(UserResource userSession, Task task, CancellationTokenSource cancellationTokenSource, CancellationTokenSource linkedCancellationTokenSource)
   {
     try
     {
@@ -93,8 +93,12 @@ public sealed class SessionManager : Service
     catch { }
     finally
     {
-      linkedCancellationTokenSource.Dispose();
-      cancellationTokenSource.Dispose();
+      lock (this)
+      {
+        Sessions.Remove(userSession);
+        linkedCancellationTokenSource.Dispose();
+        cancellationTokenSource.Dispose();
+      }
     }
   }
 

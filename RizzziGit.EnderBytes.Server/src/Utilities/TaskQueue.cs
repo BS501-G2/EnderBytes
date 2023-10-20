@@ -34,6 +34,14 @@ internal class TaskQueue : IDisposable
     return await taskCompletionSource.Task;
   }
 
+  public Task RunTask(Action callback) => RunTask((_) =>
+  {
+    callback();
+    return Task.CompletedTask;
+  }, CancellationToken.None);
+
+  public Task<T> RunTask<T>(Func<T> callback) => RunTask((_) => Task.FromResult(callback()), CancellationToken.None);
+
   public async Task Start(CancellationToken cancellationToken)
   {
     while (true)

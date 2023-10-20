@@ -19,8 +19,6 @@ public static class Program
   {
     try
     {
-      long index = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
       string username = $"abcdefg";
       string password = $"Aa11111;";
       UserResource user = await server.Resources.MainDatabase.RunTransaction((transaction) =>

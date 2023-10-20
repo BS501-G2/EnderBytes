@@ -4,7 +4,7 @@ using Database;
 
 public sealed class MainResourceManager : Service
 {
-  public MainResourceManager(Server server) : base("Resource Manager")
+  public MainResourceManager(Server server) : base("Resources")
   {
     Server = server;
 

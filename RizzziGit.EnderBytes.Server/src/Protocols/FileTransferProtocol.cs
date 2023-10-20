@@ -2,9 +2,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace RizzziGit.EnderBytes.Protocols;
+namespace RizzziGit.EnderBytes.Protocols.FileTransfer;
 
-using Buffer;
 using Connections;
 
 public abstract record FileTransferProtocolFormCode()
@@ -93,24 +92,9 @@ public sealed record FileTransferProtocolReply(short Code, string Message)
   { }
 }
 
-public sealed class FileTransferProtocolConnection
+public sealed class FileTransferProtocolConnection(FileTransferProtocol protocol, TcpClient client, Connection connection, IPEndPoint endPoint) : ProtocolConnection<FileTransferProtocol, FileTransferProtocolConnection>(protocol, client, connection, endPoint)
 {
-  public FileTransferProtocolConnection(FileTransferProtocol fileTransferProtocol, ClientConnection connection, IPEndPoint remoteEndPoint)
-  {
-    Connection = connection;
-    Logger = new(remoteEndPoint.ToString());
-    IPEndPoint = remoteEndPoint;
-    Protocol = fileTransferProtocol;
-    ReplyCallback = (reply) => throw new NotImplementedException();
-
-    fileTransferProtocol.Logger.Subscribe(Logger);
-  }
-
-  public readonly ClientConnection Connection;
-  public readonly IPEndPoint IPEndPoint;
-  public readonly Logger Logger;
-  public readonly FileTransferProtocol Protocol;
-  private Func<FileTransferProtocolReply, Task> ReplyCallback;
+  private Func<FileTransferProtocolReply, Task> ReplyCallback = (reply) => throw new NotImplementedException();
 
   public Task Reply(short code, string message) => ReplyCallback(new(code, message));
   public Task Reply(short code) => ReplyCallback(new(code));
@@ -161,15 +145,14 @@ public sealed class FileTransferProtocolConnection
     }
   }
 
-  public async Task Handle(TcpClient client, CancellationToken cancellationToken)
+  protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    NetworkStream stream = client.GetStream();
+    using NetworkStream stream = Client.GetStream();
     using StreamReader streamReader = new(stream, Encoding.ASCII);
     using StreamWriter streamWriter = new(stream, Encoding.ASCII)
     {
       AutoFlush = true
     };
-
     var oldReply = ReplyCallback;
     ReplyCallback = async (reply) =>
     {
@@ -192,41 +175,13 @@ public sealed class FileTransferProtocolConnection
     finally
     {
       ReplyCallback = oldReply;
-      Connection.Close();
-      client.Close();
     }
   }
 }
 
-public sealed class FileTransferProtocol : Protocol
+public sealed class FileTransferProtocol(ProtocolManager manager) : Protocol<FileTransferProtocol, FileTransferProtocolConnection>(manager, "FTP")
 {
-  public FileTransferProtocol(ProtocolManager manager) : base(manager, "FTP")
-  {
-    Listener = new(new IPEndPoint(manager.Server.Configuration.IpAddress, manager.Server.Configuration.FileTransferProtocolPort));
-
-    Manager.Logger.Subscribe(Logger);
-  }
-
-  public readonly TcpListener Listener;
-
-  protected override async Task OnRun(CancellationToken cancellationToken)
-  {
-    while (true)
-    {
-      cancellationToken.ThrowIfCancellationRequested();
-      TcpClient client = await Listener.AcceptTcpClientAsync(cancellationToken);
-      IPEndPoint? endPoint = (IPEndPoint?)client.Client.RemoteEndPoint;
-      if (endPoint == null)
-      {
-        client.Close();
-        continue;
-      }
-
-      Logger.Log(LogLevel.Info, $"New FTP Client: {endPoint}");
-      FileTransferProtocolConnection connection = new(this, await Manager.Server.Connections.GetClientConnection(cancellationToken), endPoint);
-      _ = connection.Handle(client, cancellationToken);
-    }
-  }
+  public readonly TcpListener Listener = new(new IPEndPoint(manager.Server.Configuration.IpAddress, manager.Server.Configuration.FileTransferProtocolPort));
 
   protected override Task OnStart(CancellationToken cancellationToken)
   {
@@ -240,5 +195,21 @@ public sealed class FileTransferProtocol : Protocol
     Listener.Stop();
 
     return Task.CompletedTask;
+  }
+
+  protected override async Task<FileTransferProtocolConnection> GetProtocolConnection(CancellationToken cancellationToken)
+  {
+    while (true)
+    {
+      cancellationToken.ThrowIfCancellationRequested();
+      TcpClient client = await Listener.AcceptTcpClientAsync(cancellationToken);
+      IPEndPoint? endPoint = (IPEndPoint?)client.Client.RemoteEndPoint;
+      if (endPoint == null)
+      {
+        continue;
+      }
+
+      return new(this, client, await Manager.Server.Connections.GetClientConnection(cancellationToken), endPoint);
+    }
   }
 }

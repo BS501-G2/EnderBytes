@@ -6,7 +6,7 @@ using Connections;
 
 public sealed class SessionManager : Service
 {
-  public SessionManager(Server server)
+  public SessionManager(Server server) : base("Sessions")
   {
     Server = server;
     Sessions = new();
@@ -18,8 +18,7 @@ public sealed class SessionManager : Service
       {
         if (Sessions.TryGetValue(resource, out var session))
         {
-          Sessions.Remove(resource);
-          session.Close();
+          session.Stop();
         }
       }
     });
@@ -53,12 +52,6 @@ public sealed class SessionManager : Service
       cancellationToken.ThrowIfCancellationRequested();
       var (source, user, connection) = await WaitQueue.Dequeue(cancellationToken);
 
-      CancellationTokenSource cancellationTokenSource = new();
-      CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
-        cancellationTokenSource.Token,
-        cancellationToken
-      );
-
       lock (this)
       {
         {
@@ -71,34 +64,20 @@ public sealed class SessionManager : Service
         }
 
         {
-          UserSession session = new(this, id, cancellationTokenSource, user);
+          UserSession session = new(this, id, user);
           Sessions.Add(user, session);
 
           session.AddConnection(connection);
-          Watchdog(user, session.Run(linkedCancellationTokenSource.Token), cancellationTokenSource, linkedCancellationTokenSource);
+          session.Stopped += (_, _) =>
+          {
+            Sessions.Remove(user);
+          };
+          session.Start(cancellationToken);
           source.SetResult(session);
         }
       }
 
       id++;
-    }
-  }
-
-  private async void Watchdog(UserResource userSession, Task task, CancellationTokenSource cancellationTokenSource, CancellationTokenSource linkedCancellationTokenSource)
-  {
-    try
-    {
-      await task;
-    }
-    catch { }
-    finally
-    {
-      lock (this)
-      {
-        Sessions.Remove(userSession);
-        linkedCancellationTokenSource.Dispose();
-        cancellationTokenSource.Dispose();
-      }
     }
   }
 

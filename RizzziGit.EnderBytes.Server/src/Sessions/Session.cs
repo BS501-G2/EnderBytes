@@ -4,29 +4,22 @@ using Resources;
 using Utilities;
 using Connections;
 
-public class UserSession
+public class UserSession : Lifetime
 {
-  public UserSession(SessionManager manager, ulong id, CancellationTokenSource cancellationTokenSource, UserResource user)
+  public UserSession(SessionManager manager, ulong id, UserResource user)
   {
     Logger = new($"#{id}");
     Id = id;
     Manager = manager;
-    CancellationTokenSource = cancellationTokenSource;
     User = user;
-    TaskQueue = new();
     Connections = [];
 
-    IsRunning = false;
     Manager.Logger.Subscribe(Logger);
   }
-
-  ~UserSession() => Close();
 
   public readonly Logger Logger;
   public readonly SessionManager Manager;
   public readonly ulong Id;
-  private readonly CancellationTokenSource CancellationTokenSource;
-  private readonly TaskQueue TaskQueue;
   private readonly List<Connection> Connections;
 
   public void AddConnection(Connection connection)
@@ -45,31 +38,15 @@ public class UserSession
 
       if (Connections.Count == 0)
       {
-        Close();
+        Stop();
       }
     }
   }
 
+  protected override async Task OnRun(CancellationToken cancellationToken)
+  {
+    await Task.Delay(-1, cancellationToken);
+  }
+
   public readonly UserResource User;
-
-  public void Close()
-  {
-    try { CancellationTokenSource.Cancel(); } catch { }
-  }
-
-  public bool IsRunning { get; private set; }
-  public async Task Run(CancellationToken cancellationToken)
-  {
-    Logger.Log(LogLevel.Verbose, "Session task queue and checker started.");
-    try
-    {
-      IsRunning = true;
-      await TaskQueue.Start(cancellationToken);
-    }
-    finally
-    {
-      IsRunning = false;
-      Logger.Log(LogLevel.Verbose, "Session task queue and checker stopped.");
-    }
-  }
 }

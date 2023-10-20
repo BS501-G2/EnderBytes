@@ -14,6 +14,7 @@ public struct ServerConfiguration()
   public IPAddress IpAddress = IPAddress.Parse("0.0.0.0");
 
   public int FileTransferProtocolPort = 8021;
+  public int SecureShellProtocolPort = 8022;
 
   public int DefaultUserAuthenticationPayloadHashIterationCount = 1000;
   public int DefaultBlobStorageFileBufferSize = 256 * 1024;

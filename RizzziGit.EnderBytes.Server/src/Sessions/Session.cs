@@ -6,10 +6,8 @@ using Connections;
 
 public class UserSession : Lifetime
 {
-  public UserSession(SessionManager manager, ulong id, UserResource user)
+  public UserSession(SessionManager manager, UserResource user) : base($"User #{user.Id}")
   {
-    Logger = new($"#{id}");
-    Id = id;
     Manager = manager;
     User = user;
     Connections = [];
@@ -17,9 +15,7 @@ public class UserSession : Lifetime
     Manager.Logger.Subscribe(Logger);
   }
 
-  public readonly Logger Logger;
   public readonly SessionManager Manager;
-  public readonly ulong Id;
   private readonly List<Connection> Connections;
 
   public void AddConnection(Connection connection)

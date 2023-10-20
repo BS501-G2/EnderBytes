@@ -10,20 +10,20 @@ public abstract class ProtocolConnection<P, PC> : Lifetime
   where P : Protocol<P, PC>
   where PC : ProtocolConnection<P, PC>
 {
-  public ProtocolConnection(P protocol, TcpClient client, Connection connection, IPEndPoint endPoint)
+  public ProtocolConnection(P protocol, TcpClient client, Connection connection, IPEndPoint endPoint) : base($"{endPoint}")
   {
-    Logger = new($"{endPoint}");
     Client = client;
     Connection = connection;
     Protocol = protocol;
 
     Protocol.Logger.Subscribe(Logger);
+
+    Stopped += (_, _) => Connection.Stop();
   }
 
   public readonly P Protocol;
   public readonly TcpClient Client;
   public readonly Connection Connection;
-  public readonly Logger Logger;
 }
 
 public abstract class Protocol<P, PC> : Service

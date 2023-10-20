@@ -43,7 +43,7 @@ public static class Program
     server.Logger.Logged += (level, scope, message, timestamp) =>
     {
       DateTimeOffset dateTimeOffset = DateTimeOffset.FromUnixTimeMilliseconds((long)timestamp);
-      // if ((int)level >= (int)LogLevel.Verbose)
+      // if (level >= LogLevel.Verbose)
       // {
       //   return;
       // }

@@ -204,6 +204,7 @@ public sealed class FileTransferProtocol(ProtocolManager manager) : Protocol<Fil
       cancellationToken.ThrowIfCancellationRequested();
       TcpClient client = await Listener.AcceptTcpClientAsync(cancellationToken);
       IPEndPoint? endPoint = (IPEndPoint?)client.Client.RemoteEndPoint;
+
       if (endPoint == null)
       {
         continue;

@@ -1,9 +1,13 @@
+using RizzziGit.Collections;
+
 namespace RizzziGit.EnderBytes.Utilities;
 
 public abstract class Lifetime
 {
-  protected Lifetime()
+  protected Lifetime(string name)
   {
+    Name = name;
+    Logger = new(name);
     TaskQueue = new();
   }
 
@@ -11,6 +15,9 @@ public abstract class Lifetime
 
   public event EventHandler? Started;
   public event EventHandler? Stopped;
+
+  public readonly string Name;
+  public readonly Logger Logger;
 
   private CancellationTokenSource? Source;
   private readonly TaskQueue TaskQueue;
@@ -24,24 +31,30 @@ public abstract class Lifetime
   public Task RunTask(Action callback) => TaskQueue!.RunTask(callback);
   public Task<T> RunTask<T>(Func<T> callback) => TaskQueue!.RunTask(callback);
 
-  protected abstract Task OnRun(CancellationToken cancellationToken);
+  protected virtual Task OnRun(CancellationToken cancellationToken) => Task.Delay(-1, cancellationToken);
 
   private async void Run(CancellationTokenSource cancellationTokenSource, CancellationTokenSource linkedCancellationTokenSource)
   {
+    Logger.Log(LogLevel.Verbose, "Lifetime started.");
     try
     {
       Started?.Invoke(this, new());
-      await OnRun(cancellationTokenSource.Token);
+      await await Task.WhenAny(
+        OnRun(linkedCancellationTokenSource.Token),
+        TaskQueue.Start(linkedCancellationTokenSource.Token)
+      );
     }
+    catch (OperationCanceledException) { }
     finally
     {
       lock (this)
       {
         linkedCancellationTokenSource.Dispose();
         cancellationTokenSource.Dispose();
-        
+
         Source = null;
       }
+      Logger.Log(LogLevel.Verbose, "Lifetime stopped.");
       Stopped?.Invoke(this, new());
     }
   }

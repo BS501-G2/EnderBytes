@@ -47,33 +47,13 @@ public sealed class ConnectionManager : Service
       var (source, isDashboard) = await WaitQueue.Dequeue(serviceCancellationToken);
 
       Logger.Log(LogLevel.Verbose, $"New {(isDashboard ? "dashboard" : "client")} connection requested. (#{id})");
-      CancellationTokenSource cancellationTokenSource = new();
-      CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
-        cancellationTokenSource.Token,
-        serviceCancellationToken
-      );
-
       Connection connection = isDashboard
-        ? new DashboardConnection(this, id, cancellationTokenSource)
-        : new ClientConnection(this, id, cancellationTokenSource);
+        ? new DashboardConnection(this, id)
+        : new ClientConnection(this, id);
 
-      Watchdog(connection.Run(linkedCancellationTokenSource.Token), cancellationTokenSource, linkedCancellationTokenSource);
+      connection.Start(serviceCancellationToken);
       source.SetResult(connection);
       id++;
-    }
-  }
-
-  private static async void Watchdog(Task task, CancellationTokenSource cancellationTokenSource, CancellationTokenSource linkedCancellationTokenSource)
-  {
-    try
-    {
-      await task;
-    }
-    catch { }
-    finally
-    {
-      linkedCancellationTokenSource.Dispose();
-      cancellationTokenSource.Dispose();
     }
   }
 

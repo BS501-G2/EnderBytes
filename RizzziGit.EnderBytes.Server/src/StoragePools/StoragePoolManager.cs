@@ -6,18 +6,15 @@ public sealed class StoragePoolManager : Service
   {
   }
 
-  protected override Task OnRun(CancellationToken cancellationToken)
+  protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    throw new NotImplementedException();
   }
 
-  protected override Task OnStart(CancellationToken cancellationToken)
+  protected override async Task OnStart(CancellationToken cancellationToken)
   {
-    throw new NotImplementedException();
   }
 
-  protected override Task OnStop(Exception? exception)
+  protected override async Task OnStop(Exception? exception)
   {
-    throw new NotImplementedException();
   }
 }

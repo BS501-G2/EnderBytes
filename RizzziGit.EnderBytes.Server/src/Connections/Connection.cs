@@ -5,7 +5,7 @@ using Utilities;
 using Sessions;
 using Extensions;
 
-public abstract class Connection
+public abstract class Connection : Lifetime
 {
   public abstract record Request()
   {
@@ -22,30 +22,22 @@ public abstract class Connection
     public sealed record InvalidCredentials() : Response(Message: "Invalid username or password.");
     public sealed record SessionExists() : Response(Message: "Already logged in.");
     public sealed record SessionNotExistent() : Response(Message: "Not logged in.");
-    public sealed record Disconnected(Exception? Exception) : Response("Not connected.");
+    public sealed record Disconnected() : Response("Not connected.");
     public sealed record SessionInvalidated() : Response("Session has been invalidated.");
   }
 
-  public Connection(ConnectionManager manager, ulong id, CancellationTokenSource cancellationTokenSource)
+  public Connection(ConnectionManager manager, ulong id) : base($"#{id}")
   {
-    Logger = new($"#{id}");
     Id = id;
     Manager = manager;
-    CancellationTokenSource = cancellationTokenSource;
-    TaskQueue = new();
-    IsRunning = false;
 
     Manager.Logger.Subscribe(Logger);
+    Stopped += (_, _) => Session?.session.RemoveConnection(this);
   }
 
-  ~Connection() => Close();
-
   public readonly ulong Id;
-  public readonly Logger Logger;
   public readonly ConnectionManager Manager;
   private MainResourceManager Resources => Manager.Server.Resources;
-  private readonly CancellationTokenSource CancellationTokenSource;
-  private readonly TaskQueue TaskQueue;
   private (UserSession session, UserAuthenticationResource userAuthentication, byte[] hashCache)? Session;
 
   private async Task<Response> Handle(Request.Login loginRequest, CancellationToken cancellationToken)
@@ -68,6 +60,11 @@ public abstract class Connection
       {
         var (authentication, hashCache) = result;
         Session = (await Manager.Server.Sessions.GetUserSession(user, this, cancellationToken), authentication, hashCache);
+
+        Session.Value.session.Stopped += (_, _) =>
+        {
+          Session = null;
+        };
       }
       else
       {
@@ -91,15 +88,15 @@ public abstract class Connection
 
   private Response.Ok<string?> Handle(Request.WhoAmI _) => new(Session?.session.User.Username);
 
-  protected virtual Task<Response> OnExecute(Request request) => TaskQueue.RunTask(async (cancellationToken) =>
+  protected virtual Task<Response> OnExecute(Request request) => RunTask(async (cancellationToken) =>
   {
     if (!IsRunning)
     {
-      return new Response.Disconnected(Exception);
+      return new Response.Disconnected();
     }
     else if (
       Session.TryGetValue(out var session) &&
-      (!session.session.User.IsValid) &&
+      (!session.session.User.IsValid || !session.session.IsRunning) &&
       request is not Request.Login &&
       request is not Request.Logout
     )
@@ -126,39 +123,8 @@ public abstract class Connection
     return response;
   }
 
-  public void Close()
+  protected override Task OnRun(CancellationToken cancellationToken)
   {
-    try { CancellationTokenSource.Cancel(); } catch { }
-  }
-
-  private Exception? Exception;
-  public bool IsRunning { get; private set; }
-  public async Task Run(CancellationToken cancellationToken)
-  {
-    IsRunning = true;
-    try
-    {
-      try
-      {
-        Logger.Log(LogLevel.Verbose, $"Task queue started.");
-        await TaskQueue.Start(cancellationToken);
-      }
-      catch (Exception exception)
-      {
-        Exception = exception;
-
-        throw;
-      }
-    }
-    finally
-    {
-      Logger.Log(LogLevel.Verbose, $"Task queue stopped.");
-      IsRunning = false;
-
-      if (Session.TryGetValue(out var session))
-      {
-        session.session.RemoveConnection(this);
-      }
-    }
+    return Task.Delay(-1, cancellationToken);
   }
 }

@@ -46,7 +46,7 @@ public sealed class SessionManager : Service
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    ulong id = 0;
+    Logger.Log(LogLevel.Info, "Session factory is now running.");
     while (true)
     {
       cancellationToken.ThrowIfCancellationRequested();
@@ -64,7 +64,7 @@ public sealed class SessionManager : Service
         }
 
         {
-          UserSession session = new(this, id, user);
+          UserSession session = new(this, user);
           Sessions.Add(user, session);
 
           session.AddConnection(connection);
@@ -76,8 +76,6 @@ public sealed class SessionManager : Service
           source.SetResult(session);
         }
       }
-
-      id++;
     }
   }
 

@@ -1,8 +1,12 @@
-using RizzziGit.Collections;
-
 namespace RizzziGit.EnderBytes.Utilities;
 
-public abstract class Lifetime
+public interface ILifetime
+{
+  public void Start(CancellationToken cancellationToken);
+  public void Stop();
+}
+
+public abstract class Lifetime : ILifetime
 {
   protected Lifetime(string name)
   {

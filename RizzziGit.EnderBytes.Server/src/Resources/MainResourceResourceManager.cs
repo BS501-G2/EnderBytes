@@ -12,6 +12,7 @@ public sealed class MainResourceManager : Service
 
     TableVersion = new(this, MainDatabase);
     Users = new(this, MainDatabase);
+    UserRoles = new(this, MainDatabase);
     UserAuthentications = new(this, MainDatabase);
     StoragePools = new(this, MainDatabase);
     Keys = new(this, MainDatabase);
@@ -23,6 +24,7 @@ public sealed class MainResourceManager : Service
   public readonly Database MainDatabase;
   public readonly TableVersionResource.ResourceManager TableVersion;
   public readonly UserResource.ResourceManager Users;
+  public readonly UserRoleResource.ResourceManager UserRoles;
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
   public readonly StoragePoolResource.ResourceManager StoragePools;
   public readonly KeyResource.ResourceManager Keys;
@@ -34,6 +36,7 @@ public sealed class MainResourceManager : Service
     {
       TableVersion.Init(transaction);
       Users.Init(transaction);
+      UserRoles.Init(transaction);
       UserAuthentications.Init(transaction);
       StoragePools.Init(transaction);
       Keys.Init(transaction);

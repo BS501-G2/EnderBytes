@@ -34,6 +34,7 @@ public abstract class Service
   public ServiceState State;
 
   public event EventHandler<ServiceState>? StateChanged;
+
   private void SetState(ServiceState state)
   {
     if (State == state)
@@ -70,7 +71,7 @@ public abstract class Service
     TaskCompletionSource<Task> serviceRunnerSource = new();
     TaskCompletionSource serviceRunnerStartTriggerSource = new();
 
-    _ = Factory?.StartNew(() =>
+    _ = Factory!.StartNew(() =>
     {
       Thread.CurrentThread.Name = Name;
       Task task = RunThread(serviceStartupSource, serviceRunnerStartTriggerSource.Task);
@@ -81,19 +82,21 @@ public abstract class Service
     });
 
     Context = new(await serviceRunnerSource.Task, new());
-
     await serviceStartupSource.Task;
   }
 
   private async Task RunThread(TaskCompletionSource startSource, Task onStart)
   {
     await onStart;
-    if (Context == null)
-    {
-      return;
-    }
 
-    await Run(Context, startSource);
+    try
+    {
+      await Run(Context!, startSource);
+    }
+    finally
+    {
+      Context!.CancellationTokenSource.Dispose();
+    }
   }
 
   private async Task Run(ServiceContext context, TaskCompletionSource? startSource)

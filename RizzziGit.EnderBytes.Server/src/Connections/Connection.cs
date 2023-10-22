@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace RizzziGit.EnderBytes.Connections;
 
 using Resources;
@@ -9,7 +11,18 @@ public abstract class Connection : Lifetime
 {
   public abstract record Request()
   {
-    public record Login(string Username, string Password) : Request();
+    public record Login(string Username, string Password) : Request()
+    {
+      public override string ToString()
+      {
+        StringBuilder builder = new();
+        char[] fill = new char[Password.Length];
+        Array.Fill(fill, '*');
+        (this with { Password = string.Concat(fill) }).PrintMembers(builder);
+
+        return $"Login {{ {builder} }}";
+      }
+    }
     public record Logout() : Request();
     public record WhoAmI() : Request();
   }
@@ -21,9 +34,9 @@ public abstract class Connection : Lifetime
     public sealed record InvalidCommand() : Response(Message: "Invalid command provided.");
     public sealed record InvalidCredentials() : Response(Message: "Invalid username or password.");
     public sealed record SessionExists() : Response(Message: "Already logged in.");
-    public sealed record SessionNotExistent() : Response(Message: "Not logged in.");
+    public sealed record NoSession() : Response(Message: "Not logged in.");
     public sealed record Disconnected() : Response("Not connected.");
-    public sealed record SessionInvalidated() : Response("Session has been invalidated.");
+    public sealed record InvalidSession() : Response("Session has been invalidated.");
   }
 
   public Connection(ConnectionManager manager, ulong id) : base($"#{id}")
@@ -32,13 +45,12 @@ public abstract class Connection : Lifetime
     Manager = manager;
 
     Manager.Logger.Subscribe(Logger);
-    Stopped += (_, _) => Session?.session.RemoveConnection(this);
   }
 
   public readonly ulong Id;
   public readonly ConnectionManager Manager;
   private MainResourceManager Resources => Manager.Server.Resources;
-  private (UserSession session, UserAuthenticationResource userAuthentication, byte[] hashCache)? Session;
+  public UserSession? Session { get; private set; }
 
   private async Task<Response> Handle(Request.Login loginRequest, CancellationToken cancellationToken)
   {
@@ -59,12 +71,7 @@ public abstract class Connection : Lifetime
       if (Resources.UserAuthentications.GetByPassword(transaction, user.Id, password).TryGetValue(out var result))
       {
         var (authentication, hashCache) = result;
-        Session = (await Manager.Server.Sessions.GetUserSession(user, this, cancellationToken), authentication, hashCache);
-
-        Session.Value.session.Stopped += (_, _) =>
-        {
-          Session = null;
-        };
+        Session = await Manager.Server.Sessions.GetUserSession(user, this, authentication, hashCache, cancellationToken);
       }
       else
       {
@@ -77,16 +84,11 @@ public abstract class Connection : Lifetime
 
   private Response Handle(Request.Logout _)
   {
-    if (Session == null)
-    {
-      return new Response.SessionNotExistent();
-    }
-
     Session = null;
     return new Response.Ok();
   }
 
-  private Response.Ok<string?> Handle(Request.WhoAmI _) => new(Session?.session.User.Username);
+  private Response.Ok<string?> Handle(Request.WhoAmI _) => new(Session?.User.Username);
 
   protected virtual Task<Response> OnExecute(Request request) => RunTask(async (cancellationToken) =>
   {
@@ -94,14 +96,20 @@ public abstract class Connection : Lifetime
     {
       return new Response.Disconnected();
     }
-    else if (
-      Session.TryGetValue(out var session) &&
-      (!session.session.User.IsValid || !session.session.IsRunning) &&
-      request is not Request.Login &&
-      request is not Request.Logout
-    )
+    else if (Session != null)
     {
-      return new Response.SessionInvalidated();
+      if (!Session.IsValid && request is not Request.Login && request is not Request.Logout)
+      {
+        return new Response.InvalidSession();
+      }
+      else if (request is Request.Login)
+      {
+        return new Response.SessionExists();
+      }
+    }
+    else if (Session == null && request is not Request.Login)
+    {
+      return new Response.NoSession();
     }
 
     return request switch

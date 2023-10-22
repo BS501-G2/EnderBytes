@@ -11,10 +11,9 @@ using Connections;
 
 public enum StoragePoolType : byte
 {
-  Virtual,
+  Blob,
   Physical,
-  Remote,
-  GoogleDrive
+  Remote
 }
 
 public enum StoragePoolScope : byte
@@ -80,7 +79,7 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     public StoragePoolResource CreateVirtual(DatabaseTransaction transaction, long userId, StoragePoolFlags flags) => DbInsert(transaction, new()
     {
       { KEY_USER_ID, userId },
-      { KEY_TYPE, (byte)StoragePoolType.Virtual },
+      { KEY_TYPE, (byte)StoragePoolType.Blob },
       { KEY_FLAGS, (byte)flags },
       { KEY_PAYLOAD, Encoding.UTF8.GetBytes("{}") }
     });

@@ -4,6 +4,14 @@ using Resources;
 using Collections;
 using Connections;
 
+public sealed record UserSession(SessionManager Manager, UserResource User)
+{
+  public sealed record HashCache(UserAuthenticationResource UserAuthentication, byte[] Cache);
+
+  public bool IsValid => User.IsValid;
+  public readonly WeakKeyDictionary<Connection, HashCache> HashCaches = new();
+}
+
 public sealed class SessionManager : Service
 {
   public SessionManager(Server server) : base("Sessions")
@@ -12,14 +20,11 @@ public sealed class SessionManager : Service
     Sessions = new();
     WaitQueue = new();
 
-    Server.Resources.Users.OnResourceDelete((transaction, resource) =>
+    Server.Resources.Users.OnResourceDelete((_, resource) =>
     {
-      lock (Sessions)
+      lock (this)
       {
-        if (Sessions.TryGetValue(resource, out var session))
-        {
-          session.Stop();
-        }
+        Sessions.Remove(resource);
       }
     });
 
@@ -28,12 +33,12 @@ public sealed class SessionManager : Service
 
   public readonly Server Server;
   private readonly WeakDictionary<UserResource, UserSession> Sessions;
-  private WaitQueue<(TaskCompletionSource<UserSession> source, UserResource user, Connection connection)> WaitQueue;
+  private WaitQueue<(TaskCompletionSource<UserSession> source, UserResource user, Connection connection, UserAuthenticationResource userAuthentication, byte[] hashCache)> WaitQueue;
 
-  public async Task<UserSession> GetUserSession(UserResource user, Connection connection, CancellationToken cancellationToken)
+  public async Task<UserSession> GetUserSession(UserResource user, Connection connection, UserAuthenticationResource userAuthentication, byte[] hashCache, CancellationToken cancellationToken)
   {
     TaskCompletionSource<UserSession> source = new();
-    await WaitQueue.Enqueue((source, user, connection), cancellationToken);
+    await WaitQueue.Enqueue((source, user, connection, userAuthentication, hashCache), cancellationToken);
     return await source.Task;
   }
 
@@ -50,31 +55,24 @@ public sealed class SessionManager : Service
     while (true)
     {
       cancellationToken.ThrowIfCancellationRequested();
-      var (source, user, connection) = await WaitQueue.Dequeue(cancellationToken);
+      var (source, user, connection, userAuthentication, hashCache) = await WaitQueue.Dequeue(cancellationToken);
 
       lock (this)
       {
+        UserSession session;
+        if (Sessions.TryGetValue(user, out var s))
         {
-          if (Sessions.TryGetValue(user, out var session))
-          {
-            session.AddConnection(connection);
-            source.SetResult(session);
-            continue;
-          }
+          session = s;
+          continue;
         }
-
+        else
         {
-          UserSession session = new(this, user);
+          session = new(this, user);
           Sessions.Add(user, session);
-
-          session.AddConnection(connection);
-          session.Stopped += (_, _) =>
-          {
-            Sessions.Remove(user);
-          };
-          session.Start(cancellationToken);
-          source.SetResult(session);
         }
+
+        session.HashCaches.AddOrUpdate(connection, new(userAuthentication, hashCache));
+        source.SetResult(session);
       }
     }
   }

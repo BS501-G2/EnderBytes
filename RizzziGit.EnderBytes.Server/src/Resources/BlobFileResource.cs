@@ -1,7 +1,8 @@
 using Microsoft.Data.Sqlite;
-using RizzziGit.EnderBytes.Database;
 
 namespace RizzziGit.EnderBytes.Resources;
+
+using Database;
 
 public sealed class FSPFileResource(FSPFileResource.ResourceManager manager, FSPFileResource.ResourceData data) : Resource<FSPFileResource.ResourceManager, FSPFileResource.ResourceData, FSPFileResource>(manager, data)
 {
@@ -13,9 +14,8 @@ public sealed class FSPFileResource(FSPFileResource.ResourceManager manager, FSP
     private const string KEY_STORAGE_POOL_ID = "PoolId";
     private const string KEY_OWNER = "OwnerUserId";
     private const string KEY_NAME = "Name";
-    private const string KEY_MODE = "Mode";
 
-    public ResourceManager(MainResourceManager main, Database.Database database) : base(main, database, NAME, VERSION)
+    public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
     }
 
@@ -28,6 +28,9 @@ public sealed class FSPFileResource(FSPFileResource.ResourceManager manager, FSP
     {
       if (oldVersion < 1)
       {
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_STORAGE_POOL_ID} integer not null;");
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_OWNER} integer not null;");
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_NAME} integer not null;");
       }
     }
   }

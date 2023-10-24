@@ -19,9 +19,9 @@ public abstract class Resource<M, D, R>
 {
   public abstract class ResourceManager
   {
-    private const string KEY_ID = "ID";
-    private const string KEY_CREATE_TIME = "CreateTime";
-    private const string KEY_UPDATE_TIME = "UpdateTime";
+    protected const string KEY_ID = "ID";
+    protected const string KEY_CREATE_TIME = "CreateTime";
+    protected const string KEY_UPDATE_TIME = "UpdateTime";
 
     public delegate void ResourceInsertHandler(DatabaseTransaction transaction, R resource);
     public delegate Task AsyncResourceInsertHandler(DatabaseTransaction transaction, R resource, CancellationToken cancellationToken);
@@ -174,7 +174,7 @@ public abstract class Resource<M, D, R>
       sql.Append(';');
 
       transaction.ExecuteNonQuery(sql.ToString(), [.. sqlParams]);
-      SqliteDataReader reader = DbSelect(transaction, new()
+      using SqliteDataReader reader = DbSelect(transaction, new()
       {
         {
           KEY_ID,
@@ -374,6 +374,21 @@ public abstract class Resource<M, D, R>
 
       sql.Append(';');
       return transaction.ExecuteReader(sql.ToString(), [.. sqlParams]);
+    }
+
+    public R? GetById(DatabaseTransaction database, long id)
+    {
+      using var reader = DbSelect(database, new()
+      {
+        { KEY_ID, ("=", id, null) }
+      }, [], (1, null), null);
+
+      while (reader.Read())
+      {
+        return Memory.ResolveFromData(CreateData(reader));
+      }
+
+      return null;
     }
 
     public Task Delete(DatabaseTransaction transaction, R resource, CancellationToken cancellationToken) => DbDelete(transaction, new()

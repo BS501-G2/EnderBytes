@@ -25,6 +25,9 @@ public abstract class Connection : Lifetime
     }
     public record Logout() : Request();
     public record WhoAmI() : Request();
+
+    public record ChangeWorkingDirectory(string[] Path, bool Relative) : Request();
+    public record GetWorkingDirectory() : Request();
   }
 
   public abstract record Response(string? Message = null)
@@ -43,14 +46,31 @@ public abstract class Connection : Lifetime
   {
     Id = id;
     Manager = manager;
+    Resources = manager.Server.Resources;
 
     Manager.Logger.Subscribe(Logger);
   }
 
   public readonly ulong Id;
   public readonly ConnectionManager Manager;
-  private MainResourceManager Resources => Manager.Server.Resources;
+  private readonly MainResourceManager Resources;
   public UserSession? Session { get; private set; }
+  public BlobStorageFileResource? WorkingDirectory { get; private set; }
+
+  protected virtual Task<Response> OnExecute(Request request) => RunTask(async (cancellationToken) =>
+  {
+    return request switch
+    {
+      Request.Login request => await Handle(request, cancellationToken),
+      Request.Logout request => Handle(request),
+      Request.WhoAmI request => Handle(request),
+      Request.ChangeWorkingDirectory request => Handle(request),
+
+      _ => new Response.InvalidCommand()
+    };
+  }, CancellationToken.None);
+
+  private Response.Ok<string> Handle(Request.WhoAmI _) => new(Session?.User.Username ?? "");
 
   private async Task<Response> Handle(Request.Login loginRequest, CancellationToken cancellationToken)
   {
@@ -88,9 +108,26 @@ public abstract class Connection : Lifetime
     return new Response.Ok();
   }
 
-  private Response.Ok<string?> Handle(Request.WhoAmI _) => new(Session?.User.Username);
+  private Response Handle(Request.ChangeWorkingDirectory request)
+  {
+    var (path, relative) = request;
 
-  protected virtual Task<Response> OnExecute(Request request) => RunTask(async (cancellationToken) =>
+    BlobStorageFileResource? folder = relative ? WorkingDirectory : null;
+    foreach (string pathEntry in path)
+    {
+      if (pathEntry == ".")
+      {
+        continue;
+      }
+      else if (pathEntry == "..")
+      {
+      }
+    }
+
+    return new Response.Ok();
+  }
+
+  private async Task<Response> WrapExecute(Request request)
   {
     if (!IsRunning)
     {
@@ -112,20 +149,13 @@ public abstract class Connection : Lifetime
       return new Response.NoSession();
     }
 
-    return request switch
-    {
-      Request.Login request => await Handle(request, cancellationToken),
-      Request.Logout request => Handle(request),
-      Request.WhoAmI request => Handle(request),
-
-      _ => new Response.InvalidCommand()
-    };
-  }, CancellationToken.None);
+    return await OnExecute(request);
+  }
 
   public async Task<Response> Execute(Request request)
   {
     Logger.Log(LogLevel.Verbose, $"> {request}");
-    Response response = await OnExecute(request);
+    Response response = await WrapExecute(request);
     Logger.Log(LogLevel.Verbose, $"< {response}");
 
     return response;

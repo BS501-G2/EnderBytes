@@ -15,6 +15,8 @@ public sealed class MainResourceManager : Service
     UserRoles = new(this, MainDatabase);
     UserAuthentications = new(this, MainDatabase);
     StoragePools = new(this, MainDatabase);
+    BlobStorageFiles = new(this, MainDatabase);
+    BlobStorageFileVersions = new(this, MainDatabase);
     Keys = new(this, MainDatabase);
 
     Server.Logger.Subscribe(Logger);
@@ -27,6 +29,8 @@ public sealed class MainResourceManager : Service
   public readonly UserRoleResource.ResourceManager UserRoles;
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
   public readonly StoragePoolResource.ResourceManager StoragePools;
+  public readonly BlobStorageFileResource.ResourceManager BlobStorageFiles;
+  public readonly BlobStorageFileVersionResource.ResourceManager BlobStorageFileVersions;
   public readonly KeyResource.ResourceManager Keys;
 
   protected override async Task OnStart(CancellationToken cancellationToken)

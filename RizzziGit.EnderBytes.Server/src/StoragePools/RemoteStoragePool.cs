@@ -3,14 +3,15 @@ namespace RizzziGit.EnderBytes.StoragePools;
 using Resources;
 using Buffer;
 
-public sealed class BlobStoragePool(StoragePoolManager manager, StoragePoolResource storagePool) : StoragePool(manager, storagePool, StoragePoolType.Blob)
+public sealed class RemoteStoragePool : StoragePool
 {
-  public readonly BlobStorageFileResource.ResourceManager Files = manager.Server.Resources.BlobStorageFiles;
-  public readonly BlobStorageFileVersionResource.ResourceManager FileVersions = manager.Server.Resources.BlobStorageFileVersions;
-  public readonly KeyResource.ResourceManager Keys = manager.Server.Resources.Keys;
+  public RemoteStoragePool(StoragePoolManager manager, StoragePoolResource storagePool) : base(manager, storagePool, StoragePoolType.Remote)
+  {
+  }
 
   public override Task ChangeOwner(string[] path, UserResource user, CancellationToken cancellationToken)
   {
+    throw new NotImplementedException();
   }
 
   public override Task Delete(string[] path, CancellationToken cancellationToken)

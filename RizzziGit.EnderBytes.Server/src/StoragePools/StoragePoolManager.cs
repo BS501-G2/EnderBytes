@@ -14,10 +14,7 @@ public sealed class StoragePoolManager : Service
     Server.Resources.StoragePools.OnResourceDelete((_, resource) => {
       lock (this)
       {
-        if (StoragePools.TryGetValue(resource, out var storagePool))
-        {
-          storagePool.Stop();
-        }
+        StoragePools.Remove(resource);
       }
     });
   }
@@ -51,29 +48,29 @@ public sealed class StoragePoolManager : Service
         }
 
         {
-          StoragePool? storagePool = resource.Type switch
+          StoragePool? storagePool = null;
+          switch (resource.Type)
           {
-            StoragePoolType.Blob => new BlobStoragePool(this, resource),
+            case StoragePoolType.Blob:
+              storagePool = new BlobStoragePool(this, resource);
+              break;
+            case StoragePoolType.Physical:
+              storagePool = new PhysicalStoragePool(this, resource);
+              break;
+            case StoragePoolType.Remote:
+              storagePool = new RemoteStoragePool(this, resource);
+              break;
 
-            _ => null
-          };
-
-          if (storagePool == null)
-          {
-            source.SetException(new InvalidOperationException("Unknown type."));
-            continue;
+            default:
+              source.SetException(new InvalidOperationException("Unknown type."));
+              break;
           }
 
-          storagePool.Stopped += (_, _) =>
+          if (storagePool != null)
           {
-            lock (this)
-            {
-              StoragePools.Remove(resource);
-            }
-          };
-
-          StoragePools.Add(resource, storagePool);
-          storagePool.Start(cancellationToken);
+            StoragePools.Add(resource, storagePool);
+            source.SetResult(storagePool);
+          }
         }
       }
     }

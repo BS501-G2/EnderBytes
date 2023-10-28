@@ -19,14 +19,15 @@ public abstract class Service
 {
   private static TaskFactory? Factory = null;
 
-  public Service() : this(null) { }
-  public Service(string? name)
+  public Service(string? name = null, Service? downstreamLogger = null)
   {
     Factory ??= new(TaskCreationOptions.LongRunning, TaskContinuationOptions.None);
 
     Name = name ?? GetType().Name;
     State = ServiceState.Stopped;
     Logger = new(Name);
+
+    downstreamLogger?.Logger.Subscribe(Logger);
   }
 
   public readonly Logger Logger;

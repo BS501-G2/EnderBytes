@@ -5,14 +5,12 @@ using SecureShell;
 
 public sealed class ProtocolManager : Service
 {
-  public ProtocolManager(Server server) : base("Protocols")
+  public ProtocolManager(Server server) : base("Protocols", server)
   {
     Server = server;
 
     FTP = new(this);
     SSH = new(this);
-
-    Server.Logger.Subscribe(Logger);
   }
 
   public readonly Server Server;

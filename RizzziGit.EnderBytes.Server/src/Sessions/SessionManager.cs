@@ -14,7 +14,7 @@ public sealed record UserSession(SessionManager Manager, UserResource User)
 
 public sealed class SessionManager : Service
 {
-  public SessionManager(Server server) : base("Sessions")
+  public SessionManager(Server server) : base("Sessions", server)
   {
     Server = server;
     Sessions = new();
@@ -27,8 +27,6 @@ public sealed class SessionManager : Service
         Sessions.Remove(resource);
       }
     });
-
-    Server.Logger.Subscribe(Logger);
   }
 
   public readonly Server Server;

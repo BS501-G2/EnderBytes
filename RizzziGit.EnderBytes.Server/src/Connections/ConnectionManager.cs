@@ -4,12 +4,10 @@ using Collections;
 
 public sealed class ConnectionManager : Service
 {
-  public ConnectionManager(Server server) : base("Connections")
+  public ConnectionManager(Server server) : base("Connections", server)
   {
     Server = server;
     WaitQueue = new();
-
-    Server.Logger.Subscribe(Logger);
   }
 
   public readonly Server Server;

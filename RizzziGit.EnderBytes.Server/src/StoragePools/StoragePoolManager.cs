@@ -22,7 +22,6 @@ public sealed class StoragePoolManager : Service
   public readonly Server Server;
   private readonly WeakDictionary<StoragePoolResource, StoragePool> StoragePools;
   private WaitQueue<(TaskCompletionSource<StoragePool> source, StoragePoolResource resource)> WaitQueue;
-
   public async Task<StoragePool> GetStoragePool(StoragePoolResource storagePool, CancellationToken cancellationToken)
   {
     TaskCompletionSource<StoragePool> source = new();
@@ -32,47 +31,60 @@ public sealed class StoragePoolManager : Service
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    while (true)
+    FileStream? blobFile = null;
+    try
     {
-      cancellationToken.ThrowIfCancellationRequested();
-      var (source, resource) = await WaitQueue.Dequeue(cancellationToken);
-
-      lock (this)
+      while (true)
       {
-        {
-          if (StoragePools.TryGetValue(resource, out var storagePool))
-          {
-            source.SetResult(storagePool);
-            continue;
-          }
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        var (source, resource) = await WaitQueue.Dequeue(cancellationToken);
 
+        lock (this)
         {
-          StoragePool? storagePool = null;
-          switch (resource.Type)
           {
-            case StoragePoolType.Blob:
-              storagePool = new BlobStoragePool(this, resource);
-              break;
-            case StoragePoolType.Physical:
-              storagePool = new PhysicalStoragePool(this, resource);
-              break;
-            case StoragePoolType.Remote:
-              storagePool = new RemoteStoragePool(this, resource);
-              break;
-
-            default:
-              source.SetException(new InvalidOperationException("Unknown type."));
-              break;
+            if (StoragePools.TryGetValue(resource, out var storagePool))
+            {
+              source.SetResult(storagePool);
+              continue;
+            }
           }
 
-          if (storagePool != null)
           {
-            StoragePools.Add(resource, storagePool);
-            source.SetResult(storagePool);
+            StoragePool? storagePool = null;
+            switch (resource.Type)
+            {
+              case StoragePoolType.Blob:
+                if (blobFile == null)
+                {
+                  blobFile = File.Open(Server.Configuration.BlobPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                }
+
+                storagePool = new BlobStoragePool(this, resource, blobFile);
+                break;
+              case StoragePoolType.Physical:
+                storagePool = new PhysicalStoragePool(this, resource);
+                break;
+              case StoragePoolType.Remote:
+                storagePool = new RemoteStoragePool(this, resource);
+                break;
+
+              default:
+                source.SetException(new InvalidOperationException("Unknown type."));
+                break;
+            }
+
+            if (storagePool != null)
+            {
+              StoragePools.Add(resource, storagePool);
+              source.SetResult(storagePool);
+            }
           }
         }
       }
+    }
+    finally
+    {
+      blobFile?.Close();
     }
   }
 

@@ -44,7 +44,7 @@ public sealed class RemoteStoragePool : StoragePool
     throw new NotImplementedException();
   }
 
-  public override Task<IEnumerable<DirectoryInformation>> DirectoryStat(string[] path, CancellationToken cancellationToken)
+  public override Task<DirectoryInformation> DirectoryStat(string[] path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
@@ -84,6 +84,11 @@ public sealed class RemoteStoragePool : StoragePool
     throw new NotImplementedException();
   }
 
+  public override Task<Information[]> ListTrash(CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
   public override Task<Information> Stat(string[] path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
@@ -100,6 +105,11 @@ public sealed class RemoteStoragePool : StoragePool
   }
 
   public override Task<SymbolicLinkInformation> SymbolicLinkStat(string[] path, CancellationToken cancellationToken)
+  {
+    throw new NotImplementedException();
+  }
+
+  public override Task Trash(string[] path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }

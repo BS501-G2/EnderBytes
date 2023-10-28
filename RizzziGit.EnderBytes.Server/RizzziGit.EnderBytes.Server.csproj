@@ -22,6 +22,8 @@
     <PackageReference Include="RizzziGit.Buffer" Version="1.2.5" />
     <PackageReference Include="RizzziGit.Collections" Version="1.0.15" />
     <PackageReference Include="RizzziGit.RBMP" Version="1.0.16" />
+    <PackageReference Include="Whisper.net" Version="1.4.7" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.4.7" />
   </ItemGroup>
 
 </Project>

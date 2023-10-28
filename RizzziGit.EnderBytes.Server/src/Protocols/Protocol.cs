@@ -30,11 +30,9 @@ public abstract class Protocol<P, PC> : Service
   where P : Protocol<P, PC>
   where PC : ProtocolConnection<P, PC>
 {
-  protected Protocol(ProtocolManager manager, string? name = null) : base(name)
+  protected Protocol(ProtocolManager manager, string? name = null) : base(name, manager)
   {
     Manager = manager;
-
-    Manager.Logger.Subscribe(Logger);
   }
 
   public readonly ProtocolManager Manager;

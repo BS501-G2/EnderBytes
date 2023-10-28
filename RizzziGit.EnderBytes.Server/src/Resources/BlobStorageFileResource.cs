@@ -124,21 +124,31 @@ public sealed class BlobStorageFileResource(BlobStorageFileResource.ResourceMana
       });
     }
 
-    public async Task UpdateAccessTime(
+    public Task<long> UpdateAccessTime(
       DatabaseTransaction transaction,
       BlobStorageFileResource file,
       long accessTime,
       CancellationToken cancellationToken
-    )
+    ) => DbUpdate(transaction, new()
     {
-      await DbUpdate(transaction, new()
-      {
-        { KEY_ACCESS_TIME, accessTime }
-      }, new()
-      {
-        { KEY_ID, ("=", file.Id, null) }
-      }, cancellationToken);
-    }
+      { KEY_ACCESS_TIME, accessTime }
+    }, new()
+    {
+      { KEY_ID, ("=", file.Id, null) }
+    }, cancellationToken);
+
+    public Task<long> UpdateOwner(
+      DatabaseTransaction transaction,
+      BlobStorageFileResource file,
+      UserResource ownerUser,
+      CancellationToken cancellationToken
+    ) => DbUpdate(transaction, new()
+    {
+      { KEY_OWNER_USER_ID, ownerUser.Id }
+    }, new()
+    {
+      { KEY_ID, ("=", file.Id, null) }
+    }, cancellationToken);
 
     public async Task Trash(DatabaseTransaction transaction, BlobStorageFileResource file, CancellationToken cancellationToken)
     {

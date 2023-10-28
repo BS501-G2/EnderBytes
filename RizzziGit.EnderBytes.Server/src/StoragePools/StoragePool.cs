@@ -50,6 +50,8 @@ public abstract class StoragePool
   public readonly StoragePoolManager Manager;
   public readonly StoragePoolResource Resource;
 
+  public abstract Task<Information[]> ListTrash(CancellationToken cancellationToken);
+  public abstract Task Trash(string[] path, CancellationToken cancellationToken);
   public abstract Task ChangeOwner(string[] path, UserResource user, CancellationToken cancellationToken);
   public abstract Task<Information> Stat(string[] path, CancellationToken cancellationToken);
   public abstract Task Delete(string[] path, CancellationToken cancellationToken);
@@ -64,7 +66,7 @@ public abstract class StoragePool
   public abstract Task DirectoryRemove(string[] path, CancellationToken cancellationToken);
   public abstract Task<uint> DirectoryOpen(string[] path, CancellationToken cancellationToken);
   public abstract Task DirectoryClose(uint handle, CancellationToken cancellationToken);
-  public abstract Task<IEnumerable<DirectoryInformation>> DirectoryStat(string[] path, CancellationToken cancellationToken);
+  public abstract Task<DirectoryInformation> DirectoryStat(string[] path, CancellationToken cancellationToken);
   public abstract Task<Information> DirectoryRead(uint handle, long length, CancellationToken cancellationToken);
   public abstract Task SymbolicLinkCreate(string[] parentPath, string name, CancellationToken cancellationToken);
   public abstract Task<string> SymbolicLinkRead(string[] path, CancellationToken cancellationToken);

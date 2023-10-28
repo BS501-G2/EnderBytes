@@ -5,11 +5,19 @@ namespace RizzziGit.EnderBytes;
 using Resources;
 using Connections;
 using Sessions;
-using RizzziGit.EnderBytes.Protocols;
+using Protocols;
+using ArtificialIntelligence;
 
 public struct ServerConfiguration()
 {
-  public string DatabasePath = Path.Join(Environment.CurrentDirectory, ".db");
+  private static readonly string BASE_PATH = Environment.CurrentDirectory;
+
+  public string DatabasePath = Path.Join(BASE_PATH, ".db");
+  public string BlobPath = Path.Join(BASE_PATH, ".db", "BlobStorageData");
+
+  // Get the dataset from the source: https://huggingface.co/openai/whisper-large-v2
+  // GGML: https://huggingface.co/4bit/whisper-large-v2-ggml/resolve/main/ggml-large-v2.bin
+  public string WhisperDatasetPath = Path.Join(BASE_PATH, ".ai", "WhisperDataset.bin");
 
   public IPAddress IpAddress = IPAddress.Parse("0.0.0.0");
 
@@ -30,6 +38,7 @@ public sealed class Server : Service
     Sessions = new(this);
     Connections = new(this);
     Protocols = new(this);
+    ArtificialIntelligence = new(this);
   }
 
   public readonly ServerConfiguration Configuration;
@@ -37,6 +46,7 @@ public sealed class Server : Service
   public readonly SessionManager Sessions;
   public readonly ConnectionManager Connections;
   public readonly ProtocolManager Protocols;
+  public readonly ArtificialIntelligenceManager ArtificialIntelligence;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
@@ -44,12 +54,13 @@ public sealed class Server : Service
     await Sessions.Start();
     await Connections.Start();
     await Protocols.Start();
+    await ArtificialIntelligence.Start();
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
     Logger.Log(LogLevel.Info, "Server is now running.");
-    await (await WatchDog([Resources, Sessions, Connections, Protocols], cancellationToken)).task;
+    await (await WatchDog([Resources, Sessions, Connections, Protocols, ArtificialIntelligence], cancellationToken)).task;
   }
 
   protected override async Task OnStop(Exception? exception)
@@ -59,6 +70,7 @@ public sealed class Server : Service
     await Connections.Stop();
     await Sessions.Stop();
     await Resources.Stop();
+    await ArtificialIntelligence.Stop();
     Logger.Log(LogLevel.Info, "Server has shut down.");
   }
 }

@@ -4,7 +4,7 @@ using Database;
 
 public sealed class MainResourceManager : Service
 {
-  public MainResourceManager(Server server) : base("Resources")
+  public MainResourceManager(Server server) : base("Resources", server)
   {
     Server = server;
 
@@ -18,8 +18,6 @@ public sealed class MainResourceManager : Service
     BlobStorageFiles = new(this, MainDatabase);
     BlobStorageFileVersions = new(this, MainDatabase);
     Keys = new(this, MainDatabase);
-
-    Server.Logger.Subscribe(Logger);
   }
 
   public readonly Server Server;

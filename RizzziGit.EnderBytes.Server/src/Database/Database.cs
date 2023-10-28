@@ -115,13 +115,11 @@ public sealed class Database : Service
   public delegate void TransactionHandler(DatabaseTransaction transaction);
   public delegate T TransactionHandler<T>(DatabaseTransaction transaction);
 
-  public Database(Server server, string path, string name) : base("Database")
+  public Database(Server server, string path, string name) : base("Database", server)
   {
     Server = server;
     Path = path;
     DatabaseFile = System.IO.Path.Join(Path, $"{name}.sqlite3");
-
-    Server.Logger.Subscribe(Logger);
   }
 
   public readonly Server Server;

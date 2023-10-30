@@ -2,6 +2,7 @@ namespace RizzziGit.EnderBytes.Runtime;
 
 using Resources;
 using Connections;
+using RizzziGit.EnderBytes.ArtificialIntelligence;
 
 public static class Program
 {
@@ -15,28 +16,37 @@ public static class Program
     Console.CancelKeyPress += onPress;
   }
 
-  public static async void Test(Server server)
+  public static async Task Test(Server server, string[] args)
   {
-    try
+    foreach (string arg in args)
     {
-      string username = $"abcdefg";
-      string password = $"Aa11111;";
-      UserResource user = await server.Resources.MainDatabase.RunTransaction((transaction) =>
+      using FileStream stream = File.OpenRead(arg);
+      await foreach (TranscriptBlock transcriptBlock in server.ArtificialIntelligence.Whisper.Transcribe(stream, CancellationToken.None))
       {
-        UserResource user = server.Resources.Users.Create(transaction, username, "Test User");
-        var (userAuthentication, hashCache) = server.Resources.UserAuthentications.CreatePassword(transaction, user.Id, password);
+        Console.WriteLine(transcriptBlock);
+      }
+    }
 
-        return user;
-      }, CancellationToken.None);
-    }
-    catch (Exception exception)
-    {
-      Console.WriteLine(exception);
-      // await server.Stop();
-    }
+    // try
+    // {
+    //   string username = $"abcdefg";
+    //   string password = $"Aa11111;";
+    //   UserResource user = await server.Resources.MainDatabase.RunTransaction((transaction) =>
+    //   {
+    //     UserResource user = server.Resources.Users.Create(transaction, username, "Test User");
+    //     var (userAuthentication, hashCache) = server.Resources.UserAuthentications.CreatePassword(transaction, user.Id, password);
+
+    //     return user;
+    //   }, CancellationToken.None);
+    // }
+    // catch (Exception exception)
+    // {
+    //   Console.WriteLine(exception);
+    //   // await server.Stop();
+    // }
   }
 
-  public static async Task Main(string[] _)
+  public static async Task Main(string[] args)
   {
     Server server = new();
 
@@ -50,11 +60,19 @@ public static class Program
       Console.WriteLine($"[{dateTimeOffset} {Enum.GetName(level)?.ToUpper()}] [{scope}] {message}");
     };
 
-    await server.Start();
-    RegisterCancelEvent(server);
-    Test(server);
+    try
+    {
+      await server.Start();
+      RegisterCancelEvent(server);
+      await Test(server, args);
 
-    await Task.Delay(1000);
-    await server.Join();
+      await server.Join();
+    }
+    catch
+    {
+      await server.Stop();
+
+      // throw;
+    }
   }
 }

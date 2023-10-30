@@ -117,10 +117,23 @@ public abstract class Service
     }
     catch (Exception exception)
     {
+      SetState(ServiceState.Stopping);
+
+      try
+      {
+        await OnStop(exception);
+      }
+      catch (Exception stopException)
+      {
+        Logger.Log(LogLevel.Fatal, $"Fatal Startup Exception on {Name}: {exception.GetType().FullName}: {stopException.Message}\n{stopException.StackTrace}");
+        SetState(ServiceState.Crashed);
+        startSource?.SetException(exception);
+        throw new AggregateException(exception, stopException);
+      }
+
       Logger.Log(LogLevel.Fatal, $"Fatal Startup Exception on {Name}: {exception.GetType().FullName}: {exception.Message}\n{exception.StackTrace}");
       SetState(ServiceState.Crashed);
       startSource?.SetException(exception);
-
       throw;
     }
 
@@ -135,7 +148,6 @@ public abstract class Service
     }
     catch (Exception exception)
     {
-      Logger.Log(LogLevel.Fatal, $"Fatal Exception on {Name}: {exception.GetType().FullName}: {exception.Message}\n{exception.StackTrace}");
       SetState(ServiceState.Stopping);
 
       try
@@ -149,6 +161,7 @@ public abstract class Service
         throw new AggregateException(exception, stopException);
       }
 
+      Logger.Log(LogLevel.Fatal, $"Fatal Exception on {Name}: {exception.GetType().FullName}: {exception.Message}\n{exception.StackTrace}");
       SetState(ServiceState.Crashed);
       throw;
     }

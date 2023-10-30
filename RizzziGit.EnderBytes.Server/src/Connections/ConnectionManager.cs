@@ -2,16 +2,10 @@ namespace RizzziGit.EnderBytes.Connections;
 
 using Collections;
 
-public sealed class ConnectionManager : Service
+public sealed class ConnectionManager(Server server) : Service("Connections", server)
 {
-  public ConnectionManager(Server server) : base("Connections", server)
-  {
-    Server = server;
-    WaitQueue = new();
-  }
-
-  public readonly Server Server;
-  private WaitQueue<(TaskCompletionSource<Connection> source, bool isDashboard)> WaitQueue;
+  public readonly Server Server = server;
+  private WaitQueue<(TaskCompletionSource<Connection> source, bool isDashboard)> WaitQueue = new();
 
   public async Task<ClientConnection> GetClientConnection(CancellationToken cancellationToken)
   {

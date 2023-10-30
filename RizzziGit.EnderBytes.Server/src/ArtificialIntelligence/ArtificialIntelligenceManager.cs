@@ -1,4 +1,3 @@
-
 namespace RizzziGit.EnderBytes.ArtificialIntelligence;
 
 public sealed class ArtificialIntelligenceManager : Service
@@ -6,11 +5,18 @@ public sealed class ArtificialIntelligenceManager : Service
   public ArtificialIntelligenceManager(Server server) : base("AI", server)
   {
     Server = server;
-    Whisper = new(this);
+
+    #if WHISPER_CPP
+    Whisper = new WhisperAiCpp(this);
+    #elif WHISPER_PYTHON
+    Whisper = new WhisperAiPy(this);
+    #else
+    throw new InvalidOperationException("Does not know which version of WhisperAI to use.");
+    #endif
   }
 
   public readonly Server Server;
-  public readonly WhisperAI Whisper;
+  public readonly WhisperAi Whisper;
 
   protected override Task OnRun(CancellationToken cancellationToken)
   {

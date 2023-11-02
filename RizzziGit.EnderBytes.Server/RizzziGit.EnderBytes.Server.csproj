@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>preview</LangVersion>
 
-    <WhisperAIDependency>Python</WhisperAIDependency>
+    <WhisperAIDependency>C++</WhisperAIDependency>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -35,9 +35,17 @@
 
   <ItemGroup Condition="'$(WhisperAIDependency)' == 'Python'">
     <PackageReference Include="IronPython" Version="3.4.1" />
+    <PackageReference Include="IronPython.StdLib" Version="3.4.1" />
 
     <Compile Remove="src/ArtificialIntelligence/WhisperAiCpp.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <File Include="$(MSBuildThisFileDirectory)res\*.*"></File>
+  </ItemGroup>
+
+  <Target Condition="'$(WhisperAIDependency)' == 'Python'" Name="PublishExtraFiles" AfterTargets="Publish">
+    <Copy SourceFiles="@(File)" DestinationFolder="$(BaseOutputPath)" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="7.0.12" />

@@ -1,8 +1,9 @@
+using RizzziGit.EnderBytes.Resources;
+
 namespace RizzziGit.EnderBytes.Connections;
 
-public sealed class InternalConnection : Connection
+public sealed class InternalConnection(ConnectionManager manager, ulong id, UserAuthenticationResource userAuthenticationResource, byte[] hashCache) : Connection(manager, id)
 {
-  public InternalConnection(ConnectionManager manager, ulong id) : base(manager, id)
-  {
-  }
+  private readonly UserAuthenticationResource UserAuthenticationResource = userAuthenticationResource;
+  private readonly byte[] HashCache = hashCache;
 }

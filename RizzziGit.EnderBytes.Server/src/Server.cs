@@ -15,9 +15,11 @@ public struct ServerConfiguration()
   public string DatabasePath = Path.Join(BASE_PATH, ".db");
   public string BlobPath = Path.Join(BASE_PATH, ".db", "BlobStorageData");
 
+  #if WHISPER_CPP
   // Get the dataset from the source: https://huggingface.co/openai/whisper-large-v2
   // GGML: https://huggingface.co/4bit/whisper-large-v2-ggml/resolve/main/ggml-large-v2.bin
   public string WhisperDatasetPath = Path.Join(BASE_PATH, ".ai", "WhisperDataset.bin");
+  #endif
 
   public IPAddress IpAddress = IPAddress.Parse("0.0.0.0");
 

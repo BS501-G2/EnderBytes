@@ -6,84 +6,26 @@ using Database;
 
 public sealed class BlobStoragePool(StoragePoolManager manager, StoragePoolResource storagePool, FileStream blob) : StoragePool(manager, storagePool, StoragePoolType.Blob)
 {
-  private sealed record DirectoryHandle(
-    BlobStorageFileResource Directory,
-    List<BlobStorageFileResource> Files,
-    int CurrentIndex
-  );
+  private readonly FileStream Blob = blob;
 
-  public readonly Database Database = manager.Server.Resources.MainDatabase;
-  public readonly BlobStorageFileResource.ResourceManager Files = manager.Server.Resources.BlobStorageFiles;
-  public readonly BlobStorageFileVersionResource.ResourceManager FileVersions = manager.Server.Resources.BlobStorageFileVersions;
-  public readonly KeyResource.ResourceManager Keys = manager.Server.Resources.Keys;
-  public readonly FileStream Blob = blob;
-
-  private readonly Dictionary<long, DirectoryHandle> Directories = [];
-
-  public override Task ChangeOwner(string[] path, UserResource user, CancellationToken cancellationToken) => Database.RunTransaction(async (transaction, cancellationToken) =>
+  public override Task ChangeOwner(string[] path, UserResource user, CancellationToken cancellationToken)
   {
-    BlobStorageFileResource? file = null;
+    throw new NotImplementedException();
+  }
 
-    foreach (string pathEntry in path)
-    {
-      file = Files.Get(transaction, Resource, file, pathEntry);
-
-      if (file == null)
-      {
-        break;
-      }
-    }
-
-    if (file == null)
-    {
-      throw new ArgumentException("Invalid path.", nameof(path));
-    }
-
-    await Files.UpdateOwner(transaction, file, user, cancellationToken);
-  }, cancellationToken);
-
-  public override Task Delete(string[] path, CancellationToken cancellationToken) => Database.RunTransaction(async (transaction, cancellationToken) =>
+  public override Task Delete(string[] path, CancellationToken cancellationToken)
   {
-    BlobStorageFileResource? file = null;
-
-    foreach (string pathEntry in path)
-    {
-      file = Files.Get(transaction, Resource, file, pathEntry);
-
-      if (file == null)
-      {
-        break;
-      }
-    }
-
-    if (file == null)
-    {
-      throw new ArgumentException("Invalid path.", nameof(path));
-    }
-
-    await Files.Delete(transaction, file, cancellationToken);
-  }, cancellationToken);
+    throw new NotImplementedException();
+  }
 
   public override Task DirectoryClose(uint handle, CancellationToken cancellationToken)
   {
-    lock (this)
-    {
-      Directories.Remove(handle);
-    }
-    return Task.CompletedTask;
+    throw new NotImplementedException();
   }
 
-  public override async Task DirectoryCreate(string[] parentPath, string name, CancellationToken cancellationToken)
+  public override Task DirectoryCreate(string[] parentPath, string name, CancellationToken cancellationToken)
   {
-    lock (this)
-    {
-      foreach (KeyValuePair<long, DirectoryHandle> entry in Directories)
-      {
-        var (id, handle) = entry;
-
-        // handle.Files.Add()
-      }
-    }
+    throw new NotImplementedException();
   }
 
   public override Task<uint> DirectoryOpen(string[] path, CancellationToken cancellationToken)

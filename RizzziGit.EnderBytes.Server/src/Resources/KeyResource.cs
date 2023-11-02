@@ -1,6 +1,5 @@
-using System.Text.Json.Serialization;
-using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
+using System.Security.Cryptography;
 
 namespace RizzziGit.EnderBytes.Resources;
 
@@ -10,24 +9,29 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
 {
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, KeyResource>.ResourceManager
   {
-    public const string NAME = "Key";
-    public const int VERSION = 1;
+    private const string NAME = "Name";
+    private const int VERSION = 1;
 
-    private const string KEY_USER_AUTHENTICATION_ID = "UserAuthenticationId";
-    private const string KEY_PRIVATE_IV = "PrivateIv";
-    private const string KEY_PRIVATE_KEY = "PrivateKey";
-    private const string KEY_PUBLIC_KEY = "PublicKey";
+    private const string KEY_USER_AUTHENTICATION_ID = "UserAuthenticationID";
+    private const string KEY_PRIVATE_PAYLOAD = "PrivatePayload";
+    private const string KEY_PRIVATE_IV = "PrivateIV";
+    private const string KEY_PUBLIC_PAYLOAD = "PublicPayload";
 
     public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
+      main.UserAuthentications.OnResourceDelete((transaction, resource, cancellationToken) => DbDelete(transaction, new()
+      {
+        { KEY_USER_AUTHENTICATION_ID, ("=", resource.Id, null) }
+      }, cancellationToken));
     }
 
     protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
+
       (long)reader[KEY_USER_AUTHENTICATION_ID],
+      (byte[])reader[KEY_PRIVATE_PAYLOAD],
       (byte[])reader[KEY_PRIVATE_IV],
-      (byte[])reader[KEY_PRIVATE_KEY],
-      (byte[])reader[KEY_PUBLIC_KEY]
+      (byte[])reader[KEY_PUBLIC_PAYLOAD]
     );
 
     protected override KeyResource CreateResource(ResourceData data) => new(this, data);
@@ -38,17 +42,13 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
       if (oldVersion < 1)
       {
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_USER_AUTHENTICATION_ID} integer not null;");
-        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PRIVATE_IV} blob not null;");
-        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PRIVATE_KEY} blob not null;");
-        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PUBLIC_KEY} blob not null;");
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PRIVATE_PAYLOAD} blob not null");
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PRIVATE_IV} blob not null");
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PUBLIC_PAYLOAD} blob not null");
       }
     }
 
-    public KeyResource Create(
-      DatabaseTransaction transaction,
-      UserAuthenticationResource userAuthentication,
-      byte[] hashCache
-    )
+    public KeyResource Create(DatabaseTransaction transaction, UserAuthenticationResource userAuthentication, byte[] hashCache)
     {
       byte[] privateIv = new byte[16];
       using var rsa = new RSACryptoServiceProvider()
@@ -56,16 +56,17 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
         PersistKeyInCsp = false,
         KeySize = 1024
       };
-      byte[] privateKey = rsa.ExportRSAPrivateKey();
+      byte[] privatePayload = rsa.ExportRSAPrivateKey();
       byte[] publicKey = rsa.ExportRSAPublicKey();
 
-      byte[] encryptedPrivateKey = Aes.Create().CreateEncryptor(hashCache, privateIv).TransformFinalBlock(privateKey, 0, privateKey.Length);
+      byte[] encryptedPrivateKey = Aes.Create().CreateEncryptor(hashCache, privateIv).TransformFinalBlock(privatePayload, 0, privatePayload.Length);
+
       return DbInsert(transaction, new()
       {
         { KEY_USER_AUTHENTICATION_ID, userAuthentication.Id },
+        { KEY_PRIVATE_PAYLOAD, encryptedPrivateKey },
         { KEY_PRIVATE_IV, privateIv },
-        { KEY_PRIVATE_KEY, encryptedPrivateKey },
-        { KEY_PUBLIC_KEY, publicKey }
+        { KEY_PUBLIC_PAYLOAD, publicKey }
       });
     }
   }
@@ -74,25 +75,37 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
     long Id,
     long CreateTime,
     long UpdateTime,
-    long UserAuthenticationId,
+    long UserAuthenticationID,
+    byte[] PrivatePayload,
     byte[] PrivateIv,
-    byte[] PrivateKey,
-    byte[] PublicKey
-  ) : Resource<ResourceManager, ResourceData, KeyResource>.ResourceData(Id, CreateTime, UpdateTime)
-  {
-    public const string KEY_USER_AUTHENTICATION_ID = "userAuthenticationId";
-    public const string KEY_PRIVATE_IV = "privateIv";
-    public const string KEY_PRIVATE_KEY = "privateKey";
-    public const string KEY_PUBLIC_KEY = "publicKey";
+    byte[] PublicPayload
+  ) : Resource<ResourceManager, ResourceData, KeyResource>.ResourceData(Id, CreateTime, UpdateTime);
 
-    [JsonPropertyName(KEY_USER_AUTHENTICATION_ID)] public long UserAuthenticationId = UserAuthenticationId;
-    [JsonPropertyName(KEY_PRIVATE_IV)] public byte[] PrivateIv = PrivateIv;
-    [JsonPropertyName(KEY_PRIVATE_IV)] public byte[] PrivateKey = PrivateKey;
-    [JsonPropertyName(KEY_PRIVATE_IV)] public byte[] PublicKey = PublicKey;
+  public long UserAuthenticationID => Data.UserAuthenticationID;
+  public byte[] PrivatePayload => Data.PrivatePayload;
+  public byte[] PrivateIv => Data.PrivateIv;
+  public byte[] PublicPayload => Data.PublicPayload;
+
+  public byte[] Encrypt(byte[] bytes)
+  {
+    using var rsa = new RSACryptoServiceProvider()
+    {
+      PersistKeyInCsp = false,
+      KeySize = 1024
+    };
+    rsa.ImportRSAPublicKey(PublicPayload, out _);
+    return rsa.Encrypt(bytes, false);
   }
 
-  public long UserAuthenticationId => Data.UserAuthenticationId;
-  public byte[] PrivateIV => Data.PrivateIv;
-  public byte[] PrivateKey => Data.PrivateKey;
-  public byte[] PublicKey => Data.PublicKey;
+  public byte[] Decrypt(byte[] bytes, byte[] hashCache)
+  {
+    using var rsa = new RSACryptoServiceProvider()
+    {
+      PersistKeyInCsp = false,
+      KeySize = 1024
+    };
+
+    rsa.ImportRSAPrivateKey(Aes.Create().CreateDecryptor(hashCache, PrivateIv).TransformFinalBlock(PrivatePayload, 0, PrivatePayload.Length), out _);
+    return rsa.Decrypt(bytes, false);
+  }
 }

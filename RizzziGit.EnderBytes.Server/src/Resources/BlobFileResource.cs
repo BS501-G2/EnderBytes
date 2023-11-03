@@ -61,6 +61,7 @@ public sealed class BlobFileResource : Resource<BlobFileResource.ResourceManager
     public (BlobFileResource file, BlobFileKeyResource fileKey) Create(
       DatabaseTransaction transaction,
       UserResource user,
+      UserAuthenticationResource userAuthentication,
       KeyResource key,
       byte type,
       BlobFileResource? parentFolder,
@@ -81,7 +82,7 @@ public sealed class BlobFileResource : Resource<BlobFileResource.ResourceManager
         { KEY_NAME, name }
       });
 
-      return (file, Main.BlobFileKeys.Create(transaction, file, key));
+      return (file, Main.BlobFileKeys.Create(transaction, file, key, userAuthentication));
     }
   }
 

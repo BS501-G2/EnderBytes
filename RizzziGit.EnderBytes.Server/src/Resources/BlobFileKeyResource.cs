@@ -54,7 +54,8 @@ public sealed class BlobFileKeyResource(BlobFileKeyResource.ResourceManager mana
     public BlobFileKeyResource Create(
       DatabaseTransaction transaction,
       BlobFileResource file,
-      KeyResource key
+      KeyResource key,
+      UserAuthenticationResource userAuthentication
     )
     {
       if (file.Type != BlobFileResource.TYPE_FILE)
@@ -62,51 +63,25 @@ public sealed class BlobFileKeyResource(BlobFileKeyResource.ResourceManager mana
         throw new ArgumentException("Invalid file resource type.", nameof(file));
       }
 
+      foreach (var _ in DbStream(transaction, new()
       {
-        using var reader = DbSelect(transaction, new()
-        {
-          { KEY_FILE_ID, ("=", file.Id, null) }
-        }, [], (1, null), null);
-
-        while (reader.Read())
-        {
-          throw new InvalidOperationException("Cannot generate new keys for file.");
-        }
+        { KEY_FILE_ID, ("=", file.Id, null) }
+      }, (1, null), null))
+      {
+        throw new InvalidOperationException("Cannot generate new keys for file.");
       }
 
-      return DbInsert(transaction, new()
-      {
-        { KEY_FILE_ID, file.Id },
-        { KEY_KEY_ID, key.Id },
-        { KEY_PAYLOAD, key.Encrypt(RNG.GetBytes(32)) }
-      });
-    }
-
-    public BlobFileKeyResource Create(
-      DatabaseTransaction transaction,
-      BlobFileResource file,
-      KeyResource key,
-      KeyResource copyFromKey,
-      byte[] hashCache
-    )
-    {
-      using var reader = DbSelect(transaction, new()
-      {
-        { KEY_FILE_ID, ("=", file.Id, null) },
-        { KEY_KEY_ID, ("=", copyFromKey.Id, null) }
-      }, [], (1, null), null);
-
-      while (reader.Read())
+      foreach (KeyDataResource keyData in Main.KeyData.List(transaction, key, (1, null), null))
       {
         return DbInsert(transaction, new()
         {
           { KEY_FILE_ID, file.Id },
           { KEY_KEY_ID, key.Id },
-          { KEY_PAYLOAD, key.Encrypt(copyFromKey.Decrypt(Memory.ResolveFromData(CreateData(reader)).Payload, hashCache)) }
+          { KEY_PAYLOAD, keyData.Encrypt(RNG.GetBytes(32)) }
         });
       }
 
-      throw new ArgumentException("Invalid source key.", nameof(copyFromKey));
+      throw new InvalidOperationException("No key data available yet.");
     }
   }
 
@@ -123,39 +98,4 @@ public sealed class BlobFileKeyResource(BlobFileKeyResource.ResourceManager mana
   public long FileId => Data.FileId;
   public long KeyId => Data.KeyId;
   public byte[] Payload => Data.Payload;
-
-  private readonly WeakKeyDictionary<ResourceData, byte[]> KeyCache = new();
-
-  private byte[] Cache(KeyResource keyResource, byte[] hashCache)
-  {
-    byte[] key;
-    if (KeyCache.TryGetValue(Data, out var cache))
-    {
-      key = cache;
-    }
-    else
-    {
-      key = keyResource.Decrypt(Payload, hashCache);
-
-      KeyCache.Add(Data, key);
-    }
-
-    return key;
-  }
-
-  public byte[] Decrypt(KeyResource keyResource, byte[] bytes, byte[] iv, byte[] hashCache)
-  {
-    byte[] key = Cache(keyResource, hashCache);
-
-    ICryptoTransform decryptor = Aes.Create().CreateDecryptor(key, iv);
-    return decryptor.TransformFinalBlock(bytes, 0, bytes.Length);
-  }
-
-  public byte[] Encrypt(KeyResource keyResource, byte[] bytes, byte[] iv, byte[] hashCache)
-  {
-    byte[] key = Cache(keyResource, hashCache);
-
-    ICryptoTransform decryptor = Aes.Create().CreateDecryptor(key, iv);
-    return decryptor.TransformFinalBlock(bytes, 0, bytes.Length);
-  }
 }

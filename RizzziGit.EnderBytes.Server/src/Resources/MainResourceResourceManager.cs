@@ -18,6 +18,7 @@ public sealed class MainResourceManager : Service
     BlobFiles = new(this, MainDatabase);
     BlobFileKeys = new(this, MainDatabase);
     Keys = new(this, MainDatabase);
+    KeyData = new(this, MainDatabase);
   }
 
   public readonly Server Server;
@@ -30,6 +31,7 @@ public sealed class MainResourceManager : Service
   public readonly BlobFileResource.ResourceManager BlobFiles;
   public readonly BlobFileKeyResource.ResourceManager BlobFileKeys;
   public readonly KeyResource.ResourceManager Keys;
+  public readonly KeyDataResource.ResourceManager KeyData;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {

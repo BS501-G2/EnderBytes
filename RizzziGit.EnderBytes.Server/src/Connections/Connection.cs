@@ -55,7 +55,7 @@ public abstract class Connection : Lifetime
   public readonly ConnectionManager Manager;
   private readonly MainResourceManager Resources;
   public UserSession? Session { get; private set; }
-  public BlobStorageFileResource? WorkingDirectory { get; private set; }
+  // public BlobStorageFileResource? WorkingDirectory { get; private set; }
 
   protected virtual Task<Response> OnExecute(Request request) => RunTask(async (cancellationToken) =>
   {
@@ -112,7 +112,7 @@ public abstract class Connection : Lifetime
   {
     var (path, relative) = request;
 
-    BlobStorageFileResource? folder = relative ? WorkingDirectory : null;
+    // BlobStorageFileResource? folder = relative ? WorkingDirectory : null;
     foreach (string pathEntry in path)
     {
       if (pathEntry == ".")

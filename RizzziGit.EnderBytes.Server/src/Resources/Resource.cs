@@ -286,6 +286,7 @@ public abstract class Resource<M, D, R>
       return count;
     }
 
+    protected IEnumerable<R> DbStream(DatabaseTransaction transaction, WhereClause where, LimitClause? limit = null, List<OrderClause>? order = null) => Stream(DbSelect(transaction, where, [], limit, order));
     protected SqliteDataReader DbSelect(DatabaseTransaction transaction, WhereClause where, List<string> project, LimitClause? limit = null, List<OrderClause>? order = null)
     {
       Validate(transaction);
@@ -374,6 +375,14 @@ public abstract class Resource<M, D, R>
 
       sql.Append(';');
       return transaction.ExecuteReader(sql.ToString(), [.. sqlParams]);
+    }
+
+    public IEnumerable<R> Stream(SqliteDataReader reader)
+    {
+      while (reader.Read())
+      {
+        yield return Memory.ResolveFromData(CreateData(reader));
+      }
     }
 
     public R? GetById(DatabaseTransaction database, long id)

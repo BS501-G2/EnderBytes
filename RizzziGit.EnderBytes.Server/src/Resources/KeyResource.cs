@@ -1,5 +1,4 @@
 using Microsoft.Data.Sqlite;
-using System.Security.Cryptography;
 
 namespace RizzziGit.EnderBytes.Resources;
 

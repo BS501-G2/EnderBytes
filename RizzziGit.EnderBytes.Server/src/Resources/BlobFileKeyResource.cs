@@ -54,8 +54,7 @@ public sealed class BlobFileKeyResource(BlobFileKeyResource.ResourceManager mana
     public BlobFileKeyResource Create(
       DatabaseTransaction transaction,
       BlobFileResource file,
-      KeyResource key,
-      UserAuthenticationResource userAuthentication
+      KeyResource key
     )
     {
       if (file.Type != BlobFileResource.TYPE_FILE)

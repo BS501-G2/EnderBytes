@@ -17,6 +17,7 @@ public sealed class MainResourceManager : Service
     StoragePools = new(this, MainDatabase);
     BlobFiles = new(this, MainDatabase);
     BlobFileKeys = new(this, MainDatabase);
+    BlobFileVersions = new(this, MainDatabase);
     Keys = new(this, MainDatabase);
     KeyData = new(this, MainDatabase);
   }
@@ -30,6 +31,7 @@ public sealed class MainResourceManager : Service
   public readonly StoragePoolResource.ResourceManager StoragePools;
   public readonly BlobFileResource.ResourceManager BlobFiles;
   public readonly BlobFileKeyResource.ResourceManager BlobFileKeys;
+  public readonly BlobFileVersionResource.ResourceManager BlobFileVersions;
   public readonly KeyResource.ResourceManager Keys;
   public readonly KeyDataResource.ResourceManager KeyData;
 
@@ -43,7 +45,11 @@ public sealed class MainResourceManager : Service
       UserRoles.Init(transaction);
       UserAuthentications.Init(transaction);
       StoragePools.Init(transaction);
+      BlobFiles.Init(transaction);
+      BlobFileKeys.Init(transaction);
+      BlobFileVersions.Init(transaction);
       Keys.Init(transaction);
+      KeyData.Init(transaction);
     }, cancellationToken);
   }
 

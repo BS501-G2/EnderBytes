@@ -26,24 +26,6 @@ public static class Program
         Console.WriteLine(transcriptBlock);
       }
     }
-
-    // try
-    // {
-    //   string username = $"abcdefg";
-    //   string password = $"Aa11111;";
-    //   UserResource user = await server.Resources.MainDatabase.RunTransaction((transaction) =>
-    //   {
-    //     UserResource user = server.Resources.Users.Create(transaction, username, "Test User");
-    //     var (userAuthentication, hashCache) = server.Resources.UserAuthentications.CreatePassword(transaction, user.Id, password);
-
-    //     return user;
-    //   }, CancellationToken.None);
-    // }
-    // catch (Exception exception)
-    // {
-    //   Console.WriteLine(exception);
-    //   // await server.Stop();
-    // }
   }
 
   public static async Task Main(string[] args)

@@ -22,9 +22,9 @@ public sealed class BlobFileDataResource : Resource<BlobFileDataResource.Resourc
 
     public ResourceManager(MainResourceManager main, Database.Database database) : base(main, database, NAME, VERSION)
     {
-      Main.BlobFiles.OnResourceDelete((transaction, resource, cancellationToken) => DbDelete(transaction, new()
+      Main.BlobFileVersions.OnResourceDelete((transaction, resource, cancellationToken) => DbDelete(transaction, new()
       {
-        { KEY_FILE_ID, ("=", resource.Id, null) }
+        { KEY_VERSION_ID, ("=", resource.Id, null) }
       }, cancellationToken));
     }
 

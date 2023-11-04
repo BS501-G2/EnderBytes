@@ -2,6 +2,7 @@ namespace RizzziGit.EnderBytes.StoragePools;
 
 using Resources;
 using Buffer;
+using Connections;
 
 public sealed class PhysicalStoragePool : StoragePool
 {
@@ -9,107 +10,107 @@ public sealed class PhysicalStoragePool : StoragePool
   {
   }
 
-  public override Task ChangeOwner(string[] path, UserResource user, CancellationToken cancellationToken)
+  public override Task ChangeOwner(Connection connection, string[] path, UserResource user, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task Delete(string[] path, CancellationToken cancellationToken)
+  public override Task Delete(Connection connection, string[] path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task DirectoryClose(uint handle, CancellationToken cancellationToken)
+  public override Task DirectoryClose(Connection connection, uint handle, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task DirectoryCreate(string[] parentPath, string name, CancellationToken cancellationToken)
+  public override Task DirectoryCreate(Connection connection, string[] parentPath, string name, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task<uint> DirectoryOpen(string[] path, CancellationToken cancellationToken)
+  public override Task<uint> DirectoryOpen(Connection connection, string[] path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task<Information> DirectoryRead(uint handle, long length, CancellationToken cancellationToken)
+  public override Task<Information> DirectoryRead(Connection connection, uint handle, long length, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task DirectoryRemove(string[] path, CancellationToken cancellationToken)
+  public override Task DirectoryRemove(Connection connection, string[] path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task<DirectoryInformation> DirectoryStat(string[] path, CancellationToken cancellationToken)
+  public override Task<DirectoryInformation> DirectoryStat(Connection connection, string[] path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task FileClose(uint handle, CancellationToken cancellationToken)
+  public override Task FileClose(Connection connection, uint handle, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task FileCreate(string[] parentPath, string name, CancellationToken cancellationToken)
+  public override Task FileCreate(Connection connection, string[] parentPath, string name, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task<uint> FileOpen(string[] path, CancellationToken cancellationToken)
+  public override Task<uint> FileOpen(Connection connection, string[] path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task<Buffer> FileRead(uint handle, long length, CancellationToken cancellationToken)
+  public override Task<Buffer> FileRead(Connection connection, uint handle, long length, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task FileSeek(uint handle, long position, CancellationToken cancellationToken)
+  public override Task FileSeek(Connection connection, uint handle, long position, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task<FileInformation> FileStat(uint handle, CancellationToken cancellationToken)
+  public override Task<FileInformation> FileStat(Connection connection, uint handle, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task FileWrite(uint handle, Buffer buffer, CancellationToken cancellationToken)
+  public override Task FileWrite(Connection connection, uint handle, Buffer buffer, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task<Information[]> ListTrash(CancellationToken cancellationToken)
+  public override Task<Information[]> ListTrash(Connection connection, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task<Information> Stat(string[] path, CancellationToken cancellationToken)
+  public override Task<Information> Stat(Connection connection, string[] path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task SymbolicLinkCreate(string[] parentPath, string name, CancellationToken cancellationToken)
+  public override Task SymbolicLinkCreate(Connection connection, string[] parentPath, string name, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task<string> SymbolicLinkRead(string[] path, CancellationToken cancellationToken)
+  public override Task<string> SymbolicLinkRead(Connection connection, string[] path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task<SymbolicLinkInformation> SymbolicLinkStat(string[] path, CancellationToken cancellationToken)
+  public override Task<SymbolicLinkInformation> SymbolicLinkStat(Connection connection, string[] path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  public override Task Trash(string[] path, CancellationToken cancellationToken)
+  public override Task Trash(Connection connection, string[] path, CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }

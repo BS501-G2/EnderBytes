@@ -54,12 +54,7 @@ public sealed class StoragePoolManager : Service
             switch (resource.Type)
             {
               case StoragePoolType.Blob:
-                if (blobFile == null)
-                {
-                  blobFile = File.Open(Server.Configuration.BlobPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-                }
-
-                storagePool = new BlobStoragePool(this, resource, blobFile);
+                storagePool = new BlobStoragePool(this, resource, blobFile ??= File.Open(Server.Configuration.BlobPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
                 break;
               case StoragePoolType.Physical:
                 storagePool = new PhysicalStoragePool(this, resource);

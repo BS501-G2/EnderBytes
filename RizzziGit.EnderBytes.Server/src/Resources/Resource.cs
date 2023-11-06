@@ -101,8 +101,7 @@ public abstract class Resource<M, D, R>
 
     protected abstract R CreateResource(D data);
 
-    protected abstract void OnInit(int oldVersion, DatabaseTransaction transaction);
-    protected abstract void OnInit(DatabaseTransaction transaction);
+    protected abstract void OnInit(DatabaseTransaction transaction, int oldVersion = default);
 
     public bool Init(DatabaseTransaction transaction)
     {
@@ -121,7 +120,7 @@ public abstract class Resource<M, D, R>
       }
       else if (oldVersion != Version)
       {
-        OnInit((int)oldVersion, transaction);
+        OnInit(transaction, (int)oldVersion);
         Main.TableVersion.SetVersion(transaction, Name, Version);
       }
       return oldVersion != Version;
@@ -379,9 +378,12 @@ public abstract class Resource<M, D, R>
 
     public IEnumerable<R> Stream(SqliteDataReader reader)
     {
-      while (reader.Read())
+      using (reader)
       {
-        yield return Memory.ResolveFromData(CreateData(reader));
+        while (reader.Read())
+        {
+          yield return Memory.ResolveFromData(CreateData(reader));
+        }
       }
     }
 

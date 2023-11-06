@@ -9,8 +9,9 @@ using Extensions;
 
 public abstract class Connection : Lifetime
 {
-  public abstract record Request()
+  public abstract record Request
   {
+    private Request() { }
     public record Login(string Username, string Password) : Request()
     {
       public override string ToString()
@@ -30,16 +31,18 @@ public abstract class Connection : Lifetime
     public record GetWorkingDirectory() : Request();
   }
 
-  public abstract record Response(string? Message = null)
+  public abstract record Response
   {
-    public sealed record Ok<T>(T Data) : Response(Message: "No errors.");
-    public sealed record Ok() : Response(Message: "No errors.");
-    public sealed record InvalidCommand() : Response(Message: "Invalid command provided.");
-    public sealed record InvalidCredentials() : Response(Message: "Invalid username or password.");
-    public sealed record SessionExists() : Response(Message: "Already logged in.");
-    public sealed record NoSession() : Response(Message: "Not logged in.");
-    public sealed record Disconnected() : Response("Not connected.");
-    public sealed record InvalidSession() : Response("Session has been invalidated.");
+    private Response() {}
+
+    public sealed record Ok<T>(T Data) : Response;
+    public sealed record Ok() : Response;
+    public sealed record InvalidCommand() : Response;
+    public sealed record InvalidCredentials() : Response;
+    public sealed record SessionExists() : Response;
+    public sealed record NoSession() : Response;
+    public sealed record Disconnected() : Response;
+    public sealed record InvalidSession() : Response;
   }
 
   public Connection(ConnectionManager manager, ulong id) : base($"#{id}")
@@ -55,7 +58,6 @@ public abstract class Connection : Lifetime
   public readonly ConnectionManager Manager;
   private readonly MainResourceManager Resources;
   public UserSession? Session { get; private set; }
-  // public BlobStorageFileResource? WorkingDirectory { get; private set; }
 
   protected virtual Task<Response> OnExecute(Request request) => RunTask(async (cancellationToken) =>
   {
@@ -110,20 +112,6 @@ public abstract class Connection : Lifetime
 
   private Response Handle(Request.ChangeWorkingDirectory request)
   {
-    var (path, relative) = request;
-
-    // BlobStorageFileResource? folder = relative ? WorkingDirectory : null;
-    foreach (string pathEntry in path)
-    {
-      if (pathEntry == ".")
-      {
-        continue;
-      }
-      else if (pathEntry == "..")
-      {
-      }
-    }
-
     return new Response.Ok();
   }
 

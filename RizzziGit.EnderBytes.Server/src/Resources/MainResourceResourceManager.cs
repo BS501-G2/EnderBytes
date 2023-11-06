@@ -15,11 +15,10 @@ public sealed class MainResourceManager : Service
     UserRoles = new(this, MainDatabase);
     UserAuthentications = new(this, MainDatabase);
     StoragePools = new(this, MainDatabase);
-    BlobFiles = new(this, MainDatabase);
-    BlobFileKeys = new(this, MainDatabase);
-    BlobFileVersions = new(this, MainDatabase);
-    Keys = new(this, MainDatabase);
-    KeyData = new(this, MainDatabase);
+    Files = new(this, MainDatabase);
+    FileSnapshots = new(this, MainDatabase);
+    FileKeys = new(this, MainDatabase);
+    FileData = new(this, MainDatabase);
   }
 
   public readonly Server Server;
@@ -29,11 +28,10 @@ public sealed class MainResourceManager : Service
   public readonly UserRoleResource.ResourceManager UserRoles;
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
   public readonly StoragePoolResource.ResourceManager StoragePools;
-  public readonly BlobFileResource.ResourceManager BlobFiles;
-  public readonly BlobFileKeyResource.ResourceManager BlobFileKeys;
-  public readonly BlobFileVersionResource.ResourceManager BlobFileVersions;
-  public readonly KeyResource.ResourceManager Keys;
-  public readonly KeyDataResource.ResourceManager KeyData;
+  public readonly BlobFileResource.ResourceManager Files;
+  public readonly BlobFileSnapshotResource.ResourceManager FileSnapshots;
+  public readonly BlobFileKeyResource.ResourceManager FileKeys;
+  public readonly BlobFileDataResource.ResourceManager FileData;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
@@ -45,11 +43,10 @@ public sealed class MainResourceManager : Service
       UserRoles.Init(transaction);
       UserAuthentications.Init(transaction);
       StoragePools.Init(transaction);
-      BlobFiles.Init(transaction);
-      BlobFileKeys.Init(transaction);
-      BlobFileVersions.Init(transaction);
-      Keys.Init(transaction);
-      KeyData.Init(transaction);
+      Files.Init(transaction);
+      FileSnapshots.Init(transaction);
+      FileKeys.Init(transaction);
+      FileData.Init(transaction);
     }, cancellationToken);
   }
 

@@ -7,113 +7,52 @@ using Connections;
 
 public sealed class BlobStoragePool(StoragePoolManager manager, StoragePoolResource storagePool, FileStream blob) : StoragePool(manager, storagePool, StoragePoolType.Blob)
 {
-  private readonly BlobFileResource.ResourceManager Files = manager.Server.Resources.BlobFiles;
-  private readonly BlobFileVersionResource.ResourceManager FileVersions = manager.Server.Resources.BlobFileVersions;
-  // private readonly BlobFileKeyResource.ResourceData FileKey
   private readonly FileStream Blob = blob;
+  private readonly Database Database = manager.Server.Resources.MainDatabase;
+  private readonly BlobFileResource.ResourceManager Files = manager.Server.Resources.Files;
+  private readonly BlobFileSnapshotResource.ResourceManager Snapshots = manager.Server.Resources.FileSnapshots;
+  private readonly BlobFileKeyResource.ResourceManager Keys = manager.Server.Resources.FileKeys;
+  private readonly BlobFileDataResource.ResourceManager Data = manager.Server.Resources.FileData;
 
-  public override Task ChangeOwner(Connection connection, string[] path, UserResource user, CancellationToken cancellationToken)
+  private (BlobFileResource? parent, BlobFileResource? file) Find(DatabaseTransaction transaction, string[] path)
   {
-    throw new NotImplementedException();
+    BlobFileResource? parent = null;
+    BlobFileResource? file = null;
+    foreach (string pathEntry in path)
+    {
+      parent = file;
+      file = Files.GetByName(transaction, Resource, file, pathEntry);
+
+      if (file == null)
+      {
+        break;
+      }
+    }
+
+    return (parent, file);
   }
 
-  public override Task Delete(Connection connection, string[] path, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
+  // public override Task<StoragePoolResult> Execute(Connection connection, StoragePoolCommand command, CancellationToken cancellationToken) => command switch
+  // {
+  //   // StoragePoolCommand.ChangeOwner a => Handle(connection, a, cancellationToken),
 
-  public override Task DirectoryClose(Connection connection, uint handle, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
+  //   _ => Task.FromResult((StoragePoolResult)new StoragePoolResult.InvalidCommand())
+  // };
 
-  public override Task DirectoryCreate(Connection connection, string[] parentPath, string name, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
+  // private async Task<StoragePoolResult> Handle(Connection connection, StoragePoolCommand.ChangeOwner command, CancellationToken cancellationToken)
+  // {
+  //   var (path, user) = command;
 
-  public override Task<uint> DirectoryOpen(Connection connection, string[] path, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
+  //   return await Database.RunTransaction<StoragePoolResult>(async (transaction, cancellationToken) =>
+  //   {
+  //     var (_, file) = Find(transaction, path);
+  //     if (file == null)
+  //     {
+  //       return new StoragePoolResult.InvalidCommand();
+  //     }
 
-  public override Task<Information> DirectoryRead(Connection connection, uint handle, long length, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task DirectoryRemove(Connection connection, string[] path, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task<DirectoryInformation> DirectoryStat(Connection connection, string[] path, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task FileClose(Connection connection, uint handle, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task FileCreate(Connection connection, string[] parentPath, string name, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task<uint> FileOpen(Connection connection, string[] path, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task<Buffer> FileRead(Connection connection, uint handle, long length, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task FileSeek(Connection connection, uint handle, long position, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task<FileInformation> FileStat(Connection connection, uint handle, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task FileWrite(Connection connection, uint handle, Buffer buffer, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task<Information[]> ListTrash(Connection connection, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task<Information> Stat(Connection connection, string[] path, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task SymbolicLinkCreate(Connection connection, string[] parentPath, string name, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task<string> SymbolicLinkRead(Connection connection, string[] path, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task<SymbolicLinkInformation> SymbolicLinkStat(Connection connection, string[] path, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task Trash(Connection connection, string[] path, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
+  //     await Files.UpdateOwner(transaction, file, user, cancellationToken);
+  //     return new StoragePoolResult.OK();
+  //   }, cancellationToken);
+  // }
 }

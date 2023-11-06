@@ -29,6 +29,7 @@ public enum StoragePoolFlags : byte
   IgnoreCase = 1 << 0,
   ConnectionIsolated = 1 << 1,
   SessionIsolated = 1 << 2,
+  Internal = 1 << 3
 }
 
 public sealed class StoragePoolResource(StoragePoolResource.ResourceManager manager, StoragePoolResource.ResourceData data) : Resource<StoragePoolResource.ResourceManager, StoragePoolResource.ResourceData, StoragePoolResource>(manager, data)
@@ -55,7 +56,7 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
-      (long)reader[KEY_USER_ID],
+      reader[KEY_USER_ID] is DBNull ? null : (long)reader[KEY_USER_ID],
       (byte)(long)reader[KEY_TYPE],
       (byte)(long)reader[KEY_FLAGS],
       (byte)(long)reader[KEY_SCOPE],
@@ -64,12 +65,11 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
 
     protected override StoragePoolResource CreateResource(ResourceData data) => new(this, data);
 
-    protected override void OnInit(DatabaseTransaction transaction) => OnInit(0, transaction);
-    protected override void OnInit(int oldVersion, DatabaseTransaction transaction)
+    protected override void OnInit(DatabaseTransaction transaction, int oldVersion = 0)
     {
       if (oldVersion < 1)
       {
-        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_USER_ID} integer not null;");
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_USER_ID};");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_TYPE} integer not null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_FLAGS} integer not null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PAYLOAD} blob not null;");
@@ -89,35 +89,14 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     long Id,
     long CreateTime,
     long UpdateTime,
-    long UserId,
+    long? UserId,
     byte Type,
     byte Flags,
     byte Scope,
     JObject Payload
+  ) : Resource<ResourceManager, ResourceData, StoragePoolResource>.ResourceData(Id, CreateTime, UpdateTime);
 
-  ) : Resource<ResourceManager, ResourceData, StoragePoolResource>.ResourceData(Id, CreateTime, UpdateTime)
-  {
-    public const string KEY_USER_ID = "userId";
-    [JsonPropertyName(KEY_USER_ID)]
-    public long UserId = UserId;
-
-    public const string KEY_TYPE = "type";
-    [JsonPropertyName(KEY_TYPE)]
-    public byte Type = Type;
-
-    public const string KEY_FLAGS = "flags";
-    [JsonPropertyName(KEY_FLAGS)]
-    public byte Flags = Flags;
-
-    public const string KEY_SCOPE = "scope";
-    [JsonPropertyName(KEY_SCOPE)]
-    public byte Scope = Scope;
-
-    [JsonIgnore]
-    public JObject Payload = Payload;
-  }
-
-  public long UserId => Data.UserId;
+  public long? UserId => Data.UserId;
   public StoragePoolType Type => (StoragePoolType)Data.Type;
   public StoragePoolFlags Flags => (StoragePoolFlags)Data.Flags;
   public StoragePoolScope Scope => (StoragePoolScope)Data.Scope;

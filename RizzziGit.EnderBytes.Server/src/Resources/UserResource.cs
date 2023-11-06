@@ -27,8 +27,7 @@ public sealed class UserResource(UserResource.ResourceManager manager, UserResou
 
     protected override UserResource CreateResource(ResourceData data) => new(this, data);
 
-    protected override void OnInit(DatabaseTransaction transaction) => OnInit(0, transaction);
-    protected override void OnInit(int oldVersion, DatabaseTransaction transaction)
+    protected override void OnInit(DatabaseTransaction transaction, int oldVersion = 0)
     {
       if (oldVersion < 1)
       {

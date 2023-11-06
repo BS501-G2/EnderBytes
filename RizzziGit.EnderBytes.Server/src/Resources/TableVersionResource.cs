@@ -34,8 +34,7 @@ public sealed class TableVersionResource(TableVersionResource.ResourceManager ma
 
     protected override TableVersionResource CreateResource(ResourceData data) => new(this, data);
 
-    protected override void OnInit(DatabaseTransaction transaction) => OnInit(0, transaction);
-    protected override void OnInit(int oldVersion, DatabaseTransaction transaction) => throw new NotImplementedException("Method not implemented.");
+    protected override void OnInit(DatabaseTransaction transaction, int oldVersion = 0) => throw new NotImplementedException("Method not implemented.");
 
     public bool SetVersion(DatabaseTransaction transaction, string name, int version)
     {

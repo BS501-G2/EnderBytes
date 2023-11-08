@@ -107,6 +107,8 @@ public sealed class DatabaseTransaction(Database database, SqliteConnection conn
 
 public sealed class Database : Service
 {
+  public static string GetDatabaseFilePath(string path, string name) => System.IO.Path.Join(path, $"{name}.sqlite3");
+
   public delegate Task AsyncTransactionHandler(DatabaseTransaction transaction, CancellationToken cancellationToken);
   public delegate Task<T> AsyncTransactionHandler<T>(DatabaseTransaction transaction, CancellationToken cancellationToken);
   public delegate void TransactionHandler(DatabaseTransaction transaction);
@@ -116,7 +118,7 @@ public sealed class Database : Service
   {
     Server = server;
     Path = path;
-    DatabaseFile = System.IO.Path.Join(Path, $"{name}.sqlite3");
+    DatabaseFile = GetDatabaseFilePath(Path, name);
   }
 
   public readonly Server Server;
@@ -211,6 +213,7 @@ public sealed class Database : Service
       cancellationTokenSource.Dispose();
     }
   }
+
   public async Task<T> RunTransaction<T>(TransactionHandler<T> handler, CancellationToken cancellationToken)
   {
     TaskCompletionSource<T> source = new();

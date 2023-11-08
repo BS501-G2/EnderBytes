@@ -8,6 +8,7 @@ using Sessions;
 using Protocols;
 using ArtificialIntelligence;
 using StoragePools;
+using RizzziGit.EnderBytes.Keys;
 
 public struct ServerConfiguration()
 {
@@ -38,6 +39,7 @@ public sealed class Server : Service
   {
     Configuration = configuration;
     Resources = new(this);
+    KeyGenerator = new(this);
     Sessions = new(this);
     Connections = new(this);
     StoragePools = new(this);
@@ -47,6 +49,7 @@ public sealed class Server : Service
 
   public readonly ServerConfiguration Configuration;
   public readonly MainResourceManager Resources;
+  public readonly KeyGenerator KeyGenerator;
   public readonly SessionManager Sessions;
   public readonly ConnectionManager Connections;
   public readonly ProtocolManager Protocols;
@@ -56,6 +59,7 @@ public sealed class Server : Service
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
     await Resources.Start();
+    await KeyGenerator.Start();
     await Sessions.Start();
     await Connections.Start();
     await StoragePools.Start();
@@ -66,7 +70,7 @@ public sealed class Server : Service
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
     Logger.Log(LogLevel.Info, "Server is now running.");
-    await (await WatchDog([Resources, Sessions, Connections, Protocols, ArtificialIntelligence], cancellationToken)).task;
+    await (await WatchDog([Resources, Sessions, Connections, Protocols, KeyGenerator], cancellationToken)).task;
   }
 
   protected override async Task OnStop(Exception? exception)
@@ -76,6 +80,7 @@ public sealed class Server : Service
     await StoragePools.Stop();
     await Connections.Stop();
     await Sessions.Stop();
+    await KeyGenerator.Stop();
     await Resources.Stop();
     // await ArtificialIntelligence.Stop();
     Logger.Log(LogLevel.Info, "Server has shut down.");

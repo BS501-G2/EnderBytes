@@ -45,7 +45,7 @@ public abstract class Resource<M, D, R>
       }
     }
 
-    protected ResourceManager(MainResourceManager main, Database database, string name, int version)
+    protected ResourceManager(IMainResourceManager main, Database database, string name, int version)
     {
       Logger = new(name);
       Main = main;
@@ -59,14 +59,14 @@ public abstract class Resource<M, D, R>
     }
 
     public readonly Logger Logger;
-    public readonly MainResourceManager Main;
+    public readonly IMainResourceManager Main;
     protected readonly Database Database;
     public readonly string Name;
     public readonly int Version;
 
     protected readonly ResourceMemory Memory;
-    public event ResourceUpdateHandler? OnResourceUpdate;
-    public event ResourceDeleteHandler? OnResourceDelete;
+    public event ResourceUpdateHandler? ResourceUpdated;
+    public event ResourceDeleteHandler? ResourceDeleted;
 
     public bool IsValid(R resource) => Memory.TryGetValue(resource.Id, out var value) && resource == value;
 
@@ -224,7 +224,7 @@ public abstract class Resource<M, D, R>
           throw new InvalidOperationException("Failed to read new resource data.");
         }
         resource = Memory.ResolveFromData(CreateData(reader));
-        OnResourceUpdate?.Invoke(transaction, resource, oldData);
+        ResourceUpdated?.Invoke(transaction, resource, oldData);
         count++;
       }
 
@@ -245,13 +245,22 @@ public abstract class Resource<M, D, R>
         transaction.ExecuteNonQuery($"delete from {Name} where {KEY_ID} = {{0}}", resource.Id);
         transaction.Failed += (_, _) => Memory.Add(resource.Id, resource);
         Memory.Remove(resource.Id);
-        OnResourceDelete?.Invoke(transaction, resource);
+        ResourceDeleted?.Invoke(transaction, resource);
         count++;
       }
 
       return count;
     }
 
+    protected R? DbOnce(DatabaseTransaction transaction, WhereClause where, LimitClause? limit = null, List<OrderClause>? order = null)
+    {
+      foreach (R resource in DbStream(transaction, where, limit, order))
+      {
+        return resource;
+      }
+
+      return null;
+    }
     protected IEnumerable<R> DbStream(DatabaseTransaction transaction, WhereClause where, LimitClause? limit = null, List<OrderClause>? order = null) => Stream(DbSelect(transaction, where, [], limit, order));
     protected SqliteDataReader DbSelect(DatabaseTransaction transaction, WhereClause where, List<string> project, LimitClause? limit = null, List<OrderClause>? order = null)
     {
@@ -373,22 +382,12 @@ public abstract class Resource<M, D, R>
     {
       { KEY_ID, ("=", resource.Id, null) }
     });
+
+    public event Action<DatabaseTransaction>? RoutineCheck;
+    public virtual void RunRoutineCheck(DatabaseTransaction transaction) => RoutineCheck?.Invoke(transaction);
   }
 
-  public abstract record ResourceData(long Id, long CreateTime, long UpdateTime)
-  {
-    public const string KEY_ID = "id";
-    [JsonPropertyName(KEY_ID)]
-    public long Id = Id;
-
-    public const string KEY_CREATE_TIME = "createTime";
-    [JsonPropertyName(KEY_CREATE_TIME)]
-    public long CreateTime = CreateTime;
-
-    public const string KEY_UPDATE_TIME = "updateTime";
-    [JsonPropertyName(KEY_UPDATE_TIME)]
-    public long UpdateTime = UpdateTime;
-  }
+  public abstract record ResourceData(long Id, long CreateTime, long UpdateTime);
 
   protected Resource(M manager, D data)
   {

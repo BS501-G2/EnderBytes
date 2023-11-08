@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 
@@ -20,12 +19,14 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
   {
     public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
-      main.Users.OnResourceDelete += (transaction, resource) => DbDelete(transaction, new() {
+      main.Users.ResourceDeleted += (transaction, resource) => DbDelete(transaction, new() {
         { KEY_USER_ID, ("=", resource.Id, null) }
       });
     }
 
     private static readonly Regex ValidPasswordRegex = new("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[\\W_])[a-zA-Z0-9\\W_]{8,64}$");
+
+    public new MainResourceManager Main => (MainResourceManager)base.Main;
 
     public const string NAME = "UserAuthentication";
     public const int VERSION = 1;
@@ -68,11 +69,11 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
         transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_CHALLENGE_BYTES} blob not null;");
         transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_ENCRYPTED_BYTES} blob not null;");
 
-        transaction.ExecuteNonQuery($"create unique index {INDEX_UNIQUENESS} on {NAME}({KEY_USER_ID},{KEY_TYPE})");
+        // transaction.ExecuteNonQuery($"create unique index {INDEX_UNIQUENESS} on {NAME}({KEY_USER_ID},{KEY_TYPE})");
       }
     }
 
-    private (UserAuthenticationResource userAuthentication, byte[] hashCache) Create(DatabaseTransaction transaction, long userId, UserAuthenticationType type, byte[] payload)
+    private (UserAuthenticationResource userAuthentication, byte[] hashCache) Create(DatabaseTransaction transaction, UserResource user, UserAuthenticationType type, byte[] payload, (UserAuthenticationResource userAuthentication, byte[] hashCache)? from = null)
     {
       int iterations = Main.Server.Configuration.DefaultUserAuthenticationPayloadHashIterationCount;
 
@@ -82,32 +83,56 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       byte[] challengeBytes = RNG.GetBytes(32);
       byte[] encryptedBytes = Aes.Create().CreateEncryptor(hash, iv).TransformFinalBlock(challengeBytes, 0, challengeBytes.Length);
 
-      return (
-        DbInsert(transaction, new()
+      UserAuthenticationResource? existing = DbOnce(transaction, new()
+      {
+        { KEY_USER_ID, ("=", user.Id, null) }
+      }, (1, null));
+
+      UserAuthenticationResource userAuthentication = DbInsert(transaction, new()
+      {
+        { KEY_USER_ID, user.Id },
+        { KEY_TYPE, (byte)type },
+        { KEY_ITERATIONS, iterations },
+        { KEY_SALT, salt },
+        { KEY_IV, iv },
+        { KEY_CHALLENGE_BYTES, challengeBytes },
+        { KEY_ENCRYPTED_BYTES, encryptedBytes }
+      });
+
+      if (existing != null)
+      {
+        if (from == null)
         {
-          { KEY_USER_ID, userId },
-          { KEY_TYPE, (byte)type },
-          { KEY_ITERATIONS, iterations },
-          { KEY_SALT, salt },
-          { KEY_IV, iv },
-          { KEY_CHALLENGE_BYTES, challengeBytes },
-          { KEY_ENCRYPTED_BYTES, encryptedBytes }
-        }),
-        hash
-      );
+          throw new InvalidOperationException("One existing user authentication method must be provided.");
+        }
+
+        Main.UserKeys.Create(transaction, user, from.Value, (userAuthentication, hash));
+      }
+      else
+      {
+        if (from != null)
+        {
+          throw new ArgumentException("Invalid source authentication method.", nameof(from));
+        }
+
+        var (privateKey, publicKey) = Main.Server.KeyGenerator.GetNew();
+        Main.UserKeys.Create(transaction, user, userAuthentication, privateKey, publicKey, hash);
+      }
+
+      return (userAuthentication, hash);
     }
 
-    public (UserAuthenticationResource userAuthentication, byte[] hashCache) CreatePassword(DatabaseTransaction transaction, long userId, string password)
+    public (UserAuthenticationResource userAuthentication, byte[] hashCache) CreatePassword(DatabaseTransaction transaction, UserResource user, string password, (UserAuthenticationResource userAuthentication, byte[] hashCache)? from = null)
     {
       if (!ValidPasswordRegex.IsMatch(password))
       {
         throw new ArgumentException("Invalid password.", nameof(password));
       }
 
-      return Create(transaction, userId, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
+      return Create(transaction, user, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password), from);
     }
 
-    public (UserAuthenticationResource userAuthentication, byte[] hashCache)? GetByPassword(DatabaseTransaction transaction, long userId, string password)
+    public (UserAuthenticationResource userAuthentication, byte[] hashCache)? GetByPassword(DatabaseTransaction transaction, UserResource user, string password)
     {
       if (!ValidPasswordRegex.IsMatch(password))
       {
@@ -117,7 +142,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       using SqliteDataReader reader = DbSelect(transaction, new()
       {
         { KEY_TYPE, ("=", (byte)UserAuthenticationType.Password, null) },
-        { KEY_USER_ID, ("=", userId, null) }
+        { KEY_USER_ID, ("=", user.Id, null) }
       }, []);
 
       byte[] passwordBytes = Encoding.UTF8.GetBytes(password);
@@ -163,16 +188,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
     byte[] IV,
     byte[] ChallengeBytes,
     byte[] EncryptedBytes
-  ) : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceData(Id, CreateTime, UpdateTime)
-  {
-    public const string KEY_USER_ID = "userId";
-    [JsonPropertyName(KEY_USER_ID)]
-    public long UserId = UserId;
-
-    public const string KEY_TYPE = "type";
-    [JsonPropertyName(KEY_TYPE)]
-    public UserAuthenticationType Type = Type;
-  }
+  ) : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceData(Id, CreateTime, UpdateTime);
 
   public long UserId => Data.UserId;
   public UserAuthenticationType Type => Data.Type;
@@ -185,7 +201,6 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
   public byte[] GetHash(byte[] payload) => new Rfc2898DeriveBytes(payload, Salt, Iterations, HashAlgorithmName.SHA256).GetBytes(32);
   public bool IsMatch(byte[] payload)
   {
-    ;
     try
     {
       return Aes.Create().CreateDecryptor(GetHash(payload), IV).TransformFinalBlock(EncryptedBytes, 0, EncryptedBytes.Length).SequenceEqual(ChallengeBytes);

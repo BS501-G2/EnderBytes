@@ -44,7 +44,7 @@ public abstract class Connection : Lifetime
 
   public abstract record Response
   {
-    private Response() {}
+    private Response() { }
 
     public sealed record Ok<T>(T Data) : Response;
     public sealed record Ok() : Response;
@@ -54,6 +54,7 @@ public abstract class Connection : Lifetime
     public sealed record NoSession() : Response;
     public sealed record Disconnected() : Response;
     public sealed record InvalidSession() : Response;
+    public sealed record InternalError() : Response;
   }
 
   public Connection(ConnectionManager manager, ulong id) : base($"#{id}")
@@ -92,27 +93,32 @@ public abstract class Connection : Lifetime
       return new Response.SessionExists();
     }
 
-    var (username, password) = command;
-    return await Resources.MainDatabase.RunTransaction<Response>(async (transaction, cancellationToken) =>
+    try
     {
-      UserResource? user = Resources.Users.GetByUsername(transaction, username);
-      if (user == null)
+      var (user, authentication, hashCache) = await Resources.MainDatabase.RunTransaction((transaction) =>
       {
-        return new Response.InvalidCredentials();
-      }
+        UserResource user = Resources.Users.GetByUsername(transaction, command.Username) ?? throw new EscapePod(0);
 
-      if (Resources.UserAuthentications.GetByPassword(transaction, user.Id, password).TryGetValue(out var result))
-      {
-        var (authentication, hashCache) = result;
-        Session = await Manager.Server.Sessions.GetUserSession(user, this, authentication, hashCache, cancellationToken);
-      }
-      else
-      {
-        return new Response.InvalidCredentials();
-      }
+        if (Resources.UserAuthentications.GetByPassword(transaction, user, command.Password).TryGetValue(out var result))
+        {
+          var (authentication, hashCache) = result;
+          return (user, authentication, hashCache);
+        }
 
+        throw new EscapePod(0);
+      }, cancellationToken);
+
+      Session = await Manager.Server.Sessions.GetUserSession(user, this, authentication, hashCache, cancellationToken);
       return new Response.Ok();
-    }, cancellationToken);
+    }
+    catch (EscapePod pod)
+    {
+      return pod.Code switch
+      {
+        0 => new Response.InvalidCredentials(),
+        _ => new Response.InternalError(),
+      };
+    }
   }
 
   private Response HandleLogoutRequest()
@@ -162,7 +168,7 @@ public abstract class Connection : Lifetime
 
   protected override Task OnRun(CancellationToken cancellationToken)
   {
-    
+
     return Task.Delay(-1, cancellationToken);
   }
 }

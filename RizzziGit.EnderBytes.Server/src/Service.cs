@@ -140,7 +140,15 @@ public abstract class Service
     context.CancellationTokenSource.Token.ThrowIfCancellationRequested();
     try
     {
-      await OnRun(context.CancellationTokenSource.Token);
+      try
+      {
+        await OnRun(context.CancellationTokenSource.Token);
+        Console.WriteLine($"Done: {Name}");
+      }
+      finally
+      {
+        try { context.CancellationTokenSource.Cancel(); } catch { };
+      }
     }
     catch (OperationCanceledException)
     {

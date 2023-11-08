@@ -5,12 +5,9 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Database;
 
-public enum UserRoleType : byte
-{
-  Admin, User
-}
+public enum UserRoleType : byte { Admin, User }
 
-public sealed class UserRoleResource : Resource<UserRoleResource.ResourceManager, UserRoleResource.ResourceData, UserRoleResource>
+public sealed class UserRoleResource(UserRoleResource.ResourceManager manager, UserRoleResource.ResourceData data) : Resource<UserRoleResource.ResourceManager, UserRoleResource.ResourceData, UserRoleResource>(manager, data)
 {
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserRoleResource>.ResourceManager
   {
@@ -22,7 +19,7 @@ public sealed class UserRoleResource : Resource<UserRoleResource.ResourceManager
 
     public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
-      main.Users.OnResourceDelete += (transaction, user) => DbDelete(transaction, new()
+      main.Users.ResourceDeleted += (transaction, user) => DbDelete(transaction, new()
       {
         { KEY_USER_ID, ("=", user.Id, null) }
       });
@@ -81,20 +78,7 @@ public sealed class UserRoleResource : Resource<UserRoleResource.ResourceManager
     long UpdateTime,
     long UserId,
     UserRoleType Type
-  ) : Resource<ResourceManager, ResourceData, UserRoleResource>.ResourceData(Id, CreateTime, UpdateTime)
-  {
-    public const string KEY_USER_ID = "userId";
-    [JsonPropertyName(KEY_USER_ID)]
-    public long UserId = UserId;
-
-    public const string KEY_TYPE = "type";
-    [JsonPropertyName(KEY_TYPE)]
-    public UserRoleType Type = Type;
-  }
-
-  public UserRoleResource(ResourceManager manager, ResourceData data) : base(manager, data)
-  {
-  }
+  ) : Resource<ResourceManager, ResourceData, UserRoleResource>.ResourceData(Id, CreateTime, UpdateTime);
 
   public long UserId => Data.UserId;
   public UserRoleType Type => Data.Type;

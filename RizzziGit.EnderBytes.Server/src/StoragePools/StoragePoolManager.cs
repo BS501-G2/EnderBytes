@@ -2,6 +2,7 @@ namespace RizzziGit.EnderBytes.StoragePools;
 
 using Collections;
 using Resources;
+using Resources.BlobStorage;
 
 public sealed class StoragePoolManager : Service
 {
@@ -11,76 +12,77 @@ public sealed class StoragePoolManager : Service
     WaitQueue = new();
     StoragePools = new();
 
-    Server.Resources.StoragePools.OnResourceDelete += (_, resource) =>
+    Server.Resources.StoragePools.ResourceDeleted += (_, resource) =>
     {
       lock (this)
       {
-        StoragePools.Remove(resource);
+        if (StoragePools.TryGetValue(resource, out var pool))
+        {
+          StoragePools.Remove(resource);
+          pool.Stop();
+
+          if (pool is BlobStoragePool)
+          {
+            File.Delete(BlobStorageResourceManager.GetDatabaseFilePath(Server, pool));
+          }
+        }
       }
     };
   }
 
   public readonly Server Server;
-  private readonly WeakDictionary<StoragePoolResource, IStoragePool> StoragePools;
-  private WaitQueue<(TaskCompletionSource<IStoragePool> source, StoragePoolResource resource)> WaitQueue;
-  public async Task<IStoragePool> GetStoragePool(StoragePoolResource storagePool, CancellationToken cancellationToken)
+  private readonly WeakDictionary<StoragePoolResource, StoragePool> StoragePools;
+  private WaitQueue<(TaskCompletionSource<StoragePool> source, StoragePoolResource resource)> WaitQueue;
+  public async Task<StoragePool> GetStoragePool(StoragePoolResource storagePool, CancellationToken cancellationToken)
   {
-    TaskCompletionSource<IStoragePool> source = new();
+    TaskCompletionSource<StoragePool> source = new();
     await WaitQueue.Enqueue((source, storagePool), cancellationToken);
     return await source.Task;
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    FileStream? blobFile = null;
-    try
+    while (true)
     {
-      while (true)
-      {
-        cancellationToken.ThrowIfCancellationRequested();
-        var (source, resource) = await WaitQueue.Dequeue(cancellationToken);
+      cancellationToken.ThrowIfCancellationRequested();
+      var (source, resource) = await WaitQueue.Dequeue(cancellationToken);
 
-        lock (this)
+      lock (this)
+      {
         {
+          if (StoragePools.TryGetValue(resource, out var storagePool))
           {
-            if (StoragePools.TryGetValue(resource, out var storagePool))
-            {
-              source.SetResult(storagePool);
-              continue;
-            }
+            source.SetResult(storagePool);
+            continue;
+          }
+        }
+
+        {
+          StoragePool? storagePool = null;
+          switch (resource.Type)
+          {
+            case StoragePoolType.Blob:
+              storagePool = new BlobStoragePool(this, resource);
+              break;
+            case StoragePoolType.Physical:
+            // storagePool = new PhysicalStoragePool(this, resource);
+            // break;
+            case StoragePoolType.Remote:
+            // storagePool = new RemoteStoragePool(this, resource);
+            // break;
+
+            default:
+              source.SetException(new System.InvalidOperationException("Unknown type."));
+              break;
           }
 
+          if (storagePool != null)
           {
-            IStoragePool? storagePool = null;
-            switch (resource.Type)
-            {
-              case StoragePoolType.Blob:
-                storagePool = new BlobStoragePool(this, resource, blobFile ??= File.Open(Server.Configuration.BlobPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
-                break;
-              case StoragePoolType.Physical:
-                // storagePool = new PhysicalStoragePool(this, resource);
-                // break;
-              case StoragePoolType.Remote:
-                // storagePool = new RemoteStoragePool(this, resource);
-                // break;
-
-              default:
-                source.SetException(new System.InvalidOperationException("Unknown type."));
-                break;
-            }
-
-            if (storagePool != null)
-            {
-              StoragePools.Add(resource, storagePool);
-              source.SetResult(storagePool);
-            }
+            StoragePools.Add(resource, storagePool);
+            source.SetResult(storagePool);
           }
         }
       }
-    }
-    finally
-    {
-      blobFile?.Close();
     }
   }
 

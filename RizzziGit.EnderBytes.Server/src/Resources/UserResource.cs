@@ -73,12 +73,7 @@ public sealed class UserResource(UserResource.ResourceManager manager, UserResou
     long CreateTime,
     long UpdateTime,
     string Username
-  ) : Resource<ResourceManager, ResourceData, UserResource>.ResourceData(Id, CreateTime, UpdateTime)
-  {
-    public const string KEY_USERNAME = "username";
-    [JsonPropertyName(KEY_USERNAME)]
-    public string Username = Username;
-  }
+  ) : Resource<ResourceManager, ResourceData, UserResource>.ResourceData(Id, CreateTime, UpdateTime);
 
   public string Username => Data.Username;
 }

@@ -5,10 +5,7 @@ using Resources;
 using Connections;
 using Utilities;
 
-public abstract class StoragePoolException : Exception
-{
-  protected StoragePoolException() { }
-}
+public abstract class StoragePoolException : Exception;
 
 public sealed class InvalidOperationException : StoragePoolException;
 public sealed class PathNotFoundException : StoragePoolException;
@@ -19,9 +16,7 @@ public sealed class NotADirectoryException : StoragePoolException;
 public sealed class IsADirectoryException : StoragePoolException;
 public sealed class DeletedException : StoragePoolException;
 
-public interface IStoragePool;
-
-public abstract class StoragePool : IStoragePool
+public abstract class StoragePool : Lifetime
 {
   public abstract record Information(
     UserResource OwnerUser,
@@ -53,7 +48,7 @@ public abstract class StoragePool : IStoragePool
     );
   }
 
-  protected StoragePool(StoragePoolManager manager, StoragePoolResource storagePool, StoragePoolType type)
+  protected StoragePool(StoragePoolManager manager, StoragePoolResource storagePool, StoragePoolType type, string name): base(name)
   {
     if (storagePool.Type != type)
     {
@@ -62,6 +57,8 @@ public abstract class StoragePool : IStoragePool
 
     Manager = manager;
     Resource = storagePool;
+
+    manager.Logger.Subscribe(Logger);
   }
 
   public readonly StoragePoolManager Manager;

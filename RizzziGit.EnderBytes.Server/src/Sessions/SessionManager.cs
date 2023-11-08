@@ -20,7 +20,7 @@ public sealed class SessionManager : Service
     Sessions = new();
     WaitQueue = new();
 
-    Server.Resources.Users.OnResourceDelete += (_, resource) =>
+    Server.Resources.Users.ResourceDeleted += (_, resource) =>
     {
       lock (this)
       {

@@ -2,7 +2,15 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Database;
 
-public sealed class MainResourceManager : Service
+public interface IMainResourceManager
+{
+  public Server Server { get; }
+  public Database MainDatabase { get; }
+  public TableVersionResource.ResourceManager TableVersion { get; }
+  public Logger Logger { get; }
+}
+
+public sealed class MainResourceManager : Service, IMainResourceManager
 {
   public MainResourceManager(Server server) : base("Resources", server)
   {
@@ -12,26 +20,21 @@ public sealed class MainResourceManager : Service
 
     TableVersion = new(this, MainDatabase);
     Users = new(this, MainDatabase);
+    UserKeys = new(this, MainDatabase);
     UserRoles = new(this, MainDatabase);
     UserAuthentications = new(this, MainDatabase);
     StoragePools = new(this, MainDatabase);
-    Files = new(this, MainDatabase);
-    FileSnapshots = new(this, MainDatabase);
-    FileKeys = new(this, MainDatabase);
-    FileData = new(this, MainDatabase);
   }
 
-  public readonly Server Server;
-  public readonly Database MainDatabase;
-  public readonly TableVersionResource.ResourceManager TableVersion;
+  public Server Server { get; private set; }
+  public Database MainDatabase { get; private set; }
+  public TableVersionResource.ResourceManager TableVersion { get; private set; }
+  public new Logger Logger => base.Logger;
   public readonly UserResource.ResourceManager Users;
   public readonly UserRoleResource.ResourceManager UserRoles;
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
+  public readonly UserKeyResource.ResourceManager UserKeys;
   public readonly StoragePoolResource.ResourceManager StoragePools;
-  public readonly BlobFileResource.ResourceManager Files;
-  public readonly BlobFileSnapshotResource.ResourceManager FileSnapshots;
-  public readonly BlobFileKeyResource.ResourceManager FileKeys;
-  public readonly BlobFileDataResource.ResourceManager FileData;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
@@ -40,13 +43,10 @@ public sealed class MainResourceManager : Service
     {
       TableVersion.Init(transaction);
       Users.Init(transaction);
+      UserKeys.Init(transaction);
       UserRoles.Init(transaction);
       UserAuthentications.Init(transaction);
       StoragePools.Init(transaction);
-      Files.Init(transaction);
-      FileSnapshots.Init(transaction);
-      FileKeys.Init(transaction);
-      FileData.Init(transaction);
     }, cancellationToken);
   }
 

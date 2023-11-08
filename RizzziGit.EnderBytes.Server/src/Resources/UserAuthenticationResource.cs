@@ -20,11 +20,8 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
   {
     public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
-      main.Users.OnResourceDelete(async (transaction, resource, cancellationToken) =>
-      {
-        await DbDelete(transaction, new() {
-          { KEY_USER_ID, ("=", resource.Id, null) }
-        }, cancellationToken);
+      main.Users.OnResourceDelete += (transaction, resource) => DbDelete(transaction, new() {
+        { KEY_USER_ID, ("=", resource.Id, null) }
       });
     }
 

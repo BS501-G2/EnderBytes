@@ -47,6 +47,16 @@ public abstract record FileTransferProtocolCommand()
 
       return new PASS(password);
     }
+    else if (command[0] == "CWD")
+    {
+      string? path = command.ElementAtOrDefault(1);
+      if (path == null)
+      {
+        return null;
+      }
+
+      return new CWD(Uri.UnescapeDataString(path));
+    }
 
     return new Unknown(string.Join(' ', command));
   }
@@ -158,7 +168,7 @@ public sealed class FileTransferProtocolConnection(FileTransferProtocol protocol
     {
       Logger.Log(LogLevel.Verbose, $"< REPLY {{ Code = {reply.Code}, Message = {reply.Message} }}");
 
-      await streamWriter.WriteLineAsync($"{reply.Code}{(reply.Message.Any() ? $"{reply.Message}" : "")}\r");
+      await streamWriter.WriteLineAsync($"{reply.Code}{(reply.Message.Length != 0 ? $"{reply.Message}" : "")}\r");
     };
 
     try

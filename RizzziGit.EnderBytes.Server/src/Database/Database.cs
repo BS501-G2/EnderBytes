@@ -8,40 +8,37 @@ using Collections;
 
 public sealed class DatabaseTransaction(Database database, SqliteConnection connection)
 {
-  public delegate Task TransactionFailureHandler(DatabaseTransaction transaction, Exception exception);
-  public delegate Task TransactionSuccessHandler(DatabaseTransaction transaction);
+  public delegate void TransactionFailureHandler(DatabaseTransaction transaction, Exception exception);
+  public delegate void TransactionSuccessHandler(DatabaseTransaction transaction);
 
   public readonly Database Database = database;
   public readonly SqliteConnection Connection = connection;
   public Logger Logger => Database.Logger;
 
-  private readonly List<TransactionFailureHandler> OnFailureHandlers = [];
-  private readonly List<TransactionSuccessHandler> OnSuccessHandlers = [];
+  public event TransactionFailureHandler? Failed;
+  public event TransactionSuccessHandler? Success;
 
-  public void OnFailure(TransactionFailureHandler handler) => OnFailureHandlers.Add(handler);
-  public void OnSuccess(TransactionSuccessHandler handler) => OnSuccessHandlers.Add(handler);
-
-  public async Task Run(Database.AsyncTransactionHandler handler, CancellationToken cancellationToken)
+  public void Run(Database.TransactionHandler handler, CancellationToken cancellationToken)
   {
     using SqliteTransaction transaction = Connection.BeginTransaction(IsolationLevel.Serializable, false);
 
     try
     {
-      await handler(this, cancellationToken);
+      handler(this);
 
       cancellationToken.ThrowIfCancellationRequested();
       transaction.Commit();
-      foreach (TransactionSuccessHandler onSuccess in OnSuccessHandlers.Reverse<TransactionSuccessHandler>())
+      foreach (TransactionSuccessHandler onSuccess in (Success?.GetInvocationList().Reverse() ?? []).Cast<TransactionSuccessHandler>())
       {
-        await onSuccess(this);
+        onSuccess(this);
       }
     }
     catch (Exception exception)
     {
       transaction.Rollback();
-      foreach (TransactionFailureHandler onFailure in OnFailureHandlers.Reverse<TransactionFailureHandler>())
+      foreach (TransactionFailureHandler onFailure in (Failed?.GetInvocationList().Reverse() ?? []).Cast<TransactionFailureHandler>())
       {
-        await onFailure(this, exception);
+        onFailure(this, exception);
       }
       throw;
     }
@@ -195,7 +192,7 @@ public sealed class Database : Service
     return Task.CompletedTask;
   }
 
-  public async Task RunTransaction(AsyncTransactionHandler handler, CancellationToken cancellationToken)
+  public async Task RunTransaction(TransactionHandler handler, CancellationToken cancellationToken)
   {
     TaskCompletionSource<(TaskCompletionSource source, CancellationToken cancellationToken)> source = new();
     await WaitQueue.Enqueue(source, cancellationToken);
@@ -206,7 +203,7 @@ public sealed class Database : Service
 
     try
     {
-      await transaction.Run(handler, cancellationTokenSource.Token);
+      transaction.Run(handler, cancellationTokenSource.Token);
     }
     finally
     {
@@ -214,43 +211,12 @@ public sealed class Database : Service
       cancellationTokenSource.Dispose();
     }
   }
-
-  public async Task<T> RunTransaction<T>(AsyncTransactionHandler<T> handler, CancellationToken cancellationToken)
-  {
-    TaskCompletionSource<T> source = new();
-
-    try
-    {
-      await RunTransaction(async (transaction, cancellationToken) =>
-      {
-        source.SetResult(await handler(transaction, cancellationToken));
-      }, cancellationToken);
-    }
-    catch (Exception exception)
-    {
-      source.SetException(exception);
-    }
-
-    return await source.Task;
-  }
-
-  public Task RunTransaction(TransactionHandler handler, CancellationToken cancellationToken) => RunTransaction((transaction, cancellationToken) =>
-  {
-    handler(transaction);
-    return Task.CompletedTask;
-  }, cancellationToken);
-
   public async Task<T> RunTransaction<T>(TransactionHandler<T> handler, CancellationToken cancellationToken)
   {
     TaskCompletionSource<T> source = new();
-
     try
     {
-      await RunTransaction((transaction, cancellationToken) =>
-      {
-        source.SetResult(handler(transaction));
-        return Task.CompletedTask;
-      }, cancellationToken);
+      await RunTransaction((transaction) => source.SetResult(handler(transaction)), cancellationToken);
     }
     catch (Exception exception)
     {

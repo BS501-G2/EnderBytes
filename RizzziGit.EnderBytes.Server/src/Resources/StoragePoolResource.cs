@@ -16,13 +16,6 @@ public enum StoragePoolType : byte
   Remote
 }
 
-public enum StoragePoolScope : byte
-{
-  Global,
-  Group,
-  User
-}
-
 [Flags]
 public enum StoragePoolFlags : byte
 {
@@ -38,10 +31,7 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
   {
     public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
-      main.Users.OnResourceDelete(async (transaction, resource, cancellationToken) =>
-      {
-        await DbDelete(transaction, new() { { KEY_USER_ID, ("=", resource.Id, null) } }, cancellationToken);
-      });
+      main.Users.OnResourceDelete += (transaction, resource) => DbDelete(transaction, new() { { KEY_USER_ID, ("=", resource.Id, null) } });
     }
 
     public const string NAME = "StoragePool";
@@ -50,7 +40,6 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     private const string KEY_USER_ID = "UserID";
     private const string KEY_TYPE = "Type";
     private const string KEY_FLAGS = "Flags";
-    private const string KEY_SCOPE = "Scope";
     private const string KEY_PAYLOAD = "Payload";
 
     protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(
@@ -59,7 +48,6 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
       reader[KEY_USER_ID] is DBNull ? null : (long)reader[KEY_USER_ID],
       (byte)(long)reader[KEY_TYPE],
       (byte)(long)reader[KEY_FLAGS],
-      (byte)(long)reader[KEY_SCOPE],
       JObject.Parse(Encoding.UTF8.GetString((byte[])reader[KEY_PAYLOAD]))
     );
 
@@ -92,13 +80,11 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     long? UserId,
     byte Type,
     byte Flags,
-    byte Scope,
     JObject Payload
   ) : Resource<ResourceManager, ResourceData, StoragePoolResource>.ResourceData(Id, CreateTime, UpdateTime);
 
   public long? UserId => Data.UserId;
   public StoragePoolType Type => (StoragePoolType)Data.Type;
   public StoragePoolFlags Flags => (StoragePoolFlags)Data.Flags;
-  public StoragePoolScope Scope => (StoragePoolScope)Data.Scope;
   public JObject Payload => Payload;
 }

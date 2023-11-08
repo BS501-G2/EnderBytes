@@ -7,6 +7,17 @@ using Utilities;
 using Sessions;
 using Extensions;
 
+public abstract class ConnectionException : Exception
+{
+  private ConnectionException(string? message = null, Exception? innerException = null) : base(message, innerException)
+  {
+
+  }
+
+  public sealed class InvalidCommand(Exception? innerException = null) : ConnectionException(innerException: innerException);
+  public sealed class InvalidParameters(Exception? innerException = null) : ConnectionException(innerException: innerException);
+}
+
 public abstract class Connection : Lifetime
 {
   public abstract record Request
@@ -24,9 +35,9 @@ public abstract class Connection : Lifetime
         return $"Login {{ {builder} }}";
       }
     }
+
     public record Logout() : Request();
     public record WhoAmI() : Request();
-
     public record ChangeWorkingDirectory(string[] Path, bool Relative) : Request();
     public record GetWorkingDirectory() : Request();
   }
@@ -63,25 +74,25 @@ public abstract class Connection : Lifetime
   {
     return request switch
     {
-      Request.Login request => await Handle(request, cancellationToken),
-      Request.Logout request => Handle(request),
-      Request.WhoAmI request => Handle(request),
-      Request.ChangeWorkingDirectory request => Handle(request),
+      Request.Login request => await HandleLoginRequest(request, cancellationToken),
+      Request.Logout => HandleLogoutRequest(),
+      Request.WhoAmI => HandleWhoAmI(),
+      Request.ChangeWorkingDirectory request => HandleChangeWorkingDirectoryRequest(request),
 
       _ => new Response.InvalidCommand()
     };
   }, CancellationToken.None);
 
-  private Response.Ok<string> Handle(Request.WhoAmI _) => new(Session?.User.Username ?? "");
+  private Response.Ok<string> HandleWhoAmI() => new(Session?.User.Username ?? "");
 
-  private async Task<Response> Handle(Request.Login loginRequest, CancellationToken cancellationToken)
+  private async Task<Response> HandleLoginRequest(Request.Login command, CancellationToken cancellationToken)
   {
     if (Session != null)
     {
       return new Response.SessionExists();
     }
 
-    var (username, password) = loginRequest;
+    var (username, password) = command;
     return await Resources.MainDatabase.RunTransaction<Response>(async (transaction, cancellationToken) =>
     {
       UserResource? user = Resources.Users.GetByUsername(transaction, username);
@@ -104,13 +115,13 @@ public abstract class Connection : Lifetime
     }, cancellationToken);
   }
 
-  private Response Handle(Request.Logout _)
+  private Response HandleLogoutRequest()
   {
     Session = null;
     return new Response.Ok();
   }
 
-  private Response Handle(Request.ChangeWorkingDirectory request)
+  private static Response HandleChangeWorkingDirectoryRequest(Request.ChangeWorkingDirectory request)
   {
     return new Response.Ok();
   }
@@ -151,6 +162,7 @@ public abstract class Connection : Lifetime
 
   protected override Task OnRun(CancellationToken cancellationToken)
   {
+    
     return Task.Delay(-1, cancellationToken);
   }
 }

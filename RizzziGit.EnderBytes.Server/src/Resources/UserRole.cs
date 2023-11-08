@@ -22,10 +22,10 @@ public sealed class UserRoleResource : Resource<UserRoleResource.ResourceManager
 
     public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
-      main.Users.OnResourceDelete((transaction, user, cancellationToken) => DbDelete(transaction, new()
+      main.Users.OnResourceDelete += (transaction, user) => DbDelete(transaction, new()
       {
         { KEY_USER_ID, ("=", user.Id, null) }
-      }, cancellationToken));
+      });
     }
 
     protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(
@@ -60,15 +60,15 @@ public sealed class UserRoleResource : Resource<UserRoleResource.ResourceManager
       return UserRoleType.User;
     }
 
-    public async Task Set(DatabaseTransaction transaction, UserResource user, UserRoleType type, CancellationToken cancellationToken)
+    public void Set(DatabaseTransaction transaction, UserResource user, UserRoleType type, CancellationToken cancellationToken)
     {
-      if (await DbUpdate(transaction, new()
+      if (DbUpdate(transaction, new()
       {
         { KEY_TYPE, (byte)type }
       }, new()
       {
         { KEY_USER_ID, ("=", user.Id, null) }
-      }, cancellationToken) == 0)
+      }) == 0)
       {
         DbInsert(transaction, new() { { KEY_TYPE, (byte)type } });
       }

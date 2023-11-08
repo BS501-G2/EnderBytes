@@ -7,6 +7,7 @@ using Connections;
 using Sessions;
 using Protocols;
 using ArtificialIntelligence;
+using StoragePools;
 
 public struct ServerConfiguration()
 {
@@ -39,6 +40,7 @@ public sealed class Server : Service
     Resources = new(this);
     Sessions = new(this);
     Connections = new(this);
+    StoragePools = new(this);
     Protocols = new(this);
     ArtificialIntelligence = new(this);
   }
@@ -48,6 +50,7 @@ public sealed class Server : Service
   public readonly SessionManager Sessions;
   public readonly ConnectionManager Connections;
   public readonly ProtocolManager Protocols;
+  public readonly StoragePoolManager StoragePools;
   public readonly ArtificialIntelligenceManager ArtificialIntelligence;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
@@ -55,8 +58,9 @@ public sealed class Server : Service
     await Resources.Start();
     await Sessions.Start();
     await Connections.Start();
+    await StoragePools.Start();
     await Protocols.Start();
-    await ArtificialIntelligence.Start();
+    // await ArtificialIntelligence.Start();
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
@@ -69,10 +73,11 @@ public sealed class Server : Service
   {
     Logger.Log(LogLevel.Info, "server is shutting down.");
     await Protocols.Stop();
+    await StoragePools.Stop();
     await Connections.Stop();
     await Sessions.Stop();
     await Resources.Stop();
-    await ArtificialIntelligence.Stop();
+    // await ArtificialIntelligence.Stop();
     Logger.Log(LogLevel.Info, "Server has shut down.");
   }
 }

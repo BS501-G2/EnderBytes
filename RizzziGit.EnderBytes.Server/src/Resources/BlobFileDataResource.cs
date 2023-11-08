@@ -17,23 +17,23 @@ public sealed class BlobFileDataResource(BlobFileDataResource.ResourceManager ma
 
     public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
-      Main.Files.OnResourceDelete((transaction, resource, cancellationToken) => DbUpdate(transaction, new()
+      Main.Files.OnResourceDelete += (transaction, resource) => DbUpdate(transaction, new()
       {
         { KEY_FILE_ID, null },
         { KEY_SNAPSHOT_ID, null }
       }, new()
       {
         { KEY_FILE_ID, ("=", resource.Id, null) }
-      }, cancellationToken));
+      });
 
-      Main.FileSnapshots.OnResourceDelete((transaction, resource, cancellationToken) => DbUpdate(transaction, new()
+      Main.FileSnapshots.OnResourceDelete += (transaction, resource) => DbUpdate(transaction, new()
       {
         { KEY_FILE_ID, null },
         { KEY_SNAPSHOT_ID, null }
       }, new()
       {
         { KEY_SNAPSHOT_ID, ("=", resource.Id, null) }
-      }, cancellationToken));
+      });
     }
 
     protected override BlobFileDataResource CreateResource(ResourceData data) => new(this, data);
@@ -72,18 +72,31 @@ public sealed class BlobFileDataResource(BlobFileDataResource.ResourceManager ma
       return 0;
     }
 
-    public async Task<BlobFileDataResource> Create(DatabaseTransaction transaction, BlobFileResource file, BlobFileSnapshotResource? snapshot, long? available, CancellationToken cancellationToken)
+    public BlobFileDataResource? GetByFile(DatabaseTransaction transaction, BlobFileResource file, int? offset)
+    {
+      foreach (BlobFileDataResource data in DbStream(transaction, new()
+      {
+        { KEY_FILE_ID, ("=", file.Id, null) }
+      }, (1, offset)))
+      {
+        return data;
+      }
+
+      return null;
+    }
+
+    public BlobFileDataResource Create(DatabaseTransaction transaction, BlobFileResource file, BlobFileSnapshotResource? snapshot, long? available)
     {
       available ??= GetAvailableAddress(transaction);
 
-      if (await DbUpdate(transaction, new()
+      if (DbUpdate(transaction, new()
         {
           { KEY_FILE_ID, file.Id },
           { KEY_SNAPSHOT_ID, snapshot?.Id }
         }, new()
         {
           { KEY_BLOB_ADDRESS, ("=", available, null) }
-        }, cancellationToken) != 0
+        }) != 0
       )
       {
         foreach (BlobFileDataResource data in DbStream(transaction, new()
@@ -106,7 +119,7 @@ public sealed class BlobFileDataResource(BlobFileDataResource.ResourceManager ma
       });
     }
 
-    public async Task<List<BlobFileDataResource>> CopyFrom(DatabaseTransaction transaction, BlobFileResource file, BlobFileSnapshotResource toSnapshot, BlobFileSnapshotResource? fromSnapshot, CancellationToken cancellationToken)
+    public List<BlobFileDataResource> CopyFrom(DatabaseTransaction transaction, BlobFileResource file, BlobFileSnapshotResource toSnapshot, BlobFileSnapshotResource? fromSnapshot)
     {
       List<BlobFileDataResource> list = [];
       UserResource user = Main.Users.GetById(transaction, file.Id) ?? throw new InvalidOperationException("User does not exist.");
@@ -117,7 +130,7 @@ public sealed class BlobFileDataResource(BlobFileDataResource.ResourceManager ma
         { KEY_SNAPSHOT_ID, ("=", fromSnapshot?.Id, null) }
       }))
       {
-        list.Add(await Create(transaction, file, toSnapshot, null, cancellationToken));
+        list.Add(Create(transaction, file, toSnapshot, null));
       }
 
       return list;

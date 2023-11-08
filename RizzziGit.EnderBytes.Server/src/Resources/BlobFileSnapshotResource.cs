@@ -20,10 +20,10 @@ public sealed class BlobFileSnapshotResource : Resource<BlobFileSnapshotResource
 
     public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
-      Main.Files.OnResourceDelete((transaction, resource, cancellationToken) => DbDelete(transaction, new()
+      Main.Files.OnResourceDelete += (transaction, resource) => DbDelete(transaction, new()
       {
         { KEY_FILE_ID, ("=", resource.Id, null) }
-      }, cancellationToken));
+      });
     }
 
     protected override BlobFileSnapshotResource CreateResource(ResourceData data) => new(this, data);
@@ -40,7 +40,7 @@ public sealed class BlobFileSnapshotResource : Resource<BlobFileSnapshotResource
       }
     }
 
-    public async Task<BlobFileSnapshotResource> Create(DatabaseTransaction transaction, UserResource authorUser, BlobFileResource file, CancellationToken cancellationToken)
+    public BlobFileSnapshotResource Create(DatabaseTransaction transaction, UserResource authorUser, BlobFileResource file, CancellationToken cancellationToken)
     {
       BlobFileSnapshotResource snapshot = DbInsert(transaction, new()
       {
@@ -48,7 +48,7 @@ public sealed class BlobFileSnapshotResource : Resource<BlobFileSnapshotResource
         { KEY_AUTHOR_USER_ID, authorUser.Id }
       });
 
-      await Main.FileData.CopyFrom(transaction, file, snapshot, null, cancellationToken);
+      Main.FileData.CopyFrom(transaction, file, snapshot, null);
       return snapshot;
     }
   }
@@ -59,5 +59,3 @@ public sealed class BlobFileSnapshotResource : Resource<BlobFileSnapshotResource
     long UpdateTime
   ) : Resource<ResourceManager, ResourceData, BlobFileSnapshotResource>.ResourceData(Id, CreateTime, UpdateTime);
 }
-
-

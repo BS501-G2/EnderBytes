@@ -7,11 +7,9 @@ using Database;
 using Extensions;
 using Collections;
 
-public sealed class BlobFileKeyResource : Resource<BlobFileKeyResource.ResourceManager, BlobFileKeyResource.ResourceData, BlobFileKeyResource>
+public sealed class BlobFileKeyResource(BlobFileKeyResource.ResourceManager manager, BlobFileKeyResource.ResourceData data) : Resource<BlobFileKeyResource.ResourceManager, BlobFileKeyResource.ResourceData, BlobFileKeyResource>(manager, data)
 {
-  public BlobFileKeyResource(ResourceManager manager, ResourceData data) : base(manager, data)
-  {
-  }
+  public const int BUFFER_SIZE = 512;
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, BlobFileKeyResource>.ResourceManager
   {
@@ -27,10 +25,10 @@ public sealed class BlobFileKeyResource : Resource<BlobFileKeyResource.ResourceM
     {
       RNG = RandomNumberGenerator.Create();
 
-      Main.Files.OnResourceDelete((transaction, resource, cancellationToken) => DbDelete(transaction, new()
+      Main.Files.OnResourceDelete += (transaction, resource) => DbDelete(transaction, new()
       {
         { KEY_FILE_ID, ("=", resource.Id, null) }
-      }, cancellationToken));
+      });
     }
 
     private readonly RandomNumberGenerator RNG;
@@ -61,13 +59,15 @@ public sealed class BlobFileKeyResource : Resource<BlobFileKeyResource.ResourceM
       using var rsa = new RSACryptoServiceProvider()
       {
         PersistKeyInCsp = false,
-        KeySize = 8 * 4096
+        KeySize = 8 * BUFFER_SIZE
       };
 
       try
       {
+        Console.WriteLine("test");
         byte[] iv = RNG.GetBytes(16);
         byte[] privateKey = rsa.ExportCspBlob(true);
+        Console.WriteLine("test");
 
         return DbInsert(transaction, new()
         {
@@ -93,13 +93,13 @@ public sealed class BlobFileKeyResource : Resource<BlobFileKeyResource.ResourceM
       using var fromRsa = new RSACryptoServiceProvider()
       {
         PersistKeyInCsp = false,
-        KeySize = 8 * 4096
+        KeySize = 8 * BUFFER_SIZE
       };
 
       using var rsa = new RSACryptoServiceProvider()
       {
         PersistKeyInCsp = false,
-        KeySize = 8 * 4096
+        KeySize = 8 * BUFFER_SIZE
       };
 
       try
@@ -125,6 +125,20 @@ public sealed class BlobFileKeyResource : Resource<BlobFileKeyResource.ResourceM
         fromRsa.Clear();
         rsa.Clear();
       }
+    }
+
+    public BlobFileKeyResource? Get(DatabaseTransaction transaction, BlobFileResource file, UserAuthenticationResource userAuthentication)
+    {
+      foreach (BlobFileKeyResource fileKey in DbStream(transaction, new()
+      {
+        { KEY_FILE_ID, ("=", file.Id, null) },
+        { KEY_USER_AUTHENTICATION_ID, ("=", userAuthentication.Id, null) }
+      }, (1, null)))
+      {
+        return fileKey;
+      }
+
+      return null;
     }
   }
 
@@ -182,7 +196,7 @@ public sealed class BlobFileKeyResource : Resource<BlobFileKeyResource.ResourceM
         PrivateRSA.TryAdd(Data, rsa = new()
         {
           PersistKeyInCsp = false,
-          KeySize = 8 * 4096
+          KeySize = 8 * BUFFER_SIZE
         });
 
         rsa.ImportCspBlob(Aes.Create().CreateDecryptor(hashCache, Data.Private[0..16]).TransformFinalBlock(Data.Private, 16, Data.Private.Length - 16));
@@ -206,7 +220,7 @@ public sealed class BlobFileKeyResource : Resource<BlobFileKeyResource.ResourceM
         PublicRSA.TryAdd(Data, rsa = new()
         {
           PersistKeyInCsp = false,
-          KeySize = 8 * 4096
+          KeySize = 8 * BUFFER_SIZE
         });
 
         rsa.ImportCspBlob(Data.Public);

@@ -24,13 +24,8 @@ public abstract class Resource<M, D, R>
     protected const string KEY_UPDATE_TIME = "UpdateTime";
 
     public delegate void ResourceInsertHandler(DatabaseTransaction transaction, R resource);
-    public delegate Task AsyncResourceInsertHandler(DatabaseTransaction transaction, R resource, CancellationToken cancellationToken);
-
     public delegate void ResourceDeleteHandler(DatabaseTransaction transaction, R resource);
-    public delegate Task AsyncResourceDeleteHandler(DatabaseTransaction transaction, R resource, CancellationToken cancellationToken);
-
     public delegate void ResourceUpdateHandler(DatabaseTransaction transaction, R resource, D oldData);
-    public delegate Task AsyncResourceUpdateHandler(DatabaseTransaction transaction, R resource, D oldData, CancellationToken cancellationToken);
 
     public sealed class ResourceMemory(ResourceManager manager) : WeakDictionary<long, R>
     {
@@ -59,8 +54,6 @@ public abstract class Resource<M, D, R>
       Version = version;
 
       Memory = new(this);
-      ResourceUpdateHandlers = [];
-      ResourceDeleteHandlers = [];
 
       Main.Logger.Subscribe(Logger);
     }
@@ -72,24 +65,10 @@ public abstract class Resource<M, D, R>
     public readonly int Version;
 
     protected readonly ResourceMemory Memory;
-    private readonly List<AsyncResourceUpdateHandler> ResourceUpdateHandlers;
-    private readonly List<AsyncResourceDeleteHandler> ResourceDeleteHandlers;
+    public event ResourceUpdateHandler? OnResourceUpdate;
+    public event ResourceDeleteHandler? OnResourceDelete;
 
     public bool IsValid(R resource) => Memory.TryGetValue(resource.Id, out var value) && resource == value;
-
-    public void OnResourceUpdate(AsyncResourceUpdateHandler handler) => ResourceUpdateHandlers.Add(handler);
-    public void OnResourceUpdate(ResourceUpdateHandler handler) => OnResourceUpdate((transaction, id, oldData, _) =>
-    {
-      handler(transaction, id, oldData);
-      return Task.CompletedTask;
-    });
-
-    public void OnResourceDelete(AsyncResourceDeleteHandler handler) => ResourceDeleteHandlers.Add(handler);
-    public void OnResourceDelete(ResourceDeleteHandler handler) => OnResourceDelete((transaction, id, _) =>
-    {
-      handler(transaction, id);
-      return Task.CompletedTask;
-    });
 
     protected D CreateData(SqliteDataReader reader) => CreateData(reader,
       (long)reader[KEY_ID],
@@ -153,6 +132,11 @@ public abstract class Resource<M, D, R>
           new(KEY_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
         ]))
         {
+          if (value == null)
+          {
+            continue;
+          }
+
           if (!firstEntry)
           {
             columnClause.Append(',');
@@ -193,7 +177,7 @@ public abstract class Resource<M, D, R>
       return Memory.ResolveFromData(CreateData(reader));
     }
 
-    protected async Task<long> DbUpdate(DatabaseTransaction transaction, ValueClause set, WhereClause where, CancellationToken cancellationToken)
+    protected long DbUpdate(DatabaseTransaction transaction, ValueClause set, WhereClause where)
     {
       Validate(transaction);
 
@@ -232,11 +216,7 @@ public abstract class Resource<M, D, R>
         R resource = Memory.ResolveFromData(CreateData(reader));
         D oldData = resource.Data;
         transaction.ExecuteNonQuery($"update set {setSql} {Name} where {KEY_ID} = {{{sqlParams.Count}}};", [.. sqlParams, resource.Id]);
-        transaction.OnFailure((_, _) =>
-        {
-          resource.Data = oldData;
-          return Task.CompletedTask;
-        });
+        transaction.Failed += (_, _) => resource.Data = oldData;
 
         using SqliteDataReader newReader = transaction.ExecuteReader($"select * from {Name} where {KEY_ID} = {{0}} limit 1;", [resource.Id]);
         if (!newReader.Read())
@@ -244,18 +224,14 @@ public abstract class Resource<M, D, R>
           throw new InvalidOperationException("Failed to read new resource data.");
         }
         resource = Memory.ResolveFromData(CreateData(reader));
-
-        foreach (AsyncResourceUpdateHandler handler in ResourceUpdateHandlers)
-        {
-          await handler(transaction, resource, oldData, cancellationToken);
-        }
+        OnResourceUpdate?.Invoke(transaction, resource, oldData);
         count++;
       }
 
       return count;
     }
 
-    protected async Task<long> DbDelete(DatabaseTransaction transaction, WhereClause where, CancellationToken cancellationToken)
+    protected long DbDelete(DatabaseTransaction transaction, WhereClause where)
     {
       Validate(transaction);
 
@@ -267,18 +243,9 @@ public abstract class Resource<M, D, R>
         R resource = Memory.ResolveFromData(CreateData(reader));
 
         transaction.ExecuteNonQuery($"delete from {Name} where {KEY_ID} = {{0}}", resource.Id);
+        transaction.Failed += (_, _) => Memory.Add(resource.Id, resource);
         Memory.Remove(resource.Id);
-        transaction.OnFailure((_, _) =>
-        {
-          Memory.Add(resource.Id, resource);
-          return Task.CompletedTask;
-        });
-
-        foreach (AsyncResourceDeleteHandler handler in ResourceDeleteHandlers)
-        {
-          await handler(transaction, resource, cancellationToken);
-        }
-
+        OnResourceDelete?.Invoke(transaction, resource);
         count++;
       }
 
@@ -402,10 +369,10 @@ public abstract class Resource<M, D, R>
       return null;
     }
 
-    public Task Delete(DatabaseTransaction transaction, R resource, CancellationToken cancellationToken) => DbDelete(transaction, new()
+    public long Delete(DatabaseTransaction transaction, R resource) => DbDelete(transaction, new()
     {
       { KEY_ID, ("=", resource.Id, null) }
-    }, cancellationToken);
+    });
   }
 
   public abstract record ResourceData(long Id, long CreateTime, long UpdateTime)

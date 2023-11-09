@@ -16,7 +16,7 @@ public sealed class MainResourceManager : Service, IMainResourceManager
   {
     Server = server;
 
-    MainDatabase = new(Server, server.Configuration.DatabasePath, "Main");
+    MainDatabase = new(this, server.Configuration.DatabasePath, "Main");
 
     TableVersion = new(this, MainDatabase);
     Users = new(this, MainDatabase);

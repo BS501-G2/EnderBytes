@@ -19,12 +19,9 @@ public sealed class StoragePoolManager : Service
         if (StoragePools.TryGetValue(resource, out var pool))
         {
           StoragePools.Remove(resource);
-          pool.Stop();
 
-          if (pool is BlobStoragePool)
-          {
-            File.Delete(BlobStorageResourceManager.GetDatabaseFilePath(Server, pool));
-          }
+          pool.MarkedForDeletion = true;
+          pool.Stop();
         }
       }
     };
@@ -33,6 +30,7 @@ public sealed class StoragePoolManager : Service
   public readonly Server Server;
   private readonly WeakDictionary<StoragePoolResource, StoragePool> StoragePools;
   private WaitQueue<(TaskCompletionSource<StoragePool> source, StoragePoolResource resource)> WaitQueue;
+
   public async Task<StoragePool> GetStoragePool(StoragePoolResource storagePool, CancellationToken cancellationToken)
   {
     TaskCompletionSource<StoragePool> source = new();
@@ -79,6 +77,7 @@ public sealed class StoragePoolManager : Service
           if (storagePool != null)
           {
             StoragePools.Add(resource, storagePool);
+            storagePool.Start(cancellationToken);
             source.SetResult(storagePool);
           }
         }

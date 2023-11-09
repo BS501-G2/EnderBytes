@@ -64,7 +64,7 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
       }
     }
 
-    public StoragePoolResource CreateVirtual(DatabaseTransaction transaction, long userId, StoragePoolFlags flags) => DbInsert(transaction, new()
+    public StoragePoolResource CreateBlob(DatabaseTransaction transaction, long userId, StoragePoolFlags flags) => DbInsert(transaction, new()
     {
       { KEY_USER_ID, userId },
       { KEY_TYPE, (byte)StoragePoolType.Blob },

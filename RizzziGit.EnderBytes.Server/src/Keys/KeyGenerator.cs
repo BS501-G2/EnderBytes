@@ -6,7 +6,7 @@ using Resources;
 
 using KeyEntry = (byte[] privatekey, byte[] publicKey);
 
-public sealed class KeyGenerator(Server server) : Service("Blob Key Generator", server)
+public sealed class KeyGenerator(Server server) : Service("Key Generator", server)
 {
   public const int KEY_SIZE = 512 * 8;
   public const int MAX_CONCURRENT_GENERATOR = 4;
@@ -54,7 +54,7 @@ public sealed class KeyGenerator(Server server) : Service("Blob Key Generator", 
       {
         cancellationToken.ThrowIfCancellationRequested();
 
-        while ((tasks.Count < MAX_CONCURRENT_GENERATOR) && (WaitQueue.Count < MAX_PREGENERATED_KEY_COUNT))
+        while ((tasks.Count < MAX_CONCURRENT_GENERATOR) && ((WaitQueue.Count + tasks.Count) < MAX_PREGENERATED_KEY_COUNT))
         {
           tasks.Add(TaskFactory.StartNew(RunGenerateJob, cancellationToken));
         }

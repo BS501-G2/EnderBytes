@@ -203,8 +203,15 @@ public abstract class Resource<M, D, R>
             firstEntry = false;
           }
 
-          setCommand.Append($"{key} = {{{sqlParams.Count}}}");
-          sqlParams.Add(value);
+          if (value == null)
+          {
+            setCommand.Append($"{key} = null");
+          }
+          else
+          {
+            setCommand.Append($"{key} = {{{sqlParams.Count}}}");
+            sqlParams.Add(value);
+          }
         }
       }
 
@@ -261,6 +268,7 @@ public abstract class Resource<M, D, R>
 
       return null;
     }
+
     protected IEnumerable<R> DbStream(DatabaseTransaction transaction, WhereClause where, LimitClause? limit = null, List<OrderClause>? order = null) => Stream(DbSelect(transaction, where, [], limit, order));
     protected SqliteDataReader DbSelect(DatabaseTransaction transaction, WhereClause where, List<string> project, LimitClause? limit = null, List<OrderClause>? order = null)
     {
@@ -308,12 +316,19 @@ public abstract class Resource<M, D, R>
             firstEntry = false;
           }
 
-          sql.Append($"{key} {condition} {{{sqlParams.Count}}}");
-          sqlParams.Add(value);
-
-          if (collate != null)
+          if (value == null)
           {
-            sql.Append($" collate {collate}");
+            sql.Append($"{key} {condition} null");
+          }
+          else
+          {
+            sql.Append($"{key} {condition} {{{sqlParams.Count}}}");
+            sqlParams.Add(value);
+
+            if (collate != null)
+            {
+              sql.Append($" collate {collate}");
+            }
           }
         }
       }

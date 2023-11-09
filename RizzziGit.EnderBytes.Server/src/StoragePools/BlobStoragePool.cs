@@ -16,17 +16,29 @@ public sealed class BlobStoragePool : StoragePool
     Resources = new(this);
   }
 
-  private readonly BlobStorageResourceManager Resources;
+  public readonly BlobStorageResourceManager Resources;
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
     try
     {
+      await Resources.Start();
+
       await base.OnRun(cancellationToken);
     }
     finally
     {
-      await Resources.Stop();
+      try
+      {
+        await Resources.Stop();
+      }
+      finally
+      {
+        if (MarkedForDeletion)
+        {
+          File.Delete(BlobStorageResourceManager.GetDatabaseFilePath(Manager.Server, this));
+        }
+      }
     }
   }
 

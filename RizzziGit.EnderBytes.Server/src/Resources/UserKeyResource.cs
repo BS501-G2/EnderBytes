@@ -20,8 +20,6 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
     private const string KEY_ENCRYPTED_PRIVATE_KEY = "EncryptedPrivateKey";
     private const string KEY_PUBLIC_KEY = "PublicKey";
 
-    private const string INDEX_UNIQUENESS = $"Index_{KEY_USER_ID}";
-
     public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
       RNG = RandomNumberGenerator.Create();
@@ -49,8 +47,6 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PRIVATE_IV} blob not null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_ENCRYPTED_PRIVATE_KEY} blob not null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PUBLIC_KEY} blob not null;");
-
-        // transaction.ExecuteNonQuery($"create unique index {INDEX_UNIQUENESS} on {NAME}({KEY_PUBLIC_KEY})");
       }
     }
 

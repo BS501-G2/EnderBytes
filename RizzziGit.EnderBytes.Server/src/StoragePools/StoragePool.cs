@@ -18,6 +18,10 @@ public sealed class DeletedException : StoragePoolException;
 
 public abstract class StoragePool : Lifetime
 {
+  public abstract class FileHandle
+  {
+  }
+
   public abstract record Information(
     UserResource OwnerUser,
     string[] Path,
@@ -58,11 +62,15 @@ public abstract class StoragePool : Lifetime
     Manager = manager;
     Resource = storagePool;
 
+    MarkedForDeletion = false;
+
     manager.Logger.Subscribe(Logger);
   }
 
   public readonly StoragePoolManager Manager;
   public readonly StoragePoolResource Resource;
+
+  public bool MarkedForDeletion;
 
   public abstract Task FileCreate(UserAuthenticationResource userAuthentication, byte[] hashCache, string[] path, CancellationToken cancellationToken);
   public abstract Task<long> FileOpen(string[] path, FileAccess fileAccess, CancellationToken cancellationToken);

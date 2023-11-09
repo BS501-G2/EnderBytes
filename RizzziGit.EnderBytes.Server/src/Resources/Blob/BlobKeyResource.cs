@@ -25,11 +25,6 @@ public sealed class BlobKeyResource(BlobKeyResource.ResourceManager manager, Blo
       {
         { KEY_FILE_ID, ("=", resource.Id, null) }
       });
-
-      main.Server.Resources.UserKeys.ResourceDeleted += (transaction, resource) => main.MainDatabase.RunTransaction((transaction) => DbDelete(transaction, new()
-      {
-        { KEY_USER_KEY_ID, ("=", resource.Id, null) }
-      }), CancellationToken.None).Wait();
     }
 
     protected override BlobKeyResource CreateResource(ResourceData data) => new(this, data);
@@ -96,6 +91,30 @@ public sealed class BlobKeyResource(BlobKeyResource.ResourceManager manager, Blo
       }
 
       throw new ArgumentException("User key is not valid.", nameof(from));
+    }
+
+    public (BlobKeyResource key, byte[] privateKey)? GetByUserKey(DatabaseTransaction transaction, BlobFileResource file, UserKeyResource userKey, byte[] hashCache)
+    {
+      foreach (BlobKeyResource key in DbStream(transaction, new()
+      {
+        { KEY_FILE_ID, ("=", file.Id, null) },
+        { KEY_USER_KEY_ID, ("=", userKey.Id, null) }
+      }))
+      {
+        byte[] privateKey;
+        try
+        {
+          privateKey = userKey.Decrypt(key.EncryptedPrivateKey, hashCache);
+        }
+        catch
+        {
+          return null;
+        }
+
+        return (key, privateKey);
+      }
+
+      return null;
     }
   }
 

@@ -1,6 +1,9 @@
 namespace RizzziGit.EnderBytes.Runtime;
 
 using Resources;
+using Database;
+using Resources.BlobStorage;
+using StoragePools;
 
 public static class Program
 {
@@ -14,28 +17,57 @@ public static class Program
     Console.CancelKeyPress += onPress;
   }
 
+  public static void ScanFiles(TaskFactory factory, BlobStorageResourceManager resources, string path = "/", BlobFileResource? parentFolder = null)
+  {
+    _ = factory.StartNew(() =>
+    {
+      foreach (string entry in Directory.EnumerateFileSystemEntries(path).Select((entry) => entry[path.Length..]))
+      {
+        try
+        {
+          FileInfo fileInfo = new(Path.Join(path, entry));
+
+          if (
+            (!fileInfo.Attributes.HasFlag(FileAttributes.Directory)) ||
+            fileInfo.LinkTarget != null ||
+            entry.Length == 0
+          )
+          {
+            continue;
+          }
+        }
+        catch
+        {
+          continue;
+        }
+
+        Console.WriteLine(Path.Join(path, entry));
+        _ = resources.MainDatabase.RunTransaction((transaction) =>
+        {
+          BlobFileResource pool = resources.Files.CreateFolder(transaction, path == "/" ? null : parentFolder, entry[0] == '/' ? entry[1..] : entry);
+          ScanFiles(factory, resources, Path.Join(path, entry), pool);
+        }, CancellationToken.None);
+      }
+    });
+  }
+
   public static async Task Test(Server server)
   {
     for (int count = 0; count < 1 && server.State == ServiceState.Started; count++)
     {
-      try
+      var (storagePoolResource, userAuthentication, hashCache) = await server.Resources.MainDatabase.RunTransaction((transaction) =>
       {
-        var (storagePoolResource, userAuthentication, hashCache) = await server.Resources.MainDatabase.RunTransaction((transaction) =>
-        {
-          string username = $"te{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
-          string password = "aasdAAASD1123123;";
+        string username = $"te{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+        string password = "aasdAAASD1123123;";
 
-          UserResource user = server.Resources.Users.Create(transaction, username, "Test user");
-          var (userAuthentication, hashCache) = server.Resources.UserAuthentications.CreatePassword(transaction, user, password);
-          return (server.Resources.StoragePools.CreateVirtual(transaction, user.Id, StoragePoolFlags.IgnoreCase), userAuthentication, hashCache);
-        }, CancellationToken.None);
-      }
-      catch
-      {
-        Console.WriteLine("asd");
-        throw;
-      }
+        UserResource user = server.Resources.Users.Create(transaction, username, "Test user");
+        var (userAuthentication, hashCache) = server.Resources.UserAuthentications.CreatePassword(transaction, user, password);
+        return (server.Resources.StoragePools.CreateBlob(transaction, user.Id, StoragePoolFlags.IgnoreCase), userAuthentication, hashCache);
+      }, CancellationToken.None);
 
+      BlobStoragePool blobStorage = (BlobStoragePool)await server.StoragePools.GetStoragePool(storagePoolResource, CancellationToken.None);
+      TaskFactory factory = new(TaskCreationOptions.LongRunning, TaskContinuationOptions.None);
+      ScanFiles(factory, blobStorage.Resources);
       // var storagePool = (BlobStoragePool)await server.StoragePools.GetStoragePool(storagePoolResource, CancellationToken.None);
       // await storagePool.FileCreate(userAuthentication, hashCache, ["test.webm"], CancellationToken.None);
 

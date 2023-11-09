@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 namespace RizzziGit.EnderBytes.Database;
 
 using Collections;
+using RizzziGit.EnderBytes.Resources;
 
 public sealed class DatabaseTransaction(Database database, SqliteConnection connection)
 {
@@ -114,11 +115,13 @@ public sealed class Database : Service
   public delegate void TransactionHandler(DatabaseTransaction transaction);
   public delegate T TransactionHandler<T>(DatabaseTransaction transaction);
 
-  public Database(Server server, string path, string name) : base("Database", server)
+  public Database(IMainResourceManager main, string path, string name) : base("Database")
   {
-    Server = server;
+    Server = main.Server;
     Path = path;
     DatabaseFile = GetDatabaseFilePath(Path, name);
+
+    main.Logger.Subscribe(Logger);
   }
 
   public readonly Server Server;
@@ -154,7 +157,8 @@ public sealed class Database : Service
       {
         ConnectionString = new SqliteConnectionStringBuilder()
         {
-          DataSource = DatabaseFile
+          DataSource = DatabaseFile,
+          Cache = SqliteCacheMode.Private
         }.ConnectionString
       };
 

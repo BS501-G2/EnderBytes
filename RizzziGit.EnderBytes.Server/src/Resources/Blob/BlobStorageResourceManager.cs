@@ -7,7 +7,7 @@ using Database;
 
 public sealed class BlobStorageResourceManager : Service, IMainResourceManager
 {
-  public static string GetDatabaseFilePath(Server server, StoragePool storagePool) => Database.GetDatabaseFilePath(server.Configuration.BlobPath, $"{storagePool.Resource.Id}");
+  public static string GetDatabaseFilePath(Server server, BlobStoragePool storagePool) => Database.GetDatabaseFilePath(server.Configuration.BlobPath, $"{storagePool.Resource.Id}");
 
   public BlobStorageResourceManager(BlobStoragePool storagePool) : base($"Blob #{storagePool.Resource.Id}")
   {

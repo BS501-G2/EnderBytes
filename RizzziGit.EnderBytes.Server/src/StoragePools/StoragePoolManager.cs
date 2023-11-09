@@ -28,12 +28,12 @@ public sealed class StoragePoolManager : Service
   }
 
   public readonly Server Server;
-  private readonly WeakDictionary<StoragePoolResource, StoragePool> StoragePools;
-  private WaitQueue<(TaskCompletionSource<StoragePool> source, StoragePoolResource resource)> WaitQueue;
+  private readonly WeakDictionary<StoragePoolResource, IStoragePool> StoragePools;
+  private WaitQueue<(TaskCompletionSource<IStoragePool> source, StoragePoolResource resource)> WaitQueue;
 
-  public async Task<StoragePool> GetStoragePool(StoragePoolResource storagePool, CancellationToken cancellationToken)
+  public async Task<IStoragePool> GetStoragePool(StoragePoolResource storagePool, CancellationToken cancellationToken)
   {
-    TaskCompletionSource<StoragePool> source = new();
+    TaskCompletionSource<IStoragePool> source = new();
     await WaitQueue.Enqueue((source, storagePool), cancellationToken);
     return await source.Task;
   }
@@ -56,7 +56,7 @@ public sealed class StoragePoolManager : Service
         }
 
         {
-          StoragePool? storagePool = null;
+          IStoragePool? storagePool = null;
           switch (resource.Type)
           {
             case StoragePoolType.Blob:

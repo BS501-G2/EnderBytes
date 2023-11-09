@@ -27,6 +27,7 @@ public abstract class Lifetime : ILifetime
   private readonly TaskQueue TaskQueue;
 
   public bool IsRunning => Source != null;
+  public Exception? Exception = null;
 
   public virtual void Stop() => Source?.Cancel();
 
@@ -49,6 +50,7 @@ public abstract class Lifetime : ILifetime
       );
     }
     catch (OperationCanceledException) { }
+    catch (Exception exception) { Exception = exception; }
     finally
     {
       lock (this)

@@ -9,8 +9,31 @@ using Database;
 using Connections;
 using Utilities;
 
-public sealed class BlobStoragePool : StoragePool
+public sealed class BlobStoragePool : StoragePool<BlobStoragePool.FileHandle>
 {
+  public new sealed class FileHandle(FileAccess access, FileMode mode) : StoragePool<FileHandle>.FileHandle(access, mode)
+  {
+    protected override Task InternalClose()
+    {
+      throw new NotImplementedException();
+    }
+
+    protected override Task<Information.File> InternalGetInfo(CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+
+    protected override Task<Buffer> InternalRead(long length, CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+
+    protected override Task InternalWrite(Buffer buffer, CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+  }
+
   public BlobStoragePool(StoragePoolManager manager, StoragePoolResource storagePool) : base(manager, storagePool, StoragePoolType.Blob, "Blob Storage")
   {
     Resources = new(this);
@@ -42,28 +65,7 @@ public sealed class BlobStoragePool : StoragePool
     }
   }
 
-  public override Task FileCreate(UserAuthenticationResource userAuthentication, byte[] hashCache, string[] path, CancellationToken cancellationToken)
+  public override Task<FileHandle> Open(UserKeyResource userKey, byte[] hashCache, CancellationToken cancellationToken)
   {
-    throw new NotImplementedException();
-  }
-
-  public override Task<long> FileOpen(string[] path, FileAccess fileAccess, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task<Buffer> FileRead(long handleId, long size, UserAuthenticationResource userAuthentication, byte[] hashCache, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task FileTruncate(long handleId, Buffer buffer, UserAuthenticationResource userAuthentication, byte[] hashCache, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
-  }
-
-  public override Task FileWrite(long handleId, Buffer buffer, UserAuthenticationResource userAuthentication, byte[] hashCache, CancellationToken cancellationToken)
-  {
-    throw new NotImplementedException();
   }
 }

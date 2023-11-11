@@ -41,7 +41,8 @@ public static class Program
           continue;
         }
 
-        Console.WriteLine(Path.Join(path, entry));
+        // Console.WriteLine(Path.Join(path, entry));
+
         _ = resources.MainDatabase.RunTransaction((transaction) =>
         {
           BlobFileResource pool = resources.Files.CreateFolder(transaction, path == "/" ? null : parentFolder, entry[0] == '/' ? entry[1..] : entry);

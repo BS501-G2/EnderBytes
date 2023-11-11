@@ -165,6 +165,16 @@ public sealed class Database : Service
       Connection.Open();
     }
 
+    // _ = RunTransaction((transaction) =>
+    // {
+    //   transaction.ExecuteNonQuery($"pragma page_size = 65536;");
+    //   transaction.ExecuteNonQuery($"pragma cache_size = 1000000;");
+    //   transaction.ExecuteNonQuery($"pragma synchronous = off;");
+    //   transaction.ExecuteNonQuery($"pragma journal_mode = memory;");
+    //   transaction.ExecuteNonQuery($"pragma auto_vacuum = 0;");
+    //   transaction.ExecuteNonQuery($"pragma secure_delete = false;");
+    // }, cancellationToken);
+
     return Task.CompletedTask;
   }
 

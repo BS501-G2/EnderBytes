@@ -51,10 +51,10 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
       public BufferBlock(Buffer Buffer, long Begin, bool PendingWrite) : this(Buffer, Begin, Begin + Buffer.Length, PendingWrite) { }
     }
 
-    private readonly List<BufferBlock> InternalCache = [];
+    private readonly List<BufferBlock> Memory = [];
 
-    public long Position { get; private set; } = 0;
-    public long Size { get; private set; } = 0;
+    public long Position { get; private set; }
+    public long Size { get; private set; }
 
     public readonly FileAccess Access = access;
     public readonly FileMode Mode = mode;
@@ -62,11 +62,12 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
     protected abstract Task<Buffer> InternalRead(long position, long length, CancellationToken cancellationToken);
     protected abstract Task InternalWrite(long position, Buffer buffer, CancellationToken cancellationToken);
     protected abstract Task<Information.File> InternalGetInfo(CancellationToken cancellationToken);
+    protected abstract Task InternalTruncate(long size, CancellationToken cancellationToken);
     protected abstract Task InternalClose();
 
     protected override async Task OnRun(CancellationToken cancellationToken)
     {
-      Information.File info = await InternalGetInfo(cancellationToken);
+      Information.File info = await RunTask(InternalGetInfo, cancellationToken);
       Size = info.Size;
 
       try
@@ -75,9 +76,31 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
       }
       finally
       {
+        foreach (BufferBlock block in Memory)
+        {
+          if (!block.PendingWrite)
+          {
+            continue;
+          }
+
+          _ = InternalWrite(block.Begin, block.Buffer, GetCancellationToken());
+        }
+
         await InternalClose();
       }
     }
+
+    private Task Flush() => RunTask(async (cancellationToken) =>
+    {
+      List<Task> tasks = [];
+
+      if (tasks.Count == 0)
+      {
+        return;
+      }
+
+      await Task.WhenAll(tasks);
+    }, GetCancellationToken());
 
     public Task<Buffer> Read(long length, CancellationToken cancellationToken) => RunTask(async (cancellationToken) =>
     {
@@ -89,63 +112,66 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
       long requestBegin() => Position + bytesRead;
       long requestEnd() => Position + length;
 
-      while (bytesRead < length)
+      for (int index = 0; index < Memory.Count; index++)
       {
-        for (int index = 0; index < InternalCache.Count; index++)
+        BufferBlock block = Memory.ElementAt(index);
+
+        if (block.Begin > requestBegin())
         {
-          BufferBlock block = InternalCache.ElementAt(index);
-
-          if (block.Begin > requestBegin())
+          long toAdd = 0;
           {
-            BufferBlock newBlock;
-            {
-              Buffer buffer = await InternalRead(requestBegin(), block.Begin - requestBegin(), cancellationToken);
-              InternalCache.Insert(index, newBlock = new(buffer, requestBegin(), false));
-              index++;
-            }
+            Buffer buffer = await InternalRead(requestBegin(), block.Begin - requestBegin(), cancellationToken);
+            list.Add(buffer);
+            toAdd += buffer.Length;
 
-            long toAdd = 0;
-
-            list.Add(newBlock.Buffer);
-            toAdd += newBlock.Buffer.Length;
-
-            if (newBlock.End < requestEnd())
-            {
-              if (block.End > requestEnd())
-              {
-                Buffer sliced = block.Buffer.Slice(0, - (requestEnd() - block.End));
-                toAdd += sliced.Length;
-                list.Add(sliced);
-              }
-              else
-              {
-                toAdd += block.Buffer.Length;
-                list.Add(block.Buffer);
-              }
-            }
-
-            bytesRead += toAdd;
+            Memory.Insert(index, new(buffer, requestBegin(), false));
+            index++;
           }
 
-          // if (requestBegin() < blockBegin())
-          // {
-          //   Buffer newBlock = await InternalRead(requestBegin(), blockBegin(), cancellationToken);
-          //   long newBlockEnd() => requestBegin() + newBlock.Length;
+          if (block.Begin < requestEnd())
+          {
+            if (block.End > requestEnd())
+            {
+              Buffer sliced = block.Buffer.Slice(0, -(block.End - requestEnd()));
+              toAdd += sliced.Length;
+              list.Add(sliced);
+            }
+            else
+            {
+              toAdd += block.Buffer.Length;
+              list.Add(block.Buffer);
+            }
+          }
 
-          //   if (newBlockEnd() > requestBegin())
-          //   {
-          //     list.Add(newBlock.Slice(0, - (newBlockEnd() - requestBegin())));
-          //     InternalCache.Insert(index, new(newBlock, requestBegin(), false));
-          //   }
-          // }
-          // else
-          // {
-          //   if (requestBegin() > blockEnd())
-          //   {
-          //     continue;
-          //   }
-          // }
+          bytesRead += toAdd;
         }
+        else
+        {
+          if (block.End <= requestBegin())
+          {
+            continue;
+          }
+
+          if (block.End > requestEnd())
+          {
+            Buffer sliced = block.Buffer.Slice(0, -(block.End - requestEnd()));
+            list.Add(sliced);
+            bytesRead += sliced.Length;
+          }
+          else
+          {
+            list.Add(block.Buffer);
+            bytesRead += block.Buffer.Length;
+          }
+        }
+      }
+
+      if (bytesRead < length)
+      {
+        Buffer buffer = await InternalRead(requestBegin(), length - bytesRead, cancellationToken);
+        Memory.Add(new(buffer, requestBegin(), false));
+        list.Add(buffer);
+        bytesRead += buffer.Length;
       }
 
       Buffer output = Buffer.Concat(list);
@@ -155,7 +181,24 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
 
     public Task Write(Buffer buffer, CancellationToken cancellationToken) => RunTask(async (cancellationToken) =>
     {
+      long bytesWritten = 0;
+      long requestBegin() => Position + bytesWritten;
+      long requestEnd() => Position + buffer.Length;
 
+      for (int index = 0; index < Memory.Count; index++)
+      {
+        BufferBlock block = Memory.ElementAt(index);
+
+        if (block.Begin < requestBegin())
+        {
+          if (block.End < requestEnd())
+          {
+            continue;
+          }
+
+
+        }
+      }
     }, cancellationToken);
   }
 

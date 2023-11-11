@@ -11,7 +11,7 @@ using Utilities;
 
 public sealed class BlobStoragePool : StoragePool<BlobStoragePool.FileHandle>
 {
-  public new sealed class FileHandle(FileAccess access, FileMode mode) : StoragePool<FileHandle>.FileHandle(access, mode)
+  public new sealed class FileHandle(string[] path, FileAccess access, FileMode mode) : StoragePool<FileHandle>.FileHandle(path, access, mode)
   {
     protected override Task InternalClose()
     {
@@ -23,12 +23,12 @@ public sealed class BlobStoragePool : StoragePool<BlobStoragePool.FileHandle>
       throw new NotImplementedException();
     }
 
-    protected override Task<Buffer> InternalRead(long length, CancellationToken cancellationToken)
+    protected override Task<Buffer> InternalRead(long position, long length, CancellationToken cancellationToken)
     {
       throw new NotImplementedException();
     }
 
-    protected override Task InternalWrite(Buffer buffer, CancellationToken cancellationToken)
+    protected override Task InternalWrite(long position, Buffer buffer, CancellationToken cancellationToken)
     {
       throw new NotImplementedException();
     }
@@ -67,5 +67,6 @@ public sealed class BlobStoragePool : StoragePool<BlobStoragePool.FileHandle>
 
   public override Task<FileHandle> Open(UserKeyResource userKey, byte[] hashCache, CancellationToken cancellationToken)
   {
+    return null;
   }
 }

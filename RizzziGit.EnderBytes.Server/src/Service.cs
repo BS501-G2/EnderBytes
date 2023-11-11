@@ -36,6 +36,9 @@ public abstract class Service
 
   public event EventHandler<ServiceState>? StateChanged;
 
+  private ServiceContext? Context;
+  public CancellationToken GetCancellationToken() => Context!.CancellationTokenSource.Token;
+
   private void SetState(ServiceState state)
   {
     if (State == state)
@@ -56,8 +59,6 @@ public abstract class Service
     State = state;
     StateChanged?.Invoke(this, state);
   }
-
-  private ServiceContext? Context;
 
   public async Task Start()
   {

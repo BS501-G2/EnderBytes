@@ -28,12 +28,13 @@ public abstract class Lifetime : ILifetime
 
   public bool IsRunning => Source != null;
   public Exception? Exception = null;
+  public CancellationToken GetCancellationToken() => Source!.Token;
 
   public virtual void Stop() => Source?.Cancel();
 
   public Task RunTask(Func<CancellationToken, Task> callback, CancellationToken cancellationToken) => TaskQueue!.RunTask(callback, cancellationToken);
   public Task<T> RunTask<T>(Func<CancellationToken, Task<T>> callback, CancellationToken cancellationToken) => TaskQueue!.RunTask(callback, cancellationToken);
-  public Task RunTask(Action callback) => TaskQueue!.RunTask(callback);
+  public Task RunTask(Action callback, CancellationToken? v) => TaskQueue!.RunTask(callback);
   public Task<T> RunTask<T>(Func<T> callback) => TaskQueue!.RunTask(callback);
 
   protected virtual Task OnRun(CancellationToken cancellationToken) => Task.Delay(-1, cancellationToken);

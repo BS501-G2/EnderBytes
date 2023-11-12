@@ -46,15 +46,81 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
 
   public abstract class FileHandle(string[] path, FileAccess access, FileMode mode) : Lifetime($"/{string.Join("/", path)}")
   {
-    protected record BufferBlock(Buffer Buffer, long Begin, long End, bool PendingWrite)
+    protected class BufferBlock(Buffer? buffer, long begin, bool pendingWrite)
     {
-      public BufferBlock(Buffer Buffer, long Begin, bool PendingWrite) : this(Buffer, Begin, Begin + Buffer.Length, PendingWrite) { }
+      public static BufferBlock Join(params BufferBlock[] blocks)
+      {
+        if (blocks.Length == 0)
+        {
+          throw new ArgumentException("Empty args.", nameof(blocks));
+        }
+
+        if (blocks.Length == 1)
+        {
+          return blocks[0];
+        }
+
+        Buffer joined = Buffer.Empty();
+
+        long? lastIndex = null;
+        foreach (BufferBlock block in blocks)
+        {
+          if (lastIndex != null && lastIndex != block.Begin)
+          {
+            throw new ArgumentException("Not continuous.", nameof(blocks));
+          }
+
+          if (block.Buffer == null)
+          {
+            throw new ArgumentException("All blocks must not be empty.", nameof(blocks));
+          }
+
+          joined.Append(block.Buffer);
+
+          lastIndex = block.End;
+        }
+
+        return new(joined, blocks[0].Begin, blocks[0].PendingWrite);
+      }
+
+      public Buffer? Buffer = buffer;
+      public long Begin = begin;
+      public long End => Begin + Buffer?.Length ?? Begin;
+      public long Length => Buffer?.Length ?? 0;
+      public bool PendingWrite = pendingWrite;
+
+      public (BufferBlock left, BufferBlock right) Split(long index) => (
+        new(Buffer!.Slice(0, index), Begin, PendingWrite),
+        new(Buffer!.Slice(index, End), Begin + index, PendingWrite)
+      );
+
+      public (BufferBlock left, BufferBlock center, BufferBlock right) Split(long index1, long index2) => (
+        new(Buffer!.Slice(0, index1), Begin, PendingWrite),
+        new(Buffer!.Slice(index1, index2), Begin + index1, PendingWrite),
+        new (Buffer!.Slice(index2, End), Begin + index2, PendingWrite)
+      );
     }
 
     private readonly List<BufferBlock> Memory = [];
 
     public long Position { get; private set; }
-    public long Size { get; private set; }
+    public long Size
+    {
+      get
+      {
+        long size = 0;
+
+        lock (Memory)
+        {
+          foreach (BufferBlock block in Memory)
+          {
+            size += block.Length;
+          }
+        }
+
+        return size;
+      }
+    }
 
     public readonly FileAccess Access = access;
     public readonly FileMode Mode = mode;
@@ -68,7 +134,6 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
     protected override async Task OnRun(CancellationToken cancellationToken)
     {
       Information.File info = await RunTask(InternalGetInfo, cancellationToken);
-      Size = info.Size;
 
       try
       {
@@ -76,16 +141,6 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
       }
       finally
       {
-        foreach (BufferBlock block in Memory)
-        {
-          if (!block.PendingWrite)
-          {
-            continue;
-          }
-
-          _ = InternalWrite(block.Begin, block.Buffer, GetCancellationToken());
-        }
-
         await InternalClose();
       }
     }
@@ -104,98 +159,119 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
 
     public Task<Buffer> Read(long length, CancellationToken cancellationToken) => RunTask(async (cancellationToken) =>
     {
-      List<Buffer> list = [];
+      long requestBegin = Position;
+      long requestEnd = Position + length > Size ? Size - Position : length;
 
-      length = Position + length > Size ? Size - Position : length;
-
-      long bytesRead = 0;
-      long requestBegin() => Position + bytesRead;
-      long requestEnd() => Position + length;
-
-      for (int index = 0; index < Memory.Count; index++)
+      List<Task<Buffer>> toRead = [];
+      lock (Memory)
       {
-        BufferBlock block = Memory.ElementAt(index);
-
-        if (block.Begin > requestBegin())
+        for (int index = 0; index < Memory.Count && requestBegin < requestEnd; index++)
         {
-          long toAdd = 0;
-          {
-            Buffer buffer = await InternalRead(requestBegin(), block.Begin - requestBegin(), cancellationToken);
-            list.Add(buffer);
-            toAdd += buffer.Length;
+          BufferBlock block = Memory.ElementAt(index);
 
-            Memory.Insert(index, new(buffer, requestBegin(), false));
-            index++;
-          }
-
-          if (block.Begin < requestEnd())
-          {
-            if (block.End > requestEnd())
-            {
-              Buffer sliced = block.Buffer.Slice(0, -(block.End - requestEnd()));
-              toAdd += sliced.Length;
-              list.Add(sliced);
-            }
-            else
-            {
-              toAdd += block.Buffer.Length;
-              list.Add(block.Buffer);
-            }
-          }
-
-          bytesRead += toAdd;
-        }
-        else
-        {
-          if (block.End <= requestBegin())
+          if (requestBegin >= block.End)
           {
             continue;
           }
 
-          if (block.End > requestEnd())
+          if (requestBegin < block.Begin)
           {
-            Buffer sliced = block.Buffer.Slice(0, -(block.End - requestEnd()));
-            list.Add(sliced);
-            bytesRead += sliced.Length;
+            long internalReadLength = long.Min(block.Begin - requestBegin, requestEnd - requestBegin);
+            Task<Buffer> readTask = InternalRead(requestBegin, internalReadLength, cancellationToken);
+            BufferBlock newBlock = new(null, requestBegin, false);
+
+            _ = readTask.ContinueWith(async (task) => requestBegin += (newBlock.Buffer = await task).Length);
+            toRead.Add(readTask);
+            Memory.Insert(index++, newBlock);
           }
           else
           {
-            list.Add(block.Buffer);
-            bytesRead += block.Buffer.Length;
+            long sliceBegin = requestBegin - block.Begin;
+            long sliceEnd = sliceBegin + long.Min(requestEnd - requestBegin, block.Length - sliceBegin);
+
+            Buffer sliced = block.Buffer!.Slice(sliceBegin, sliceEnd);
+            toRead.Add(Task.FromResult(sliced));
+
+            requestBegin += sliceEnd - sliceBegin;
           }
+        }
+
+        if (requestBegin < requestEnd)
+        {
+          Task<Buffer> read = InternalRead(requestBegin, requestEnd - requestBegin, cancellationToken);
+          BufferBlock newBlock = new(null, requestBegin, false);
+
+          requestBegin = requestEnd;
+
+          _ = read.ContinueWith(async (task) => newBlock.Buffer = await task);
+          Memory.Add(newBlock);
         }
       }
 
-      if (bytesRead < length)
-      {
-        Buffer buffer = await InternalRead(requestBegin(), length - bytesRead, cancellationToken);
-        Memory.Add(new(buffer, requestBegin(), false));
-        list.Add(buffer);
-        bytesRead += buffer.Length;
-      }
-
-      Buffer output = Buffer.Concat(list);
-      Position += output.Length;
-      return output;
+      Position = requestEnd;
+      return Buffer.Concat(await Task.WhenAll(toRead));
     }, cancellationToken);
 
     public Task Write(Buffer buffer, CancellationToken cancellationToken) => RunTask(async (cancellationToken) =>
     {
-      long bytesWritten = 0;
-      long requestBegin() => Position + bytesWritten;
-      long requestEnd() => Position + buffer.Length;
+      long requestBegin = Position;
 
-      for (int index = 0; index < Memory.Count; index++)
+      Buffer toWrite = buffer.Clone();
+      lock (Memory)
       {
-        BufferBlock block = Memory.ElementAt(index);
-
-        if (block.Begin < requestBegin())
+        for (int index = 0; index < Memory.Count && toWrite.Length != 0; index++)
         {
-          if (block.End < requestEnd())
+          BufferBlock block = Memory.ElementAt(index);
+
+          if (requestBegin >= block.End)
           {
             continue;
           }
 
+          if (requestBegin < block.Begin)
+          {
+            Buffer spliced = toWrite.TruncateStart(block.Begin - requestBegin);
+            BufferBlock newBlock = new(spliced, requestBegin, true);
+
+            Memory.Insert(index++, newBlock);
+            requestBegin += spliced.Length;
+          }
+          else if (block.PendingWrite)
+          {
+            long spliceIndex = requestBegin - block.Begin;
+
+            block.Buffer!.Write(spliceIndex, toWrite.TruncateStart(long.Min(block.Length - spliceIndex, toWrite.Length)));
+          }
+          else
+          {
+            if (block.Begin == requestBegin)
+            {
+              if (block.Length > toWrite.Length)
+              {
+                var (left, right) = block.Split(toWrite.Length);
+
+                left.Buffer = toWrite.TruncateStart(toWrite.Length);
+                left.PendingWrite = true;
+
+                Memory.RemoveAt(index);
+                Memory.Insert(index++, left);
+                Memory.Insert(index, right);
+              }
+              else
+              {
+                block.Buffer = toWrite.TruncateStart(block.Length);
+                block.PendingWrite = true;
+              }
+            }
+            else
+            {
+
+            }
+          }
+        }
+
+        if (toWrite.Length != 0)
+        {
 
         }
       }

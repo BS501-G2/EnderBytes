@@ -104,23 +104,7 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
     private readonly List<BufferBlock> Memory = [];
 
     public long Position { get; private set; }
-    public long Size
-    {
-      get
-      {
-        long size = 0;
-
-        lock (Memory)
-        {
-          foreach (BufferBlock block in Memory)
-          {
-            size += block.Length;
-          }
-        }
-
-        return size;
-      }
-    }
+    public long Size { get; private set; }
 
     public readonly FileAccess Access = access;
     public readonly FileMode Mode = mode;
@@ -134,6 +118,7 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
     protected override async Task OnRun(CancellationToken cancellationToken)
     {
       Information.File info = await RunTask(InternalGetInfo, cancellationToken);
+      Size = info.Size;
 
       try
       {
@@ -141,6 +126,16 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
       }
       finally
       {
+        foreach (BufferBlock block in Memory)
+        {
+          if (!block.PendingWrite)
+          {
+            continue;
+          }
+
+          _ = InternalWrite(Position, block.Buffer!.Clone(), cancellationToken);
+        }
+
         await InternalClose();
       }
     }
@@ -239,8 +234,10 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
           else if (block.PendingWrite)
           {
             long spliceIndex = requestBegin - block.Begin;
+            long spliceLength = long.Min(block.Length - spliceIndex, toWrite.Length);
 
-            block.Buffer!.Write(spliceIndex, toWrite.TruncateStart(long.Min(block.Length - spliceIndex, toWrite.Length)));
+            block.Buffer!.Write(spliceIndex, toWrite.TruncateStart(spliceLength));
+            requestBegin += spliceLength;
           }
           else
           {
@@ -256,16 +253,37 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
                 Memory.RemoveAt(index);
                 Memory.Insert(index++, left);
                 Memory.Insert(index, right);
+
+                requestBegin += left.Length;
               }
               else
               {
                 block.Buffer = toWrite.TruncateStart(block.Length);
                 block.PendingWrite = true;
+
+                requestBegin += block.Length;
               }
             }
             else
             {
+              long spliceIndex1 = requestBegin - block.Begin;
 
+              if (block.Length > toWrite.Length)
+              {
+                var (left, right) = block.Split(spliceIndex1);
+
+                right.Buffer = toWrite.TruncateStart(block.Length);
+                right.PendingWrite = true;
+
+                Memory.RemoveAt(index);
+                Memory.Insert(index++, left);
+                Memory.Insert(index, right);
+
+                requestBegin += right.Length;
+              }
+              else
+              {
+              }
             }
           }
         }

@@ -70,7 +70,7 @@ public sealed class BlobStoragePool : StoragePool<BlobStoragePool.FileHandle>
     }
   }
 
-  public override Task<FileHandle> Open(UserKeyResource userKey, byte[] hashCache, CancellationToken cancellationToken)
+  public override Task<FileHandle> InternalOpen(UserKeyResource userKey, byte[] hashCache, CancellationToken cancellationToken)
   {
     return null;
   }

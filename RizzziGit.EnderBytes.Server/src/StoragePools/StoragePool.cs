@@ -4,6 +4,7 @@ using Buffer;
 using Resources;
 using Connections;
 using Utilities;
+using System.Reflection;
 
 public abstract class StoragePoolException : Exception;
 public sealed class InvalidOperationException : StoragePoolException;
@@ -46,58 +47,24 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
 
   public abstract class FileHandle(string[] path, FileAccess access, FileMode mode) : Lifetime($"/{string.Join("/", path)}")
   {
-    protected class BufferBlock(Buffer? buffer, long begin, bool pendingWrite)
+    protected class BufferBlock(Buffer? buffer, long begin, bool pendingWrite, long lastAccessTime)
     {
-      public static BufferBlock Join(params BufferBlock[] blocks)
-      {
-        if (blocks.Length == 0)
-        {
-          throw new ArgumentException("Empty args.", nameof(blocks));
-        }
-
-        if (blocks.Length == 1)
-        {
-          return blocks[0];
-        }
-
-        Buffer joined = Buffer.Empty();
-
-        long? lastIndex = null;
-        foreach (BufferBlock block in blocks)
-        {
-          if (lastIndex != null && lastIndex != block.Begin)
-          {
-            throw new ArgumentException("Not continuous.", nameof(blocks));
-          }
-
-          if (block.Buffer == null)
-          {
-            throw new ArgumentException("All blocks must not be empty.", nameof(blocks));
-          }
-
-          joined.Append(block.Buffer);
-
-          lastIndex = block.End;
-        }
-
-        return new(joined, blocks[0].Begin, blocks[0].PendingWrite);
-      }
-
       public Buffer? Buffer = buffer;
+      public long LastAccessTime = lastAccessTime;
       public long Begin = begin;
       public long End => Begin + Buffer?.Length ?? Begin;
       public long Length => Buffer?.Length ?? 0;
       public bool PendingWrite = pendingWrite;
 
       public (BufferBlock left, BufferBlock right) Split(long index) => (
-        new(Buffer!.Slice(0, index), Begin, PendingWrite),
-        new(Buffer!.Slice(index, End), Begin + index, PendingWrite)
+        new(Buffer!.Slice(0, index), Begin, PendingWrite, LastAccessTime),
+        new(Buffer!.Slice(index, End), Begin + index, PendingWrite, LastAccessTime)
       );
 
       public (BufferBlock left, BufferBlock center, BufferBlock right) Split(long index1, long index2) => (
-        new(Buffer!.Slice(0, index1), Begin, PendingWrite),
-        new(Buffer!.Slice(index1, index2), Begin + index1, PendingWrite),
-        new (Buffer!.Slice(index2, End), Begin + index2, PendingWrite)
+        new(Buffer!.Slice(0, index1), Begin, PendingWrite, LastAccessTime),
+        new(Buffer!.Slice(index1, index2), Begin + index1, PendingWrite, LastAccessTime),
+        new(Buffer!.Slice(index2, End), Begin + index2, PendingWrite, LastAccessTime)
       );
     }
 
@@ -105,6 +72,19 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
 
     public long Position { get; private set; }
     public long Size { get; private set; }
+    public long CachedSize
+    {
+      get
+      {
+        long size = 0;
+        foreach (BufferBlock block in Memory)
+        {
+          size += block.Length;
+        }
+
+        return size;
+      }
+    }
 
     public readonly FileAccess Access = access;
     public readonly FileMode Mode = mode;
@@ -133,6 +113,7 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
             continue;
           }
 
+          block.PendingWrite = false;
           _ = InternalWrite(Position, block.Buffer!.Clone(), cancellationToken);
         }
 
@@ -151,6 +132,8 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
 
       await Task.WhenAll(tasks);
     }, GetCancellationToken());
+
+    private long GetTimestampNow() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     public Task<Buffer> Read(long length, CancellationToken cancellationToken) => RunTask(async (cancellationToken) =>
     {
@@ -173,7 +156,7 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
           {
             long internalReadLength = long.Min(block.Begin - requestBegin, requestEnd - requestBegin);
             Task<Buffer> readTask = InternalRead(requestBegin, internalReadLength, cancellationToken);
-            BufferBlock newBlock = new(null, requestBegin, false);
+            BufferBlock newBlock = new(null, requestBegin, false, GetTimestampNow());
 
             _ = readTask.ContinueWith(async (task) => requestBegin += (newBlock.Buffer = await task).Length);
             toRead.Add(readTask);
@@ -194,7 +177,7 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
         if (requestBegin < requestEnd)
         {
           Task<Buffer> read = InternalRead(requestBegin, requestEnd - requestBegin, cancellationToken);
-          BufferBlock newBlock = new(null, requestBegin, false);
+          BufferBlock newBlock = new(null, requestBegin, false, GetTimestampNow());
 
           requestBegin = requestEnd;
 
@@ -207,7 +190,7 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
       return Buffer.Concat(await Task.WhenAll(toRead));
     }, cancellationToken);
 
-    public Task Write(Buffer buffer, CancellationToken cancellationToken) => RunTask(async (cancellationToken) =>
+    public Task Write(Buffer buffer, CancellationToken cancellationToken) => RunTask(() =>
     {
       long requestBegin = Position;
 
@@ -226,7 +209,7 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
           if (requestBegin < block.Begin)
           {
             Buffer spliced = toWrite.TruncateStart(block.Begin - requestBegin);
-            BufferBlock newBlock = new(spliced, requestBegin, true);
+            BufferBlock newBlock = new(spliced, requestBegin, true, GetTimestampNow());
 
             Memory.Insert(index++, newBlock);
             requestBegin += spliced.Length;
@@ -268,7 +251,7 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
             {
               long spliceIndex1 = requestBegin - block.Begin;
 
-              if (block.Length > toWrite.Length)
+              if (block.Length <= toWrite.Length)
               {
                 var (left, right) = block.Split(spliceIndex1);
 
@@ -283,6 +266,17 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
               }
               else
               {
+                var (left, center, right) = block.Split(spliceIndex1, spliceIndex1 + toWrite.Length);
+
+                center.Buffer = toWrite.TruncateStart(toWrite.Length);
+                center.PendingWrite = true;
+
+                Memory.RemoveAt(index);
+                Memory.Insert(index++, left);
+                Memory.Insert(index++, center);
+                Memory.Insert(index, right);
+
+                requestBegin += center.Length;
               }
             }
           }
@@ -290,10 +284,37 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
 
         if (toWrite.Length != 0)
         {
+          BufferBlock newBlock = new(toWrite.TruncateStart(toWrite.Length), requestBegin, true, GetTimestampNow());
 
+          Memory.Add(newBlock);
+          requestBegin += newBlock.Length;
         }
       }
     }, cancellationToken);
+
+    public void ClearCache(long minimumSize)
+    {
+      long remaining = long.Min(minimumSize, CachedSize);
+
+      List<BufferBlock> sorted = [..Memory];
+      sorted.Sort((a, b) => Comparer<long>.Default.Compare(a.LastAccessTime, b.LastAccessTime));
+      foreach (BufferBlock block in sorted)
+      {
+        if (remaining == 0)
+        {
+          break;
+        }
+
+        if (block.PendingWrite)
+        {
+          block.PendingWrite = false;
+          _ = InternalWrite(block.Begin, block.Buffer!, GetCancellationToken());
+        }
+
+        remaining = long.Max(0, remaining - block.Length);
+        sorted.Remove(block);
+      }
+    }
   }
 
   public abstract record Information(
@@ -331,6 +352,7 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
 
     Manager = manager;
     Resource = storagePool;
+    Handles = [];
 
     MarkedForDeletion = false;
 
@@ -340,12 +362,35 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
   public readonly StoragePoolManager Manager;
   public readonly StoragePoolResource Resource;
 
+  private readonly List<FileHandle> Handles;
+
   public bool MarkedForDeletion { get; set; }
+  public long CacheSize
+  {
+    get
+    {
+      long size = 0;
+      foreach (FileHandle handle in Handles)
+      {
+        size += handle.CachedSize;
+      }
+
+      return size;
+    }
+  }
 
   protected override Task OnRun(CancellationToken cancellationToken)
   {
     return base.OnRun(cancellationToken);
   }
 
-  public abstract Task<F> Open(UserKeyResource userKey, byte[] hashCache, CancellationToken cancellationToken);
+  protected abstract Task<F> InternalOpen(UserKeyResource userKey, byte[] hashCache, CancellationToken cancellationToken);
+
+  public async Task<F> Open(UserKeyResource userKey, byte[] hashCache, CancellationToken cancellationToken)
+  {
+    F handle = await InternalOpen(userKey, hashCache, cancellationToken);
+
+    handle.Stopped += (_, _) => Handles.Remove(handle);
+    return handle;
+  }
 }

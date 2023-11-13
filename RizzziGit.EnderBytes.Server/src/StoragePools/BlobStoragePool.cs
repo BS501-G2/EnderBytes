@@ -28,6 +28,11 @@ public sealed class BlobStoragePool : StoragePool<BlobStoragePool.FileHandle>
       throw new NotImplementedException();
     }
 
+    protected override Task InternalTruncate(long size, CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+
     protected override Task InternalWrite(long position, Buffer buffer, CancellationToken cancellationToken)
     {
       throw new NotImplementedException();

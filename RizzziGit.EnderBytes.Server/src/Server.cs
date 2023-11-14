@@ -30,6 +30,8 @@ public struct ServerConfiguration()
 
   public int DefaultUserAuthenticationPayloadHashIterationCount = 1000;
   public int DefaultBlobStorageFileBufferSize = 256 * 1024;
+
+  public int MaxCachedDataSize = 1024 * 1024 * 2;
 }
 
 public sealed class Server : Service

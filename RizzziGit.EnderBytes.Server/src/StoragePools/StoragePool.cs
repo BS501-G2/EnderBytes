@@ -1,217 +1,206 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace RizzziGit.EnderBytes.StoragePools;
 
+using Utilities;
 using Buffer;
 using Resources;
-using Connections;
-using Utilities;
-using System.Reflection;
-using RizzziGit.Collections;
+using Collections;
 
-public abstract class StoragePoolException : Exception;
-public sealed class InvalidOperationException : StoragePoolException;
-public sealed class PathNotFoundException : StoragePoolException;
-public sealed class PathFileExistsException : StoragePoolException;
-public sealed class ResourceInUseException : StoragePoolException;
-public sealed class MissingKeyException : StoragePoolException;
-public sealed class NotADirectoryException : StoragePoolException;
-public sealed class IsADirectoryException : StoragePoolException;
-public sealed class DeletedException : StoragePoolException;
-
-public interface IStoragePool : ILifetime
+public abstract class StoragePool : Service
 {
-  public bool MarkedForDeletion { get; set; }
-}
-
-public abstract class StoragePool<F> : Lifetime, IStoragePool
-  where F : StoragePool<F>.FileHandle
-{
-  [Flags]
-  public enum FileAccess : byte
+  public abstract record Information(long? AccessTime, long? TrashTime)
   {
-    Read = 1 << 0,
-    Write = 1 << 1,
-
-    ReadWrite = Read | Write
+    public sealed record File(long Size, long? AccessTime, long? TrashTime) : Information(AccessTime, TrashTime);
+    public sealed record Folder(long? AccessTime, long? TrashTime) : Information(AccessTime, TrashTime);
+    public sealed record SymbolicLink(long? AccessTime, long? TrashTime) : Information(AccessTime, TrashTime);
   }
 
-  [Flags]
-  public enum FileMode : byte
+  public abstract class FileHandle : Service
   {
-    Open = 1 << 0,
-    Truncate = 1 << 1,
-    Append = 1 << 2,
-    CreateNew = 1 << 3,
-
-    Create = Open | CreateNew | Truncate,
-    OpenOrCreate = Open | CreateNew | Append
-  }
-
-  private class FileHandleBufferBlock(Buffer? buffer, long begin, bool toSync, long lastAccessTime, Func<FileHandleBufferBlock, Task> syncCallback)
-  {
-    public Buffer? Buffer = buffer;
-    public long LastAccessTime = lastAccessTime;
-    public long Begin = begin;
-    public long End => Begin + Buffer?.Length ?? Begin;
-    public long Length => Buffer?.Length ?? 0;
-    public bool ToSync = toSync;
-    public async Task Sync()
+    [Flags]
+    public enum FileAccess : byte
     {
-      await syncCallback(this);
-      ToSync = false;
+      Read = 1 << 0,
+      Write = 1 << 1,
+
+      ReadWrite = Read | Write
     }
 
-    public (FileHandleBufferBlock left, FileHandleBufferBlock right) Split(long index) => (
-      new(Buffer!.Slice(0, index), Begin, ToSync, LastAccessTime, syncCallback),
-      new(Buffer!.Slice(index, End), Begin + index, ToSync, LastAccessTime, syncCallback)
-    );
-
-    public (FileHandleBufferBlock left, FileHandleBufferBlock center, FileHandleBufferBlock right) Split(long index1, long index2) => (
-      new(Buffer!.Slice(0, index1), Begin, ToSync, LastAccessTime, syncCallback),
-      new(Buffer!.Slice(index1, index2), Begin + index1, ToSync, LastAccessTime, syncCallback),
-      new(Buffer!.Slice(index2, End), Begin + index2, ToSync, LastAccessTime, syncCallback)
-    );
-  }
-
-  public abstract class FileHandle : Lifetime
-  {
-    public FileHandle(StoragePool<F> storagePool, string[] path, FileAccess access, FileMode mode) : base($"/{string.Join("/", path)}")
+    [Flags]
+    public enum FileMode : byte
     {
-      Memory = storagePool.GetHandleMemory(this);
-      StoragePool = storagePool;
+      Open = 1 << 0,
+      Truncate = 1 << 1,
+      Append = 1 << 2,
+      CreateNew = 1 << 3,
+
+      Create = Open | CreateNew | Truncate,
+      OpenOrCreate = Open | CreateNew | Append
+    }
+
+    public sealed class BufferCache(Buffer buffer, long begin, long end, bool toSync, long lastAccessTime, Func<BufferCache, Task> syncCallback)
+    {
+      public readonly long Begin = begin;
+      public readonly long End = end;
+      private readonly Buffer BufferBackingField = buffer;
+
+      public Buffer Buffer
+      {
+        get
+        {
+          LastAccessTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+          return BufferBackingField;
+        }
+      }
+
+      public bool ToSync { get; private set; } = toSync;
+      public long LastAccessTime { get; private set; } = lastAccessTime;
+
+      public long Length => End - Begin;
+      public async Task Sync()
+      {
+        if (!ToSync)
+        {
+          return;
+        }
+
+        await syncCallback(this);
+      }
+
+      public void Write(long position, Buffer buffer)
+      {
+        ToSync = true;
+        Buffer.Write(position, buffer);
+      }
+
+      public (BufferCache left, BufferCache right) Split(long index) => (
+        new(Buffer.Slice(0, index), Begin, Begin + index, ToSync, LastAccessTime, syncCallback),
+        new(Buffer.Slice(index, End), Begin + index, End, ToSync, LastAccessTime, syncCallback)
+      );
+
+      public (BufferCache left, BufferCache center, BufferCache right) Split(long index1, long index2) => (
+        new(Buffer.Slice(0, index1), Begin, Begin + index1, ToSync, LastAccessTime, syncCallback),
+        new(Buffer.Slice(index1, index2), Begin + index1, Begin + index2, ToSync, LastAccessTime, syncCallback),
+        new(Buffer.Slice(index2, End), Begin + index2, End, ToSync, LastAccessTime, syncCallback)
+      );
+    }
+
+    protected FileHandle(string[] path, StoragePool pool, FileAccess access) : base(string.Join("/", path), pool)
+    {
+      Pool = pool;
+      Cache = pool.AcquireHandleBufferList(path);
+      TaskQueue = new();
       Access = access;
-      Mode = mode;
     }
 
-    private readonly List<FileHandleBufferBlock> Memory;
+    public readonly StoragePool Pool;
+    public readonly FileAccess Access;
+
+    private readonly List<BufferCache> Cache;
+    private readonly TaskQueue TaskQueue;
 
     public long Position { get; private set; }
     public long Size { get; private set; }
-    public long CachedSize
+    public long CacheSize
     {
       get
       {
         long size = 0;
-        foreach (FileHandleBufferBlock block in Memory)
+
+        lock (Cache)
         {
-          size += block.Length;
+          foreach (BufferCache cache in Cache)
+          {
+            size += cache.Length;
+          }
         }
 
         return size;
       }
     }
 
-    public readonly StoragePool<F> StoragePool;
-    public readonly FileAccess Access;
-    public readonly FileMode Mode;
-
-    protected abstract Task<Buffer> InternalRead(long position, long length, CancellationToken cancellationToken);
+    protected abstract Task<Buffer> InternalRead(long position, long size, CancellationToken cancellationToken);
     protected abstract Task InternalWrite(long position, Buffer buffer, CancellationToken cancellationToken);
-    protected abstract Task<Information.File> InternalGetInfo(CancellationToken cancellationToken);
     protected abstract Task InternalTruncate(long size, CancellationToken cancellationToken);
-    protected abstract Task InternalClose();
 
-    protected override async Task OnRun(CancellationToken cancellationToken)
+    private BufferCache CreateBufferCache(Buffer buffer, long begin, long end, bool toSync) => new(buffer, begin, end, toSync, default, CacheSync);
+    private async Task CacheSync(BufferCache cache) => await InternalWrite(cache.Begin, cache.Buffer, CancellationToken.None);
+
+    protected override Task OnRun(CancellationToken cancellationToken) => TaskQueue.Start(cancellationToken);
+    protected override Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
+    protected override Task OnStop(Exception? exception) => Sync();
+
+    public Task Sync() => TaskQueue.RunTask(async (_) =>
     {
-      Information.File info = await RunTask(InternalGetInfo, cancellationToken);
-      Size = info.Size;
+      List<Task> tasks = [];
 
-      try
+      lock (Cache)
       {
-        await base.OnRun(cancellationToken);
-      }
-      finally
-      {
-        foreach (FileHandleBufferBlock block in Memory)
+        foreach (BufferCache cacheEntry in Cache)
         {
-          if (!block.ToSync)
-          {
-            continue;
-          }
-
-          _ = block.Sync();
+          tasks.Add(cacheEntry.Sync());
         }
-
-        await RunTask(async (cancellationToken) => await InternalClose(), cancellationToken);
       }
-    }
 
-    private Task Flush(long minimumSize) => RunTask(() =>
-    {
-      long remaining = long.Min(minimumSize, CachedSize);
+      await Task.WhenAll(tasks);
+    }, CancellationToken.None);
 
-      List<FileHandleBufferBlock> sorted = [.. Memory];
-      sorted.Sort((a, b) => Comparer<long>.Default.Compare(a.LastAccessTime, b.LastAccessTime));
-      foreach (FileHandleBufferBlock block in sorted)
-      {
-        if (remaining == 0)
-        {
-          break;
-        }
-
-        _ = block.Sync();
-
-        remaining = long.Max(0, remaining - block.Length);
-        sorted.Remove(block);
-      }
-    }, GetCancellationToken());
-
-    private static long GetTimestampNow() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-    private Task Sync(FileHandleBufferBlock block) => RunTask(async (cancellationToken) =>
-    {
-      if (block.ToSync)
-      {
-        await InternalWrite(block.Begin, block.Buffer!, cancellationToken);
-      }
-    }, GetCancellationToken());
-
-    public Task<Buffer> Read(long length, CancellationToken cancellationToken) => RunTask(async (cancellationToken) =>
+    public Task<Buffer> Read(long length, CancellationToken cancellationToken) => TaskQueue.RunTask(async (cancellationToken) =>
     {
       long requestBegin = Position;
       long requestEnd = Position + length > Size ? Size - Position : length;
+      long requestLength() => requestEnd - requestBegin;
 
       List<Task<Buffer>> toRead = [];
-      lock (Memory)
+      lock (Cache)
       {
-        for (int index = 0; index < Memory.Count && requestBegin < requestEnd; index++)
+        for (int index = 0; index < Cache.Count && requestBegin < requestEnd; index++)
         {
-          FileHandleBufferBlock block = Memory.ElementAt(index);
+          BufferCache cache = Cache.ElementAt(index);
 
-          if (requestBegin >= block.End)
+          if (requestBegin >= cache.End)
           {
             continue;
           }
 
-          if (requestBegin < block.Begin)
+          if (requestBegin < cache.Begin)
           {
-            long internalReadLength = long.Min(block.Begin - requestBegin, requestEnd - requestBegin);
-            Task<Buffer> readTask = InternalRead(requestBegin, internalReadLength, cancellationToken);
-            FileHandleBufferBlock newBlock = new(null, requestBegin, false, GetTimestampNow(), Sync);
+            long toReadLength = long.Min(cache.Begin - requestBegin, requestLength());
 
-            _ = readTask.ContinueWith(async (task) => requestBegin += (newBlock.Buffer = await task).Length);
-            toRead.Add(readTask);
-            Memory.Insert(index++, newBlock);
+            Task<Buffer> bufferTask = InternalRead(requestBegin, toReadLength, cancellationToken);
+            BufferCache newCache = CreateBufferCache(Buffer.Allocate(toReadLength), requestBegin, cache.Begin, false);
+
+            _ = bufferTask.ContinueWith(async (task) => newCache.Buffer.Write(0, await task), cancellationToken);
+
+            toRead.Add(bufferTask);
+            Cache.Insert(index, newCache);
+
+            requestBegin += toReadLength;
           }
           else
           {
-            long sliceBegin = requestBegin - block.Begin;
-            long sliceEnd = sliceBegin + long.Min(requestEnd - requestBegin, block.Length - sliceBegin);
+            long sliceBegin = requestBegin - cache.Begin;
+            long sliceEnd = sliceBegin + long.Min(requestLength(), cache.Length - sliceBegin);
 
-            Buffer sliced = block.Buffer!.Slice(sliceBegin, sliceEnd);
+            Buffer sliced = cache.Buffer.Slice(sliceBegin, sliceEnd);
             toRead.Add(Task.FromResult(sliced));
 
-            requestBegin += sliceEnd - sliceBegin;
+            requestBegin += sliced.Length;
           }
         }
 
         if (requestBegin < requestEnd)
         {
-          Task<Buffer> read = InternalRead(requestBegin, requestEnd - requestBegin, cancellationToken);
-          FileHandleBufferBlock newBlock = new(null, requestBegin, false, StoragePool<F>.FileHandle.GetTimestampNow(), Sync);
+          Task<Buffer> bufferTask = InternalRead(requestBegin, requestLength(), cancellationToken);
+          BufferCache newCache = CreateBufferCache(Buffer.Allocate(requestLength()), requestBegin, requestLength(), false);
+
+          _ = bufferTask.ContinueWith(async (task) => newCache.Buffer.Write(0, await task), cancellationToken);
+
+          toRead.Add(bufferTask);
+          Cache.Add(newCache);
 
           requestBegin = requestEnd;
-
-          _ = read.ContinueWith(async (task) => newBlock.Buffer = await task);
-          Memory.Add(newBlock);
         }
       }
 
@@ -219,200 +208,223 @@ public abstract class StoragePool<F> : Lifetime, IStoragePool
       return Buffer.Concat(await Task.WhenAll(toRead));
     }, cancellationToken);
 
-    public Task Write(Buffer buffer, CancellationToken cancellationToken) => RunTask(() =>
+    public Task Write(Buffer buffer)
     {
-      long requestBegin = Position;
-
       Buffer toWrite = buffer.Clone();
-      lock (Memory)
-      {
-        for (int index = 0; index < Memory.Count && toWrite.Length != 0; index++)
-        {
-          FileHandleBufferBlock block = Memory.ElementAt(index);
 
-          if (requestBegin >= block.End)
+      long requestBegin() => Position + (buffer.Length - toWrite.Length);
+      lock (Cache)
+      {
+        for (int index = 0; index < Cache.Count && toWrite.Length != 0; index++)
+        {
+          BufferCache cacheEntry = Cache.ElementAt(index);
+
+          if (requestBegin() >= cacheEntry.End)
           {
             continue;
           }
 
-          if (requestBegin < block.Begin)
+          if (requestBegin() < cacheEntry.Begin)
           {
-            Buffer spliced = toWrite.TruncateStart(block.Begin - requestBegin);
-            FileHandleBufferBlock newBlock = new(spliced, requestBegin, true, GetTimestampNow(), Sync);
+            BufferCache newCache = CreateBufferCache(toWrite.TruncateStart(cacheEntry.Begin - requestBegin()), requestBegin(), cacheEntry.Begin, true);
 
-            Memory.Insert(index++, newBlock);
-            requestBegin += spliced.Length;
+            Cache.Insert(index, newCache);
           }
-          else if (block.ToSync)
+          else if (cacheEntry.ToSync)
           {
-            long spliceIndex = requestBegin - block.Begin;
-            long spliceLength = long.Min(block.Length - spliceIndex, toWrite.Length);
+            long spliceIndex = requestBegin() - cacheEntry.Begin;
 
-            block.Buffer!.Write(spliceIndex, toWrite.TruncateStart(spliceLength));
-            requestBegin += spliceLength;
+            cacheEntry.Write(spliceIndex, toWrite.TruncateStart(long.Min(cacheEntry.Length - spliceIndex, toWrite.Length)));
           }
           else
           {
-            if (block.Begin == requestBegin)
+            if (cacheEntry.Begin == requestBegin())
             {
-              if (block.Length > toWrite.Length)
+              if (cacheEntry.Length > toWrite.Length)
               {
-                var (left, right) = block.Split(toWrite.Length);
+                var (left, right) = cacheEntry.Split(toWrite.Length);
 
-                left.Buffer = toWrite.TruncateStart(toWrite.Length);
-                left.ToSync = true;
+                left.Write(0, toWrite.TruncateStart(toWrite.Length));
 
-                Memory.RemoveAt(index);
-                Memory.Insert(index++, left);
-                Memory.Insert(index, right);
-
-                requestBegin += left.Length;
+                Cache.RemoveAt(index);
+                Cache.Insert(index++, left);
+                Cache.Insert(index, right);
               }
               else
               {
-                block.Buffer = toWrite.TruncateStart(block.Length);
-                block.ToSync = true;
-
-                requestBegin += block.Length;
+                cacheEntry.Write(0, toWrite.TruncateStart(cacheEntry.Length));
               }
             }
             else
             {
-              long spliceIndex1 = requestBegin - block.Begin;
+              long spliceIndex1 = requestBegin() - cacheEntry.Begin;
 
-              if (block.Length <= toWrite.Length)
+              if ((cacheEntry.Length - spliceIndex1) <= toWrite.Length)
               {
-                var (left, right) = block.Split(spliceIndex1);
+                var (left, right) = cacheEntry.Split(spliceIndex1);
 
-                right.Buffer = toWrite.TruncateStart(block.Length);
-                right.ToSync = true;
+                right.Write(0, toWrite.TruncateStart(right.Length));
 
-                Memory.RemoveAt(index);
-                Memory.Insert(index++, left);
-                Memory.Insert(index, right);
-
-                requestBegin += right.Length;
+                Cache.RemoveAt(index);
+                Cache.Insert(index++, left);
+                Cache.Insert(index, right);
               }
               else
               {
-                var (left, center, right) = block.Split(spliceIndex1, spliceIndex1 + toWrite.Length);
+                long spliceIndex2 = spliceIndex1 + toWrite.Length;
 
-                center.Buffer = toWrite.TruncateStart(toWrite.Length);
-                center.ToSync = true;
+                var (left, center, right) = cacheEntry.Split(spliceIndex1, spliceIndex1 + toWrite.Length);
 
-                Memory.RemoveAt(index);
-                Memory.Insert(index++, left);
-                Memory.Insert(index++, center);
-                Memory.Insert(index, right);
+                center.Write(0, toWrite.TruncateStart(toWrite.Length));
 
-                requestBegin += center.Length;
+                Cache.RemoveAt(index);
+                Cache.Insert(index++, left);
+                Cache.Insert(index++, center);
+                Cache.Insert(index, right);
               }
             }
           }
         }
-
-        if (toWrite.Length != 0)
-        {
-          FileHandleBufferBlock newBlock = new(toWrite.TruncateStart(toWrite.Length), requestBegin, true, StoragePool<F>.FileHandle.GetTimestampNow(), Sync);
-
-          Memory.Add(newBlock);
-          requestBegin += newBlock.Length;
-        }
       }
-    }, cancellationToken);
-  }
 
-  public abstract record Information(
-    string[] Path,
-    long CreateTime,
-    long UpdateTime
-  )
-  {
-    public record File(
-      string[] Path,
-      long Size,
-      long CreateTime,
-      long UpdateTime
-    ) : Information(Path, CreateTime, UpdateTime);
-
-    public record Folder(
-      string[] Path,
-      long CreateTime,
-      long UpdateTime
-    ) : Information(Path, CreateTime, UpdateTime);
-
-    public record SymbolicLink(
-      string[] Path,
-      long CreateTime,
-      long UpdateTime
-    );
-  }
-
-  protected StoragePool(StoragePoolManager manager, StoragePoolResource storagePool, StoragePoolType type, string name) : base(name)
-  {
-    if (storagePool.Type != type)
-    {
-      throw new InvalidOperationException();
+      return Task.CompletedTask;
     }
+  }
 
+  private sealed class PathEqualityComparer(StoragePool pool) : IEqualityComparer<string[]>
+  {
+    public readonly StoragePool Pool = pool;
+
+    public bool Equals(string[]? x, string[]? y) => (x == y) || (x != null && y != null && x.SequenceEqual(y));
+    public int GetHashCode([DisallowNull] string[] obj) => HashCode.Combine(obj.Select((entry) => entry.GetHashCode()));
+  }
+
+  protected StoragePool(StoragePoolManager manager, StoragePoolResource resource) : base($"#{resource.Id}", manager)
+  {
     Manager = manager;
-    Resource = storagePool;
-    Handles = [];
+    Resource = resource;
 
-    MarkedForDeletion = false;
+    TaskQueue = new();
 
-    manager.Logger.Subscribe(Logger);
+    PathComparer = new(this);
+    Handles = new(PathComparer);
+    HandleBufferCache = new(PathComparer);
+    HandleWaitQueue = new();
   }
 
-  public readonly StoragePoolManager Manager;
   public readonly StoragePoolResource Resource;
+  public readonly StoragePoolManager Manager;
 
-  private readonly List<FileHandle> Handles;
-  private readonly Dictionary<FileHandle, List<FileHandleBufferBlock>> HandleMemory;
+  private readonly TaskQueue TaskQueue;
 
-  private List<FileHandleBufferBlock> GetHandleMemory(FileHandle fileHandle)
+  private readonly PathEqualityComparer PathComparer;
+  private readonly Dictionary<string[], FileHandle> Handles;
+  private readonly Dictionary<string[], List<FileHandle.BufferCache>> HandleBufferCache;
+  private readonly WaitQueue<(TaskCompletionSource<FileHandle> source, (UserAuthenticationContext authenticationContext, string[] path, FileHandle.FileAccess access, FileHandle.FileMode mode, CancellationToken cancellationToken) args)> HandleWaitQueue;
+
+  protected abstract Task<Information> InternalStat(string[] path, CancellationToken cancellationToken);
+  protected abstract Task InternalDelete(string[] path, CancellationToken cancellationToken);
+  protected abstract Task InternalMove(string[] fromPath, string[] toPath, CancellationToken cancellationToken);
+
+  protected abstract Task<FileHandle> InternalOpen(UserAuthenticationContext authenticationContext, string[] path, FileHandle.FileAccess access, FileHandle.FileMode mode, CancellationToken cancellationToken);
+
+  protected abstract Task InternalCreateDirectory(string[] path, CancellationToken cancellationToken);
+  protected abstract Task InternalRemoveDirectory(string[] path, CancellationToken cancellationToken);
+  protected abstract Task<Information[]> InternalScanDirectory(string[] path, CancellationToken cancellationToken);
+
+  protected abstract Task InternalCreateSymbolicLink(string[] path, string target, CancellationToken cancellationToken);
+  protected abstract Task InternalReadSymbolicLink(string[] path, string target, CancellationToken cancellationToken);
+
+  public Task<Information> Stat(string[] path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => InternalStat(path, cancellationToken), cancellationToken);
+  public Task Delete(string[] path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => InternalDelete(path, cancellationToken), cancellationToken);
+  public Task Move(string[] fromPath, string[] toPath, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => InternalMove(fromPath, toPath, cancellationToken), cancellationToken);
+
+  public Task<FileHandle> Open(UserAuthenticationContext authenticationContext, string[] path, FileHandle.FileAccess access, FileHandle.FileMode mode, CancellationToken cancellationToken) => TaskQueue.RunTask(async (cancellationToken) =>
   {
+    TaskCompletionSource<FileHandle> source = new();
+
+    await HandleWaitQueue.Enqueue((source, (authenticationContext, path, access, mode, cancellationToken)), cancellationToken);
+    return await source.Task;
+  }, cancellationToken);
+
+  private List<FileHandle.BufferCache> AcquireHandleBufferList(string[] path)
+  {
+    if (!HandleBufferCache.TryGetValue(path, out var value))
     {
-      if (HandleMemory.TryGetValue(fileHandle, out var memory))
+      HandleBufferCache.Add(path, value = []);
+    }
+
+    return value;
+  }
+
+  private async Task RunOpenQueue(CancellationToken serviceCancellationToken)
+  {
+    while (true)
+    {
+      serviceCancellationToken.ThrowIfCancellationRequested();
+
+      var (source, (authenticationContext, path, access, mode, cancellationToken)) = await HandleWaitQueue.Dequeue(serviceCancellationToken);
+
+      CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, serviceCancellationToken);
+      try
       {
-        return memory;
+        FileHandle handle;
+        if (Handles.TryGetValue(path, out var value))
+        {
+          handle = value;
+        }
+        else
+        {
+          handle = await InternalOpen(authenticationContext, path, access, mode, linkedCancellationTokenSource.Token);
+
+          handle.StateChanged += (_, state) =>
+          {
+            lock (Handles)
+            {
+              switch (state)
+              {
+                case ServiceState.Starting:
+                case ServiceState.Started:
+                  if (Handles.TryGetValue(path, out var _))
+                  {
+                    break;
+                  }
+
+                  Handles.Add(path, handle);
+                  break;
+
+                default:
+                  Handles.Remove(path);
+                  break;
+              }
+            }
+          };
+
+          await handle.Start();
+        }
+
+        source.SetResult(handle);
+      }
+      catch (Exception exception)
+      {
+        source.SetException(exception);
+      }
+      finally
+      {
+        linkedCancellationTokenSource.Dispose();
       }
     }
+  }
 
+  protected override Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
+
+  protected override Task OnRun(CancellationToken cancellationToken) => Task.WhenAny(RunOpenQueue(cancellationToken), TaskQueue.Start(cancellationToken));
+
+  protected override async Task OnStop(Exception? exception)
+  {
+    foreach (var (_, handle) in new Dictionary<string[], FileHandle>(Handles))
     {
-      List<FileHandleBufferBlock> memory = [];
-      HandleMemory.Add(fileHandle, memory);
-      return memory;
+      await handle.Stop();
     }
-  }
-
-  public bool MarkedForDeletion { get; set; }
-  public long CacheSize
-  {
-    get
-    {
-      long size = 0;
-      foreach (FileHandle handle in Handles)
-      {
-        size += handle.CachedSize;
-      }
-
-      return size;
-    }
-  }
-
-  protected override Task OnRun(CancellationToken cancellationToken)
-  {
-    return base.OnRun(cancellationToken);
-  }
-
-  protected abstract Task<F> InternalOpen(UserKeyResource userKey, byte[] hashCache, CancellationToken cancellationToken);
-
-  public async Task<F> Open(UserKeyResource userKey, byte[] hashCache, CancellationToken cancellationToken)
-  {
-    F handle = await InternalOpen(userKey, hashCache, cancellationToken);
-
-    handle.Stopped += (_, _) => Handles.Remove(handle);
-    return handle;
   }
 }

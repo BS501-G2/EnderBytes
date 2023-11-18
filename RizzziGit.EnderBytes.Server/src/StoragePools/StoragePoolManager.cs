@@ -2,100 +2,97 @@ namespace RizzziGit.EnderBytes.StoragePools;
 
 using Collections;
 using Resources;
-using Resources.BlobStorage;
 
-public sealed class StoragePoolManager : Service
+public sealed class StoragePoolManager(Server server) : Service
 {
-  public StoragePoolManager(Server server) : base("Storage Pools", server)
+  private class StoragePoolInformation(StoragePool pool)
   {
-    Server = server;
-    WaitQueue = new();
-    StoragePools = new();
+    private static long GetTimestamp() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    private readonly StoragePool PoolBackingField = pool;
 
-    Server.Resources.StoragePools.ResourceDeleted += (_, resource) =>
+    public StoragePool Pool
     {
-      lock (this)
+      get
       {
-        if (StoragePools.TryGetValue(resource, out var pool))
-        {
-          StoragePools.Remove(resource);
+        LastAccess = GetTimestamp();
 
-          pool.MarkedForDeletion = true;
-          pool.Stop();
-        }
+        return PoolBackingField;
       }
-    };
+    }
+
+    public long LastAccess = GetTimestamp();
   }
 
-  public readonly Server Server;
-  private readonly WeakDictionary<StoragePoolResource, IStoragePool> StoragePools;
-  private WaitQueue<(TaskCompletionSource<IStoragePool> source, StoragePoolResource resource)> WaitQueue;
+  public readonly Server Server = server;
 
-  public async Task<IStoragePool> GetStoragePool(StoragePoolResource storagePool, CancellationToken cancellationToken)
-  {
-    TaskCompletionSource<IStoragePool> source = new();
-    await WaitQueue.Enqueue((source, storagePool), cancellationToken);
-    return await source.Task;
-  }
-
-  protected override async Task OnRun(CancellationToken cancellationToken)
+  private readonly Dictionary<StoragePoolResource, StoragePoolInformation> Pools = [];
+  private readonly WaitQueue<(TaskCompletionSource<StoragePool> source, StoragePoolResource resource)> WaitQueue = new();
+  private async Task RunOpenQueue(CancellationToken cancellationToken)
   {
     while (true)
     {
       cancellationToken.ThrowIfCancellationRequested();
+
       var (source, resource) = await WaitQueue.Dequeue(cancellationToken);
 
-      lock (this)
+      StoragePool pool;
+      if (Pools.TryGetValue(resource, out var value))
       {
+        pool = value.Pool;
+      }
+      else
+      {
+        pool = resource.Type switch
         {
-          if (StoragePools.TryGetValue(resource, out var storagePool))
+          StoragePoolType.Blob => new BlobStoragePool(this, resource),
+
+          _ => throw new InvalidOperationException("Invalid storage pool type.")
+        };
+
+        try
+        {
+          pool.StateChanged += (_, state) =>
           {
-            source.SetResult(storagePool);
-            continue;
-          }
+            switch (state)
+            {
+              case ServiceState.Starting:
+              case ServiceState.Started:
+                if (Pools.TryGetValue(resource, out var _))
+                {
+                  break;
+                }
+
+                Pools.Add(resource, new(pool));
+                break;
+
+              default:
+                Pools.Remove(resource);
+                break;
+            }
+          };
+
+          await pool.Start();
+          source.SetResult(pool);
         }
-
+        catch (Exception exception)
         {
-          IStoragePool? storagePool = null;
-          switch (resource.Type)
-          {
-            case StoragePoolType.Blob:
-              storagePool = new BlobStoragePool(this, resource);
-              break;
-            case StoragePoolType.Physical:
-            // storagePool = new PhysicalStoragePool(this, resource);
-            // break;
-            case StoragePoolType.Remote:
-            // storagePool = new RemoteStoragePool(this, resource);
-            // break;
-
-            default:
-              source.SetException(new System.InvalidOperationException("Unknown type."));
-              break;
-          }
-
-          if (storagePool != null)
-          {
-            StoragePools.Add(resource, storagePool);
-            storagePool.Start(cancellationToken);
-            source.SetResult(storagePool);
-          }
+          await pool.Stop();
+          source.SetException(exception);
         }
       }
     }
   }
 
-  protected override Task OnStart(CancellationToken cancellationToken)
-  {
-    try { WaitQueue.Dispose(); } catch { }
-    WaitQueue = new();
 
-    return Task.CompletedTask;
-  }
+  protected override Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
 
-  protected override Task OnStop(Exception? exception)
+  protected override Task OnRun(CancellationToken cancellationToken) => RunOpenQueue(cancellationToken);
+
+  protected override async Task OnStop(Exception? exception)
   {
-    try { WaitQueue.Dispose(); } catch { }
-    return Task.CompletedTask;
+    foreach (var (_, information) in new Dictionary<StoragePoolResource, StoragePoolInformation>())
+    {
+      await information.Pool.Stop();
+    }
   }
 }

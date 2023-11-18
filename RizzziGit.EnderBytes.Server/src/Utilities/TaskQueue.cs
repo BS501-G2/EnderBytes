@@ -44,29 +44,39 @@ internal class TaskQueue : IDisposable
 
   public async Task Start(CancellationToken cancellationToken)
   {
-    while (true)
+    try
     {
-      cancellationToken.ThrowIfCancellationRequested();
-      var (callback, remoteCancellationToken, taskCompletionSource) = await WaitQueue.Dequeue(cancellationToken);
+      while (true)
+      {
+        cancellationToken.ThrowIfCancellationRequested();
+        var (callback, remoteCancellationToken, taskCompletionSource) = await WaitQueue.Dequeue(cancellationToken);
 
-      CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
-        remoteCancellationToken,
-        cancellationToken
-      );
+        CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+          remoteCancellationToken,
+          cancellationToken
+        );
 
-      try
-      {
-        await callback(linkedCancellationTokenSource.Token);
-        taskCompletionSource.SetResult();
+        try
+        {
+          await callback(linkedCancellationTokenSource.Token);
+          taskCompletionSource.SetResult();
+        }
+        catch (Exception exception)
+        {
+          taskCompletionSource.SetException(exception);
+        }
+        finally
+        {
+          linkedCancellationTokenSource.Dispose();
+        }
       }
-      catch (Exception exception)
-      {
-        taskCompletionSource.SetException(exception);
-      }
-      finally
-      {
-        linkedCancellationTokenSource.Dispose();
-      }
+    }
+    catch (Exception exception)
+    {
+      var (_, _, source) = await WaitQueue.Dequeue(cancellationToken);
+
+      source.SetException(exception);
+      throw;
     }
   }
 }

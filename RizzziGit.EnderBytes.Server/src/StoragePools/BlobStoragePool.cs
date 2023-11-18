@@ -1,29 +1,18 @@
-using System.Security.Cryptography;
-
 namespace RizzziGit.EnderBytes.StoragePools;
 
 using Resources;
-using Resources.BlobStorage;
-using Buffer;
-using Database;
-using Connections;
-using Utilities;
+using RizzziGit.Buffer;
 
-public sealed class BlobStoragePool : StoragePool<BlobStoragePool.FileHandle>
+public sealed class BlobStoragePool(StoragePoolManager manager, StoragePoolResource resource) : StoragePool(manager, resource)
 {
-  public new sealed class FileHandle(BlobStoragePool storagePool, string[] path, FileAccess access, FileMode mode) : StoragePool<FileHandle>.FileHandle(storagePool, path, access, mode)
+  protected override Task<StoragePool.FileHandle> InternalOpen(string[] path, CancellationToken cancellationToken)
   {
-    protected override Task InternalClose()
-    {
-      throw new NotImplementedException();
-    }
+    throw new NotImplementedException();
+  }
 
-    protected override Task<Information.File> InternalGetInfo(CancellationToken cancellationToken)
-    {
-      throw new NotImplementedException();
-    }
-
-    protected override Task<Buffer> InternalRead(long position, long length, CancellationToken cancellationToken)
+  private new class FileHandle(string[] path, StoragePool pool) : StoragePool.FileHandle(path, pool)
+  {
+    protected override Task<Buffer> InternalRead(long position, long size, CancellationToken cancellationToken)
     {
       throw new NotImplementedException();
     }
@@ -37,41 +26,20 @@ public sealed class BlobStoragePool : StoragePool<BlobStoragePool.FileHandle>
     {
       throw new NotImplementedException();
     }
-  }
 
-  public BlobStoragePool(StoragePoolManager manager, StoragePoolResource storagePool) : base(manager, storagePool, StoragePoolType.Blob, "Blob Storage")
-  {
-    Resources = new(this);
-  }
-
-  public readonly BlobStorageResourceManager Resources;
-
-  protected override async Task OnRun(CancellationToken cancellationToken)
-  {
-    try
+    protected override Task OnRun(CancellationToken cancellationToken)
     {
-      await Resources.Start();
-
-      await base.OnRun(cancellationToken);
+      throw new NotImplementedException();
     }
-    finally
+
+    protected override Task OnStart(CancellationToken cancellationToken)
     {
-      try
-      {
-        await Resources.Stop();
-      }
-      finally
-      {
-        if (MarkedForDeletion)
-        {
-          File.Delete(BlobStorageResourceManager.GetDatabaseFilePath(Manager.Server, this));
-        }
-      }
+      throw new NotImplementedException();
     }
-  }
 
-  protected override Task<FileHandle> InternalOpen(UserKeyResource userKey, byte[] hashCache, CancellationToken cancellationToken)
-  {
-    return null;
+    protected override Task OnStop(Exception? exception)
+    {
+      throw new NotImplementedException();
+    }
   }
 }

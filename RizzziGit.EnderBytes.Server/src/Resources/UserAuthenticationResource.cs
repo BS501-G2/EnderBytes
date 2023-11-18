@@ -13,6 +13,8 @@ public enum UserAuthenticationType : byte
   Password
 }
 
+public sealed record UserAuthenticationContext(UserAuthenticationResource UserAuthentication, byte[] HashCache);
+
 public sealed class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager
@@ -159,7 +161,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       return null;
     }
 
-    public (UserAuthenticationResource userAuthentication, byte[] hashCache)? GetByPayload(DatabaseTransaction transaction, byte[] payload)
+    public UserAuthenticationContext? GetByPayload(DatabaseTransaction transaction, byte[] payload)
     {
       using SqliteDataReader reader = DbSelect(transaction, [], []);
 
@@ -169,7 +171,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
         if (userAuthentication.IsMatch(payload))
         {
-          return (userAuthentication, userAuthentication.GetHash(payload));
+          return new(userAuthentication, userAuthentication.GetHash(payload));
         }
       }
 

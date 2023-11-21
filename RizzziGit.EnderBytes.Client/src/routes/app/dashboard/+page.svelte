@@ -19,17 +19,105 @@
 
     <div class="Categories"  style="margin-left: 150px; padding-top: 20px;">
         <h1 class="TitleCategories" style="color: #FFC107; font-size: 24px; font-semibold;">Categories</h1>
-        <button class="border-2 border-blue-500 rounded-lg p-4 mb-8">
-            <h2 class="text-xl text-blue-500">File Name</h2>
-            <p class="text-gray-500">File Size: 10MB</p>
-        </button>
+        <div class="button flex" style="padding-top: 20px;">
+            <div style="padding-right: 20px;">
+                <button class="border-2 border-blue-500 rounded-lg p-4" style="width: 120px; height: 120px;">
+                    <h2 class="text-xl text-blue-500">Pictures</h2>
+                    <p class="text-gray-500" style="padding-top: 20px;">380 Files</p>
+                 </button>
+            </div>
+            <div style="padding-right: 20px;">
+                <button class="border-2 border-blue-500 rounded-lg p-4 " style="width: 120px; height: 120px; ">
+                    <h2 class="text-xl text-blue-500">Documents</h2>
+                    <p class="text-gray-500" style="padding-top: 20px;">180 Files</p>
+                </button>
+            </div>
+            <div style="padding-right: 20px;">
+                <button class="border-2 border-blue-500 rounded-lg p-4"style="width: 120px; height: 120px;">
+                    <h2 class="text-xl text-blue-500">Videos</h2>
+                    <p class="text-gray-500" style="padding-top: 20px;">120 Files</p>
+                </button>
+            </div>
+            <div style="padding-right: 20px;">
+                <button class="border-2 border-blue-500 rounded-lg p-4"style="width: 120px; height: 120px;">
+                    <h2 class="text-xl text-blue-500">Audio</h2>
+                    <p class="text-gray-500" style="padding-top: 20px;">50 Files</p>
+                </button>
+            </div>
+        </div>
+        
+        
         
     </div>
-    <div class="Files"  style="margin-left: 150px; padding-top: 140px;">
+    <div class="Files"  style="margin-left: 150px; padding-top: 20px;">
         <h1 class="TitleFiles" style="color: #FFC107; font-size: 24px; font-semibold;">Files</h1>
+        <div class="button flex" style="padding-top: 20px;">
+            <div style="padding-right: 20px;">
+                <button class="border-2 border-blue-500 rounded-lg p-4" style="width: 120px; height: 120px; padding: 10px;">
+                    <h2 class="text-xl text-blue-500">Work</h2>
+                    <p class="text-gray-500" style="padding-top: 20px;">380 Files</p>
+                 </button>
+            </div>
+            <div style="padding-right: 20px;">
+                <button class="border-2 border-blue-500 rounded-lg p-4 " style="width: 120px; height: 120px; ">
+                        <h2 class="text-xl text-blue-500">Personal</h2>
+                        <p class="text-gray-500" style="padding-top: 20px;">180 Files</p>
+                </button>
+            </div>
+            <div style="padding-right: 20px;">
+                <button class="border-2 border-blue-500 rounded-lg p-4"style="width: 120px; height: 120px;">
+                    <h2 class="text-xl text-blue-500">School</h2>
+                    <p class="text-gray-500" style="padding-top: 20px;">120 Files</p>
+                </button>
+            </div>
+            <div style="padding-right: 20px;">
+                <button class="border-2 border-blue-500 rounded-lg p-4"style="width: 120px; height: 120px;">
+                    <h2 class="text-xl text-blue-500">Archive</h2>
+                    <p class="text-gray-500" style="padding-top: 20px;">50 Files</p>
+                </button>
+            </div>
+            <div style="padding-right: 20px;">
+                <button class="border-2 border-blue-500 rounded-lg p-4" style="width: 120px; height: 120px; display: flex; justify-content: center; align-items: center;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" class="text-blue-500" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-width="2" d="M12 5v14M5 12h14" fill="none" />
+                    </svg>
+                </button>
+            </div>
+            
+            
+        </div>
+        
     </div>
-    <div class="RecentFiles"  style="margin-left: 150px; padding-top: 140px;">
-        <h1 class="TitleRecentFiles" style="color: #FFC107; font-size: 24px; font-semibold;">Recent Files</h1>
+    <div class="RecentFiles"  style="margin-left: 150px; padding-top: 20px;">
+        <h1 class="TitleRecentFiles" style="color: #FFC107; font-size: 24px; font-semibold; padding-bottom:20px">Recent Files</h1>
+                <div class="file" style="display: flex;justify-content: space-between;align-items: center;padding: 10px;border: solid black;height: 50px;border-radius: 10px;margin-bottom: 10px;margin-right: 10px;color: black; text-overflow:ellipsis; width: 700px; ">
+                    <div class="fileIcon"><img src="/images/fileIcon/docx-icon.png" width="20px"></div>
+                    <div class="fileName" style="max-width:300px;"><p style="font-weight: bold; width: 300px; overflow: hidden; display: inline-block; text-overflow: ellipsis; white-space: nowrap;">computer programming laboratory exercise</p></div>
+                    <div class="fileSize"><p style="color: gray;">*.filetype</p></div>  
+                    <div class="fileSize"><p style="color: gray;">*file size</p></div>
+                    <div class="createDate"><p style="color: gray;">*create date</p></div>
+                    <div class="dots"><img src="/images/fileIcon/ellipses-icon.png" width="20px"></div> 
+                </div>
+                <div class="file" style="display: flex;justify-content: space-between;align-items: center;padding: 10px;border: solid black;height: 50px;border-radius: 10px;margin-bottom: 10px;margin-right: 10px;color: black; text-overflow:ellipsis; width: 700px; ">
+                    <div class="fileIcon"><img src="/images/fileIcon/docx-icon.png" width="20px"></div>
+                    <div class="fileName" style="max-width:300px;"><p style="font-weight: bold; width: 300px; overflow: hidden; display: inline-block; text-overflow: ellipsis; white-space: nowrap;">computer programming laboratory exercise</p></div>
+                    <div class="fileSize"><p style="color: gray;">*.filetype</p></div>  
+                    <div class="fileSize"><p style="color: gray;">*file size</p></div>
+                    <div class="createDate"><p style="color: gray;">*create date</p></div>
+                    <div class="dots"><img src="/images/fileIcon/ellipses-icon.png" width="20px"></div> 
+                </div>
+                 <div class="file" style="display: flex;justify-content: space-between;align-items: center;padding: 10px;border: solid black;height: 50px;border-radius: 10px;margin-bottom: 10px;margin-right: 10px;color: black; text-overflow:ellipsis; width: 700px; ">
+                    <div class="fileIcon"><img src="/images/fileIcon/docx-icon.png" width="20px"></div>
+                    <div class="fileName" style="max-width:300px;"><p style="font-weight: bold; width: 300px; overflow: hidden; display: inline-block; text-overflow: ellipsis; white-space: nowrap;">computer programming laboratory exercise</p></div>
+                    <div class="fileSize"><p style="color: gray;">*.filetype</p></div>  
+                    <div class="fileSize"><p style="color: gray;">*file size</p></div>
+                    <div class="createDate"><p style="color: gray;">*create date</p></div>
+                    <div class="dots"><img src="/images/fileIcon/ellipses-icon.png" width="20px"></div> 
+                </div>
+           
+    </div>
+     <div class="side-panel flex flex-col justify-between" style="align-items: center; padding-top: 10px; border: solid black; border-radius: 15px; height: 800px; width: 400px; margin-left: auto; margin-right: 60px; overflow: hidden auto;">
+        
     </div>
 
 </div>

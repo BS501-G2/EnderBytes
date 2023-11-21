@@ -25,7 +25,8 @@
 
     background-color: var(--side-panel-background);
 
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: hidden;
 
     transition-duration: 400ms;
     transition-timing-function: cubic-bezier(0,1,.5,1);
@@ -48,7 +49,7 @@
   div.nav-entry {
     height: max-content;
 
-    padding: 16px 0px 0px 0px;
+    padding: 8px 0px 8px 0px;
     margin: 16px 4px 16px 4px;
 
     white-space: nowrap;
@@ -57,6 +58,11 @@
     transition-duration: --panel-side-hover-transition-duration;
     transition-duration: 400ms;
     border-radius: 8px;
+  }
+
+  div.side-panel:hover
+  div.nav-entry {
+    padding: 16px 0px 0px 0px;
   }
 
   div.nav-entry-not-active:hover {
@@ -81,7 +87,6 @@
 
     display: flex;
     transition-duration: 400ms;
-    transition-timing-function: cubic-bezier(0,1,.5,1);
   }
 
   div.side-panel:hover
@@ -107,12 +112,14 @@
     height: 24px;
 
     opacity: 0;
+    margin-top: 8px;
     transition-duration: 400ms;
   }
 
   div.side-panel:hover
   div.nav-entry-label {
     opacity: 1;
+    margin-top: 0px;
   }
 
   div.nav-entry-label-flex-container {
@@ -124,10 +131,53 @@
   div.foot-section {
     height: var(--panel-side-foot-section-height);
   }
+
+  div.head-section {
+    display: flex;
+
+    white-space: nowrap;
+
+    padding: 16px 0px 0px 12px;
+    align-items: center;
+  }
+
+  img.head-image {
+    width: 48px;
+    height: 48px;
+
+    image-rendering: pixelated;
+
+    transition-duration: 300ms;
+    transition-timing-function: ease-in-out;
+  }
+
+  div.side-panel:hover
+  img.head-image {
+    width: 32px;
+    height: 32px;
+
+    margin-right: 8px;
+  }
+
+  h1.head-title {
+    opacity: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 16px;
+
+    transition-duration: 300ms;
+    transition-timing-function: ease-in-out;
+  }
+
+  div.side-panel:hover
+  h1.head-title {
+    opacity: 1;
+  }
 </style>
 
 <div class="side-panel">
   <div class="head-section">
+    <img class="head-image" src="/favicon.png" alt="icon"/>
+    <h1 class="head-title">EnderBytes</h1>
   </div>
   <div class="nav-section">
     <ul>

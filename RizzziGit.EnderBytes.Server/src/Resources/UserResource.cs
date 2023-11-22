@@ -42,8 +42,8 @@ public sealed class UserResource(UserResource.ResourceManager manager, UserResou
     {
       using var reader = DbSelect(transaction, new()
       {
-        { KEY_USERNAME, ("=", username, null) }
-      }, [], (1, null), null);
+        { KEY_USERNAME, ("=", username) }
+      }, [], new(1, null), null);
 
       while (reader.Read())
       {

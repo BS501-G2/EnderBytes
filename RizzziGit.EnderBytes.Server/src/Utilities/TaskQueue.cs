@@ -73,10 +73,13 @@ internal class TaskQueue : IDisposable
     }
     catch (Exception exception)
     {
-      var (_, _, source) = await WaitQueue.Dequeue(cancellationToken);
+      while (WaitQueue.Count != 0)
+      {
+        var (_, _, source) = await WaitQueue.Dequeue(cancellationToken);
 
-      source.SetException(exception);
-      throw;
+        source.SetException(exception);
+        throw;
+      }
     }
   }
 }

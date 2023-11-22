@@ -73,9 +73,9 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
     {
       foreach (UserKeyResource userKey in DbStream(transaction, new()
       {
-        { KEY_USER_ID, ("=", user.Id, null) },
-        { KEY_USER_AUTHENTICATION_ID, ("=", from.userAuthentication.Id, null) }
-      }, (1, null)))
+        { KEY_USER_ID, ("=", user.Id) },
+        { KEY_USER_AUTHENTICATION_ID, ("=", from.userAuthentication.Id) }
+      }, new(1, null)))
       {
         byte[] iv = RNG.GetBytes(16);
         byte[] privateKey = Aes.Create().CreateDecryptor(from.hashCache, userKey.PrivateIv).TransformFinalBlock(userKey.EncryptedPrivateKey);
@@ -105,56 +105,35 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
     byte[] PublicKey
   ) : Resource<ResourceManager, ResourceData, UserKeyResource>.ResourceData(Id, CreateTime, UpdateTime);
 
+
+  public sealed class Transformer(UserKeyResource userKey, RSACryptoServiceProvider serviceProvider) : IDisposable
+  {
+    public readonly UserKeyResource UserKey = userKey;
+
+    private readonly RSACryptoServiceProvider Provider = serviceProvider;
+
+    public byte[] Encrypt(byte[] bytes) => Provider.Encrypt(bytes, true);
+    public byte[] Decrypt(byte[] bytes) => Provider.Decrypt(bytes, true);
+
+    public void Dispose() => Provider.Dispose();
+  }
+
   public long UserId => Data.UserId;
   public long UserAuthenticationId => Data.UserAuthenticationId;
   public byte[] PrivateIv => Data.PrivateIv;
   public byte[] EncryptedPrivateKey => Data.EncryptedPrivateKey;
   public byte[] PublicKey => Data.PublicKey;
 
-  public byte[] Decrypt(byte[] bytes, byte[] hashCache)
+  public Transformer GetTransformer(byte[]? hashCache = null)
   {
-    using RSACryptoServiceProvider provider = new()
+    RSACryptoServiceProvider provider = new()
     {
       PersistKeyInCsp = false,
       KeySize = KeyGenerator.KEY_SIZE
     };
 
-    try
-    {
-      provider.ImportCspBlob(Aes.Create().CreateDecryptor(hashCache, PrivateIv).TransformFinalBlock(EncryptedPrivateKey));
-      return provider.Encrypt(bytes, true);
-    }
-    finally
-    {
-      provider.Clear();
-    }
-  }
-
-  public byte[] Encrypt(byte[] bytes, byte[]? hashCache = null)
-  {
-    using RSACryptoServiceProvider provider = new()
-    {
-      PersistKeyInCsp = false,
-      KeySize = KeyGenerator.KEY_SIZE
-    };
-
-    try
-    {
-      if (hashCache == null)
-      {
-        provider.ImportCspBlob(PublicKey);
-      }
-      else
-      {
-        provider.ImportCspBlob(Aes.Create().CreateDecryptor(hashCache, PrivateIv).TransformFinalBlock(EncryptedPrivateKey));
-      }
-
-      return provider.Encrypt(bytes, true);
-    }
-    finally
-    {
-      provider.Clear();
-    }
-
+    Transformer transform = new(this, provider);
+    provider.ImportCspBlob(hashCache != null ? Aes.Create().CreateDecryptor(hashCache, PrivateIv).TransformFinalBlock(EncryptedPrivateKey) : PublicKey);
+    return transform;
   }
 }

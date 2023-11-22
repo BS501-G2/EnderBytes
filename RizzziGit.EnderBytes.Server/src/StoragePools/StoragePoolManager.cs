@@ -3,7 +3,7 @@ namespace RizzziGit.EnderBytes.StoragePools;
 using Collections;
 using Resources;
 
-public sealed class StoragePoolManager(Server server) : Service
+public sealed class StoragePoolManager : Service
 {
   private class StoragePoolInformation(StoragePool pool)
   {
@@ -23,7 +23,22 @@ public sealed class StoragePoolManager(Server server) : Service
     public long LastAccess = GetTimestamp();
   }
 
-  public readonly Server Server = server;
+  public StoragePoolManager(Server server)
+  {
+    Server = server;
+    Server.Resources.StoragePools.ResourceDeleted += (transaction, resource) =>
+    {
+      lock (Pools)
+      {
+        if (Pools.TryGetValue(resource, out StoragePoolInformation? value))
+        {
+          _ = value.Pool.Stop();
+        }
+      }
+    };
+  }
+
+  public readonly Server Server;
 
   private readonly Dictionary<StoragePoolResource, StoragePoolInformation> Pools = [];
   private readonly WaitQueue<(TaskCompletionSource<StoragePool> source, StoragePoolResource resource)> WaitQueue = new();
@@ -53,21 +68,24 @@ public sealed class StoragePoolManager(Server server) : Service
         {
           pool.StateChanged += (_, state) =>
           {
-            switch (state)
+            lock (Pools)
             {
-              case ServiceState.Starting:
-              case ServiceState.Started:
-                if (Pools.TryGetValue(resource, out var _))
-                {
+              switch (state)
+              {
+                case ServiceState.Starting:
+                case ServiceState.Started:
+                  if (Pools.TryGetValue(resource, out var _))
+                  {
+                    break;
+                  }
+
+                  Pools.Add(resource, new(pool));
                   break;
-                }
 
-                Pools.Add(resource, new(pool));
-                break;
-
-              default:
-                Pools.Remove(resource);
-                break;
+                default:
+                  Pools.Remove(resource);
+                  break;
+              }
             }
           };
 
@@ -90,9 +108,16 @@ public sealed class StoragePoolManager(Server server) : Service
 
   protected override async Task OnStop(Exception? exception)
   {
-    foreach (var (_, information) in new Dictionary<StoragePoolResource, StoragePoolInformation>())
+    List<Task> tasks = [];
+
+    lock (Pools)
     {
-      await information.Pool.Stop();
+      foreach (var (_, information) in Pools)
+      {
+        tasks.Add(information.Pool.Stop());
+      }
     }
+
+    await Task.WhenAll(tasks);
   }
 }

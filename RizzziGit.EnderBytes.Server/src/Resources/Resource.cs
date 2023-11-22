@@ -7,10 +7,8 @@ namespace RizzziGit.EnderBytes.Resources;
 using Database;
 using Collections;
 
-using WhereClause = Dictionary<string, (string condition, object? value, string? collate)>;
+using WhereClause = Dictionary<string, (string condition, object? value)>;
 using ValueClause = Dictionary<string, object?>;
-using LimitClause = (int count, int? offset);
-using OrderClause = (string column, string orderBy);
 
 public abstract class Resource<M, D, R>
   where M : Resource<M, D, R>.ResourceManager
@@ -19,6 +17,9 @@ public abstract class Resource<M, D, R>
 {
   public abstract class ResourceManager
   {
+    public sealed record Limit(int Count, int? Offset = null);
+    public sealed record Order(string Column, string OrderBy);
+
     protected const string KEY_ID = "ID";
     protected const string KEY_CREATE_TIME = "CreateTime";
     protected const string KEY_UPDATE_TIME = "UpdateTime";
@@ -157,17 +158,7 @@ public abstract class Resource<M, D, R>
       sql.Append(';');
 
       transaction.ExecuteNonQuery(sql.ToString(), [.. sqlParams]);
-      using SqliteDataReader reader = DbSelect(transaction, new()
-      {
-        {
-          KEY_ID,
-          (
-            "=",
-            (long)(transaction.ExecuteScalar($"select seq from sqlite_sequence where name = {{0}} limit 1;", Name) ?? throw new InvalidOperationException("Failed to get new row ID.")),
-            null
-          )
-        }
-      }, []);
+      using SqliteDataReader reader = DbSelect(transaction, new() { { KEY_ID, ("=", (long)(transaction.ExecuteScalar($"select seq from sqlite_sequence where name = {{0}} limit 1;", Name) ?? throw new InvalidOperationException("Failed to get new row ID."))) } }, []);
 
       if (!reader.Read())
       {
@@ -259,7 +250,7 @@ public abstract class Resource<M, D, R>
       return count;
     }
 
-    protected R? DbOnce(DatabaseTransaction transaction, WhereClause where, LimitClause? limit = null, List<OrderClause>? order = null)
+    protected R? DbOnce(DatabaseTransaction transaction, WhereClause where, Limit? limit = null, List<Order>? order = null)
     {
       foreach (R resource in DbStream(transaction, where, limit, order))
       {
@@ -269,8 +260,8 @@ public abstract class Resource<M, D, R>
       return null;
     }
 
-    protected IEnumerable<R> DbStream(DatabaseTransaction transaction, WhereClause where, LimitClause? limit = null, List<OrderClause>? order = null) => Stream(DbSelect(transaction, where, [], limit, order));
-    protected SqliteDataReader DbSelect(DatabaseTransaction transaction, WhereClause where, List<string> project, LimitClause? limit = null, List<OrderClause>? order = null)
+    protected IEnumerable<R> DbStream(DatabaseTransaction transaction, WhereClause where, Limit? limit = null, List<Order>? order = null) => Stream(DbSelect(transaction, where, [], limit, order));
+    protected SqliteDataReader DbSelect(DatabaseTransaction transaction, WhereClause where, List<string> project, Limit? limit = null, List<Order>? order = null)
     {
       Validate(transaction);
 
@@ -305,7 +296,7 @@ public abstract class Resource<M, D, R>
         sql.Append(" where ");
 
         bool firstEntry = true;
-        foreach (var (key, (condition, value, collate)) in where)
+        foreach (var (key, (condition, value)) in where)
         {
           if (!firstEntry)
           {
@@ -324,22 +315,17 @@ public abstract class Resource<M, D, R>
           {
             sql.Append($"{key} {condition} {{{sqlParams.Count}}}");
             sqlParams.Add(value);
-
-            if (collate != null)
-            {
-              sql.Append($" collate {collate}");
-            }
           }
         }
       }
 
       if (limit != null)
       {
-        sql.Append($" limit {limit.Value.count}");
+        sql.Append($" limit {limit.Count}");
 
-        if (limit.Value.offset != null)
+        if (limit.Offset != null)
         {
-          sql.Append($" offset {limit.Value.offset}");
+          sql.Append($" offset {limit.Offset}");
         }
       }
 
@@ -382,8 +368,8 @@ public abstract class Resource<M, D, R>
     {
       using var reader = DbSelect(database, new()
       {
-        { KEY_ID, ("=", id, null) }
-      }, [], (1, null), null);
+        { KEY_ID, ("=", id) }
+      }, [], new(1, null), null);
 
       while (reader.Read())
       {
@@ -395,7 +381,7 @@ public abstract class Resource<M, D, R>
 
     public long Delete(DatabaseTransaction transaction, R resource) => DbDelete(transaction, new()
     {
-      { KEY_ID, ("=", resource.Id, null) }
+      { KEY_ID, ("=", resource.Id) }
     });
 
     public event Action<DatabaseTransaction>? RoutineCheck;

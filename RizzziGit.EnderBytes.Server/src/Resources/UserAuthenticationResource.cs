@@ -13,7 +13,20 @@ public enum UserAuthenticationType : byte
   Password
 }
 
-public sealed record UserAuthenticationContext(UserAuthenticationResource UserAuthentication, byte[] HashCache);
+public sealed class UserAuthenticationContext(
+  UserResource user,
+  UserAuthenticationResource userAuthentication,
+  byte[] hashCache
+)
+{
+  public readonly UserResource User = user;
+  public readonly UserAuthenticationResource UserAuthentication = userAuthentication;
+  private readonly byte[] HashCache = hashCache;
+
+  public UserKeyResource.Transformer GetTransformer(UserKeyResource userKey) => userKey.GetTransformer(HashCache);
+
+  public bool IsValid => UserAuthentication.IsValid;
+}
 
 public sealed class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
@@ -22,7 +35,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
     public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
       main.Users.ResourceDeleted += (transaction, resource) => DbDelete(transaction, new() {
-        { KEY_USER_ID, ("=", resource.Id, null) }
+        { KEY_USER_ID, ("=", resource.Id) }
       });
     }
 
@@ -87,8 +100,8 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
       UserAuthenticationResource? existing = DbOnce(transaction, new()
       {
-        { KEY_USER_ID, ("=", user.Id, null) }
-      }, (1, null));
+        { KEY_USER_ID, ("=", user.Id) }
+      }, new(1, null));
 
       UserAuthenticationResource userAuthentication = DbInsert(transaction, new()
       {
@@ -143,8 +156,8 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
       using SqliteDataReader reader = DbSelect(transaction, new()
       {
-        { KEY_TYPE, ("=", (byte)UserAuthenticationType.Password, null) },
-        { KEY_USER_ID, ("=", user.Id, null) }
+        { KEY_TYPE, ("=", (byte)UserAuthenticationType.Password) },
+        { KEY_USER_ID, ("=", user.Id) }
       }, []);
 
       byte[] passwordBytes = Encoding.UTF8.GetBytes(password);
@@ -168,10 +181,15 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
       while (reader.Read())
       {
         UserAuthenticationResource userAuthentication = Memory.ResolveFromData(CreateData(reader));
+        UserResource? user = Main.Users.GetById(transaction, userAuthentication.Id);
+        if (user == null)
+        {
+          continue;
+        }
 
         if (userAuthentication.IsMatch(payload))
         {
-          return new(userAuthentication, userAuthentication.GetHash(payload));
+          return new(user, userAuthentication, userAuthentication.GetHash(payload));
         }
       }
 

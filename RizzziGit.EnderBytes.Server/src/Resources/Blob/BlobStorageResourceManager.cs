@@ -26,6 +26,7 @@ public sealed class BlobStorageResourceManager : Service, IMainResourceManager
     Maps = new(this, MainDatabase);
     Keys = new(this, MainDatabase);
     Versions = new(this, MainDatabase);
+    Data = new(this, MainDatabase);
 
     storagePool.Manager.Logger.Subscribe(Logger);
   }
@@ -38,9 +39,10 @@ public sealed class BlobStorageResourceManager : Service, IMainResourceManager
   public new Logger Logger => base.Logger;
 
   public readonly BlobFileResource.ResourceManager Files;
-  public readonly BlobDataMapResource.ResourceManager Maps;
   public readonly BlobKeyResource.ResourceManager Keys;
   public readonly BlobFileVersionResource.ResourceManager Versions;
+  public readonly BlobDataMapResource.ResourceManager Maps;
+  public readonly BlobDataResource.ResourceManager Data;
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
@@ -54,9 +56,10 @@ public sealed class BlobStorageResourceManager : Service, IMainResourceManager
     {
       TableVersion.Init(transaction);
       Files.Init(transaction);
-      Maps.Init(transaction);
       Keys.Init(transaction);
       Versions.Init(transaction);
+      Maps.Init(transaction);
+      Data.Init(transaction);
     }, cancellationToken);
   }
 

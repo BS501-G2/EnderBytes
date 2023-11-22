@@ -21,7 +21,7 @@ public sealed class UserRoleResource(UserRoleResource.ResourceManager manager, U
     {
       main.Users.ResourceDeleted += (transaction, user) => DbDelete(transaction, new()
       {
-        { KEY_USER_ID, ("=", user.Id, null) }
+        { KEY_USER_ID, ("=", user.Id) }
       });
     }
 
@@ -46,8 +46,8 @@ public sealed class UserRoleResource(UserRoleResource.ResourceManager manager, U
     {
       using SqliteDataReader reader = DbSelect(transaction, new()
       {
-        { KEY_USER_ID, ("=", user.Id, null) }
-      }, [], (1, null), null);
+        { KEY_USER_ID, ("=", user.Id) }
+      }, [], new(1, null), null);
 
       while (reader.Read())
       {
@@ -64,7 +64,7 @@ public sealed class UserRoleResource(UserRoleResource.ResourceManager manager, U
         { KEY_TYPE, (byte)type }
       }, new()
       {
-        { KEY_USER_ID, ("=", user.Id, null) }
+        { KEY_USER_ID, ("=", user.Id) }
       }) == 0)
       {
         DbInsert(transaction, new() { { KEY_TYPE, (byte)type } });

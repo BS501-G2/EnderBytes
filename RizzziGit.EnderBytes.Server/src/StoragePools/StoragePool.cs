@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Buffers;
+using System.Collections.ObjectModel;
 
 namespace RizzziGit.EnderBytes.StoragePools;
 
@@ -6,14 +8,187 @@ using Utilities;
 using Buffer;
 using Resources;
 using Collections;
+using System.Collections;
 
 public abstract class StoragePool : Service
 {
-  public abstract record Information(long? AccessTime, long? TrashTime)
+  public abstract class Exception : System.Exception
   {
-    public sealed record File(long Size, long? AccessTime, long? TrashTime) : Information(AccessTime, TrashTime);
-    public sealed record Folder(long? AccessTime, long? TrashTime) : Information(AccessTime, TrashTime);
-    public sealed record SymbolicLink(long? AccessTime, long? TrashTime) : Information(AccessTime, TrashTime);
+    private static Exception Wrap(System.Exception innerException) => innerException is Exception exception
+      ? exception
+      : new InternalException(innerException);
+
+    public static async Task<T> Wrap<T>(Task<T> task)
+    {
+      try
+      {
+        return await task;
+      }
+      catch (Exception exception)
+      {
+        throw Wrap(exception);
+      }
+    }
+
+    public static async Task Wrap(Task task)
+    {
+      try
+      {
+        await task;
+      }
+      catch (Exception exception)
+      {
+        throw Wrap(exception);
+      }
+    }
+
+    private Exception(string? message, System.Exception? innerException) : base(message, innerException) { }
+
+    public class NoSuchFileOrFolder(System.Exception? innerException = null) : Exception("No such file or directory.", innerException);
+    public class FileOrFolderExists(System.Exception? innerException = null) : Exception("File or folder already exists", innerException);
+    public class InternalException(System.Exception? innerException = null) : Exception("Internal exception.", innerException);
+    public class IsAFolder(System.Exception? innerException = null) : Exception("Path specified is a folder.", innerException);
+    public class NotAFolder(System.Exception? innerException = null) : Exception("Path specified is not a folder.", innerException);
+    public class AccessDenied(System.Exception? innerException = null) : Exception("Permission denied.", innerException);
+  }
+
+  public abstract record Information(string Name, long? AccessTime, long? TrashTime)
+  {
+    public sealed record File(string Name, long Size, long? AccessTime, long? TrashTime) : Information(Name, AccessTime, TrashTime);
+    public sealed record Folder(string Name, long? AccessTime, long? TrashTime) : Information(Name, AccessTime, TrashTime);
+    public sealed record SymbolicLink(string Name, long? AccessTime, long? TrashTime) : Information(Name, AccessTime, TrashTime);
+    public sealed record Root(long? AccessTime, long? TrashTime) : Information("/", AccessTime, TrashTime);
+  }
+
+  public sealed class Path : IEnumerable<string>
+  {
+    public Path(StoragePool pool, params string[] path)
+    {
+      Pool = pool;
+
+      {
+        List<string> sanitized = [];
+        foreach (string pathEntry in path)
+        {
+          if (
+            (pathEntry.Length == 0) ||
+            (pathEntry == ".")
+          )
+          {
+            continue;
+          }
+          else if (pathEntry == "..")
+          {
+            if (sanitized.Count == 0)
+            {
+              throw new ArgumentException("Invalid path.", nameof(path));
+            }
+
+            sanitized.RemoveAt(sanitized.Count - 1);
+            continue;
+          }
+
+          sanitized.Add(pathEntry);
+        }
+
+        InternalPath = [.. sanitized];
+        sanitized.Clear();
+      }
+    }
+
+    private readonly StoragePool Pool;
+    private readonly string[] InternalPath;
+
+    public string this[int index] => InternalPath[index];
+    public int Length => InternalPath.Length;
+
+    public bool IsInsideOf(Path other)
+    {
+      if (Length <= other.Length)
+      {
+        return false;
+      }
+
+      for (int index = 0; index < other.Length; index++)
+      {
+        if (string.Equals(
+          this[index],
+          other[index],
+          Pool.Resource.Flags.HasFlag(
+            StoragePoolFlags.IgnoreCase)
+              ? StringComparison.OrdinalIgnoreCase
+              : StringComparison.Ordinal
+          )
+        )
+        {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    public override bool Equals(object? obj)
+    {
+      if (ReferenceEquals(this, obj))
+      {
+        return true;
+      }
+      else if (obj is null || obj is not Path)
+      {
+        return false;
+      }
+
+      Path path = (Path)obj;
+      if (path.InternalPath.Length != InternalPath.Length)
+      {
+        return false;
+      }
+
+      if (path.Pool != Pool)
+      {
+        throw new ArgumentException("Cannot compare paths from different storage pools.");
+      }
+
+      for (int index = 0; index < Length; index++)
+      {
+        if (string.Equals(
+          this[index],
+          path[index],
+          Pool.Resource.Flags.HasFlag(
+            StoragePoolFlags.IgnoreCase)
+              ? StringComparison.InvariantCultureIgnoreCase
+              : StringComparison.InvariantCulture
+          )
+        )
+        {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    public override int GetHashCode()
+    {
+      HashCode hashCode = new();
+
+      foreach (string pathEntry in InternalPath)
+      {
+        hashCode.Add(pathEntry);
+      }
+
+      return hashCode.ToHashCode();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    public IEnumerator<string> GetEnumerator()
+    {
+      foreach (string pathEntry in InternalPath)
+      {
+        yield return pathEntry;
+      }
+    }
   }
 
   public abstract class FileHandle : Service
@@ -86,7 +261,7 @@ public abstract class StoragePool : Service
       );
     }
 
-    protected FileHandle(string[] path, StoragePool pool, FileAccess access) : base(string.Join("/", path), pool)
+    protected FileHandle(StoragePool pool, Path path, FileAccess access) : base(string.Join("/", path), pool)
     {
       Pool = pool;
       Cache = pool.AcquireHandleBufferList(path);
@@ -129,7 +304,7 @@ public abstract class StoragePool : Service
 
     protected override Task OnRun(CancellationToken cancellationToken) => TaskQueue.Start(cancellationToken);
     protected override Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
-    protected override Task OnStop(Exception? exception) => Sync();
+    protected override Task OnStop(System.Exception? exception) => Sync();
 
     public Task Sync() => TaskQueue.RunTask(async (_) =>
     {
@@ -148,6 +323,11 @@ public abstract class StoragePool : Service
 
     public Task<Buffer> Read(long length, CancellationToken cancellationToken) => TaskQueue.RunTask(async (cancellationToken) =>
     {
+      if (!Access.HasFlag(FileAccess.Read))
+      {
+        throw new InvalidOperationException("Read flag is not present.");
+      }
+
       long requestBegin = Position;
       long requestEnd = Position + length > Size ? Size - Position : length;
       long requestLength() => requestEnd - requestBegin;
@@ -210,6 +390,11 @@ public abstract class StoragePool : Service
 
     public Task Write(Buffer buffer)
     {
+      if (!Access.HasFlag(FileAccess.Write))
+      {
+        throw new InvalidOperationException("Write flag is not present.");
+      }
+
       Buffer toWrite = buffer.Clone();
 
       long requestBegin() => Position + (buffer.Length - toWrite.Length);
@@ -287,6 +472,7 @@ public abstract class StoragePool : Service
         }
       }
 
+      Size = long.Max(Position += buffer.Length, Size);
       return Task.CompletedTask;
     }
   }
@@ -299,6 +485,18 @@ public abstract class StoragePool : Service
     public int GetHashCode([DisallowNull] string[] obj) => HashCode.Combine(obj.Select((entry) => entry.GetHashCode()));
   }
 
+  public sealed class Context(UserAuthenticationContext authentication, UserKeyResource key)
+  {
+    public readonly UserAuthenticationContext Authentication = authentication;
+    public readonly UserKeyResource Key = key;
+
+    public UserResource User => Authentication.User;
+    public bool IsValid => Authentication.IsValid;
+
+    private UserKeyResource.Transformer? Transformer;
+    public UserKeyResource.Transformer GetTransformer() => Transformer ??= Authentication.GetTransformer(Key);
+  }
+
   protected StoragePool(StoragePoolManager manager, StoragePoolResource resource) : base($"#{resource.Id}", manager)
   {
     Manager = manager;
@@ -306,9 +504,8 @@ public abstract class StoragePool : Service
 
     TaskQueue = new();
 
-    PathComparer = new(this);
-    Handles = new(PathComparer);
-    HandleBufferCache = new(PathComparer);
+    Handles = [];
+    HandleBufferCache = [];
     HandleWaitQueue = new();
   }
 
@@ -317,44 +514,62 @@ public abstract class StoragePool : Service
 
   private readonly TaskQueue TaskQueue;
 
-  private readonly PathEqualityComparer PathComparer;
-  private readonly Dictionary<string[], FileHandle> Handles;
-  private readonly Dictionary<string[], List<FileHandle.BufferCache>> HandleBufferCache;
-  private readonly WaitQueue<(TaskCompletionSource<FileHandle> source, (UserAuthenticationContext authenticationContext, string[] path, FileHandle.FileAccess access, FileHandle.FileMode mode, CancellationToken cancellationToken) args)> HandleWaitQueue;
+  private readonly Dictionary<Path, FileHandle> Handles;
+  private readonly Dictionary<Path, List<FileHandle.BufferCache>> HandleBufferCache;
+  private readonly WaitQueue<(TaskCompletionSource<FileHandle> source, (Context authenticationContext, Path path, FileHandle.FileAccess access, FileHandle.FileMode mode, CancellationToken cancellationToken) args)> HandleWaitQueue;
 
-  protected abstract Task<Information> InternalStat(string[] path, CancellationToken cancellationToken);
-  protected abstract Task InternalDelete(string[] path, CancellationToken cancellationToken);
-  protected abstract Task InternalMove(string[] fromPath, string[] toPath, CancellationToken cancellationToken);
+  protected abstract Task<Information> InternalStat(Context context, Path path, CancellationToken cancellationToken);
+  protected abstract Task InternalDelete(Context context, Path path, CancellationToken cancellationToken);
+  protected abstract Task InternalMove(Context context, string[] fromPath, string[] toPath, CancellationToken cancellationToken);
+  protected abstract Task InternalCopy(Context context, string[] sourcePath, string[] destinationPath, CancellationToken cancellationToken);
 
-  protected abstract Task<FileHandle> InternalOpen(UserAuthenticationContext authenticationContext, string[] path, FileHandle.FileAccess access, FileHandle.FileMode mode, CancellationToken cancellationToken);
+  protected abstract Task<FileHandle> InternalOpen(Context context, Path path, FileHandle.FileAccess access, FileHandle.FileMode mode, CancellationToken cancellationToken);
 
-  protected abstract Task InternalCreateDirectory(string[] path, CancellationToken cancellationToken);
-  protected abstract Task InternalRemoveDirectory(string[] path, CancellationToken cancellationToken);
-  protected abstract Task<Information[]> InternalScanDirectory(string[] path, CancellationToken cancellationToken);
+  protected abstract Task InternalCreateDirectory(Context context, Path path, CancellationToken cancellationToken);
+  protected abstract Task InternalRemoveDirectory(Context context, Path path, CancellationToken cancellationToken);
+  protected abstract Task<Information[]> InternalScanDirectory(Context context, Path path, CancellationToken cancellationToken);
 
-  protected abstract Task InternalCreateSymbolicLink(string[] path, string target, CancellationToken cancellationToken);
-  protected abstract Task InternalReadSymbolicLink(string[] path, string target, CancellationToken cancellationToken);
+  protected abstract Task InternalCreateSymbolicLink(Context context, Path path, string[] target, CancellationToken cancellationToken);
+  protected abstract Task<string[]> InternalReadSymbolicLink(Context context, Path path, CancellationToken cancellationToken);
 
-  public Task<Information> Stat(string[] path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => InternalStat(path, cancellationToken), cancellationToken);
-  public Task Delete(string[] path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => InternalDelete(path, cancellationToken), cancellationToken);
-  public Task Move(string[] fromPath, string[] toPath, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => InternalMove(fromPath, toPath, cancellationToken), cancellationToken);
+  protected abstract Task<long> InternalTrash(Context context, Path path, CancellationToken cancellationToken);
+  protected abstract Task InternalRestore(Context context, long trashedFileId, string[]? newPath, CancellationToken cancellationToken);
 
-  public Task<FileHandle> Open(UserAuthenticationContext authenticationContext, string[] path, FileHandle.FileAccess access, FileHandle.FileMode mode, CancellationToken cancellationToken) => TaskQueue.RunTask(async (cancellationToken) =>
+  public Task<Information> Stat(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalStat(context, path, cancellationToken)), cancellationToken);
+  public Task Delete(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalDelete(context, path, cancellationToken)), cancellationToken);
+  public Task Move(Context context, string[] fromPath, string[] toPath, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalMove(context, fromPath, toPath, cancellationToken)), cancellationToken);
+  public Task Copy(Context context, string[] sourcePath, string[] destinationPath, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalCopy(context, sourcePath, destinationPath, cancellationToken)), cancellationToken);
+
+  public Task<FileHandle> Open(Context context, Path path, FileHandle.FileAccess access, FileHandle.FileMode mode, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) =>
   {
-    TaskCompletionSource<FileHandle> source = new();
+    return Exception.Wrap(run());
 
-    await HandleWaitQueue.Enqueue((source, (authenticationContext, path, access, mode, cancellationToken)), cancellationToken);
-    return await source.Task;
+    async Task<FileHandle> run()
+    {
+      TaskCompletionSource<FileHandle> source = new();
+      await HandleWaitQueue.Enqueue((source, (context, path, access, mode, cancellationToken)), cancellationToken);
+      return await source.Task;
+    }
   }, cancellationToken);
 
-  private List<FileHandle.BufferCache> AcquireHandleBufferList(string[] path)
+  public Task CreateDirectory(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalCreateDirectory(context, path, cancellationToken)), cancellationToken);
+  public Task RemoveDirectory(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalRemoveDirectory(context, path, cancellationToken)), cancellationToken);
+  public Task<Information[]> ScanDirectory(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalScanDirectory(context, path, cancellationToken)), cancellationToken);
+
+  public Task CreateSymbolicLink(Context context, Path path, string[] target, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalCreateSymbolicLink(context, path, target, cancellationToken)), cancellationToken);
+  public Task<string[]> ReadSymbolicLink(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalReadSymbolicLink(context, path, cancellationToken)), cancellationToken);
+
+  public Task<long> Trash(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalTrash(context, path, cancellationToken)), cancellationToken);
+  public Task Restore(Context context, long trashedFileId, string[]? newPath, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalRestore(context, trashedFileId, newPath, cancellationToken)), cancellationToken);
+
+  private List<FileHandle.BufferCache> AcquireHandleBufferList(Path path)
   {
-    if (!HandleBufferCache.TryGetValue(path, out var value))
+    if (!HandleBufferCache.TryGetValue(path, out List<FileHandle.BufferCache>? list))
     {
-      HandleBufferCache.Add(path, value = []);
+      HandleBufferCache.Add(path, list = []);
     }
 
-    return value;
+    return list;
   }
 
   private async Task RunOpenQueue(CancellationToken serviceCancellationToken)
@@ -363,7 +578,7 @@ public abstract class StoragePool : Service
     {
       serviceCancellationToken.ThrowIfCancellationRequested();
 
-      var (source, (authenticationContext, path, access, mode, cancellationToken)) = await HandleWaitQueue.Dequeue(serviceCancellationToken);
+      var (source, (context, path, access, mode, cancellationToken)) = await HandleWaitQueue.Dequeue(serviceCancellationToken);
 
       CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, serviceCancellationToken);
       try
@@ -375,7 +590,7 @@ public abstract class StoragePool : Service
         }
         else
         {
-          handle = await InternalOpen(authenticationContext, path, access, mode, linkedCancellationTokenSource.Token);
+          handle = await InternalOpen(context, path, access, mode, linkedCancellationTokenSource.Token);
 
           handle.StateChanged += (_, state) =>
           {
@@ -420,11 +635,18 @@ public abstract class StoragePool : Service
 
   protected override Task OnRun(CancellationToken cancellationToken) => Task.WhenAny(RunOpenQueue(cancellationToken), TaskQueue.Start(cancellationToken));
 
-  protected override async Task OnStop(Exception? exception)
+  protected override async Task OnStop(System.Exception? exception)
   {
-    foreach (var (_, handle) in new Dictionary<string[], FileHandle>(Handles))
+    List<Task> tasks = [];
+
+    lock (Handles)
     {
-      await handle.Stop();
+      foreach (var (_, handle) in Handles)
+      {
+        tasks.Add(handle.Stop());
+      }
     }
+
+    await Task.WhenAll(tasks);
   }
 }

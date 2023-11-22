@@ -23,7 +23,7 @@ public sealed class BlobKeyResource(BlobKeyResource.ResourceManager manager, Blo
     {
       main.Files.ResourceDeleted += (transaction, resource) => DbDelete(transaction, new()
       {
-        { KEY_FILE_ID, ("=", resource.Id, null) }
+        { KEY_FILE_ID, ("=", resource.Id) }
       });
     }
 
@@ -52,18 +52,20 @@ public sealed class BlobKeyResource(BlobKeyResource.ResourceManager manager, Blo
     {
       foreach (BlobKeyResource _ in DbStream(transaction, new()
       {
-        { KEY_FILE_ID, ("=", file.Id, null) }
-      }, (1, null)))
+        { KEY_FILE_ID, ("=", file.Id) }
+      }, new(1, null)))
       {
         throw new InvalidOperationException("Key already exists for the specified file resource.");
       }
 
       var (privateKey, publicKey) = Main.Server.KeyGenerator.GetNew();
+
+      using var transformer = userKey.GetTransformer();
       return DbInsert(transaction, new()
       {
         { KEY_FILE_ID, file.Id },
         { KEY_USER_KEY_ID, userKey.Id },
-        { KEY_ENCRYPTED_PRIVATE_KEY, userKey.Encrypt(privateKey) },
+        { KEY_ENCRYPTED_PRIVATE_KEY, transformer.Encrypt(privateKey) },
         { KEY_PUBLIC_KEY, publicKey }
       });
     }
@@ -77,15 +79,18 @@ public sealed class BlobKeyResource(BlobKeyResource.ResourceManager manager, Blo
     {
       foreach (BlobKeyResource blobKey in DbStream(transaction, new()
       {
-        { KEY_FILE_ID, ("=", file.Id, null) },
-        { KEY_USER_KEY_ID, ("=", from.userKey.Id, null) }
-      }, (1, null)))
+        { KEY_FILE_ID, ("=", file.Id) },
+        { KEY_USER_KEY_ID, ("=", from.userKey.Id) }
+      }, new(1, null)))
       {
+        using var fromTransformer = from.userKey.GetTransformer(from.hashCache);
+        using var toTransformer = toUserKey.GetTransformer();
+
         return DbInsert(transaction, new()
         {
           { KEY_FILE_ID, file.Id },
           { KEY_USER_KEY_ID, toUserKey.Id },
-          { KEY_ENCRYPTED_PRIVATE_KEY, toUserKey.Encrypt(from.userKey.Decrypt(blobKey.EncryptedPrivateKey, from.hashCache)) },
+          { KEY_ENCRYPTED_PRIVATE_KEY, toTransformer.Encrypt(fromTransformer.Decrypt(blobKey.EncryptedPrivateKey)) },
           { KEY_PUBLIC_KEY, from.userKey.PublicKey }
         });
       }
@@ -97,14 +102,15 @@ public sealed class BlobKeyResource(BlobKeyResource.ResourceManager manager, Blo
     {
       foreach (BlobKeyResource key in DbStream(transaction, new()
       {
-        { KEY_FILE_ID, ("=", file.Id, null) },
-        { KEY_USER_KEY_ID, ("=", userKey.Id, null) }
+        { KEY_FILE_ID, ("=", file.Id) },
+        { KEY_USER_KEY_ID, ("=", userKey.Id) }
       }))
       {
         byte[] privateKey;
         try
         {
-          privateKey = userKey.Decrypt(key.EncryptedPrivateKey, hashCache);
+          using var transformer = userKey.GetTransformer(hashCache);
+          privateKey = transformer.Decrypt(key.EncryptedPrivateKey);
         }
         catch
         {

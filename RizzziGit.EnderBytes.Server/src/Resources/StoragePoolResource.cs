@@ -31,7 +31,7 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
   {
     public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
-      main.Users.ResourceDeleted += (transaction, resource) => DbDelete(transaction, new() { { KEY_USER_ID, ("=", resource.Id, null) } });
+      main.Users.ResourceDeleted += (transaction, resource) => DbDelete(transaction, new() { { KEY_USER_ID, ("=", resource.Id) } });
     }
 
     public const string NAME = "StoragePool";

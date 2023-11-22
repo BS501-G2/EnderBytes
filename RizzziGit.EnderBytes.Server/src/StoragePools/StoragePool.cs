@@ -52,16 +52,33 @@ public abstract class StoragePool : Service
     public class AccessDenied(System.Exception? innerException = null) : Exception("Permission denied.", innerException);
   }
 
-  public abstract record Information(string Name, long? AccessTime, long? TrashTime)
+  public abstract record Information(string Name, long? AccessTime, Information.Trash? TrashInformation)
   {
-    public sealed record File(string Name, long Size, long? AccessTime, long? TrashTime) : Information(Name, AccessTime, TrashTime);
-    public sealed record Folder(string Name, long? AccessTime, long? TrashTime) : Information(Name, AccessTime, TrashTime);
-    public sealed record SymbolicLink(string Name, long? AccessTime, long? TrashTime) : Information(Name, AccessTime, TrashTime);
-    public sealed record Root(long? AccessTime, long? TrashTime) : Information("/", AccessTime, TrashTime);
+    public sealed record Trash(long TrashTime, long TrashId);
+
+    public sealed record File(string Name, long Size, long? AccessTime, Trash? TrashInformation) : Information(Name, AccessTime, TrashInformation);
+    public sealed record Folder(string Name, long? AccessTime, Trash? TrashInformation) : Information(Name, AccessTime, TrashInformation);
+    public sealed record SymbolicLink(string Name, long? AccessTime, Trash? TrashInformation) : Information(Name, AccessTime, TrashInformation);
+    public sealed record Root(long? AccessTime, Trash? TrashInformation) : Information("/", AccessTime, TrashInformation);
   }
 
   public sealed class Path : IEnumerable<string>
   {
+    public static bool operator !=(Path? path1, Path? path2) => !(path1 == path2);
+    public static bool operator ==(Path? path1, Path? path2)
+    {
+      if ((path1 is null && path2 is null) || ReferenceEquals(path1, path2))
+      {
+        return true;
+      }
+      else if (path1 is null || path2 is null)
+      {
+        return false;
+      }
+
+      return path1.Equals(path2);
+    }
+
     public Path(StoragePool pool, params string[] path)
     {
       Pool = pool;
@@ -114,12 +131,10 @@ public abstract class StoragePool : Service
         if (string.Equals(
           this[index],
           other[index],
-          Pool.Resource.Flags.HasFlag(
-            StoragePoolFlags.IgnoreCase)
-              ? StringComparison.OrdinalIgnoreCase
-              : StringComparison.Ordinal
-          )
-        )
+          Pool.Resource.Flags.HasFlag(StoragePoolFlags.IgnoreCase)
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal
+        ))
         {
           return false;
         }
@@ -155,12 +170,10 @@ public abstract class StoragePool : Service
         if (string.Equals(
           this[index],
           path[index],
-          Pool.Resource.Flags.HasFlag(
-            StoragePoolFlags.IgnoreCase)
-              ? StringComparison.InvariantCultureIgnoreCase
-              : StringComparison.InvariantCulture
-          )
-        )
+          Pool.Resource.Flags.HasFlag(StoragePoolFlags.IgnoreCase)
+            ? StringComparison.InvariantCultureIgnoreCase
+            : StringComparison.InvariantCulture
+        ))
         {
           return false;
         }
@@ -520,8 +533,8 @@ public abstract class StoragePool : Service
 
   protected abstract Task<Information> InternalStat(Context context, Path path, CancellationToken cancellationToken);
   protected abstract Task InternalDelete(Context context, Path path, CancellationToken cancellationToken);
-  protected abstract Task InternalMove(Context context, string[] fromPath, string[] toPath, CancellationToken cancellationToken);
-  protected abstract Task InternalCopy(Context context, string[] sourcePath, string[] destinationPath, CancellationToken cancellationToken);
+  protected abstract Task InternalMove(Context context, Path fromPath, Path toPath, CancellationToken cancellationToken);
+  protected abstract Task InternalCopy(Context context, Path sourcePath, Path destinationPath, CancellationToken cancellationToken);
 
   protected abstract Task<FileHandle> InternalOpen(Context context, Path path, FileHandle.FileAccess access, FileHandle.FileMode mode, CancellationToken cancellationToken);
 
@@ -529,16 +542,16 @@ public abstract class StoragePool : Service
   protected abstract Task InternalRemoveDirectory(Context context, Path path, CancellationToken cancellationToken);
   protected abstract Task<Information[]> InternalScanDirectory(Context context, Path path, CancellationToken cancellationToken);
 
-  protected abstract Task InternalCreateSymbolicLink(Context context, Path path, string[] target, CancellationToken cancellationToken);
-  protected abstract Task<string[]> InternalReadSymbolicLink(Context context, Path path, CancellationToken cancellationToken);
+  protected abstract Task InternalCreateSymbolicLink(Context context, Path path, Path target, CancellationToken cancellationToken);
+  protected abstract Task<Path> InternalReadSymbolicLink(Context context, Path path, CancellationToken cancellationToken);
 
   protected abstract Task<long> InternalTrash(Context context, Path path, CancellationToken cancellationToken);
-  protected abstract Task InternalRestore(Context context, long trashedFileId, string[]? newPath, CancellationToken cancellationToken);
+  protected abstract Task InternalRestore(Context context, long trashedFileId, Path? newPath, CancellationToken cancellationToken);
 
   public Task<Information> Stat(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalStat(context, path, cancellationToken)), cancellationToken);
   public Task Delete(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalDelete(context, path, cancellationToken)), cancellationToken);
-  public Task Move(Context context, string[] fromPath, string[] toPath, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalMove(context, fromPath, toPath, cancellationToken)), cancellationToken);
-  public Task Copy(Context context, string[] sourcePath, string[] destinationPath, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalCopy(context, sourcePath, destinationPath, cancellationToken)), cancellationToken);
+  public Task Move(Context context, Path fromPath, Path toPath, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalMove(context, fromPath, toPath, cancellationToken)), cancellationToken);
+  public Task Copy(Context context, Path sourcePath, Path destinationPath, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalCopy(context, sourcePath, destinationPath, cancellationToken)), cancellationToken);
 
   public Task<FileHandle> Open(Context context, Path path, FileHandle.FileAccess access, FileHandle.FileMode mode, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) =>
   {
@@ -556,11 +569,11 @@ public abstract class StoragePool : Service
   public Task RemoveDirectory(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalRemoveDirectory(context, path, cancellationToken)), cancellationToken);
   public Task<Information[]> ScanDirectory(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalScanDirectory(context, path, cancellationToken)), cancellationToken);
 
-  public Task CreateSymbolicLink(Context context, Path path, string[] target, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalCreateSymbolicLink(context, path, target, cancellationToken)), cancellationToken);
-  public Task<string[]> ReadSymbolicLink(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalReadSymbolicLink(context, path, cancellationToken)), cancellationToken);
+  public Task CreateSymbolicLink(Context context, Path path, Path target, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalCreateSymbolicLink(context, path, target, cancellationToken)), cancellationToken);
+  public Task<Path> ReadSymbolicLink(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalReadSymbolicLink(context, path, cancellationToken)), cancellationToken);
 
   public Task<long> Trash(Context context, Path path, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalTrash(context, path, cancellationToken)), cancellationToken);
-  public Task Restore(Context context, long trashedFileId, string[]? newPath, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalRestore(context, trashedFileId, newPath, cancellationToken)), cancellationToken);
+  public Task Restore(Context context, long trashedFileId, Path? newPath, CancellationToken cancellationToken) => TaskQueue.RunTask((cancellationToken) => Exception.Wrap(InternalRestore(context, trashedFileId, newPath, cancellationToken)), cancellationToken);
 
   private List<FileHandle.BufferCache> AcquireHandleBufferList(Path path)
   {

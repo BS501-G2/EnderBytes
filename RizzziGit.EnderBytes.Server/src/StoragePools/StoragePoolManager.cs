@@ -59,7 +59,7 @@ public sealed class StoragePoolManager : Service
       {
         pool = resource.Type switch
         {
-          StoragePoolType.Blob => new BlobStoragePool(this, resource),
+          // StoragePoolType.Blob => new BlobStoragePool(this, resource),
 
           _ => throw new InvalidOperationException("Invalid storage pool type.")
         };

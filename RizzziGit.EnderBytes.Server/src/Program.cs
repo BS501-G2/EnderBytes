@@ -17,7 +17,7 @@ public static class Program
     Console.CancelKeyPress += onPress;
   }
 
-  public static void ScanFiles(TaskFactory factory, BlobStorageResourceManager resources, string path = "/", BlobFileResource? parentFolder = null)
+  public static void ScanFiles(TaskFactory factory, Resources.BlobStorage.ResourceManager resources, string path = "/", BlobFileResource? parentFolder = null)
   {
     _ = factory.StartNew(() =>
     {

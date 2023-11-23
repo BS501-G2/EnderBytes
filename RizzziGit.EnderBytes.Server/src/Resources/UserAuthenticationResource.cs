@@ -28,20 +28,21 @@ public sealed class UserAuthenticationContext(
   public bool IsValid => UserAuthentication.IsValid;
 }
 
-public sealed class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
+public sealed partial class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
-  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager
+  public new sealed partial class ResourceManager : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager
   {
-    public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
+    public ResourceManager(Resources.ResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
       main.Users.ResourceDeleted += (transaction, resource) => DbDelete(transaction, new() {
         { KEY_USER_ID, ("=", resource.Id) }
       });
     }
 
-    private static readonly Regex ValidPasswordRegex = new("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[\\W_])[a-zA-Z0-9\\W_]{8,64}$");
+    [GeneratedRegex("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[\\W_])[a-zA-Z0-9\\W_]{8,64}$")]
+    private static partial Regex ValidPasswordRegex();
 
-    public new MainResourceManager Main => (MainResourceManager)base.Main;
+    public new Resources.ResourceManager Main => (Resources.ResourceManager)base.Main;
 
     public const string NAME = "UserAuthentication";
     public const int VERSION = 1;
@@ -139,7 +140,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
     public (UserAuthenticationResource userAuthentication, byte[] hashCache) CreatePassword(DatabaseTransaction transaction, UserResource user, string password, (UserAuthenticationResource userAuthentication, byte[] hashCache)? from = null)
     {
-      if (!ValidPasswordRegex.IsMatch(password))
+      if (!ValidPasswordRegex().IsMatch(password))
       {
         throw new ArgumentException("Invalid password.", nameof(password));
       }
@@ -149,7 +150,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
     public (UserAuthenticationResource userAuthentication, byte[] hashCache)? GetByPassword(DatabaseTransaction transaction, UserResource user, string password)
     {
-      if (!ValidPasswordRegex.IsMatch(password))
+      if (!ValidPasswordRegex().IsMatch(password))
       {
         return null;
       }
@@ -195,7 +196,7 @@ public sealed class UserAuthenticationResource(UserAuthenticationResource.Resour
 
       return null;
     }
-  }
+    }
 
   public new sealed record ResourceData(
     long Id,

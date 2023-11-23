@@ -50,7 +50,7 @@ public sealed class Server : Service
   }
 
   public readonly ServerConfiguration Configuration;
-  public readonly MainResourceManager Resources;
+  public readonly ResourceManager Resources;
   public readonly KeyGenerator KeyGenerator;
   public readonly SessionManager Sessions;
   public readonly ConnectionManager Connections;

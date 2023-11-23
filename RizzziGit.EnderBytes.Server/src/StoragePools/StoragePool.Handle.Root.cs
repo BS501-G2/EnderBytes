@@ -6,9 +6,11 @@ public abstract partial class StoragePool
   {
     public abstract class Root : Folder
     {
-      protected Root(StoragePool pool) : base(pool, null) { }
+      protected Root(StoragePool pool) : base(pool) { }
 
       public override Path Path => new(Pool);
+
+      protected override Task<Folder?> InternalGetParent(CancellationToken cancellationToken) => throw new NotSupportedException();
 
       protected abstract Task<Handle> InternalGetHandle(Path path, CancellationToken cancellationToken);
 

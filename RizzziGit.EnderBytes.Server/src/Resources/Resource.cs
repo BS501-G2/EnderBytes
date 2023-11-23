@@ -66,6 +66,7 @@ public abstract class Resource<M, D, R>
     public readonly int Version;
 
     protected readonly ResourceMemory Memory;
+
     public event ResourceUpdateHandler? ResourceUpdated;
     public event ResourceDeleteHandler? ResourceDeleted;
 

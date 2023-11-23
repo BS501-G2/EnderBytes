@@ -9,7 +9,7 @@ using Extensions;
 
 public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, UserKeyResource.ResourceData data) : Resource<UserKeyResource.ResourceManager, UserKeyResource.ResourceData, UserKeyResource>(manager, data)
 {
-  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserKeyResource>.ResourceManager
+  public new sealed class ResourceManager(Resources.ResourceManager main, Database database) : Resource<ResourceManager, ResourceData, UserKeyResource>.ResourceManager(main, database, NAME, VERSION)
   {
     private const string NAME = "UserKey";
     private const int VERSION = 1;
@@ -20,12 +20,7 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
     private const string KEY_ENCRYPTED_PRIVATE_KEY = "EncryptedPrivateKey";
     private const string KEY_PUBLIC_KEY = "PublicKey";
 
-    public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
-    {
-      RNG = RandomNumberGenerator.Create();
-    }
-
-    private readonly RandomNumberGenerator RNG;
+    private readonly RandomNumberGenerator RNG = RandomNumberGenerator.Create();
 
     protected override UserKeyResource CreateResource(ResourceData data) => new(this, data);
     protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(

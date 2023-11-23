@@ -17,7 +17,7 @@ public sealed class UserRoleResource(UserRoleResource.ResourceManager manager, U
     private const string KEY_USER_ID = "UserID";
     private const string KEY_TYPE = "Type";
 
-    public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
+    public ResourceManager(Resources.ResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
       main.Users.ResourceDeleted += (transaction, user) => DbDelete(transaction, new()
       {

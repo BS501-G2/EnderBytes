@@ -10,9 +10,9 @@ public interface IMainResourceManager
   public Logger Logger { get; }
 }
 
-public sealed class MainResourceManager : Service, IMainResourceManager
+public sealed class ResourceManager : Service, IMainResourceManager
 {
-  public MainResourceManager(Server server) : base("Resources", server)
+  public ResourceManager(Server server) : base("Resources", server)
   {
     Server = server;
 

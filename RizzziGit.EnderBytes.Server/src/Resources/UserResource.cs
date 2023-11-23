@@ -6,11 +6,12 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Database;
 
-public sealed class UserResource(UserResource.ResourceManager manager, UserResource.ResourceData data) : Resource<UserResource.ResourceManager, UserResource.ResourceData, UserResource>(manager, data)
+public sealed partial class UserResource(UserResource.ResourceManager manager, UserResource.ResourceData data) : Resource<UserResource.ResourceManager, UserResource.ResourceData, UserResource>(manager, data)
 {
-  public new sealed class ResourceManager(MainResourceManager main, Database database) : Resource<ResourceManager, ResourceData, UserResource>.ResourceManager(main, database, NAME, VERSION)
+  public new sealed partial class ResourceManager(Resources.ResourceManager main, Database database) : Resource<ResourceManager, ResourceData, UserResource>.ResourceManager(main, database, NAME, VERSION)
   {
-    private static readonly Regex ValidUsernameRegex = new("^[A-Za-z0-9_\\-\\.]{6,16}$");
+    [GeneratedRegex("^[A-Za-z0-9_\\-\\.]{6,16}$")]
+    private static partial Regex ValidUsernameRegex();
 
     public const string NAME = "User";
     public const int VERSION = 1;
@@ -55,7 +56,7 @@ public sealed class UserResource(UserResource.ResourceManager manager, UserResou
 
     public UserResource Create(DatabaseTransaction transaction, string username, string name)
     {
-      if (!ValidUsernameRegex.IsMatch(username))
+      if (!ValidUsernameRegex().IsMatch(username))
       {
         throw new ArgumentException("Invalid username.", nameof(username));
       }

@@ -68,7 +68,7 @@ public abstract class Connection : Lifetime
 
   public readonly ulong Id;
   public readonly ConnectionManager Manager;
-  private readonly MainResourceManager Resources;
+  private readonly ResourceManager Resources;
   public UserSession? Session { get; private set; }
 
   protected virtual Task<Response> OnExecute(Request request) => RunTask(async (cancellationToken) =>

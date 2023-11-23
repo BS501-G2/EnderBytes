@@ -6,7 +6,7 @@ public abstract partial class StoragePool
   {
     public abstract class SymbolicLink : Handle
     {
-      protected SymbolicLink(StoragePool pool, Folder? parent) : base(pool, parent) { }
+      protected SymbolicLink(StoragePool pool) : base(pool) { }
 
       public abstract Task<Path> GetTargetPath(CancellationToken cancellationToken);
 

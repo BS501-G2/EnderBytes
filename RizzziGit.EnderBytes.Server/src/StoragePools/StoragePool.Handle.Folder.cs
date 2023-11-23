@@ -6,7 +6,7 @@ public abstract partial class StoragePool
   {
     public abstract class Folder : Handle
     {
-      protected Folder(StoragePool pool, Folder? parent) : base(pool, parent) { }
+      protected Folder(StoragePool pool) : base(pool) { }
 
       protected abstract IAsyncEnumerable<Handle> InternalScan(CancellationToken cancellationToken);
 

@@ -29,7 +29,7 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
 {
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, StoragePoolResource>.ResourceManager
   {
-    public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
+    public ResourceManager(Resources.ResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
       main.Users.ResourceDeleted += (transaction, resource) => DbDelete(transaction, new() { { KEY_USER_ID, ("=", resource.Id) } });
     }

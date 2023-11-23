@@ -4,14 +4,15 @@ public abstract partial class StoragePool
 {
   public abstract partial class Handle
   {
-    private Handle(StoragePool pool, Folder? parent)
+    private Handle(StoragePool pool)
     {
       Pool = pool;
-      Parent = parent;
     }
 
     public readonly StoragePool Pool;
-    public readonly Handle? Parent;
+
+    protected abstract Task<Folder?> InternalGetParent(CancellationToken cancellationToken);
+    public Task<Folder?> GetParent(CancellationToken cancellationToken) => InternalGetParent(cancellationToken);
 
     public abstract long Id { get; }
     public abstract Path Path { get; }

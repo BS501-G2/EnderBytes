@@ -1,7 +1,8 @@
 using Microsoft.Data.Sqlite;
-using RizzziGit.EnderBytes.Database;
 
 namespace RizzziGit.EnderBytes.Resources.BlobStorage;
+
+using Database;
 
 public sealed class FileLinkResource : Resource<FileLinkResource.ResourceManager, FileLinkResource.ResourceData, FileLinkResource>
 {
@@ -18,7 +19,7 @@ public sealed class FileLinkResource : Resource<FileLinkResource.ResourceManager
     private const string KEY_NODE_ID = "NodeId";
     private const string KEY_SNAPSHOT_ID = "SnapshotId";
 
-    public ResourceManager(IMainResourceManager main, Database.Database database) : base(main, database, NAME, VERSION)
+    public ResourceManager(IMainResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
     }
 

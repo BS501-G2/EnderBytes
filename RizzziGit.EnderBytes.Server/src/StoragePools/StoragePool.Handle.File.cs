@@ -26,7 +26,7 @@ public abstract partial class StoragePool
         NewSnapshot = 1 << 2
       }
 
-      protected File(StoragePool pool) : base(pool) { }
+      protected File(Context context, StoragePool pool) : base(context, pool) { }
 
       public abstract IAsyncEnumerable<Snapshot> GetSnapshots(CancellationToken cancellationToken);
       public abstract Task<Snapshot> CreateSnapshot(Snapshot? baseSnapshot, CancellationToken cancellationToken);

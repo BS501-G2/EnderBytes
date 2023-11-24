@@ -95,7 +95,7 @@ public abstract class Connection : Lifetime
 
     try
     {
-      var (user, authentication, hashCache) = await Resources.MainDatabase.RunTransaction((transaction) =>
+      var (user, authentication, hashCache) = await Resources.Database.RunTransaction((transaction) =>
       {
         UserResource user = Resources.Users.GetByUsername(transaction, command.Username) ?? throw new EscapePod(0);
 

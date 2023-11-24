@@ -19,8 +19,10 @@ public sealed class ResourceManager : Service, IMainResourceManager
     StoragePool = storagePool;
 
     Server = storagePool.Resource.Manager.Main.Server;
-    MainDatabase = new(this, Server.Configuration.BlobPath, $"{storagePool.Resource.Id}");
-    TableVersion = new(this, MainDatabase);
+    Database = new(this, Server.Configuration.BlobPath, $"{storagePool.Resource.Id}");
+    TableVersion = new(this, Database);
+
+    Nodes = new(this, Database);
 
     storagePool.Manager.Logger.Subscribe(Logger);
   }
@@ -28,19 +30,21 @@ public sealed class ResourceManager : Service, IMainResourceManager
   public BlobStoragePool StoragePool;
 
   public Server Server { get; private set; }
-  public Database MainDatabase { get; private set; }
+  public Database Database { get; private set; }
   public TableVersionResource.ResourceManager TableVersion { get; private set; }
   public new Logger Logger => base.Logger;
 
+  public readonly FileNodeResource.ResourceManager Nodes;
+
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    await (await WatchDog([MainDatabase], cancellationToken)).task;
+    await (await WatchDog([Database], cancellationToken)).task;
   }
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
-    await MainDatabase.Start();
-    await MainDatabase.RunTransaction((transaction) =>
+    await Database.Start();
+    await Database.RunTransaction((transaction) =>
     {
       TableVersion.Init(transaction);
     }, cancellationToken);
@@ -48,6 +52,6 @@ public sealed class ResourceManager : Service, IMainResourceManager
 
   protected override async Task OnStop(Exception? exception)
   {
-    await MainDatabase.Stop();
+    await Database.Stop();
   }
 }

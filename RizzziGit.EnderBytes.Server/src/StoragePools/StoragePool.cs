@@ -66,15 +66,6 @@ public abstract partial class StoragePool : Service
   protected abstract Task InternalRun(CancellationToken cancellationToken);
   protected abstract Task InternalStop(Exception? exception);
 
-  protected abstract Task<Handle.Root> InternalGetRoot(CancellationToken cancellationToken);
-
-  private Handle.Root? Root;
-
-  public async Task<Handle.Root> GetRoot(CancellationToken cancellationToken)
-  {
-    return await InternalGetRoot(cancellationToken);
-  }
-
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
     await InternalStart(cancellationToken);

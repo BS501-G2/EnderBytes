@@ -6,11 +6,11 @@ public abstract partial class StoragePool
   {
     public abstract class SymbolicLink : Handle
     {
-      protected SymbolicLink(StoragePool pool) : base(pool) { }
+      protected SymbolicLink(Context context, StoragePool pool) : base(context, pool) { }
 
       public abstract Task<Path> GetTargetPath(CancellationToken cancellationToken);
 
-      public async Task<Handle> GetTargetHandle(CancellationToken cancellationToken) => await (await Pool.GetRoot(cancellationToken)).GetHandle(await GetTargetPath(cancellationToken), cancellationToken);
+      public async Task<Handle> GetTargetHandle(CancellationToken cancellationToken) => await (await Pool.GetRoot(Context, cancellationToken)).GetHandle(await GetTargetPath(cancellationToken), cancellationToken);
     }
   }
 }

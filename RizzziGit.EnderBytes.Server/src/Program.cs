@@ -43,7 +43,7 @@ public static class Program
 
         // Console.WriteLine(Path.Join(path, entry));
 
-        _ = resources.MainDatabase.RunTransaction((transaction) =>
+        _ = resources.Database.RunTransaction((transaction) =>
         {
           BlobFileResource pool = resources.Files.CreateFolder(transaction, path == "/" ? null : parentFolder, entry[0] == '/' ? entry[1..] : entry);
           ScanFiles(factory, resources, Path.Join(path, entry), pool);
@@ -56,7 +56,7 @@ public static class Program
   {
     for (int count = 0; count < 1 && server.State == ServiceState.Started; count++)
     {
-      var (storagePoolResource, userAuthentication, hashCache) = await server.Resources.MainDatabase.RunTransaction((transaction) =>
+      var (storagePoolResource, userAuthentication, hashCache) = await server.Resources.Database.RunTransaction((transaction) =>
       {
         string username = $"te{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
         string password = "aasdAAASD1123123;";

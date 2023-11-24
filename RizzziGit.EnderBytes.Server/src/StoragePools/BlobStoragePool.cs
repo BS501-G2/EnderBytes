@@ -2,9 +2,15 @@ namespace RizzziGit.EnderBytes.StoragePools;
 
 using Resources;
 using Buffer;
+using RizzziGit.EnderBytes.Connections;
 
-public sealed class BlobStoragePool(StoragePoolManager manager, StoragePoolResource resource) : StoragePool(manager, resource)
+public sealed class BlobStoragePool : StoragePool
 {
+  public BlobStoragePool(StoragePoolManager manager, StoragePoolResource resource) : base(manager, resource)
+  {
+    Resources = new(this);
+  }
+
   private sealed class BlobFileSnapshot(Handle.File file) : Handle.File.Snapshot(file)
   {
     public override long Id => throw new NotImplementedException();
@@ -41,7 +47,7 @@ public sealed class BlobStoragePool(StoragePoolManager manager, StoragePoolResou
     }
   }
 
-  private sealed class BlobFileHandle(StoragePool pool) : Handle.File(pool)
+  private sealed class BlobFileHandle(Context context, StoragePool pool) : Handle.File(context, pool)
   {
     public override long Id => throw new NotImplementedException();
     public override Path Path => throw new NotImplementedException();
@@ -69,14 +75,49 @@ public sealed class BlobStoragePool(StoragePoolManager manager, StoragePoolResou
     }
   }
 
-  private sealed class BlobFolderHandle(StoragePool pool) : Handle.Folder(pool)
+  private sealed class BlobFolderHandle(Context context, StoragePool pool) : Handle.Folder(context, pool)
   {
     public override long Id => throw new NotImplementedException();
     public override Path Path => throw new NotImplementedException();
     public override long? AccessTime => throw new NotImplementedException();
     public override long? TrashTime => throw new NotImplementedException();
 
+    protected override Task<File> InternalCreateFile(string name, long preallocateLength, CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+
+    protected override Task<File> InternalCreateFile(string name, File copyFromFile, CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+
+    protected override Task<Folder> InternalCreateFolder(string name, CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+
+    protected override Task<Folder> InternalCreateFolder(string name, Folder copyFromFolder, CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+
+    protected override Task<SymbolicLink> InternalCreateSymbolicLink(string name, Path target, CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+
+    protected override Task<SymbolicLink> InternalCreateSymbolicLink(string name, SymbolicLink copyFromSymbolicLink, CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+
     protected override Task<Folder?> InternalGetParent(CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+
+    protected override Task InternalRemove(CancellationToken cancellationToken)
     {
       throw new NotImplementedException();
     }
@@ -87,7 +128,7 @@ public sealed class BlobStoragePool(StoragePoolManager manager, StoragePoolResou
     }
   }
 
-  private sealed class BlobSymbolicLinkHandle(StoragePool pool) : Handle.SymbolicLink(pool)
+  private sealed class BlobSymbolicLinkHandle(Context context, StoragePool pool) : Handle.SymbolicLink(context, pool)
   {
     public override long Id => throw new NotImplementedException();
     public override Path Path => throw new NotImplementedException();
@@ -105,40 +146,37 @@ public sealed class BlobStoragePool(StoragePoolManager manager, StoragePoolResou
     }
   }
 
-  private sealed class BlobRootHandle(StoragePool pool) : Handle.Root(pool)
+  public new sealed class Context : StoragePool.Context
   {
-    public override long Id => throw new NotImplementedException();
-    public override long? AccessTime => throw new NotImplementedException();
-    public override long? TrashTime => throw new NotImplementedException();
+    public Context(StoragePool pool, Connection connection) : base(pool, connection)
+    {
+    }
 
-    protected override Task<Handle> InternalGetHandle(Path path, CancellationToken cancellationToken)
+    protected override Task<Handle> InternalGetByPath(Path path, CancellationToken cancellationToken)
     {
       throw new NotImplementedException();
     }
 
-    protected override Task<Folder?> InternalGetParent(CancellationToken cancellationToken)
+    protected override Task<Handle.Folder> InternalGetRoot(CancellationToken cancellationToken)
     {
       throw new NotImplementedException();
     }
 
-    protected override IAsyncEnumerable<Handle> InternalScan(CancellationToken cancellationToken)
+    protected override IAsyncEnumerable<Handle> InternalGetTrashed(CancellationToken cancellationToken)
     {
       throw new NotImplementedException();
     }
   }
 
-  private BlobRootHandle? Root = null;
-  protected override Task<Handle.Root> InternalGetRoot(CancellationToken cancellationToken)
-  {
-    return Task.FromResult<Handle.Root>(Root ??= new(this));
-  }
+  private readonly Resources.BlobStorage.ResourceManager Resources;
+  private Resources.BlobStorage.FileNodeResource.ResourceManager Nodes => Resources.Nodes;
 
-  protected override Task InternalRun(CancellationToken cancellationToken)
+  protected override Task InternalStart(CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }
 
-  protected override Task InternalStart(CancellationToken cancellationToken)
+  protected override Task InternalRun(CancellationToken cancellationToken)
   {
     throw new NotImplementedException();
   }

@@ -26,10 +26,10 @@ public abstract partial class StoragePool
         NewSnapshot = 1 << 2
       }
 
-      protected File(Context context, StoragePool pool) : base(context, pool) { }
+      protected File(StoragePool pool) : base(pool) { }
 
-      public abstract IAsyncEnumerable<Snapshot> GetSnapshots(CancellationToken cancellationToken);
-      public abstract Task<Snapshot> CreateSnapshot(Snapshot? baseSnapshot, CancellationToken cancellationToken);
+      public abstract IAsyncEnumerable<Snapshot> GetSnapshots(Context context, CancellationToken cancellationToken);
+      public abstract Task<Snapshot> CreateSnapshot(Context context, Snapshot? baseSnapshot, CancellationToken cancellationToken);
 
       private readonly WeakKeyDictionary<Snapshot, List<Stream.BufferCache>> BufferCaches = new();
       private readonly Dictionary<Snapshot, Stream> Streams = [];
@@ -65,20 +65,20 @@ public abstract partial class StoragePool
         }
       }
 
-      protected abstract Task<Stream> InternalOpen(Snapshot snapshot, Access access, CancellationToken cancellationToken);
+      protected abstract Task<Stream> InternalOpen(Context context, Snapshot snapshot, Access access, CancellationToken cancellationToken);
 
-      public async Task<Stream> Open(Snapshot snapshot, Access access, Mode mode, CancellationToken cancellationToken)
+      public async Task<Stream> Open(Context context, Snapshot snapshot, Access access, Mode mode, CancellationToken cancellationToken)
       {
         if (mode.HasFlag(Mode.NewSnapshot))
         {
-          snapshot = await CreateSnapshot(snapshot, cancellationToken);
+          snapshot = await CreateSnapshot(context, snapshot, cancellationToken);
         }
 
-        Stream stream = await InternalOpen(snapshot, access, cancellationToken);
+        Stream stream = await InternalOpen(context, snapshot, access, cancellationToken);
 
         if (mode.HasFlag(Mode.TruncateToZero))
         {
-          await stream.Truncate(0);
+          await stream.Truncate(context, 0);
         }
 
         if (mode.HasFlag(Mode.Append))
@@ -89,10 +89,10 @@ public abstract partial class StoragePool
         return stream;
       }
 
-      public async Task<Stream> Open(Access access, Mode mode, CancellationToken cancellationToken)
+      public async Task<Stream> Open(Context context, Access access, Mode mode, CancellationToken cancellationToken)
       {
         Snapshot? snapshot = null;
-        await foreach (Snapshot entry in GetSnapshots(cancellationToken))
+        await foreach (Snapshot entry in GetSnapshots(context, cancellationToken))
         {
           if ((snapshot?.CreateTime ?? 0) < entry.CreateTime)
           {
@@ -102,12 +102,12 @@ public abstract partial class StoragePool
 
         if (snapshot == null)
         {
-          snapshot = await CreateSnapshot(null, cancellationToken);
+          snapshot = await CreateSnapshot(context, null, cancellationToken);
 
-          return await Open(snapshot, access, mode.RemoveFlag(Mode.NewSnapshot), cancellationToken);
+          return await Open(context, snapshot, access, mode.RemoveFlag(Mode.NewSnapshot), cancellationToken);
         }
 
-        return await Open(snapshot, access, mode, cancellationToken);
+        return await Open(context, snapshot, access, mode, cancellationToken);
       }
     }
   }

@@ -19,10 +19,7 @@ public enum StoragePoolType : byte
 [Flags]
 public enum StoragePoolFlags : byte
 {
-  IgnoreCase = 1 << 0,
-  ConnectionIsolated = 1 << 1,
-  SessionIsolated = 1 << 2,
-  Internal = 1 << 3
+  IgnoreCase = 1 << 0
 }
 
 public sealed class StoragePoolResource(StoragePoolResource.ResourceManager manager, StoragePoolResource.ResourceData data) : Resource<StoragePoolResource.ResourceManager, StoragePoolResource.ResourceData, StoragePoolResource>(manager, data)

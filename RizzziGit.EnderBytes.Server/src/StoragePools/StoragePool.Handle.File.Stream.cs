@@ -33,7 +33,7 @@ public abstract partial class StoragePool
 
         public async Task<List<BufferCache>> GetCache() => Cache ??= await File.GetCacheList(Snapshot);
 
-        public async Task<long> GetCacheSize()
+        public async Task<long> GetCacheSize(Context context)
         {
           long size = 0;
 
@@ -50,13 +50,13 @@ public abstract partial class StoragePool
           return size;
         }
 
-        protected abstract Task<Buffer> InternalRead(long position, long size);
-        protected abstract Task InternalWrite(long position, Buffer buffer);
-        protected abstract Task InternalTruncate(long size);
+        protected abstract Task<Buffer> InternalRead(Context context, long position, long size);
+        protected abstract Task InternalWrite(Context context, long position, Buffer buffer);
+        protected abstract Task InternalTruncate(Context context, long size);
         protected abstract Task InternalClose();
 
-        private BufferCache CreateBufferCache(Buffer buffer, long begin, long end, bool toSync) => new(buffer, begin, end, toSync, default, CacheSync);
-        private async Task CacheSync(BufferCache cache) => await InternalWrite(cache.Begin, cache.Buffer);
+        private BufferCache CreateBufferCache(Context context, Buffer buffer, long begin, long end, bool toSync) => new(buffer, begin, end, toSync, default, (cache) => CacheSync(context, cache));
+        private async Task CacheSync(Context context, BufferCache cache) => await InternalWrite(context, cache.Begin, cache.Buffer);
 
         public Task Sync() => TaskQueue.RunTask(async (_) =>
         {
@@ -74,7 +74,7 @@ public abstract partial class StoragePool
           await Task.WhenAll(tasks);
         }, CancellationToken.None);
 
-        public Task<Buffer> Read(long length, CancellationToken cancellationToken) => TaskQueue.RunTask(async (__) =>
+        public Task<Buffer> Read(Context context, long length, CancellationToken cancellationToken) => TaskQueue.RunTask(async (__) =>
         {
           if (!Access.HasFlag(Access.Read))
           {
@@ -102,8 +102,8 @@ public abstract partial class StoragePool
               {
                 long toReadLength = long.Min(entry.Begin - requestBegin, requestLength());
 
-                Task<Buffer> bufferTask = InternalRead(requestBegin, toReadLength);
-                BufferCache newCache = CreateBufferCache(Buffer.Allocate(toReadLength), requestBegin, entry.Begin, false);
+                Task<Buffer> bufferTask = InternalRead(context, requestBegin, toReadLength);
+                BufferCache newCache = CreateBufferCache(context, Buffer.Allocate(toReadLength), requestBegin, entry.Begin, false);
 
                 _ = bufferTask.ContinueWith(async (task) => newCache.Buffer.Write(0, await task));
 
@@ -126,8 +126,8 @@ public abstract partial class StoragePool
 
             if (requestBegin < requestEnd)
             {
-              Task<Buffer> bufferTask = InternalRead(requestBegin, requestLength());
-              BufferCache newCache = CreateBufferCache(Buffer.Allocate(requestLength()), requestBegin, requestLength(), false);
+              Task<Buffer> bufferTask = InternalRead(context, requestBegin, requestLength());
+              BufferCache newCache = CreateBufferCache(context, Buffer.Allocate(requestLength()), requestBegin, requestLength(), false);
 
               _ = bufferTask.ContinueWith(async (task) => newCache.Buffer.Write(0, await task));
 
@@ -142,7 +142,7 @@ public abstract partial class StoragePool
           return Buffer.Concat(await Task.WhenAll(toRead));
         }, cancellationToken);
 
-        public Task Write(Buffer buffer) => TaskQueue.RunTask(async (_) =>
+        public Task Write(Context context, Buffer buffer) => TaskQueue.RunTask(async (_) =>
         {
           if (!Access.HasFlag(Access.Write))
           {
@@ -167,7 +167,7 @@ public abstract partial class StoragePool
 
               if (requestBegin() < entry.Begin)
               {
-                BufferCache newCache = CreateBufferCache(toWrite.TruncateStart(entry.Begin - requestBegin()), requestBegin(), entry.Begin, true);
+                BufferCache newCache = CreateBufferCache(context, toWrite.TruncateStart(entry.Begin - requestBegin()), requestBegin(), entry.Begin, true);
 
                 cache.Insert(index, newCache);
               }
@@ -246,7 +246,7 @@ public abstract partial class StoragePool
           }),
         };
 
-        public Task Truncate(long length) => TaskQueue.RunTask(async (cancellationToken) =>
+        public Task Truncate(Context context, long length) => TaskQueue.RunTask(async (cancellationToken) =>
         {
           List<BufferCache> cache = await GetCache();
           lock (cache)
@@ -273,7 +273,7 @@ public abstract partial class StoragePool
 
           Size = length;
           await Sync();
-          await InternalTruncate(length);
+          await InternalTruncate(context, length);
         }, CancellationToken.None);
 
         public async ValueTask DisposeAsync()

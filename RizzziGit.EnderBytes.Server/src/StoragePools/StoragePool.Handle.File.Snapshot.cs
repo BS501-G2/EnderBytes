@@ -17,7 +17,7 @@ public abstract partial class StoragePool
 
         public abstract Task<Snapshot?> GetParentSnapshot();
 
-        public Task<Stream> Open(Access access, Mode mode, CancellationToken cancellationToken) => File.Open(this, access, mode, cancellationToken);
+        public Task<Stream> Open(Context context, Access access, Mode mode, CancellationToken cancellationToken) => File.Open(context, this, access, mode, cancellationToken);
       }
     }
   }

@@ -17,10 +17,14 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
     private const string KEY_TRASH_TIME = "TrashTime";
     private const string KEY_PARENT_ID = "ParentNode";
     private const string KEY_TYPE = "Type";
+    private const string KEY_NAME = "Name";
 
-    public ResourceManager(IMainResourceManager main, Database database) : base(main, database, NAME, VERSION)
+    public ResourceManager(BlobStorage.ResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
+      Main = main;
     }
+
+    public new readonly BlobStorage.ResourceManager Main;
 
     protected override FileNodeResource CreateResource(ResourceData data) => new(this, data);
     protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(
@@ -29,7 +33,8 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
       reader[KEY_ACCESS_TIME] is DBNull ? null : (long)reader[KEY_ACCESS_TIME],
       reader[KEY_TRASH_TIME] is DBNull ? null : (long)reader[KEY_TRASH_TIME],
       reader[KEY_PARENT_ID] is DBNull ? null : (long)reader[KEY_PARENT_ID],
-      (FileNodeType)(byte)reader[KEY_TYPE]
+      (FileNodeType)(byte)reader[KEY_TYPE],
+      (string)reader[KEY_NAME]
     );
 
     protected override void OnInit(DatabaseTransaction transaction, int oldVersion = 0)
@@ -40,7 +45,58 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_TRASH_TIME} integer null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PARENT_ID} integer null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_TYPE} integer not null;");
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_NAME} varchar(128) not null{(Main.StoragePool.Resource.Flags.HasFlag(StoragePoolFlags.IgnoreCase) ? " collage nocase" : "")};");
       }
+    }
+
+    public FileNodeResource? GetByName(DatabaseTransaction transaction, string name, FileNodeResource? parentNode)
+    {
+      foreach (FileNodeResource node in DbStream(transaction, new()
+      {
+        { KEY_PARENT_ID, ("=", parentNode?.Id) },
+        { KEY_NAME, ("=", name) }
+      }, new(1)))
+      {
+        return node;
+      }
+
+      return null;
+    }
+
+    public FileNodeResource CreateFolder(DatabaseTransaction transaction, string name, FileNodeResource? parentNode)
+    {
+      return DbInsert(transaction, new()
+      {
+        { KEY_ACCESS_TIME, null },
+        { KEY_TRASH_TIME, null },
+        { KEY_PARENT_ID, parentNode?.Id },
+        { KEY_TYPE, (byte)FileNodeType.Directory },
+        { KEY_NAME, name }
+      });
+    }
+
+    public FileNodeResource CreateFile(DatabaseTransaction transaction, string name, FileNodeResource parentNode)
+    {
+      return DbInsert(transaction, new()
+      {
+        { KEY_ACCESS_TIME, null },
+        { KEY_TRASH_TIME, null },
+        { KEY_PARENT_ID, parentNode.Id },
+        { KEY_TYPE, (byte)FileNodeType.File },
+        { KEY_NAME, name }
+      });
+    }
+
+    public FileNodeResource CreateSymbolicLink(DatabaseTransaction transaction, string name, FileNodeResource parentNode)
+    {
+      return DbInsert(transaction, new()
+      {
+        { KEY_ACCESS_TIME, null },
+        { KEY_TRASH_TIME, null },
+        { KEY_PARENT_ID, parentNode.Id },
+        { KEY_TYPE, (byte)FileNodeType.SymbolicLink },
+        { KEY_NAME, name }
+      });
     }
   }
 
@@ -51,11 +107,13 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
     long? AccessTime,
     long? TrashTime,
     long? ParentId,
-    FileNodeType Type
+    FileNodeType Type,
+    string Name
   ) : Resource<ResourceManager, ResourceData, FileNodeResource>.ResourceData(Id, CreateTime, UpdateTime);
 
   public long? AccessTime => Data.AccessTime;
   public long? TrashTime => Data.TrashTime;
   public long? ParentId => Data.ParentId;
   public FileNodeType Type => Data.Type;
+  public string Name => Data.Name;
 }

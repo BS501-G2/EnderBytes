@@ -1,15 +1,26 @@
 namespace RizzziGit.EnderBytes.StoragePools;
 
+using Resources.BlobStorage;
+
 public sealed partial class BlobStoragePool
 {
-  private sealed class BlobFileHandle(StoragePool pool) : Handle.File(pool)
+  private sealed class BlobFileHandle(StoragePool pool, FileNodeResource resource) : Handle.File(pool)
   {
-    public override long Id => throw new NotImplementedException();
-    public override Path Path => throw new NotImplementedException();
-    public override long? AccessTime => throw new NotImplementedException();
-    public override long? TrashTime => throw new NotImplementedException();
+    private readonly FileNodeResource Resource = resource;
+
+    public override long Id => Resource.Id;
 
     public override Task<Snapshot> CreateSnapshot(Context context, Snapshot? baseSnapshot, CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+
+    public override Task<long?> GetAccessTime(Context context, CancellationToken cancellationToken)
+    {
+      throw new NotImplementedException();
+    }
+
+    public override Task<string> GetName(Context context, CancellationToken cancellationToken)
     {
       throw new NotImplementedException();
     }

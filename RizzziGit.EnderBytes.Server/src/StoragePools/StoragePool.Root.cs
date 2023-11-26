@@ -9,9 +9,16 @@ public abstract partial class StoragePool
     protected abstract Task<Handle.Folder> InternalGetRootFolder(Context context, CancellationToken cancellationToken);
     protected abstract IAsyncEnumerable<Handle> InternalListTrashed(Context context, CancellationToken cancellationToken);
 
+    protected abstract Task<Handle> InternalGetByPath(Context context, Path path, CancellationToken cancellationToken);
+
     public async Task<Handle.Folder> GetRootFolder(Context context, CancellationToken cancellationToken)
     {
       return await GetRootFolder(context, cancellationToken);
+    }
+
+    public async Task<Handle> GetByPath(Context context, Path path, CancellationToken cancellationToken)
+    {
+      return await InternalGetByPath(context, path, cancellationToken);
     }
 
     public async Task<Handle[]> ListTrashed(Context context, CancellationToken cancellationToken)

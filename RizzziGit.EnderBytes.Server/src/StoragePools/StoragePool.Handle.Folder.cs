@@ -19,6 +19,16 @@ public abstract partial class StoragePool
       protected abstract Task<SymbolicLink> InternalCreateSymbolicLink(Context context, string name, Path target, CancellationToken cancellationToken);
       protected abstract Task<SymbolicLink> InternalCreateSymbolicLink(Context context, string name, SymbolicLink copyFromSymbolicLink, CancellationToken cancellationToken);
 
+      public async Task<Handle> GetByPath(Context context, Path path, CancellationToken cancellationToken)
+      {
+        if (path.Length == 0)
+        {
+          return this;
+        }
+
+        return await (await Pool.GetRoot(context, cancellationToken)).GetByPath(context, new(Pool, [.. await GetPath(context, cancellationToken), .. path]), cancellationToken);
+      }
+
       public async Task<Handle[]> Scan(Context context, CancellationToken cancellationToken)
       {
         List<Handle> handles = [];

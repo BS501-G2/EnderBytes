@@ -64,7 +64,7 @@ public abstract partial class StoragePool : Service
 
   protected abstract Task InternalStart(CancellationToken cancellationToken);
   protected abstract Task InternalRun(CancellationToken cancellationToken);
-  protected abstract Task InternalStop(Exception? exception);
+  protected abstract Task InternalStop(System.Exception? exception);
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
@@ -76,8 +76,28 @@ public abstract partial class StoragePool : Service
     await InternalRun(cancellationToken);
   }
 
-  protected override async Task OnStop(Exception? exception)
+  protected override async Task OnStop(System.Exception? exception)
   {
     await InternalStop(exception);
+  }
+
+  protected abstract Task<Root> InternalGetRoot(Context context, CancellationToken cancellationToken);
+  protected abstract IAsyncEnumerable<Handle> InternalGetTrashed(Context context, CancellationToken cancellationToken);
+
+  public async Task<Root> GetRoot(Context context, CancellationToken cancellationToken)
+  {
+    return await InternalGetRoot(context, cancellationToken);
+  }
+
+  public async Task<Handle[]> GetTrashed(Context context, CancellationToken cancellationToken)
+  {
+    List<Handle> list = [];
+
+    await foreach (Handle handle in InternalGetTrashed(context, cancellationToken))
+    {
+      list.Add(handle);
+    }
+
+    return [.. list];
   }
 }

@@ -45,7 +45,7 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_TRASH_TIME} integer null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PARENT_ID} integer null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_TYPE} integer not null;");
-        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_NAME} varchar(128) not null{(Main.StoragePool.Resource.Flags.HasFlag(StoragePoolFlags.IgnoreCase) ? " collage nocase" : "")};");
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_NAME} varchar(128) not null{(Main.StoragePool.Resource.Flags.HasFlag(StoragePoolFlags.IgnoreCase) ? " collate nocase" : "")};");
       }
     }
 
@@ -61,6 +61,17 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
       }
 
       return null;
+    }
+
+    public IEnumerable<FileNodeResource> StreamChildrenNodes(DatabaseTransaction transaction, FileNodeResource? parentNode)
+    {
+      foreach (FileNodeResource node in DbStream(transaction, new()
+      {
+        { KEY_PARENT_ID, ("=", parentNode?.Id) }
+      }))
+      {
+        yield return node;
+      }
     }
 
     public FileNodeResource CreateFolder(DatabaseTransaction transaction, string name, FileNodeResource? parentNode)

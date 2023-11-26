@@ -110,8 +110,6 @@ public sealed class Database : Service
 {
   public static string GetDatabaseFilePath(string path, string name) => System.IO.Path.Join(path, $"{name}.sqlite3");
 
-  public delegate Task AsyncTransactionHandler(DatabaseTransaction transaction, CancellationToken cancellationToken);
-  public delegate Task<T> AsyncTransactionHandler<T>(DatabaseTransaction transaction, CancellationToken cancellationToken);
   public delegate void TransactionHandler(DatabaseTransaction transaction);
   public delegate T TransactionHandler<T>(DatabaseTransaction transaction);
 

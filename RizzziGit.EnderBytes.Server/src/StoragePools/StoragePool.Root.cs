@@ -2,9 +2,9 @@ namespace RizzziGit.EnderBytes.StoragePools;
 
 public abstract partial class StoragePool
 {
-  public abstract class Root(StoragePool storagePool)
+  public abstract class Root(StoragePool pool)
   {
-    public readonly StoragePool StoragePool = storagePool;
+    public readonly StoragePool Pool = pool;
 
     protected abstract Task<Handle.Folder> InternalGetRootFolder(Context context, CancellationToken cancellationToken);
     protected abstract IAsyncEnumerable<Handle> InternalListTrashed(Context context, CancellationToken cancellationToken);

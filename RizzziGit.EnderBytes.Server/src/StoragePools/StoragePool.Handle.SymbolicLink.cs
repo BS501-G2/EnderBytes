@@ -10,7 +10,7 @@ public abstract partial class StoragePool
 
       public abstract Task<Path> GetTargetPath(Context context, CancellationToken cancellationToken);
 
-      public async Task<Handle> GetTargetHandle(Context context, CancellationToken cancellationToken) => await Pool.GetByPath(context, await GetTargetPath(context, cancellationToken), cancellationToken);
+      public async Task<Handle> GetTargetHandle(Context context, CancellationToken cancellationToken) => await (await Pool.GetRoot(context, cancellationToken)).GetByPath(context, await GetTargetPath(context, cancellationToken), cancellationToken);
     }
   }
 }

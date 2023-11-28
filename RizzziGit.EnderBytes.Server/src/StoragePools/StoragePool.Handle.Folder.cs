@@ -2,7 +2,6 @@ namespace RizzziGit.EnderBytes.StoragePools;
 
 public abstract partial class StoragePool
 {
-
   public abstract partial class Handle
   {
     public abstract class Folder : Handle
@@ -10,14 +9,11 @@ public abstract partial class StoragePool
       protected Folder(StoragePool pool) : base(pool) { }
 
       protected abstract IAsyncEnumerable<Handle> InternalScan(Context context, CancellationToken cancellationToken);
-      protected abstract Task InternalRemove(Context context, CancellationToken cancellationToken);
+      protected abstract Task InternalMoveHere(Context context, Handle handle, CancellationToken cancellationToken);
 
       protected abstract Task<File> InternalCreateFile(Context context, string name, long preallocateLength, CancellationToken cancellationToken);
-      protected abstract Task<File> InternalCreateFile(Context context, string name, File copyFromFile, CancellationToken cancellationToken);
       protected abstract Task<Folder> InternalCreateFolder(Context context, string name, CancellationToken cancellationToken);
-      protected abstract Task<Folder> InternalCreateFolder(Context context, string name, Folder copyFromFolder, CancellationToken cancellationToken);
       protected abstract Task<SymbolicLink> InternalCreateSymbolicLink(Context context, string name, Path target, CancellationToken cancellationToken);
-      protected abstract Task<SymbolicLink> InternalCreateSymbolicLink(Context context, string name, SymbolicLink copyFromSymbolicLink, CancellationToken cancellationToken);
 
       public async Task<Handle> GetByPath(Context context, Path path, CancellationToken cancellationToken)
       {
@@ -42,15 +38,15 @@ public abstract partial class StoragePool
       }
 
       public Task<File> CreateFile(Context context, string name, CancellationToken cancellationToken) => CreateFile(context, name, 0, cancellationToken);
-      public async Task<File> CreateFile(Context context, string name, long preallocateLength, CancellationToken cancellationToken)
+      public virtual async Task<File> CreateFile(Context context, string name, long preallocateLength, CancellationToken cancellationToken)
       {
-        throw new NotImplementedException();
+        return await InternalCreateFile(context, name, preallocateLength, cancellationToken);
       }
 
-      public async Task<File> CreateFile(Context context, string name, File copyFromFile, CancellationToken cancellationToken)
-      {
-        throw new NotImplementedException();
-      }
+      // public virtual async Task<File> CreateFile(Context context, string name, File copyFromFile, CancellationToken cancellationToken)
+      // {
+      //   // return await InternalCreateFile(context, name, copyFromFile.Size)
+      // }
     }
   }
 }

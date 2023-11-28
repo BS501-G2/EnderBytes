@@ -109,6 +109,34 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
         { KEY_NAME, name }
       });
     }
+
+    public bool UpdateParentFolder(DatabaseTransaction transaction, FileNodeResource node, FileNodeResource? parentNode)
+    {
+      if ((parentNode != null) && (parentNode?.Type == FileNodeType.Directory))
+      {
+        throw new InvalidOperationException("Invalid node type.");
+      }
+
+      return DbUpdate(transaction, new()
+      {
+        { KEY_PARENT_ID, parentNode?.Id }
+      }, new()
+      {
+        { KEY_ID, ("=", node.Id) }
+      }) != 0;
+    }
+
+    public bool UpdateTimestamps(DatabaseTransaction transaction, FileNodeResource node, long? accessTime, long? trashTime)
+    {
+      return DbUpdate(transaction, new()
+      {
+        { KEY_ACCESS_TIME, accessTime },
+        { KEY_TRASH_TIME, trashTime }
+      }, new()
+      {
+        { KEY_ID, ("=", node.Id) }
+      }) != 0;
+    }
   }
 
   public new sealed record ResourceData(

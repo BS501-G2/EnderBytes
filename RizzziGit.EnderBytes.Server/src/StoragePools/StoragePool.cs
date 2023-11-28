@@ -82,18 +82,18 @@ public abstract partial class StoragePool : Service
   }
 
   protected abstract Task<Root> InternalGetRoot(Context context, CancellationToken cancellationToken);
-  protected abstract IAsyncEnumerable<Handle> InternalGetTrashed(Context context, CancellationToken cancellationToken);
+  protected abstract IAsyncEnumerable<TrashedHandle> InternalGetTrashed(Context context, CancellationToken cancellationToken);
 
   public async Task<Root> GetRoot(Context context, CancellationToken cancellationToken)
   {
     return await InternalGetRoot(context, cancellationToken);
   }
 
-  public async Task<Handle[]> GetTrashed(Context context, CancellationToken cancellationToken)
+  public async Task<TrashedHandle[]> GetTrashed(Context context, CancellationToken cancellationToken)
   {
-    List<Handle> list = [];
+    List<TrashedHandle> list = [];
 
-    await foreach (Handle handle in InternalGetTrashed(context, cancellationToken))
+    await foreach (TrashedHandle handle in InternalGetTrashed(context, cancellationToken))
     {
       list.Add(handle);
     }

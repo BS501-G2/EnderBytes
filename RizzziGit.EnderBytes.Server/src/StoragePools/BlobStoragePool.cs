@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace RizzziGit.EnderBytes.StoragePools;
 
 using Resources;
@@ -21,7 +23,7 @@ public sealed partial class BlobStoragePool : StoragePool
 
   private FileNodeResource.ResourceManager Nodes => Resources.Nodes;
 
-  private readonly WeakDictionary<FileNodeResource, Handle> Handles;
+  private readonly DoublyWeakDictionary<FileNodeResource, Handle> Handles;
 
   private Handle ResolveHandle(FileNodeResource node)
   {
@@ -60,23 +62,44 @@ public sealed partial class BlobStoragePool : StoragePool
     );
   }
 
-  protected override IAsyncEnumerable<Handle> InternalGetTrashed(Context context, CancellationToken cancellationToken)
+  protected override async IAsyncEnumerable<TrashedHandle> InternalGetTrashed(Context context, [EnumeratorCancellation] CancellationToken cancellationToken)
   {
-    throw new NotImplementedException();
+    List<TrashedHandle> handles = [];
+
+    BlobRoot root = (BlobRoot)await GetRoot(context, cancellationToken);
+    BlobFolderHandle trashedFolder = (BlobFolderHandle)await root.GetRootFolder(context, cancellationToken);
+
+    await Database.RunTransaction((transaction) =>
+    {
+      foreach (FileNodeResource node in Nodes.StreamChildrenNodes(transaction, trashedFolder.Resource))
+      {
+        if (node.TrashTime == null)
+        {
+          continue;
+        }
+
+        handles.Add(new(ResolveHandle(node), (long)node.TrashTime));
+      }
+    }, cancellationToken);
+
+    foreach (TrashedHandle handle in handles)
+    {
+      yield return handle;
+    }
   }
 
   protected override Task InternalStart(CancellationToken cancellationToken)
   {
-    throw new NotImplementedException();
+    return Task.CompletedTask;
   }
 
   protected override Task InternalRun(CancellationToken cancellationToken)
   {
-    throw new NotImplementedException();
+    return Task.CompletedTask;
   }
 
-  protected override Task InternalStop(Exception? exception)
+  protected override Task InternalStop(System.Exception? exception)
   {
-    throw new NotImplementedException();
+    return Task.CompletedTask;
   }
 }

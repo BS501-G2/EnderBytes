@@ -6,7 +6,7 @@ public sealed partial class BlobStoragePool
 {
   private sealed class BlobFileHandle(StoragePool pool, FileNodeResource resource) : Handle.File(pool)
   {
-    private readonly FileNodeResource Resource = resource;
+    public readonly FileNodeResource Resource = resource;
 
     public override long Id => Resource.Id;
 
@@ -15,12 +15,12 @@ public sealed partial class BlobStoragePool
       throw new NotImplementedException();
     }
 
-    public override Task<long?> GetAccessTime(Context context, CancellationToken cancellationToken)
+    public override Task<long?> InternalGetAccessTime(Context context, CancellationToken cancellationToken)
     {
       throw new NotImplementedException();
     }
 
-    public override Task<string> GetName(Context context, CancellationToken cancellationToken)
+    public override Task<string> InternalGetName(Context context, CancellationToken cancellationToken)
     {
       throw new NotImplementedException();
     }

@@ -33,7 +33,7 @@ public abstract partial class StoragePool
 
         public async Task<List<BufferCache>> GetCache() => Cache ??= await File.GetCacheList(Snapshot);
 
-        public async Task<long> GetCacheSize(Context context)
+        public async Task<long> GetCacheSize()
         {
           long size = 0;
 

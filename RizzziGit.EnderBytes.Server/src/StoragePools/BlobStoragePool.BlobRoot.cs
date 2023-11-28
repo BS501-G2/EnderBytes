@@ -10,7 +10,7 @@ public sealed partial class BlobStoragePool
   {
     public BlobRoot(BlobStoragePool storagePool, FileNodeResource folderNode, FileNodeResource trashNode) : base(storagePool)
     {
-      StoragePool = storagePool;
+      Pool = storagePool;
 
       FolderNode = folderNode;
       TrashNode = trashNode;
@@ -19,7 +19,7 @@ public sealed partial class BlobStoragePool
       TrashFolder = new(storagePool, TrashNode);
     }
 
-    private readonly new BlobStoragePool StoragePool;
+    private readonly new BlobStoragePool Pool;
 
     private readonly FileNodeResource FolderNode;
     private readonly FileNodeResource TrashNode;
@@ -27,19 +27,16 @@ public sealed partial class BlobStoragePool
     private readonly BlobFolderHandle RootFolder;
     private readonly BlobFolderHandle TrashFolder;
 
-    protected override Task<Handle> InternalGetByPath(Context context, Path path, CancellationToken cancellationToken) => StoragePool.Database.RunTransaction((transaction) =>
+    protected override Task<Handle> InternalGetByPath(Context context, Path path, CancellationToken cancellationToken) => Pool.Database.RunTransaction((transaction) =>
     {
       FileNodeResource? node = FolderNode;
       foreach (string pathEntry in path)
       {
-        node = StoragePool.Nodes.GetByName(transaction, pathEntry, node);
+        node = Pool.Nodes.GetByName(transaction, pathEntry, node);
 
         if (node == null)
         {
           break;
-        } else if (node.Type != FileNodeType.Directory)
-        {
-          throw new Exception.HandleNotFound();
         }
       }
 
@@ -48,7 +45,7 @@ public sealed partial class BlobStoragePool
         throw new Exception.HandleNotFound();
       }
 
-      return StoragePool.ResolveHandle(node);
+      return Pool.ResolveHandle(node);
     }, cancellationToken);
 
     protected override Task<Handle.Folder> InternalGetRootFolder(Context context, CancellationToken cancellationToken)
@@ -60,11 +57,11 @@ public sealed partial class BlobStoragePool
     {
       List<Handle> handles = [];
 
-      await StoragePool.Database.RunTransaction((transaction) =>
+      await Pool.Database.RunTransaction((transaction) =>
       {
-        foreach (FileNodeResource node in StoragePool.Nodes.StreamChildrenNodes(transaction, TrashNode))
+        foreach (FileNodeResource node in Pool.Nodes.StreamChildrenNodes(transaction, TrashNode))
         {
-          handles.Add(StoragePool.ResolveHandle(node));
+          handles.Add(Pool.ResolveHandle(node));
         }
       }, cancellationToken);
 

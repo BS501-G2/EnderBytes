@@ -11,7 +11,12 @@ public abstract partial class StoragePool
 
     public readonly StoragePool Pool;
 
+    protected abstract Task<long?> InternalGetTrashTime(Context context, CancellationToken cancellationToken);
+    protected abstract Task<string> InternalGetName(Context context, CancellationToken cancellationToken);
+    protected abstract Task<long?> InternalGetAccessTime(Context context, CancellationToken cancellationToken);
+
     protected abstract Task<Folder?> InternalGetParent(Context context, CancellationToken cancellationToken);
+    protected abstract Task InternalTrash(Context context, CancellationToken cancellationToken);
 
     public Task<Folder?> GetParent(Context context, CancellationToken cancellationToken) => InternalGetParent(context, cancellationToken);
     public async Task<Path> GetPath(Context context, CancellationToken cancellationToken)
@@ -20,14 +25,11 @@ public abstract partial class StoragePool
 
       if (parent != null)
       {
-        return new Path(Pool, [.. await GetPath(context, cancellationToken), await GetName(context, cancellationToken)]);
+        return new Path(Pool, [.. await GetPath(context, cancellationToken), await InternalGetName(context, cancellationToken)]);
       }
 
       return new Path(Pool);
     }
-
-    public abstract Task<string> GetName(Context context, CancellationToken cancellationToken);
-    public abstract Task<long?> GetAccessTime(Context context, CancellationToken cancellationToken);
     public abstract long Id { get; }
   }
 }

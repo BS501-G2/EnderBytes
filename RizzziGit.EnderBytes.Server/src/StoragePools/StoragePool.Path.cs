@@ -57,7 +57,7 @@ public abstract partial class StoragePool
       }
     }
 
-    private readonly StoragePool Pool;
+    public readonly StoragePool Pool;
     private readonly string[] InternalPath;
 
     public string this[int index] => InternalPath[index];

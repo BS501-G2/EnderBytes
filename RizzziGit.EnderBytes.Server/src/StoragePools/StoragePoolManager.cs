@@ -66,28 +66,28 @@ public sealed class StoragePoolManager : Service
 
         try
         {
-          pool.StateChanged += (_, state) =>
-          {
-            lock (Pools)
-            {
-              switch (state)
-              {
-                case ServiceState.Starting:
-                case ServiceState.Started:
-                  if (Pools.TryGetValue(resource, out var _))
-                  {
-                    break;
-                  }
+          // pool.StateChanged += (_, state) =>
+          // {
+          //   lock (Pools)
+          //   {
+          //     switch (state)
+          //     {
+          //       case ServiceState.Starting:
+          //       case ServiceState.Started:
+          //         if (Pools.TryGetValue(resource, out var _))
+          //         {
+          //           break;
+          //         }
 
-                  Pools.Add(resource, new(pool));
-                  break;
+          //         Pools.Add(resource, new(pool));
+          //         break;
 
-                default:
-                  Pools.Remove(resource);
-                  break;
-              }
-            }
-          };
+          //       default:
+          //         Pools.Remove(resource);
+          //         break;
+          //     }
+          //   }
+          // };
 
           await pool.Start();
           source.SetResult(pool);

@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 namespace RizzziGit.EnderBytes.Database;
 
 using Collections;
-using RizzziGit.EnderBytes.Resources;
+using Resources;
 
 public sealed class DatabaseTransaction(Database database, SqliteConnection connection)
 {

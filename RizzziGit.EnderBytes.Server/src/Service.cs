@@ -73,14 +73,14 @@ public abstract class Service
     TaskCompletionSource<Task> serviceRunnerSource = new();
     TaskCompletionSource serviceRunnerStartTriggerSource = new();
 
-    _ = Factory!.StartNew(() =>
+    _ = Factory!.StartNew(async () =>
     {
       Thread.CurrentThread.Name = Name;
       Task task = RunThread(serviceStartupSource, serviceRunnerStartTriggerSource.Task);
       serviceRunnerSource.SetResult(task);
       serviceRunnerStartTriggerSource.SetResult();
 
-      task.ContinueWith((task) => { }).Wait();
+      await task;
     });
 
     Context = new(await serviceRunnerSource.Task, new());

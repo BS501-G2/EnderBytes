@@ -31,6 +31,8 @@ public static class Program
         return (server.Resources.StoragePools.CreateBlob(transaction, user.Id, StoragePoolFlags.IgnoreCase), userAuthentication, hashCache);
       }, CancellationToken.None);
 
+      // server.StoragePools.Get
+
       // var storagePool = (BlobStoragePool)await server.StoragePools.GetStoragePool(storagePoolResource, CancellationToken.None);
       // await storagePool.FileCreate(userAuthentication, hashCache, ["test.webm"], CancellationToken.None);
 

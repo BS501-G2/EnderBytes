@@ -3,36 +3,48 @@ namespace RizzziGit.EnderBytes.StoragePools;
 using Resources;
 using Connections;
 using Utilities;
-using System.Threading.Tasks;
-using System.Threading;
+using Buffer;
+using MongoDB.Bson;
 
 public abstract partial class StoragePool : Service
 {
-  protected StoragePool(StoragePoolManager manager, StoragePoolResource resource, Action onStart, Action onStop) : base($"#{resource.Id}", manager)
+  [Flags]
+  public enum Access : byte
+  {
+    Read = 1 << 0,
+    Write = 1 << 1,
+    Exclusive = 1 << 2,
+
+    ReadWrite = Read | Write,
+    ExclusiveReadWrite = Exclusive | ReadWrite
+  }
+
+  [Flags]
+  public enum Mode : byte
+  {
+    TruncateToZero = 1 << 0,
+    Append = 1 << 1,
+    NewSnapshot = 1 << 2
+  }
+
+  protected StoragePool(StoragePoolManager manager, StoragePoolResource resource) : base($"#{resource.Id}", manager)
   {
     Manager = manager;
     Resource = resource;
     TaskQueue = new();
-
-    Manager_OnStart = onStart;
-    Manager_OnStop = onStop;
   }
 
   public readonly StoragePoolManager Manager;
   public readonly StoragePoolResource Resource;
 
-  private readonly Action Manager_OnStart;
-  private readonly Action Manager_OnStop;
   private readonly TaskQueue TaskQueue;
 
-  protected abstract Context Internal_GetContext(Connection connection);
   protected abstract Task Internal_OnStart(CancellationToken cancellationToken);
   protected abstract Task Internal_OnRun(CancellationToken cancellationToken);
   protected abstract Task Internal_OnStop(System.Exception? exception);
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
-    Manager_OnStart();
     await Internal_OnStart(cancellationToken);
   }
 
@@ -48,6 +60,5 @@ public abstract partial class StoragePool : Service
   {
     TaskQueue.Dispose(exception);
     await Internal_OnStop(exception);
-    Manager_OnStop();
   }
 }

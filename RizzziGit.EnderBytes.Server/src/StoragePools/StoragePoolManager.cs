@@ -42,6 +42,15 @@ public sealed class StoragePoolManager : Service
 
   private readonly Dictionary<StoragePoolResource, StoragePoolInformation> Pools = [];
   private readonly WaitQueue<(TaskCompletionSource<StoragePool> source, StoragePoolResource resource)> WaitQueue = new();
+
+  public async Task<StoragePool> GetStoragePool(StoragePoolResource resource)
+  {
+    TaskCompletionSource<StoragePool> source = new();
+
+    await WaitQueue.Enqueue((source, resource));
+    return await source.Task;
+  }
+
   private async Task RunOpenQueue(CancellationToken cancellationToken)
   {
     while (true)
@@ -59,35 +68,35 @@ public sealed class StoragePoolManager : Service
       {
         pool = resource.Type switch
         {
-          // StoragePoolType.Blob => new BlobStoragePool(this, resource),
+          StoragePoolType.Blob => new BlobStoragePool(this, resource),
 
           _ => throw new InvalidOperationException("Invalid storage pool type.")
         };
 
         try
         {
-          // pool.StateChanged += (_, state) =>
-          // {
-          //   lock (Pools)
-          //   {
-          //     switch (state)
-          //     {
-          //       case ServiceState.Starting:
-          //       case ServiceState.Started:
-          //         if (Pools.TryGetValue(resource, out var _))
-          //         {
-          //           break;
-          //         }
+          pool.StateChanged += (_, state) =>
+          {
+            lock (Pools)
+            {
+              switch (state)
+              {
+                case ServiceState.Starting:
+                case ServiceState.Started:
+                  if (Pools.TryGetValue(resource, out var _))
+                  {
+                    break;
+                  }
 
-          //         Pools.Add(resource, new(pool));
-          //         break;
+                  Pools.Add(resource, new(pool));
+                  break;
 
-          //       default:
-          //         Pools.Remove(resource);
-          //         break;
-          //     }
-          //   }
-          // };
+                default:
+                  Pools.Remove(resource);
+                  break;
+              }
+            }
+          };
 
           await pool.Start();
           source.SetResult(pool);
@@ -101,11 +110,8 @@ public sealed class StoragePoolManager : Service
     }
   }
 
-
   protected override Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
-
   protected override Task OnRun(CancellationToken cancellationToken) => RunOpenQueue(cancellationToken);
-
   protected override async Task OnStop(Exception? exception)
   {
     List<Task> tasks = [];

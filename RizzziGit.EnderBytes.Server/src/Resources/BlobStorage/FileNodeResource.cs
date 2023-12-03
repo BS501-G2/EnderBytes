@@ -19,6 +19,8 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
     private const string KEY_TYPE = "Type";
     private const string KEY_NAME = "Name";
 
+    private const string INDEX_UNIQUENESS = $"Index_{KEY_PARENT_ID}_{KEY_NAME}";
+
     public ResourceManager(BlobStorage.ResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
       Main = main;
@@ -46,6 +48,8 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PARENT_ID} integer null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_TYPE} integer not null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_NAME} varchar(128) not null{(Main.StoragePool.Resource.Flags.HasFlag(StoragePoolFlags.IgnoreCase) ? " collate nocase" : "")};");
+
+        transaction.ExecuteNonQuery($"create unique index {INDEX_UNIQUENESS} on {NAME}({KEY_PARENT_ID},{KEY_NAME})");
       }
     }
 
@@ -110,6 +114,17 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
       });
     }
 
+    public bool UpdateName(DatabaseTransaction transaction, FileNodeResource node, string newName)
+    {
+      return DbUpdate(transaction, new()
+      {
+        { KEY_NAME, newName }
+      }, new()
+      {
+        { KEY_ID, ("=", node.Id) }
+      }) != 0;
+    }
+
     public bool UpdateParentFolder(DatabaseTransaction transaction, FileNodeResource node, FileNodeResource? parentNode)
     {
       if ((parentNode != null) && (parentNode?.Type == FileNodeType.Directory))
@@ -126,17 +141,17 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
       }) != 0;
     }
 
-    public bool UpdateTimestamps(DatabaseTransaction transaction, FileNodeResource node, long? accessTime, long? trashTime)
-    {
-      return DbUpdate(transaction, new()
-      {
-        { KEY_ACCESS_TIME, accessTime },
-        { KEY_TRASH_TIME, trashTime }
-      }, new()
-      {
-        { KEY_ID, ("=", node.Id) }
-      }) != 0;
-    }
+    // public bool UpdateTimestamps(DatabaseTransaction transaction, FileNodeResource node, long? accessTime, long? trashTime)
+    // {
+    //   return DbUpdate(transaction, new()
+    //   {
+    //     { KEY_ACCESS_TIME, accessTime },
+    //     { KEY_TRASH_TIME, trashTime }
+    //   }, new()
+    //   {
+    //     { KEY_ID, ("=", node.Id) }
+    //   }) != 0;
+    // }
   }
 
   public new sealed record ResourceData(

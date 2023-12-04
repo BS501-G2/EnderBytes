@@ -38,10 +38,15 @@ public abstract partial class StoragePool : Service
   public readonly StoragePoolResource Resource;
 
   private readonly TaskQueue TaskQueue;
+  private FolderNode? RootFolder;
 
   protected abstract Task Internal_OnStart(CancellationToken cancellationToken);
   protected abstract Task Internal_OnRun(CancellationToken cancellationToken);
   protected abstract Task Internal_OnStop(System.Exception? exception);
+
+  protected abstract Task<FolderNode> Internal_GetRootFolder(Context context);
+
+  public async Task<FolderNode> GetRootFolder(Context context) => RootFolder ??= await Internal_GetRootFolder(context);
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {

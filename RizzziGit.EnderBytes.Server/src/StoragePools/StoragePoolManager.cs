@@ -47,7 +47,7 @@ public sealed class StoragePoolManager : Service
   {
     TaskCompletionSource<StoragePool> source = new();
 
-    await WaitQueue.Enqueue((source, resource));
+    await WaitQueue.Enqueue((source, resource)); 
     return await source.Task;
   }
 

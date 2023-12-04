@@ -24,7 +24,7 @@ public sealed class BlobStoragePool : StoragePool
     public override long Id => Resource.Id;
     public override FolderNode? Parent => BlobParent;
     public override string Name => Resource.Name;
-    }
+  }
 
   public BlobStoragePool(StoragePoolManager manager, StoragePoolResource resource) : base(manager, resource)
   {
@@ -60,6 +60,21 @@ public sealed class BlobStoragePool : StoragePool
   protected override Task Internal_OnRun(CancellationToken cancellationToken) => Task.CompletedTask;
   protected override Task Internal_OnStart(CancellationToken cancellationToken) => Resources.Start();
   protected override Task Internal_OnStop(System.Exception? exception) => Resources.Stop();
+
+  protected override Task<FolderNode> Internal_GetRootFolder(Context context) => RunTransaction<FolderNode>((transaction) =>
+  {
+    FileNodeResource? node = null;
+
+    foreach (FileNodeResource entry in Resources.Nodes.StreamChildrenNodes(transaction, null))
+    {
+      if (entry.Name == ".ROOT")
+      {
+        node = entry;
+      }
+    }
+
+    return (BlobFolderNode)ResolveNode(node ??= Resources.Nodes.CreateFolder(transaction, ".ROOT", null), null);
+  }, CancellationToken.None);
 
   protected override Task<FileNode> Internal_CreateFile(Context context, FolderNode parent, string name, long preallocateSize) => RunTransaction<FileNode>((transaction) =>
   {

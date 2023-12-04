@@ -35,6 +35,7 @@ public sealed class ResourceManager : Service, IMainResourceManager
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
   public readonly UserKeyResource.ResourceManager UserKeys;
   public readonly StoragePoolResource.ResourceManager StoragePools;
+  public readonly MountPointResource.ResourceManager MountPoints;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {

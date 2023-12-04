@@ -354,7 +354,7 @@ public abstract class Resource<M, D, R>
       return transaction.ExecuteReader(sql.ToString(), [.. sqlParams]);
     }
 
-    public IEnumerable<R> Stream(SqliteDataReader reader)
+    private IEnumerable<R> Stream(SqliteDataReader reader)
     {
       using (reader)
       {

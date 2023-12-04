@@ -23,10 +23,9 @@ public abstract partial class StoragePool
       return path1.Equals(path2);
     }
 
-    public Path(StoragePool pool, params string[] path)
+    public Path(params string[] path) : this(false, path) { }
+    public Path(bool ignoreCase = false, params string[] path)
     {
-      Pool = pool;
-
       {
         List<string> sanitized = [];
         foreach (string pathEntry in path)
@@ -57,8 +56,8 @@ public abstract partial class StoragePool
       }
     }
 
-    public readonly StoragePool Pool;
     private readonly string[] InternalPath;
+    public bool IgnoreCase = false;
 
     public string this[int index] => InternalPath[index];
     public int Length => InternalPath.Length;
@@ -75,7 +74,7 @@ public abstract partial class StoragePool
         if (string.Equals(
           this[index],
           other[index],
-          Pool.Resource.Flags.HasFlag(StoragePoolFlags.IgnoreCase)
+            IgnoreCase
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal
         ))
@@ -90,7 +89,7 @@ public abstract partial class StoragePool
     public bool EqualsAt(int index, string test) => string.Equals(
       this[index],
       test,
-      Pool.Resource.Flags.HasFlag(StoragePoolFlags.IgnoreCase)
+      IgnoreCase
         ? StringComparison.InvariantCultureIgnoreCase
         : StringComparison.InvariantCulture
     );
@@ -110,11 +109,6 @@ public abstract partial class StoragePool
       if (path.InternalPath.Length != InternalPath.Length)
       {
         return false;
-      }
-
-      if (path.Pool != Pool)
-      {
-        throw new ArgumentException("Cannot compare paths from different storage pools.");
       }
 
       for (int index = 0; index < Length; index++)

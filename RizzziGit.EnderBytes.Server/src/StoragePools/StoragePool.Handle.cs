@@ -34,7 +34,7 @@ public abstract partial class StoragePool
     public abstract FolderNode? Parent { get; }
     public abstract string Name { get; }
 
-    public Path Path => new(Pool, Parent != null ? [.. Parent.Path, Name] : [Name]);
+    public Path Path => new(Parent != null ? [.. Parent.Path, Name] : [Name]);
 
     public Task SetParent(Context context, FolderNode? parent) => Pool.Internal_SetParent(context, this, parent);
     public Task SetName(Context context, string newName) => Pool.Internal_SetName(context, this, newName);

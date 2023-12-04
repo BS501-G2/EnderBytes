@@ -26,11 +26,6 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
 {
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, StoragePoolResource>.ResourceManager
   {
-    public ResourceManager(Resources.ResourceManager main, Database database) : base(main, database, NAME, VERSION)
-    {
-      main.Users.ResourceDeleted += (transaction, resource) => DbDelete(transaction, new() { { KEY_USER_ID, ("=", resource.Id) } });
-    }
-
     public const string NAME = "StoragePool";
     public const int VERSION = 1;
 
@@ -38,6 +33,11 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     private const string KEY_TYPE = "Type";
     private const string KEY_FLAGS = "Flags";
     private const string KEY_PAYLOAD = "Payload";
+
+    public ResourceManager(Resources.ResourceManager main, Database database) : base(main, database, NAME, VERSION)
+    {
+      main.Users.ResourceDeleted += (transaction, resource) => DbDelete(transaction, new() { { KEY_USER_ID, ("=", resource.Id) } });
+    }
 
     protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,

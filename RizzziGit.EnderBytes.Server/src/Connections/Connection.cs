@@ -6,6 +6,7 @@ using Resources;
 using Utilities;
 using Sessions;
 using Extensions;
+using StoragePools;
 
 public abstract class ConnectionException : Exception
 {
@@ -55,6 +56,8 @@ public abstract class Connection : Lifetime
     public sealed record Disconnected() : Response;
     public sealed record InvalidSession() : Response;
     public sealed record InternalError() : Response;
+
+    public sealed record NotFound() : Response;
   }
 
   public Connection(ConnectionManager manager, ulong id) : base($"#{id}")
@@ -66,73 +69,15 @@ public abstract class Connection : Lifetime
     Manager.Logger.Subscribe(Logger);
   }
 
+  private readonly ResourceManager Resources;
+
+  private StoragePool.FolderNode? CurrentNode;
+
   public readonly ulong Id;
   public readonly ConnectionManager Manager;
-  private readonly ResourceManager Resources;
   public UserSession? Session { get; private set; }
 
-  protected virtual Task<Response> OnExecute(Request request) => RunTask(async (cancellationToken) =>
-  {
-    return request switch
-    {
-      Request.Login request => await HandleLoginRequest(request, cancellationToken),
-      Request.Logout => HandleLogoutRequest(),
-      Request.WhoAmI => HandleWhoAmI(),
-      Request.ChangeWorkingDirectory request => HandleChangeWorkingDirectoryRequest(request),
-
-      _ => new Response.InvalidCommand()
-    };
-  }, CancellationToken.None);
-
-  private Response.Ok<string> HandleWhoAmI() => new(Session?.User.Username ?? "");
-
-  private async Task<Response> HandleLoginRequest(Request.Login command, CancellationToken cancellationToken)
-  {
-    if (Session != null)
-    {
-      return new Response.SessionExists();
-    }
-
-    try
-    {
-      var (user, authentication, hashCache) = await Resources.Database.RunTransaction((transaction) =>
-      {
-        UserResource user = Resources.Users.GetByUsername(transaction, command.Username) ?? throw new EscapePod(0);
-
-        if (Resources.UserAuthentications.GetByPassword(transaction, user, command.Password).TryGetValue(out var result))
-        {
-          var (authentication, hashCache) = result;
-          return (user, authentication, hashCache);
-        }
-
-        throw new EscapePod(0);
-      }, cancellationToken);
-
-      Session = await Manager.Server.Sessions.GetUserSession(user, this, authentication, hashCache, cancellationToken);
-      return new Response.Ok();
-    }
-    catch (EscapePod pod)
-    {
-      return pod.Code switch
-      {
-        0 => new Response.InvalidCredentials(),
-        _ => new Response.InternalError(),
-      };
-    }
-  }
-
-  private Response HandleLogoutRequest()
-  {
-    Session = null;
-    return new Response.Ok();
-  }
-
-  private static Response HandleChangeWorkingDirectoryRequest(Request.ChangeWorkingDirectory request)
-  {
-    return new Response.Ok();
-  }
-
-  private async Task<Response> WrapExecute(Request request)
+  protected virtual Task<Response> OnExecute(Request request) => RunTask<Response>(async (cancellationToken) =>
   {
     if (!IsRunning)
     {
@@ -154,13 +99,65 @@ public abstract class Connection : Lifetime
       return new Response.NoSession();
     }
 
-    return await OnExecute(request);
-  }
+    switch (request)
+    {
+      case Request.Login loginRequest:
+        if (Session != null)
+        {
+          return new Response.SessionExists();
+        }
+
+        try
+        {
+          var (user, authentication, hashCache) = await Resources.Database.RunTransaction((transaction) =>
+          {
+            UserResource user = Resources.Users.GetByUsername(transaction, loginRequest.Username) ?? throw new EscapePod(0);
+
+            if (Resources.UserAuthentications.GetByPassword(transaction, user, loginRequest.Password).TryGetValue(out var result))
+            {
+              var (authentication, hashCache) = result;
+              return (user, authentication, hashCache);
+            }
+
+            throw new EscapePod(0);
+          }, cancellationToken);
+
+          Session = await Manager.Server.Sessions.GetUserSession(user, this, authentication, hashCache, cancellationToken);
+          return new Response.Ok();
+        }
+        catch (EscapePod pod)
+        {
+          return pod.Code switch
+          {
+            0 => new Response.InvalidCredentials(),
+            _ => new Response.InternalError(),
+          };
+        }
+
+      case Request.Logout:
+        Session = null;
+        return new Response.Ok();
+
+      case Request.ChangeWorkingDirectory request:
+        await Resources.Database.RunTransaction((transaction) =>
+        {
+          foreach (MountPointResource mountPoint in Resources.MountPoints.Stream(transaction, Session!.User))
+          {
+
+          }
+        }, cancellationToken);
+
+        // return new Response.Ok();
+        break;
+    }
+
+    return new Response.InvalidCommand();
+  }, CancellationToken.None);
 
   public async Task<Response> Execute(Request request)
   {
     Logger.Log(LogLevel.Verbose, $"> {request}");
-    Response response = await WrapExecute(request);
+    Response response = await OnExecute(request);
     Logger.Log(LogLevel.Verbose, $"< {response}");
 
     return response;
@@ -168,7 +165,6 @@ public abstract class Connection : Lifetime
 
   protected override Task OnRun(CancellationToken cancellationToken)
   {
-
     return Task.Delay(-1, cancellationToken);
   }
 }

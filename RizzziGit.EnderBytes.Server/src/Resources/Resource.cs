@@ -253,7 +253,7 @@ public abstract class Resource<M, D, R>
 
     protected R? DbOnce(DatabaseTransaction transaction, WhereClause where, Limit? limit = null, List<Order>? order = null)
     {
-      foreach (R resource in DbStream(transaction, where, limit, order))
+      foreach (R resource in DbStream(transaction, where, limit ?? new(1, null), order))
       {
         return resource;
       }
@@ -399,6 +399,14 @@ public abstract class Resource<M, D, R>
 
   public readonly M Manager;
   protected D Data { get; private set; }
+
+  public void ThrowIfInvalid()
+  {
+    if (!IsValid)
+    {
+      throw new InvalidOperationException("Resource is invalid.");
+    }
+  }
 
   public bool IsValid => Manager.IsValid((R)this);
   public long Id => Data.Id;

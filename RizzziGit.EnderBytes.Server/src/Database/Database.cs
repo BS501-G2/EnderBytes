@@ -113,11 +113,12 @@ public sealed class Database : Service
   public delegate void TransactionHandler(DatabaseTransaction transaction);
   public delegate T TransactionHandler<T>(DatabaseTransaction transaction);
 
-  public Database(IMainResourceManager main, string path, string name) : base("Database")
+  public Database(IMainResourceManager main, string path, string name, string? password = null) : base("Database")
   {
     Server = main.Server;
     Path = path;
     DatabaseFile = GetDatabaseFilePath(Path, name);
+    Password = password;
 
     main.Logger.Subscribe(Logger);
   }
@@ -127,6 +128,7 @@ public sealed class Database : Service
   public readonly string DatabaseFile;
 
   private SqliteConnection? Connection;
+  private readonly string? Password;
   private readonly WaitQueue<TaskCompletionSource<(TaskCompletionSource source, CancellationToken cancellationToken)>> WaitQueue = new();
 
   public void ValidateTransaction(SqliteTransaction transaction)
@@ -156,7 +158,8 @@ public sealed class Database : Service
         ConnectionString = new SqliteConnectionStringBuilder()
         {
           DataSource = DatabaseFile,
-          Cache = SqliteCacheMode.Private
+          Cache = SqliteCacheMode.Private,
+          Password = Password
         }.ConnectionString
       };
 

@@ -6,7 +6,7 @@ public interface IMainResourceManager
 {
   public Server Server { get; }
   public Database Database { get; }
-  public TableVersionResource.ResourceManager TableVersion { get; }
+  internal TableVersionResource.ResourceManager TableVersion { get; }
   public Logger Logger { get; }
 }
 
@@ -15,7 +15,6 @@ public sealed class ResourceManager : Service, IMainResourceManager
   public ResourceManager(Server server) : base("Resources", server)
   {
     Server = server;
-
     Database = new(this, server.Configuration.DatabasePath, "Main");
 
     TableVersion = new(this, Database);
@@ -26,16 +25,20 @@ public sealed class ResourceManager : Service, IMainResourceManager
     StoragePools = new(this, Database);
   }
 
-  public Server Server { get; private set; }
-  public Database Database { get; private set; }
-  public TableVersionResource.ResourceManager TableVersion { get; private set; }
-  public new Logger Logger => base.Logger;
+  public readonly Server Server;
+  public readonly Database Database;
+  internal readonly TableVersionResource.ResourceManager TableVersion;
+
+  TableVersionResource.ResourceManager IMainResourceManager.TableVersion => TableVersion;
+  Server IMainResourceManager.Server => Server;
+  Database IMainResourceManager.Database => Database;
+  Logger IMainResourceManager.Logger => Logger;
+
   public readonly UserResource.ResourceManager Users;
   public readonly UserRoleResource.ResourceManager UserRoles;
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
   public readonly UserKeyResource.ResourceManager UserKeys;
   public readonly StoragePoolResource.ResourceManager StoragePools;
-  public readonly MountPointResource.ResourceManager MountPoints;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {

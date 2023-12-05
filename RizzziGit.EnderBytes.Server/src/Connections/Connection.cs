@@ -6,7 +6,6 @@ using Resources;
 using Utilities;
 using Sessions;
 using Extensions;
-using StoragePools;
 
 public abstract class ConnectionException : Exception
 {
@@ -70,8 +69,6 @@ public abstract class Connection : Lifetime
   }
 
   private readonly ResourceManager Resources;
-
-  private StoragePool.FolderNode? CurrentNode;
 
   public readonly ulong Id;
   public readonly ConnectionManager Manager;
@@ -139,14 +136,6 @@ public abstract class Connection : Lifetime
         return new Response.Ok();
 
       case Request.ChangeWorkingDirectory request:
-        await Resources.Database.RunTransaction((transaction) =>
-        {
-          foreach (MountPointResource mountPoint in Resources.MountPoints.Stream(transaction, Session!.User))
-          {
-
-          }
-        }, cancellationToken);
-
         // return new Response.Ok();
         break;
     }

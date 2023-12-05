@@ -1,11 +1,10 @@
-using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
 
 namespace RizzziGit.EnderBytes.Resources;
 
 using Database;
 
-public sealed class TableVersionResource(TableVersionResource.ResourceManager manager, TableVersionResource.ResourceData data) : Resource<TableVersionResource.ResourceManager, TableVersionResource.ResourceData, TableVersionResource>(manager, data)
+internal sealed class TableVersionResource(TableVersionResource.ResourceManager manager, TableVersionResource.ResourceData data) : Resource<TableVersionResource.ResourceManager, TableVersionResource.ResourceData, TableVersionResource>(manager, data)
 {
   public new sealed class ResourceManager(IMainResourceManager main, Database database) : Resource<ResourceManager, ResourceData, TableVersionResource>.ResourceManager(main, database, NAME, VERSION)
   {

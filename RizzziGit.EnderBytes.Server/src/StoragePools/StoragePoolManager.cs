@@ -5,125 +5,45 @@ using Resources;
 
 public sealed class StoragePoolManager : Service
 {
-  private class StoragePoolInformation(StoragePool pool)
+  private readonly WaitQueue<(TaskCompletionSource<StoragePool> source, KeyResource.Transformer transformer, StoragePoolResource pool)> WaitQueue = new(0);
+  private readonly WeakDictionary<StoragePoolResource, StoragePool> Handles = [];
+
+  public async Task<StoragePool> GetHandle(StoragePoolResource pool, KeyResource.Transformer transformer, CancellationToken cancellationToken)
   {
-    private static long GetTimestamp() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-    private readonly StoragePool PoolBackingField = pool;
-
-    public StoragePool Pool
+    if (transformer.Key.Id != pool.KeyId)
     {
-      get
-      {
-        LastAccess = GetTimestamp();
-
-        return PoolBackingField;
-      }
+      throw new InvalidOperationException("Invalid key transformer.");
     }
 
-    public long LastAccess = GetTimestamp();
-  }
-
-  public StoragePoolManager(Server server)
-  {
-    Server = server;
-    Server.Resources.StoragePools.ResourceDeleted += (transaction, resource) =>
-    {
-      lock (Pools)
-      {
-        if (Pools.TryGetValue(resource, out StoragePoolInformation? value))
-        {
-          _ = value.Pool.Stop();
-        }
-      }
-    };
-  }
-
-  public readonly Server Server;
-
-  private readonly Dictionary<StoragePoolResource, StoragePoolInformation> Pools = [];
-  private readonly WaitQueue<(TaskCompletionSource<StoragePool> source, StoragePoolResource resource)> WaitQueue = new();
-
-  public async Task<StoragePool> GetStoragePool(StoragePoolResource resource)
-  {
     TaskCompletionSource<StoragePool> source = new();
 
-    await WaitQueue.Enqueue((source, resource)); 
+    await WaitQueue.Enqueue((source, transformer, pool), cancellationToken);
     return await source.Task;
   }
 
-  private async Task RunOpenQueue(CancellationToken cancellationToken)
+  protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    while (true)
+    await foreach (var (source, transformer, pool) in WaitQueue)
     {
-      cancellationToken.ThrowIfCancellationRequested();
-
-      var (source, resource) = await WaitQueue.Dequeue(cancellationToken);
-
-      StoragePool pool;
-      if (Pools.TryGetValue(resource, out var value))
+      if (!Handles.TryGetValue(pool, out var handle))
       {
-        pool = value.Pool;
-      }
-      else
-      {
-        pool = resource.Type switch
+        switch (pool.Type)
         {
-          StoragePoolType.Blob => new BlobStoragePool(this, resource),
+          case StoragePoolType.Blob:
+            handle = new BlobStoragePool(this,pool, transformer);
+            break;
 
-          _ => throw new InvalidOperationException("Invalid storage pool type.")
-        };
-
-        try
-        {
-          pool.StateChanged += (_, state) =>
-          {
-            lock (Pools)
-            {
-              switch (state)
-              {
-                case ServiceState.Starting:
-                case ServiceState.Started:
-                  if (Pools.TryGetValue(resource, out var _))
-                  {
-                    break;
-                  }
-
-                  Pools.Add(resource, new(pool));
-                  break;
-
-                default:
-                  Pools.Remove(resource);
-                  break;
-              }
-            }
-          };
-
-          await pool.Start();
-          source.SetResult(pool);
+          default: continue;
         }
-        catch (Exception exception)
-        {
-          await pool.Stop();
-          source.SetException(exception);
-        }
+
+        handle.Start(CancellationToken.None);
+        Handles.Add(pool, handle);
       }
+
+      source.SetResult(handle);
     }
   }
 
   protected override Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
-  protected override Task OnRun(CancellationToken cancellationToken) => RunOpenQueue(cancellationToken);
-  protected override async Task OnStop(Exception? exception)
-  {
-    List<Task> tasks = [];
-
-    lock (Pools)
-    {
-      foreach (var (_, information) in Pools)
-      {
-        tasks.Add(information.Pool.Stop());
-      }
-    }
-
-    await Task.WhenAll(tasks);
-  }
+  protected override Task OnStop(Exception? exception) => Task.CompletedTask;
 }

@@ -14,6 +14,7 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
     private const string NAME = "UserKey";
     private const int VERSION = 1;
 
+    private const string KEY_SHARED_ID = "SharedId";
     private const string KEY_USER_ID = "UserId";
     private const string KEY_USER_AUTHENTICATION_ID = "UserAuthenticationId";
     private const string KEY_PRIVATE_IV = "PrivateIv";
@@ -26,6 +27,7 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
     protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
+      (long)reader[KEY_SHARED_ID],
       (long)reader[KEY_USER_ID],
       (long)reader[KEY_USER_AUTHENTICATION_ID],
       (byte[])reader[KEY_PRIVATE_IV],
@@ -48,9 +50,16 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
     public UserKeyResource Create(DatabaseTransaction transaction, UserResource user, UserAuthenticationResource userAuthentication, byte[] privateKey, byte[] publicKey, byte[] hashcache)
     {
       byte[] iv = RNG.GetBytes(16);
+      long sharedId;
+      do
+      {
+        sharedId = Random.Shared.NextInt64();
+      }
+      while (DbOnce(transaction, new() { { KEY_SHARED_ID, ("=", sharedId) } }) != null);
 
       return DbInsert(transaction, new()
       {
+        { KEY_SHARED_ID, sharedId },
         { KEY_USER_ID, user.Id },
         { KEY_USER_AUTHENTICATION_ID, userAuthentication.Id },
         { KEY_PRIVATE_IV, iv },
@@ -77,6 +86,7 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
 
         return DbInsert(transaction, new()
         {
+          { KEY_SHARED_ID, userKey.SharedId },
           { KEY_USER_ID, user.Id },
           { KEY_USER_AUTHENTICATION_ID, to.userAuthentication.Id },
           { KEY_PRIVATE_IV, iv },
@@ -93,6 +103,7 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
     long Id,
     long CreateTime,
     long UpdateTime,
+    long SharedId,
     long UserId,
     long UserAuthenticationId,
     byte[] PrivateIv,
@@ -100,19 +111,28 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
     byte[] PublicKey
   ) : Resource<ResourceManager, ResourceData, UserKeyResource>.ResourceData(Id, CreateTime, UpdateTime);
 
-
   public sealed class Transformer(UserKeyResource userKey, RSACryptoServiceProvider serviceProvider) : IDisposable
   {
     public readonly UserKeyResource UserKey = userKey;
 
     private readonly RSACryptoServiceProvider Provider = serviceProvider;
 
-    public byte[] Encrypt(byte[] bytes) => Provider.Encrypt(bytes, true);
-    public byte[] Decrypt(byte[] bytes) => Provider.Decrypt(bytes, true);
+    public byte[] Encrypt(byte[] bytes)
+    {
+      UserKey.ThrowIfInvalid();
+      return Provider.Encrypt(bytes, true);
+    }
+
+    public byte[] Decrypt(byte[] bytes)
+    {
+      UserKey.ThrowIfInvalid();
+      return Provider.Decrypt(bytes, true);
+    }
 
     public void Dispose() => Provider.Dispose();
   }
 
+  public long SharedId => Data.SharedId;
   public long UserId => Data.UserId;
   public long UserAuthenticationId => Data.UserAuthenticationId;
   public byte[] PrivateIv => Data.PrivateIv;
@@ -121,6 +141,7 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
 
   public Transformer GetTransformer(byte[]? hashCache = null)
   {
+    ThrowIfInvalid();
     RSACryptoServiceProvider provider = new()
     {
       PersistKeyInCsp = false,

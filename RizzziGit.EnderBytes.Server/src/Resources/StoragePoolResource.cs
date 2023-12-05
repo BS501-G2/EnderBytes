@@ -1,13 +1,11 @@
 using System.Text;
-using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
 using Newtonsoft.Json.Linq;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-using Buffer;
 using Database;
-using Connections;
+using Collections;
 
 public enum StoragePoolType : byte
 {
@@ -33,6 +31,7 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     private const string KEY_TYPE = "Type";
     private const string KEY_FLAGS = "Flags";
     private const string KEY_PAYLOAD = "Payload";
+    private const string KEY_KEY_SHARED_ID = "KeyId";
 
     public ResourceManager(Resources.ResourceManager main, Database database) : base(main, database, NAME, VERSION)
     {
@@ -42,6 +41,7 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
+      (long)reader[KEY_KEY_SHARED_ID],
       reader[KEY_USER_ID] is DBNull ? null : (long)reader[KEY_USER_ID],
       (byte)(long)reader[KEY_TYPE],
       (byte)(long)reader[KEY_FLAGS],
@@ -54,6 +54,7 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     {
       if (oldVersion < 1)
       {
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_KEY_SHARED_ID} integer not null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_USER_ID};");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_TYPE} integer not null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_FLAGS} integer not null;");
@@ -61,25 +62,39 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
       }
     }
 
-    public StoragePoolResource CreateBlob(DatabaseTransaction transaction, long userId, StoragePoolFlags flags) => DbInsert(transaction, new()
+    public StoragePoolResource CreateBlob(
+      DatabaseTransaction transaction,
+      UserKeyResource userKey,
+      UserResource user,
+      StoragePoolFlags flags,
+      UserAuthenticationContext context
+    )
     {
-      { KEY_USER_ID, userId },
-      { KEY_TYPE, (byte)StoragePoolType.Blob },
-      { KEY_FLAGS, (byte)flags },
-      { KEY_PAYLOAD, Encoding.UTF8.GetBytes("{}") }
-    });
+      using UserKeyResource.Transformer transformer = context.GetTransformer(userKey);
+
+      return DbInsert(transaction, new()
+      {
+        { KEY_KEY_SHARED_ID, userKey.SharedId },
+        { KEY_USER_ID, user.Id },
+        { KEY_TYPE, (byte)StoragePoolType.Blob },
+        { KEY_FLAGS, (byte)flags },
+        { KEY_PAYLOAD, transformer.Encrypt(Encoding.UTF8.GetBytes("{}")) }
+      });
+    }
   }
 
   public new sealed record ResourceData(
     long Id,
     long CreateTime,
     long UpdateTime,
+    long KeyId,
     long? UserId,
     byte Type,
     byte Flags,
     JObject Payload
   ) : Resource<ResourceManager, ResourceData, StoragePoolResource>.ResourceData(Id, CreateTime, UpdateTime);
 
+  public long KeyId => Data.KeyId;
   public long? UserId => Data.UserId;
   public StoragePoolType Type => (StoragePoolType)Data.Type;
   public StoragePoolFlags Flags => (StoragePoolFlags)Data.Flags;

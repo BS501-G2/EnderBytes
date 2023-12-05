@@ -1,8 +1,6 @@
 using System.Collections;
 
-namespace RizzziGit.EnderBytes.StoragePools;
-
-using Resources;
+namespace  RizzziGit.EnderBytes.StoragePools;
 
 public abstract partial class StoragePool
 {
@@ -134,7 +132,6 @@ public abstract partial class StoragePool
       return hashCode.ToHashCode();
     }
 
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     public IEnumerator<string> GetEnumerator()
     {
       foreach (string pathEntry in InternalPath)
@@ -142,5 +139,8 @@ public abstract partial class StoragePool
         yield return pathEntry;
       }
     }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
   }
+
 }

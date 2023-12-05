@@ -2,9 +2,6 @@ namespace RizzziGit.EnderBytes.Runtime;
 
 using Resources;
 using Database;
-using Resources.BlobStorage;
-using StoragePools;
-
 public static class Program
 {
   public static void RegisterCancelEvent(Server server)
@@ -21,24 +18,18 @@ public static class Program
   {
     for (int count = 0; count < 1 && server.State == ServiceState.Started; count++)
     {
-      var (storagePoolResource, userAuthentication, hashCache) = await server.Resources.Database.RunTransaction((transaction) =>
+      await server.Resources.Database.RunTransaction((transaction) =>
       {
         string username = $"te{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
         string password = "aasdAAASD1123123;";
 
         UserResource user = server.Resources.Users.Create(transaction, username, "Test user");
         var (userAuthentication, hashCache) = server.Resources.UserAuthentications.CreatePassword(transaction, user, password);
-        return (server.Resources.StoragePools.CreateBlob(transaction, user.Id, StoragePoolFlags.IgnoreCase), userAuthentication, hashCache);
+        var (privateKey, publicKey) = server.KeyGenerator.GetNew();
+        UserKeyResource userKey = server.Resources.UserKeys.Create(transaction, user, userAuthentication, privateKey, publicKey, hashCache);
+
+        // StoragePool storagePool = server.Resources.StoragePools.CreateBlob(transaction, userKey.Id, user.Id, StoragePoolFlags.IgnoreCase);
       }, CancellationToken.None);
-
-      // var storagePool = (BlobStoragePool)await server.StoragePools.GetStoragePool(storagePoolResource, CancellationToken.None);
-      // await storagePool.FileCreate(userAuthentication, hashCache, ["test.webm"], CancellationToken.None);
-
-      // using FileStream stream = File.OpenRead(arg);
-      // await foreach (TranscriptBlock transcriptBlock in server.ArtificialIntelligence.Whisper.Transcribe(stream, CancellationToken.None))
-      // {
-      //   Console.WriteLine(transcriptBlock);
-      // }
     }
   }
 

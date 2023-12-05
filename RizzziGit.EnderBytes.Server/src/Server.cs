@@ -7,8 +7,7 @@ using Connections;
 using Sessions;
 using Protocols;
 using ArtificialIntelligence;
-using StoragePools;
-using RizzziGit.EnderBytes.Keys;
+using Keys;
 
 public struct ServerConfiguration()
 {
@@ -34,7 +33,7 @@ public struct ServerConfiguration()
   public int MaxCachedDataSize = 1024 * 1024 * 2;
 }
 
-public sealed class Server : Service
+public class Server : Service
 {
   public Server() : this(new()) { }
   public Server(ServerConfiguration configuration) : base("Server")
@@ -44,7 +43,6 @@ public sealed class Server : Service
     KeyGenerator = new(this);
     Sessions = new(this);
     Connections = new(this);
-    StoragePools = new(this);
     Protocols = new(this);
     ArtificialIntelligence = new(this);
   }
@@ -55,7 +53,6 @@ public sealed class Server : Service
   public readonly SessionManager Sessions;
   public readonly ConnectionManager Connections;
   public readonly ProtocolManager Protocols;
-  public readonly StoragePoolManager StoragePools;
   public readonly ArtificialIntelligenceManager ArtificialIntelligence;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
@@ -64,7 +61,6 @@ public sealed class Server : Service
     await KeyGenerator.Start();
     await Sessions.Start();
     await Connections.Start();
-    await StoragePools.Start();
     await Protocols.Start();
     // await ArtificialIntelligence.Start();
   }
@@ -79,7 +75,6 @@ public sealed class Server : Service
   {
     Logger.Log(LogLevel.Info, "server is shutting down.");
     await Protocols.Stop();
-    await StoragePools.Stop();
     await Connections.Stop();
     await Sessions.Stop();
     await KeyGenerator.Stop();

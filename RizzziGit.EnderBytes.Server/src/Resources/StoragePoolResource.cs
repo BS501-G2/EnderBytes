@@ -87,14 +87,14 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
     long Id,
     long CreateTime,
     long UpdateTime,
-    long KeyId,
+    long KeySharedId,
     long? UserId,
     byte Type,
     byte Flags,
     JObject Payload
   ) : Resource<ResourceManager, ResourceData, StoragePoolResource>.ResourceData(Id, CreateTime, UpdateTime);
 
-  public long KeyId => Data.KeyId;
+  public long KeySharedId => Data.KeySharedId;
   public long? UserId => Data.UserId;
   public StoragePoolType Type => (StoragePoolType)Data.Type;
   public StoragePoolFlags Flags => (StoragePoolFlags)Data.Flags;

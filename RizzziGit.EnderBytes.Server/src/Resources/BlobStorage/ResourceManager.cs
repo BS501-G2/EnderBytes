@@ -17,7 +17,10 @@ public class ResourceManager : Service, IMainResourceManager
 
     Server = storagePool.Resource.Manager.Main.Server;
     Database = new(this, Server.Configuration.BlobPath, $"{storagePool.Resource.Id}", password);
+
     TableVersion = new(this, Database);
+    Nodes = new(this, Database);
+    Keys = new(this, Database);
 
     storagePool.Manager.Logger.Subscribe();
   }
@@ -27,6 +30,8 @@ public class ResourceManager : Service, IMainResourceManager
   public readonly Database Database;
 
   internal readonly TableVersionResource.ResourceManager TableVersion;
+  public readonly BlobNodeResource.ResourceManager Nodes;
+  public readonly KeyResource.ResourceManager Keys;
 
   Server IMainResourceManager.Server => Server;
   Database IMainResourceManager.Database => Database;
@@ -39,12 +44,14 @@ public class ResourceManager : Service, IMainResourceManager
     await Database.RunTransaction((transaction) =>
     {
       TableVersion.Init(transaction);
+      Keys.Init(transaction);
+      Nodes.Init(transaction);
     }, cancellationToken);
   }
 
-  protected override Task OnRun(CancellationToken cancellationToken)
+  protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    return Task.Delay(-1, cancellationToken);
+    await (await WatchDog([Database], cancellationToken)).task;
   }
 
   protected override async Task OnStop(Exception? exception)

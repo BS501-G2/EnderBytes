@@ -111,47 +111,52 @@ public sealed class FileTransferProtocolConnection(FileTransferProtocol protocol
 
   private string? PendingUsername;
 
-  private async Task HandleCommand(FileTransferProtocolCommand.USER userCommand, CancellationToken cancellationToken)
-  {
-    if (string.Compare(userCommand.Username, "anonymous", true) == 0)
-    {
-      await Reply(332);
-
-      return;
-    }
-
-    PendingUsername = userCommand.Username;
-    await Reply(331);
-  }
-
-  private async Task HandleCommand(FileTransferProtocolCommand.PASS passCommand, CancellationToken cancellationToken)
-  {
-    if (PendingUsername != null)
-    {
-      string username = PendingUsername;
-      string password = passCommand.Password;
-
-      PendingUsername = null;
-      if (await Connection.Execute(new Connection.Request.Login(username, password)) is Connection.Response.Ok)
-      {
-        await Reply(230);
-        return;
-      }
-    }
-
-    await Reply(430);
-  }
-
   private async Task Handle(FileTransferProtocolCommand? rawCommand, CancellationToken cancellationToken)
   {
     Logger.Log(LogLevel.Verbose, $"> {rawCommand}");
 
     switch (rawCommand)
     {
-      case FileTransferProtocolCommand.USER command: await HandleCommand(command, cancellationToken); break;
-      case FileTransferProtocolCommand.PASS command: await HandleCommand(command, cancellationToken); break;
-      case FileTransferProtocolCommand.Unknown: await Reply(500); break;
-      default: await Reply(501); break;
+      case FileTransferProtocolCommand.USER command:
+        {
+          if (string.Compare(command.Username, "anonymous", true) == 0)
+          {
+            await Reply(332);
+
+            return;
+          }
+
+          PendingUsername = command.Username;
+          await Reply(331);
+        }
+        break;
+
+      case FileTransferProtocolCommand.PASS command:
+        {
+          if (PendingUsername != null)
+          {
+            string username = PendingUsername;
+            string password = command.Password;
+
+            // if (await Connection.Execute(new Connection.Request.Login(username, password)) is Connection.Response.Ok)
+            // {
+            //   await Reply(230);
+            //   return;
+            // }
+          }
+
+          PendingUsername = null;
+          await Reply(430);
+        }
+        break;
+
+      case FileTransferProtocolCommand.Unknown:
+        await Reply(500);
+        break;
+
+      default:
+        await Reply(501);
+        break;
     }
   }
 
@@ -220,7 +225,7 @@ public sealed class FileTransferProtocol(ProtocolManager manager) : Protocol<Fil
         continue;
       }
 
-      return new(this, client, await Manager.Server.Connections.GetClientConnection(cancellationToken), endPoint);
+      return new(this, client, await Manager.Server.Connections.GetConnection(ConnectionType.Basic, cancellationToken), endPoint);
     }
   }
 }

@@ -97,6 +97,12 @@ public sealed class UserKeyResource(UserKeyResource.ResourceManager manager, Use
 
       throw new ArgumentException("Source user authentication is not valid.", nameof(from));
     }
+
+    public UserKeyResource? GetByUserAuthentication(DatabaseTransaction transaction, UserResource user, UserAuthenticationResource userAuthentication) => DbOnce(transaction, new()
+    {
+      { KEY_USER_ID, ("=", user.Id) },
+      { KEY_USER_AUTHENTICATION_ID, ("=", userAuthentication.Id) },
+    });
   }
 
   public new sealed record ResourceData(

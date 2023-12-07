@@ -9,14 +9,14 @@ internal class TaskQueue : IDisposable
   void IDisposable.Dispose() => WaitQueue.Dispose();
   public void Dispose(Exception? exception) => WaitQueue.Dispose(exception);
 
-  public async Task RunTask(Func<CancellationToken, Task> callback, CancellationToken cancellationToken)
+  public async Task RunTask(Func<CancellationToken, Task> callback, CancellationToken? cancellationToken = null)
   {
     TaskCompletionSource taskCompletionSource = new();
-    await WaitQueue.Enqueue((callback, cancellationToken, taskCompletionSource), cancellationToken);
+    await WaitQueue.Enqueue((callback, cancellationToken ?? CancellationToken.None, taskCompletionSource), cancellationToken ?? CancellationToken.None);
     await taskCompletionSource.Task;
   }
 
-  public async Task<T> RunTask<T>(Func<CancellationToken, Task<T>> callback, CancellationToken cancellationToken)
+  public async Task<T> RunTask<T>(Func<CancellationToken, Task<T>> callback, CancellationToken? cancellationToken = null)
   {
     TaskCompletionSource<T> taskCompletionSource = new();
     try
@@ -34,13 +34,12 @@ internal class TaskQueue : IDisposable
     return await taskCompletionSource.Task;
   }
 
+  public Task<T> RunTask<T>(Func<T> callback) => RunTask((_) => Task.FromResult(callback()));
   public Task RunTask(Action callback) => RunTask((_) =>
   {
     callback();
     return Task.CompletedTask;
-  }, CancellationToken.None);
-
-  public Task<T> RunTask<T>(Func<T> callback) => RunTask((_) => Task.FromResult(callback()), CancellationToken.None);
+  });
 
   public async Task Start(CancellationToken cancellationToken)
   {

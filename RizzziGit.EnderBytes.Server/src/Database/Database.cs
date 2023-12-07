@@ -209,6 +209,7 @@ public sealed class Database : Service
     return Task.CompletedTask;
   }
 
+  public Task RunTransaction(TransactionHandler handler) => RunTransaction(handler, CancellationToken.None);
   public async Task RunTransaction(TransactionHandler handler, CancellationToken cancellationToken)
   {
     TaskCompletionSource<(TaskCompletionSource source, CancellationToken cancellationToken)> source = new();
@@ -229,6 +230,7 @@ public sealed class Database : Service
     }
   }
 
+  public Task<T> RunTransaction<T>(TransactionHandler<T> handler) => RunTransaction(handler, CancellationToken.None);
   public async Task<T> RunTransaction<T>(TransactionHandler<T> handler, CancellationToken cancellationToken)
   {
     TaskCompletionSource<T> source = new();

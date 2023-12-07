@@ -1,36 +1,62 @@
 namespace RizzziGit.EnderBytes.StoragePools;
 
 using Resources;
+using Resources.BlobStorage;
 using Database;
+using Collections;
 
 public sealed partial class BlobStoragePool : StoragePool
 {
-  public BlobStoragePool(StoragePoolManager manager, StoragePoolResource resource, KeyResource.Transformer transformer) : base(manager, resource, transformer)
+  private const string ROOT_FOLDER = ".ROOT";
+  private const string TRASH_FOLDER = ".TRASH_FOLDER";
+
+  public BlobStoragePool(StoragePoolManager manager, StoragePoolResource resource, string password) : base(manager, resource)
   {
-    // ResourceManager = new(this, transformer.);
+    ResourceManager = new(this, password);
+    Nodes = [];
   }
 
   private readonly Resources.BlobStorage.ResourceManager ResourceManager;
+  private readonly WeakDictionary<BlobNodeResource, INode> Nodes;
+  private IBlobFolder? RootFolder;
+
   private Database Database => ResourceManager.Database;
 
-  protected override Task<Node.Folder> Internal_GetRootFolder(KeyResource.Transformer transformer)
+  private INode ResolveNode(BlobNodeResource resource)
   {
-    ValidateTransformer(transformer);
+    if (!Nodes.TryGetValue(resource, out var node))
+    {
+      Nodes.Add(resource, node = resource.Type switch
+      {
+        BlobNodeType.Folder => new Node.Folder(this, resource),
+        BlobNodeType.File => new Node.File(this, resource),
+        BlobNodeType.SymbolicLink => new Node.SymbolicLink(this, resource),
+
+        _ => throw new NotImplementedException(),
+      });
+    }
+
+    return node;
+  }
+
+  protected override async Task<INode.IFolder> IGetRootFolder(KeyResource.Transformer transformer) =>
+    RootFolder ??= (IBlobFolder)ResolveNode(await RunTask((cancellationToken) =>
+      Database.RunTransaction((transaction) =>
+        ResourceManager.Nodes.GetByName(transaction, ROOT_FOLDER, null)
+          ?? ResourceManager.Nodes.Create(transaction, ROOT_FOLDER, BlobNodeType.Folder, null, transformer)
+      ), CancellationToken.None));
+
+  protected override Task<TrashItem[]> IListTrashItems(KeyResource.Transformer transformer)
+  {
     throw new NotImplementedException();
   }
 
-  protected override Task<TrashItem[]> Internal_ListTrashItems(KeyResource.Transformer transformer)
-  {
-    ValidateTransformer(transformer);
-    throw new NotImplementedException();
-  }
-
-  protected override Task Internal_OnStart()
+  protected override Task IOnStart()
   {
     throw new NotImplementedException();
   }
 
-  protected override Task Internal_OnStop()
+  protected override Task IOnStop()
   {
     throw new NotImplementedException();
   }

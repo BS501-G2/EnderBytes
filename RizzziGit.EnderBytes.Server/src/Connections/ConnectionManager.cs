@@ -1,57 +1,61 @@
 namespace RizzziGit.EnderBytes.Connections;
 
+using Resources;
 using Collections;
 
-public sealed class ConnectionManager(Server server) : Service("Connections", server)
+public sealed class ConnectionManager(Server server) : Service("Connections")
 {
   public readonly Server Server = server;
-  private WaitQueue<(TaskCompletionSource<Connection> source, bool isDashboard)> WaitQueue = new();
 
-  public async Task<ClientConnection> GetClientConnection(CancellationToken cancellationToken)
+  private readonly WeakDictionary<long, Connection> Connections = [];
+  private readonly WaitQueue<(TaskCompletionSource<Connection> connection, ConnectionType type)> WaitQueue = new(0);
+
+  public async Task<Connection> GetConnection(ConnectionType type, CancellationToken cancellationToken)
   {
     TaskCompletionSource<Connection> source = new();
-    await WaitQueue.Enqueue((source, false), cancellationToken);
-    return (ClientConnection)await source.Task;
+
+    await WaitQueue.Enqueue((source, type), cancellationToken);
+    return await source.Task;
   }
 
-  public async Task<DashboardConnection> GetDashboardConnection(CancellationToken cancellationToken)
+  protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    TaskCompletionSource<Connection> source = new();
-    await WaitQueue.Enqueue((source, true), cancellationToken);
-    return (DashboardConnection)await source.Task;
+    await foreach ((TaskCompletionSource<Connection> source, ConnectionType type) in WaitQueue)
+    {
+      try
+      {
+        long id;
+        lock (Connections)
+        {
+          do { id = Random.Shared.NextInt64(); } while (Connections.ContainsKey(id));
+
+          Connection connection = type switch
+          {
+            ConnectionType.Basic => new Connection.Basic(this, id),
+            ConnectionType.Advanced => new Connection.Advanced(this, id),
+            ConnectionType.Internal => new Connection.Internal(this, id),
+
+            _ => throw new InvalidOperationException("Unknown type.")
+          };
+
+          Connections.Add(id, connection);
+          source.SetResult(connection);
+        }
+      }
+      catch (Exception exception)
+      {
+        source.SetException(exception);
+      }
+    }
   }
 
   protected override Task OnStart(CancellationToken cancellationToken)
   {
-    try { WaitQueue.Dispose(); } catch { }
-
-    WaitQueue = new();
-    return Task.CompletedTask;
-  }
-
-  protected override async Task OnRun(CancellationToken serviceCancellationToken)
-  {
-    Logger.Log(LogLevel.Info, "Connection factory is now running.");
-    ulong id = 0;
-    while (true)
-    {
-      serviceCancellationToken.ThrowIfCancellationRequested();
-      var (source, isDashboard) = await WaitQueue.Dequeue(serviceCancellationToken);
-
-      Logger.Log(LogLevel.Verbose, $"New {(isDashboard ? "dashboard" : "client")} connection requested. (#{id})");
-      Connection connection = isDashboard
-        ? new DashboardConnection(this, id)
-        : new ClientConnection(this, id);
-
-      connection.Start(serviceCancellationToken);
-      source.SetResult(connection);
-      id++;
-    }
+    throw new NotImplementedException();
   }
 
   protected override Task OnStop(Exception? exception)
   {
-    try { WaitQueue.Dispose(exception); } catch { }
-    return Task.CompletedTask;
+    throw new NotImplementedException();
   }
 }

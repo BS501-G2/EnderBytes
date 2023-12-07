@@ -43,6 +43,15 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
       }
     }
 
+    public KeyResource? GetBySharedId(DatabaseTransaction transaction, long sharedId, long? userKeySharedId)
+    {
+      return DbOnce(transaction, new()
+      {
+        { KEY_SHARED_ID, ("=", sharedId) },
+        { KEY_USER_KEY_SHARED_ID, ("=", userKeySharedId) }
+      });
+    }
+
     public KeyResource Create(DatabaseTransaction transaction, UserKeyResource.Transformer? transformer, byte[] privateKey, byte[] publicKey)
     {
       long sharedId;
@@ -139,7 +148,7 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
     return PrivateKey;
   }
 
-  public Transformer GetTransformer(UserKeyResource.Transformer userKeyTransformer)
+  public Transformer GetTransformer(UserKeyResource.Transformer? userKeyTransformer = null)
   {
     ThrowIfInvalid();
 
@@ -150,21 +159,7 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
     };
 
     Transformer keyTransformer = new(this, provider);
-    provider.ImportCspBlob(userKeyTransformer.Decrypt(PrivateKey));
-    return keyTransformer;
-  }
-
-  public Transformer GetTransformer()
-  {
-    RSACryptoServiceProvider provider = new()
-    {
-      PersistKeyInCsp = false,
-      KeySize = KeyGenerator.KEY_SIZE
-    };
-
-    Transformer keyTransformer = new(this, provider);
-
-    provider.ImportCspBlob(PublicKey);
+    provider.ImportCspBlob(UserKeySharedId == null ? PrivateKey : userKeyTransformer == null ? PublicKey : userKeyTransformer.Decrypt(PrivateKey));
     return keyTransformer;
   }
 }

@@ -2,45 +2,57 @@ namespace RizzziGit.EnderBytes.StoragePools;
 
 using Collections;
 using Resources;
+using Connections;
+using Database;
 
-public sealed class StoragePoolManager : Service
+public sealed class StoragePoolManager(Server server) : Service
 {
-  private readonly WaitQueue<(TaskCompletionSource<StoragePool> source, KeyResource.Transformer transformer, StoragePoolResource pool)> WaitQueue = new(0);
+  public readonly Server Server = server;
+
+  public ResourceManager Resources => Server.Resources;
+  public Database Database => Server.Resources.Database;
+
+  private readonly WaitQueue<(TaskCompletionSource<StoragePool> source, KeyResource key, Connection.SessionInformation? session, StoragePoolResource pool)> WaitQueue = new(0);
   private readonly WeakDictionary<StoragePoolResource, StoragePool> Handles = [];
 
-  public async Task<StoragePool> GetHandle(StoragePoolResource pool, KeyResource.Transformer transformer, CancellationToken cancellationToken)
+  public async Task<StoragePool> GetHandle(StoragePoolResource pool, Connection.SessionInformation? session, CancellationToken cancellationToken)
   {
-    if (transformer.Key.Id != pool.KeyId)
-    {
-      throw new InvalidOperationException("Invalid key transformer.");
-    }
-
+    KeyResource? key = await Database.RunTransaction((transaction) => Resources.Keys.GetBySharedId(transaction, pool.KeySharedId, session?.Transformer.UserKey.SharedId), CancellationToken.None);
     TaskCompletionSource<StoragePool> source = new();
 
-    await WaitQueue.Enqueue((source, transformer, pool), cancellationToken);
+    await WaitQueue.Enqueue((source, key!, session, pool), cancellationToken);
     return await source.Task;
+  }
+
+  private StoragePool GetPool(KeyResource key, Connection.SessionInformation? session, StoragePoolResource pool)
+  {
+    if (!Handles.TryGetValue(pool, out var handle))
+    {
+      handle = pool.Type switch
+      {
+        StoragePoolType.Blob => new BlobStoragePool(this, pool, Convert.ToHexString(key.DecryptPrivateKey(session?.Transformer))),
+        _ => throw new InvalidOperationException("Unknown type."),
+      };
+
+      handle.Start(CancellationToken.None);
+      Handles.Add(pool, handle);
+    }
+
+    return handle;
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    await foreach (var (source, transformer, pool) in WaitQueue)
+    await foreach (var (source, key, session, pool) in WaitQueue)
     {
-      if (!Handles.TryGetValue(pool, out var handle))
+      try
       {
-        switch (pool.Type)
-        {
-          case StoragePoolType.Blob:
-            handle = new BlobStoragePool(this,pool, transformer);
-            break;
-
-          default: continue;
-        }
-
-        handle.Start(CancellationToken.None);
-        Handles.Add(pool, handle);
+        source.SetResult(GetPool(key, session, pool));
       }
-
-      source.SetResult(handle);
+      catch (Exception exception)
+      {
+        source.SetException(exception);
+      }
     }
   }
 

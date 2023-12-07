@@ -1,159 +1,57 @@
-using System.Text;
-
 namespace RizzziGit.EnderBytes.Connections;
 
 using Resources;
 using Utilities;
-using Sessions;
-using Extensions;
+using Database;
 
-public abstract class ConnectionException : Exception
+public enum ConnectionType { Basic, Advanced, Internal }
+
+public abstract partial class Connection : Lifetime
 {
-  private ConnectionException(string? message = null, Exception? innerException = null) : base(message, innerException)
+  private Connection(ConnectionManager manager, long id) : base($"#{id}")
   {
-
-  }
-
-  public sealed class InvalidCommand(Exception? innerException = null) : ConnectionException(innerException: innerException);
-  public sealed class InvalidParameters(Exception? innerException = null) : ConnectionException(innerException: innerException);
-}
-
-public abstract class Connection : Lifetime
-{
-  public abstract record Request
-  {
-    private Request() { }
-    public record Login(string Username, string Password) : Request()
-    {
-      public override string ToString()
-      {
-        StringBuilder builder = new();
-        char[] fill = new char[Password.Length];
-        Array.Fill(fill, '*');
-        (this with { Password = string.Concat(fill) }).PrintMembers(builder);
-
-        return $"Login {{ {builder} }}";
-      }
-    }
-
-    public record Logout() : Request();
-    public record WhoAmI() : Request();
-    public record ChangeWorkingDirectory(string[] Path, bool Relative) : Request();
-    public record GetWorkingDirectory() : Request();
-  }
-
-  public abstract record Response
-  {
-    private Response() { }
-
-    public sealed record Ok<T>(T Data) : Response;
-    public sealed record Ok() : Response;
-    public sealed record InvalidCommand() : Response;
-    public sealed record InvalidCredentials() : Response;
-    public sealed record SessionExists() : Response;
-    public sealed record NoSession() : Response;
-    public sealed record Disconnected() : Response;
-    public sealed record InvalidSession() : Response;
-    public sealed record InternalError() : Response;
-
-    public sealed record NotFound() : Response;
-  }
-
-  public Connection(ConnectionManager manager, ulong id) : base($"#{id}")
-  {
-    Id = id;
     Manager = manager;
-    Resources = manager.Server.Resources;
-
-    Manager.Logger.Subscribe(Logger);
+    Id = id;
   }
 
-  private readonly ResourceManager Resources;
+  public record SessionInformation(UserResource User, UserKeyResource.Transformer Transformer, UserAuthenticationResource UserAuthentication, byte[] HashCache);
 
-  public readonly ulong Id;
+  public new abstract class Exception : System.Exception
+  {
+    private Exception(string? message = null, System.Exception? innerException = null) : base(message, innerException) { }
+
+    public sealed class SessionException() : Exception("Already logged in.");
+    public sealed class SessionError() : Exception();
+  }
+
+  public readonly long Id;
   public readonly ConnectionManager Manager;
-  public UserSession? Session { get; private set; }
+  public readonly ConnectionType Type;
 
-  protected virtual Task<Response> OnExecute(Request request) => RunTask<Response>(async (cancellationToken) =>
+  public Server Server => Manager.Server;
+  public ResourceManager ResourceManager => Server.Resources;
+  public Database Database => ResourceManager.Database;
+
+  public SessionInformation? Session { get; private set; }
+
+  public Task ClearSession() => RunTask(() =>
   {
-    if (!IsRunning)
+    Session = null;
+  });
+
+  public Task<SessionInformation> SetSession(UserResource user, UserAuthenticationResource userAuthentication, byte[] hashCache) => RunTask(async (cancellationToken) => await Database.RunTransaction((transaction) =>
+  {
+    lock (this)
     {
-      return new Response.Disconnected();
-    }
-    else if (Session != null)
-    {
-      if (!Session.IsValid && request is not Request.Login && request is not Request.Logout)
+      if (Session != null)
       {
-        return new Response.InvalidSession();
+        throw new Exception.SessionException();
       }
-      else if (request is Request.Login)
-      {
-        return new Response.SessionExists();
-      }
+
+      UserKeyResource? userKey = ResourceManager.UserKeys.GetByUserAuthentication(transaction, user, userAuthentication);
+      UserKeyResource.Transformer transformer = userKey!.GetTransformer(hashCache);
+
+      return Session = new(user, transformer, userAuthentication, hashCache);
     }
-    else if (Session == null && request is not Request.Login)
-    {
-      return new Response.NoSession();
-    }
-
-    switch (request)
-    {
-      case Request.Login loginRequest:
-        if (Session != null)
-        {
-          return new Response.SessionExists();
-        }
-
-        try
-        {
-          var (user, authentication, hashCache) = await Resources.Database.RunTransaction((transaction) =>
-          {
-            UserResource user = Resources.Users.GetByUsername(transaction, loginRequest.Username) ?? throw new EscapePod(0);
-
-            if (Resources.UserAuthentications.GetByPassword(transaction, user, loginRequest.Password).TryGetValue(out var result))
-            {
-              var (authentication, hashCache) = result;
-              return (user, authentication, hashCache);
-            }
-
-            throw new EscapePod(0);
-          }, cancellationToken);
-
-          Session = await Manager.Server.Sessions.GetUserSession(user, this, authentication, hashCache, cancellationToken);
-          return new Response.Ok();
-        }
-        catch (EscapePod pod)
-        {
-          return pod.Code switch
-          {
-            0 => new Response.InvalidCredentials(),
-            _ => new Response.InternalError(),
-          };
-        }
-
-      case Request.Logout:
-        Session = null;
-        return new Response.Ok();
-
-      case Request.ChangeWorkingDirectory request:
-        // return new Response.Ok();
-        break;
-    }
-
-    return new Response.InvalidCommand();
-  }, CancellationToken.None);
-
-  public async Task<Response> Execute(Request request)
-  {
-    Logger.Log(LogLevel.Verbose, $"> {request}");
-    Response response = await OnExecute(request);
-    Logger.Log(LogLevel.Verbose, $"< {response}");
-
-    return response;
-  }
-
-  protected override Task OnRun(CancellationToken cancellationToken)
-  {
-    return Task.Delay(-1, cancellationToken);
-  }
+  }));
 }

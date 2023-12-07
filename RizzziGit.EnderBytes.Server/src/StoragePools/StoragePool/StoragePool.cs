@@ -3,31 +3,22 @@ namespace RizzziGit.EnderBytes.StoragePools;
 using Resources;
 using Utilities;
 
-public abstract partial class StoragePool(StoragePoolManager manager, StoragePoolResource resource, KeyResource.Transformer transformer) : Lifetime($"#{resource.Id}")
+public abstract partial class StoragePool(StoragePoolManager manager, StoragePoolResource resource) : Lifetime($"#{resource.Id}")
 {
   public readonly StoragePoolManager Manager = manager;
   public readonly StoragePoolResource Resource = resource;
-  protected readonly KeyResource.Transformer Transformer = transformer;
 
   public long LastActiveTime { get; private set; }
   public Task? UnderlyingTask { get; private set; }
 
-  protected void ValidateTransformer(KeyResource.Transformer transformer)
-  {
-    if (transformer.Key != Transformer.Key)
-    {
-      throw new InvalidOperationException("Invalid key transformer.");
-    }
-  }
+  protected abstract Task<INode.IFolder> IGetRootFolder(KeyResource.Transformer transformer);
+  protected abstract Task<TrashItem[]> IListTrashItems(KeyResource.Transformer transformer);
 
-  protected abstract Task<Node.Folder> Internal_GetRootFolder(KeyResource.Transformer transformer);
-  protected abstract Task<TrashItem[]> Internal_ListTrashItems(KeyResource.Transformer transformer);
+  protected abstract Task IOnStart();
+  protected abstract Task IOnStop();
 
-  protected abstract Task Internal_OnStart();
-  protected abstract Task Internal_OnStop();
-
-  public Task<Node.Folder> GetRootFolder(KeyResource.Transformer transformer) => Internal_GetRootFolder(transformer);
-  public Task<TrashItem[]> ListTrashItems(KeyResource.Transformer transformer) => Internal_ListTrashItems(transformer);
+  public Task<INode.IFolder> GetRootFolder(KeyResource.Transformer transformer) => IGetRootFolder(transformer);
+  public Task<TrashItem[]> ListTrashItems(KeyResource.Transformer transformer) => IListTrashItems(transformer);
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
@@ -45,14 +36,14 @@ public abstract partial class StoragePool(StoragePoolManager manager, StoragePoo
 
     try
     {
-      await Internal_OnStart();
+      await IOnStart();
       await base.OnRun(cancellationToken);
     }
     finally
     {
       try
       {
-        await Internal_OnStop();
+        await IOnStop();
       }
       finally
       {

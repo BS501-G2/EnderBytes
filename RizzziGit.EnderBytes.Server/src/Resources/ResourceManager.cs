@@ -38,6 +38,7 @@ public sealed class ResourceManager : Service, IMainResourceManager
   public readonly UserRoleResource.ResourceManager UserRoles;
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
   public readonly UserKeyResource.ResourceManager UserKeys;
+  public readonly KeyResource.ResourceManager Keys;
   public readonly StoragePoolResource.ResourceManager StoragePools;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
@@ -50,6 +51,7 @@ public sealed class ResourceManager : Service, IMainResourceManager
       UserKeys.Init(transaction);
       UserRoles.Init(transaction);
       UserAuthentications.Init(transaction);
+      Keys.Init(transaction);
       StoragePools.Init(transaction);
     }, cancellationToken);
   }

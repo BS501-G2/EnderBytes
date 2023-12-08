@@ -5,7 +5,6 @@ using Newtonsoft.Json.Linq;
 namespace RizzziGit.EnderBytes.Resources;
 
 using Database;
-using Collections;
 
 public enum StoragePoolType : byte
 {
@@ -17,7 +16,7 @@ public enum StoragePoolType : byte
 [Flags]
 public enum StoragePoolFlags : byte
 {
-  IgnoreCase = 1 << 0
+  Internal = 1 << 0
 }
 
 public sealed class StoragePoolResource(StoragePoolResource.ResourceManager manager, StoragePoolResource.ResourceData data) : Resource<StoragePoolResource.ResourceManager, StoragePoolResource.ResourceData, StoragePoolResource>(manager, data)
@@ -64,23 +63,27 @@ public sealed class StoragePoolResource(StoragePoolResource.ResourceManager mana
 
     public StoragePoolResource CreateBlob(
       DatabaseTransaction transaction,
-      UserKeyResource userKey,
-      UserResource user,
-      StoragePoolFlags flags,
-      UserAuthenticationContext context
+      KeyResource key,
+      UserResource? user,
+      StoragePoolFlags flags
     )
     {
-      using UserKeyResource.Transformer transformer = context.GetTransformer(userKey);
+      using KeyResource.Transformer transformer = key.GetTransformer();
 
       return DbInsert(transaction, new()
       {
-        { KEY_KEY_SHARED_ID, userKey.SharedId },
-        { KEY_USER_ID, user.Id },
+        { KEY_KEY_SHARED_ID, key.SharedId },
+        { KEY_USER_ID, user?.Id },
         { KEY_TYPE, (byte)StoragePoolType.Blob },
         { KEY_FLAGS, (byte)flags },
         { KEY_PAYLOAD, transformer.Encrypt(Encoding.UTF8.GetBytes("{}")) }
       });
     }
+
+    public StoragePoolResource? GetByKeySharedId(DatabaseTransaction transaction, KeyResource key) => DbOnce(transaction, new()
+    {
+      { KEY_KEY_SHARED_ID, ("=", key.SharedId) }
+    });
   }
 
   public new sealed record ResourceData(

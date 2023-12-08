@@ -1,11 +1,16 @@
 using System.Collections;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 
-namespace  RizzziGit.EnderBytes.StoragePools;
+namespace RizzziGit.EnderBytes.StoragePools;
 
 public abstract partial class StoragePool
 {
   public sealed class Path : IEnumerable<string>
   {
+    public static Path Deserialize(byte[] bytes) => new(BsonSerializer.Deserialize<string[]>(bytes));
+    public static byte[] Serialize(Path path) => path.ToArray().ToBson();
+
     public static bool operator !=(Path? path1, Path? path2) => !(path1 == path2);
     public static bool operator ==(Path? path1, Path? path2)
     {
@@ -21,9 +26,10 @@ public abstract partial class StoragePool
       return path1.Equals(path2);
     }
 
-    public Path(params string[] path) : this(false, path) { }
-    public Path(bool ignoreCase = false, params string[] path)
+    public Path(IEnumerable<string> path) : this([.. path]) { }
+    public Path(params string[] path)
     {
+      lock (this)
       {
         List<string> sanitized = [];
         foreach (string pathEntry in path)
@@ -50,47 +56,52 @@ public abstract partial class StoragePool
         }
 
         InternalPath = [.. sanitized];
-        sanitized.Clear();
       }
     }
 
     private readonly string[] InternalPath;
-    public bool IgnoreCase = false;
 
-    public string this[int index] => InternalPath[index];
-    public int Length => InternalPath.Length;
+    public string this[int index]
+    {
+      get
+      {
+        lock (this)
+        {
+          return InternalPath[index];
+        }
+      }
+    }
+    public int Length
+    {
+      get
+      {
+        lock (this)
+        {
+          return InternalPath.Length;
+        }
+      }
+    }
 
     public bool IsInsideOf(Path other)
     {
-      if (Length <= other.Length)
+      lock (this)
       {
-        return false;
-      }
-
-      for (int index = 0; index < other.Length; index++)
-      {
-        if (string.Equals(
-          this[index],
-          other[index],
-            IgnoreCase
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal
-        ))
+        if (Length <= other.Length)
         {
           return false;
+        }
+
+        for (int index = 0; index < other.Length; index++)
+        {
+          if (this[index] != other[index])
+          {
+            return false;
+          }
         }
       }
 
       return true;
     }
-
-    public bool EqualsAt(int index, string test) => string.Equals(
-      this[index],
-      test,
-      IgnoreCase
-        ? StringComparison.InvariantCultureIgnoreCase
-        : StringComparison.InvariantCulture
-    );
 
     public override bool Equals(object? obj)
     {
@@ -104,43 +115,54 @@ public abstract partial class StoragePool
       }
 
       Path path = (Path)obj;
-      if (path.InternalPath.Length != InternalPath.Length)
-      {
-        return false;
-      }
-
-      for (int index = 0; index < Length; index++)
-      {
-        if (EqualsAt(index, path[index]))
+      lock (this)
+        lock (path)
         {
-          return false;
+          if (path.InternalPath.Length != InternalPath.Length)
+          {
+            return false;
+          }
+
+          for (int index = 0; index < Length; index++)
+          {
+            if (this[index] == path[index])
+            {
+              return false;
+            }
+          }
         }
-      }
 
       return true;
     }
 
     public override int GetHashCode()
     {
-      HashCode hashCode = new();
-
-      foreach (string pathEntry in InternalPath)
+      lock (this)
       {
-        hashCode.Add(pathEntry);
-      }
+        HashCode hashCode = new();
 
-      return hashCode.ToHashCode();
+        foreach (string pathEntry in InternalPath)
+        {
+          hashCode.Add(pathEntry);
+        }
+
+        return hashCode.ToHashCode();
+      }
     }
 
     public IEnumerator<string> GetEnumerator()
     {
-      foreach (string pathEntry in InternalPath)
+      lock (this)
       {
-        yield return pathEntry;
+        foreach (string pathEntry in InternalPath)
+        {
+          yield return pathEntry;
+        }
       }
     }
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-  }
 
+    public byte[] Serialize() => Serialize(this);
+  }
 }

@@ -3,6 +3,7 @@ namespace RizzziGit.EnderBytes.Connections;
 using Resources;
 using Utilities;
 using Database;
+using StoragePools;
 
 public enum ConnectionType { Basic, Advanced, Internal }
 
@@ -14,7 +15,18 @@ public abstract partial class Connection : Lifetime
     Id = id;
   }
 
-  public record SessionInformation(UserResource User, UserKeyResource.Transformer Transformer, UserAuthenticationResource UserAuthentication, byte[] HashCache);
+  public record MainHubInformation(
+    HubResource Hub,
+    KeyResource.Transformer Transformer
+  );
+
+  public record SessionInformation(
+    UserResource User,
+    UserKeyResource.Transformer Transformer,
+    UserAuthenticationResource UserAuthentication,
+    MainHubInformation Information,
+    byte[] HashCache
+  );
 
   public new abstract class Exception : System.Exception
   {
@@ -34,9 +46,14 @@ public abstract partial class Connection : Lifetime
 
   public SessionInformation? Session { get; private set; }
 
+  private StoragePool.Path CurrentPath = [];
+
   public Task ClearSession() => RunTask(() =>
   {
-    Session = null;
+    lock (this)
+    {
+      Session = null;
+    }
   });
 
   public Task<SessionInformation> SetSession(UserResource user, UserAuthenticationResource userAuthentication, byte[] hashCache) => RunTask(async (cancellationToken) => await Database.RunTransaction((transaction) =>
@@ -50,8 +67,31 @@ public abstract partial class Connection : Lifetime
 
       UserKeyResource? userKey = ResourceManager.UserKeys.GetByUserAuthentication(transaction, user, userAuthentication);
       UserKeyResource.Transformer transformer = userKey!.GetTransformer(hashCache);
+      HubResource? hub = ResourceManager.Hubs.GetMainByUserId(transaction, user);
+      KeyResource key;
 
-      return Session = new(user, transformer, userAuthentication, hashCache);
+      if (hub == null)
+      {
+        var (privateKey, publicKey) = Server.KeyGenerator.GetNew();
+
+        key = ResourceManager.Keys.Create(transaction, transformer, privateKey, publicKey);
+        hub = ResourceManager.Hubs.Create(transaction, user, key, HubFlags.PersonalMain);
+      }
+      else
+      {
+        key = ResourceManager.Keys.GetBySharedId(transaction, Id, transformer.UserKey.Id)!;
+      }
+
+      return Session = new(user, transformer, userAuthentication, new(hub, key.GetTransformer(transformer)), hashCache);
     }
   }));
+
+  public Task<StoragePool.Path> GetDirectory() => RunTask(() => CurrentPath);
+  public Task SetDirectory(StoragePool.Path path) => RunTask(async (cancellationToken) =>
+  {
+    if (path.Length == 0)
+    {
+      CurrentPath = [];
+    }
+  });
 }

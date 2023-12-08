@@ -31,8 +31,8 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
     {
       if (oldVersion < 1)
       {
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_USERNAME} varchar(16) not null collate nocase;");
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_NAME} varchar(64) not null;");
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_USERNAME} varchar(16) not null collate nocase;");
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_NAME} varchar(64) not null;");
 
         transaction.ExecuteNonQuery($"create unique index {INDEX_UNIQUENESS} on {NAME}({KEY_USERNAME});");
       }

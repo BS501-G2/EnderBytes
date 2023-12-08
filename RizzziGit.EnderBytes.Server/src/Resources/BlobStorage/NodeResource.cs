@@ -41,7 +41,7 @@ public sealed class BlobNodeResource(BlobNodeResource.ResourceManager manager, B
       if (oldVersion < 1)
       {
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_ACCESS_TIME} integer not null;");
-        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_NAME} varchar(128) not null {(Main.StoragePool.Resource.Flags.HasFlag(StoragePoolFlags.IgnoreCase) ? "collate nocase" : "")};");
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_NAME} varchar(128) not null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PARENT_ID} integer;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_KEY_SHARED_ID} integer not null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_TYPE} integer not null;");

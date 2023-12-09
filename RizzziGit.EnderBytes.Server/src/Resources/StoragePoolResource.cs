@@ -16,6 +16,7 @@ public enum StoragePoolType : byte
 [Flags]
 public enum StoragePoolFlags : byte
 {
+  None = 0,
   Internal = 1 << 0
 }
 

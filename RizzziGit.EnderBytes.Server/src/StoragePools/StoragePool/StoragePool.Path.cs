@@ -105,17 +105,19 @@ public abstract partial class StoragePool
 
     public override bool Equals(object? obj)
     {
-      if (ReferenceEquals(this, obj))
-      {
-        return true;
-      }
-      else if (obj is null || obj is not Path)
-      {
-        return false;
-      }
-
-      Path path = (Path)obj;
       lock (this)
+      {
+        if (ReferenceEquals(this, obj))
+        {
+          return true;
+        }
+        else if (obj is null || obj is not Path)
+        {
+          return false;
+        }
+
+        Path path = (Path)obj;
+
         lock (path)
         {
           if (path.InternalPath.Length != InternalPath.Length)
@@ -131,9 +133,12 @@ public abstract partial class StoragePool
             }
           }
         }
+      }
 
       return true;
     }
+
+    public bool IsInsideOfOrEquals(Path path) => (path == this) || IsInsideOf(path);
 
     public override int GetHashCode()
     {

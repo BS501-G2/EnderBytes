@@ -5,6 +5,7 @@ using Resources.BlobStorage;
 using Database;
 using Buffer;
 using Connections;
+using System.Threading.Tasks;
 
 public sealed partial class BlobStoragePool
 {
@@ -54,22 +55,27 @@ public sealed partial class BlobStoragePool
         Resources.BlobStorage.ResourceManager IBlobClass.ResourceManager => ResourceManager;
         Server IBlobClass.Server => Server;
 
-        Task INode.IFile.IStream.ISeek(Connection connection, long position)
+        Task INode.IFile.IStream.ISeek(KeyResource.Transformer transformer, long position)
         {
           throw new NotImplementedException();
         }
 
-        Task INode.IFile.IStream.ISetSize(Connection connection, long size)
+        Task INode.IFile.IStream.ISetSize(KeyResource.Transformer transformer, long size)
         {
           throw new NotImplementedException();
         }
 
-        Task<Buffer> INode.IFile.IStream.IRead(Connection connection, long count)
+        Task<Buffer> INode.IFile.IStream.IRead(KeyResource.Transformer transformer, long count)
         {
           throw new NotImplementedException();
         }
 
-        Task INode.IFile.IStream.IWrite(Connection connection, Buffer buffer)
+        Task INode.IFile.IStream.IWrite(KeyResource.Transformer transformer, Buffer buffer)
+        {
+          throw new NotImplementedException();
+        }
+
+        Task INode.IFile.IStream.IClose(KeyResource.Transformer poolTransformer)
         {
           throw new NotImplementedException();
         }
@@ -79,7 +85,7 @@ public sealed partial class BlobStoragePool
       {
       }
 
-      Task<INode.IFile.IStream> INode.IFile.IOpen(Connection connection, INode.IFile.Access access, INode.IFile.Mode mode)
+      Task<INode.IFile.IStream> INode.IFile.IOpen(KeyResource.Transformer transformer, INode.IFile.Access access, INode.IFile.Mode mode)
       {
         throw new NotImplementedException();
       }

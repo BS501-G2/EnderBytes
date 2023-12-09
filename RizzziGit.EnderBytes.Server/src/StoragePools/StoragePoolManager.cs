@@ -15,12 +15,12 @@ public sealed class StoragePoolManager(Server server) : Service
   private readonly WaitQueue<(TaskCompletionSource<StoragePool> source, KeyResource key, Connection.SessionInformation? session, StoragePoolResource pool)> WaitQueue = new(0);
   private readonly WeakDictionary<StoragePoolResource, StoragePool> Handles = [];
 
-  public async Task<StoragePool> GetHandle(StoragePoolResource pool, Connection.SessionInformation? session, CancellationToken cancellationToken)
+  public async Task<StoragePool> Get(StoragePoolResource resource, Connection.SessionInformation? session, CancellationToken cancellationToken)
   {
-    KeyResource? key = await Database.RunTransaction((transaction) => Resources.Keys.GetBySharedId(transaction, pool.KeySharedId, session?.Transformer.UserKey.SharedId), CancellationToken.None);
+    KeyResource? key = await Database.RunTransaction((transaction) => Resources.Keys.GetBySharedId(transaction, resource.KeySharedId, session?.Transformer.UserKey.SharedId), CancellationToken.None);
     TaskCompletionSource<StoragePool> source = new();
 
-    await WaitQueue.Enqueue((source, key!, session, pool), cancellationToken);
+    await WaitQueue.Enqueue((source, key!, session, resource), cancellationToken);
     return await source.Task;
   }
 

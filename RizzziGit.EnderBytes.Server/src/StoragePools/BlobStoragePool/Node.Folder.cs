@@ -15,49 +15,74 @@ public sealed partial class BlobStoragePool
       {
       }
 
-      async Task<INode.IFile> INode.IFolder.ICreateFile(Connection connection, string name, long preallocateSize)
+      // async Task<INode.IFile> INode.IFolder.ICreateFile(Connection connection, string name, long preallocateSize)
+      // {
+      //   var (privateKey, publicKey) = Server.KeyGenerator.GetNew();
+      //   return await Database.RunTransaction((transaction) =>
+      //   {
+      //     KeyResource key = ResourceManager.Keys.Create(transaction, connection.Session?.Transformer, privateKey, publicKey);
+      //     return (IBlobFile)Pool.ResolveNode(ResourceManager.Nodes.Create(transaction, name, BlobNodeType.File, Resource, key.GetTransformer()));
+      //   });
+      // }
+
+      Task<INode.IFile> INode.IFolder.ICreateFile(KeyResource.Transformer transformer, string name, long preallocateSize)
       {
-        var (privateKey, publicKey) = Server.KeyGenerator.GetNew();
-        return await Database.RunTransaction((transaction) =>
-        {
-          KeyResource key = ResourceManager.Keys.Create(transaction, connection.Session?.Transformer, privateKey, publicKey);
-          return (IBlobFile)Pool.ResolveNode(ResourceManager.Nodes.Create(transaction, name, BlobNodeType.File, Resource, key.GetTransformer()));
-        });
+        throw new NotImplementedException();
       }
 
-      async Task<INode.IFolder> INode.IFolder.ICreateFolder(Connection connection, string name)
+      // async Task<INode.IFolder> INode.IFolder.ICreateFolder(Connection connection, string name)
+      // {
+      //   var (privateKey, publicKey) = Server.KeyGenerator.GetNew();
+      //   return await Database.RunTransaction((transaction) =>
+      //   {
+      //     KeyResource key = ResourceManager.Keys.Create(transaction, connection.Session?.Transformer, privateKey, publicKey);
+      //     return (IBlobFolder)Pool.ResolveNode(ResourceManager.Nodes.Create(transaction, name, BlobNodeType.Folder, Resource, key.GetTransformer()));
+      //   });
+      // }
+
+      Task<INode.IFolder> INode.IFolder.ICreateFolder(KeyResource.Transformer transformer, string name)
       {
-        var (privateKey, publicKey) = Server.KeyGenerator.GetNew();
-        return await Database.RunTransaction((transaction) =>
-        {
-          KeyResource key = ResourceManager.Keys.Create(transaction, connection.Session?.Transformer, privateKey, publicKey);
-          return (IBlobFolder)Pool.ResolveNode(ResourceManager.Nodes.Create(transaction, name, BlobNodeType.Folder, Resource, key.GetTransformer()));
-        });
+        throw new NotImplementedException();
       }
 
-      async Task<INode.ISymbolicLink> INode.IFolder.ICreateSymbolicLink(Connection connection, string name, Path target)
+      // async Task<INode.ISymbolicLink> INode.IFolder.ICreateSymbolicLink(Connection connection, string name, Path target)
+      // {
+      //   var (privateKey, publicKey) = Server.KeyGenerator.GetNew();
+      //   return await Database.RunTransaction((transaction) =>
+      //   {
+      //     KeyResource key = ResourceManager.Keys.Create(transaction, connection.Session?.Transformer, privateKey, publicKey);
+      //     return (IBlobSymbolicLink)Pool.ResolveNode(ResourceManager.Nodes.Create(transaction, name, BlobNodeType.SymbolicLink, Resource, key.GetTransformer()));
+      //   });
+      // }
+
+      Task<INode.ISymbolicLink> INode.IFolder.ICreateSymbolicLink(KeyResource.Transformer transformer, string name, Path target)
       {
-        var (privateKey, publicKey) = Server.KeyGenerator.GetNew();
-        return await Database.RunTransaction((transaction) =>
-        {
-          KeyResource key = ResourceManager.Keys.Create(transaction, connection.Session?.Transformer, privateKey, publicKey);
-          return (IBlobSymbolicLink)Pool.ResolveNode(ResourceManager.Nodes.Create(transaction, name, BlobNodeType.SymbolicLink, Resource, key.GetTransformer()));
-        });
+        throw new NotImplementedException();
       }
 
-      async Task<INode[]> INode.IFolder.IScan(Connection connection)
+      Task<INode?> INode.IFolder.IGetByPath(KeyResource.Transformer transformer, Path path)
       {
-        List<INode> nodes = [];
+        throw new NotImplementedException();
+      }
 
-        await Database.RunTransaction((transaction) =>
-        {
-          foreach (BlobNodeResource resource in ResourceManager.Nodes.StreamChildren(transaction, Resource))
-          {
-            nodes.Add(Pool.ResolveNode(resource));
-          }
-        });
+      // async Task<INode[]> INode.IFolder.IScan(Connection connection)
+      // {
+      //   List<INode> nodes = [];
 
-        return [.. nodes];
+      //   await Database.RunTransaction((transaction) =>
+      //   {
+      //     foreach (BlobNodeResource resource in ResourceManager.Nodes.StreamChildren(transaction, Resource))
+      //     {
+      //       nodes.Add(Pool.ResolveNode(resource));
+      //     }
+      //   });
+
+      //   return [.. nodes];
+      // }
+
+      Task<INode[]> INode.IFolder.IScan(KeyResource.Transformer transformer)
+      {
+        throw new NotImplementedException();
       }
     }
   }

@@ -24,8 +24,7 @@ public sealed class ResourceManager : Service, IMainResourceManager
     UserRoles = new(this, Database);
     UserAuthentications = new(this, Database);
     StoragePools = new(this, Database);
-    Hubs = new(this, Database);
-    HubEntries = new(this, Database);
+    SharedNodes = new(this, Database);
   }
 
   public readonly Server Server;
@@ -43,8 +42,7 @@ public sealed class ResourceManager : Service, IMainResourceManager
   public readonly UserKeyResource.ResourceManager UserKeys;
   public readonly KeyResource.ResourceManager Keys;
   public readonly StoragePoolResource.ResourceManager StoragePools;
-  public readonly HubResource.ResourceManager Hubs;
-  public readonly HubEntryResource.ResourceManager HubEntries;
+  public readonly SharedNodeResource.ResourceManager SharedNodes;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
@@ -58,8 +56,7 @@ public sealed class ResourceManager : Service, IMainResourceManager
       UserAuthentications.Init(transaction);
       Keys.Init(transaction);
       StoragePools.Init(transaction);
-      Hubs.Init(transaction);
-      HubEntries.Init(transaction);
+      SharedNodes.Init(transaction);
     }, cancellationToken);
   }
 

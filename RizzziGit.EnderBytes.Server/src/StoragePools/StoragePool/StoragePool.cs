@@ -2,6 +2,7 @@ namespace RizzziGit.EnderBytes.StoragePools;
 
 using Resources;
 using Utilities;
+using Connections;
 
 public abstract partial class StoragePool(StoragePoolManager manager, StoragePoolResource resource) : Lifetime($"#{resource.Id}")
 {
@@ -11,14 +12,14 @@ public abstract partial class StoragePool(StoragePoolManager manager, StoragePoo
   public long LastActiveTime { get; private set; }
   public Task? UnderlyingTask { get; private set; }
 
-  protected abstract Task<INode.IFolder> IGetRootFolder(KeyResource.Transformer transformer);
-  protected abstract Task<TrashItem[]> IListTrashItems(KeyResource.Transformer transformer);
+  protected abstract Task<INode.IFolder> IGetRootFolder(Connection connection);
+  protected abstract Task<TrashItem[]> IListTrashItems(Connection connection);
 
   protected abstract Task IOnStart();
   protected abstract Task IOnStop();
 
-  public Task<INode.IFolder> GetRootFolder(KeyResource.Transformer transformer) => IGetRootFolder(transformer);
-  public Task<TrashItem[]> ListTrashItems(KeyResource.Transformer transformer) => IListTrashItems(transformer);
+  public Task<INode.IFolder> GetRootFolder(Connection connection) => IGetRootFolder(connection);
+  public Task<TrashItem[]> ListTrashItems(Connection connection) => IListTrashItems(connection);
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {

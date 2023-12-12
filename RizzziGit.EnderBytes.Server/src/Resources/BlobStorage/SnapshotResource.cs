@@ -21,7 +21,10 @@ public sealed class BlobSnapshotResource(BlobSnapshotResource.ResourceManager ma
 
     protected override BlobSnapshotResource CreateResource(ResourceData data) => new(this, data);
     protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(
-      id, createTime, updateTime
+      id, createTime, updateTime,
+
+      (long)reader[KEY_BASE_SNAPSHOT_ID],
+      (long)reader[KEY_SIZE]
     );
 
     protected override void OnInit(DatabaseTransaction transaction, int oldVersion = 0)
@@ -50,6 +53,11 @@ public sealed class BlobSnapshotResource(BlobSnapshotResource.ResourceManager ma
   public new sealed record ResourceData(
     long Id,
     long CreateTime,
-    long UpdateTime
+    long UpdateTime,
+    long BaseSnapshotId,
+    long Size
   ) : Resource<ResourceManager, ResourceData, BlobSnapshotResource>.ResourceData(Id, CreateTime, UpdateTime);
+
+  public long BaseSnapshotId => Data.BaseSnapshotId;
+  public long Size => Data.Size;
 }

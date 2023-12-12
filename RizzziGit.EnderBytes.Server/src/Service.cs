@@ -1,3 +1,5 @@
+using RizzziGit.EnderBytes.Utilities;
+
 namespace RizzziGit.EnderBytes;
 
 public enum ServiceState : byte
@@ -9,17 +11,21 @@ public enum ServiceState : byte
   Crashed = 0b001
 }
 
-public class ServiceContext(Task task, CancellationTokenSource stopToken)
-{
-  public readonly Task Task = task;
-  public readonly CancellationTokenSource CancellationTokenSource = stopToken;
-}
-
 public abstract class Service
 {
+  private class ServiceContext(Task task, CancellationTokenSource stopToken)
+  {
+    public readonly Task Task = task;
+    public readonly CancellationTokenSource CancellationTokenSource = stopToken;
+  }
+
   private static TaskFactory? Factory = null;
 
-  public Service(string? name = null, Service? downstreamLogger = null)
+  public Service() : this(null) { }
+  public Service(string? name) : this(name, (Logger?)null) { }
+
+  public Service(string? name, Service? downstreamLogger) : this(name, downstreamLogger?.Logger) { }
+  public Service(string? name, Logger? downstreamLogger)
   {
     Factory ??= new(TaskCreationOptions.LongRunning, TaskContinuationOptions.None);
 
@@ -27,7 +33,7 @@ public abstract class Service
     State = ServiceState.Stopped;
     Logger = new(Name);
 
-    downstreamLogger?.Logger.Subscribe(Logger);
+    downstreamLogger?.Subscribe(Logger);
   }
 
   public readonly Logger Logger;
@@ -36,7 +42,16 @@ public abstract class Service
 
   public event EventHandler<ServiceState>? StateChanged;
 
+  private TaskQueue? TaskQueue;
   private ServiceContext? Context;
+
+  private TaskQueue RequireTaskQueue() => TaskQueue ?? throw new NotImplementedException();
+
+  public Task RunTask(Func<CancellationToken, Task> callback, CancellationToken? cancellationToken = null) => RequireTaskQueue().RunTask(callback, cancellationToken);
+  public Task<T> RunTask<T>(Func<CancellationToken, Task<T>> callback, CancellationToken? cancellationToken = null) => RequireTaskQueue().RunTask(callback, cancellationToken);
+  public Task<T> RunTask<T>(Func<T> callback) => RequireTaskQueue().RunTask(callback);
+  public Task RunTask(Action callback) => RequireTaskQueue().RunTask(callback);
+
   public CancellationToken GetCancellationToken() => Context!.CancellationTokenSource.Token;
 
   private void SetState(ServiceState state)
@@ -143,12 +158,19 @@ public abstract class Service
     {
       try
       {
-        await OnRun(context.CancellationTokenSource.Token);
+        using TaskQueue taskQueue = TaskQueue = new();
+
+        await Task.WhenAny(
+          taskQueue.Start(context.CancellationTokenSource.Token),
+          OnRun(context.CancellationTokenSource.Token)
+        );
+
         Console.WriteLine($"Done: {Name}");
       }
       finally
       {
         try { context.CancellationTokenSource.Cancel(); } catch { };
+        TaskQueue = null;
       }
     }
     catch (OperationCanceledException)

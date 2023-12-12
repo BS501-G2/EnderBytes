@@ -4,6 +4,8 @@ using Resources;
 using Resources.BlobStorage;
 using Database;
 using Buffer;
+using Connections;
+using System.Threading.Tasks;
 
 public sealed partial class BlobStoragePool
 {
@@ -27,6 +29,7 @@ public sealed partial class BlobStoragePool
     Resources.BlobStorage.ResourceManager IBlobClass.ResourceManager => ResourceManager;
     Server IBlobClass.Server => Pool.Manager.Server;
 
+    long INode.Id => Resource.Id;
     long INode.CreateTime => Resource.CreateTime;
     long INode.AccessTime => Resource.AccessTime;
     long INode.ModifyTime => Resource.UpdateTime;
@@ -34,20 +37,25 @@ public sealed partial class BlobStoragePool
     long INode.KeySharedId => Resource.KeySharedId;
     string INode.Name => Resource.Name;
 
-    async Task<INode.IFolder?> INode.IGetParent(KeyResource.Transformer transformer)
+    Task<INode.IFolder?> INode.IGetParent(KeyResource.Transformer transformer)
     {
-      if (Resource.ParentId == null)
-      {
-        return null;
-      }
-
-      BlobNodeResource? resource = await Pool.Database.RunTransaction((transaction) => Pool.ResourceManager.Nodes.GetById(transaction, (long)Resource.ParentId));
-      if (resource == null)
-      {
-        return null;
-      }
-
-      return (INode.IFolder)Pool.ResolveNode(resource);
+      throw new NotImplementedException();
     }
+
+    // async Task<INode.IFolder?> INode.IGetParent(Connection connection)
+    // {
+    //   if (Resource.ParentId == null)
+    //   {
+    //     return null;
+    //   }
+
+    //   BlobNodeResource? resource = await Pool.Database.RunTransaction((transaction) => Pool.ResourceManager.Nodes.GetById(transaction, (long)Resource.ParentId));
+    //   if (resource == null)
+    //   {
+    //     return null;
+    //   }
+
+    //   return (INode.IFolder)Pool.ResolveNode(resource);
+    // }
   }
 }

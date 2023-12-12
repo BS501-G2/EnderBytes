@@ -5,7 +5,6 @@ using Resources.BlobStorage;
 using Database;
 using Buffer;
 using Connections;
-using System.Threading.Tasks;
 
 public sealed partial class BlobStoragePool
 {
@@ -28,6 +27,8 @@ public sealed partial class BlobStoragePool
         public readonly Database Database;
         public readonly Resources.BlobStorage.ResourceManager ResourceManager;
 
+        long INode.IFile.ISnapshot.Id => Resource.Id;
+        long? INode.IFile.ISnapshot.BaseSnapshotId => Resource.BaseSnapshotId;
         INode.IFile INode.IFile.ISnapshot.File => File;
         BlobSnapshotResource IBlobSnapshot.Resource => Resource;
         Database IBlobClass.Database => Database;
@@ -85,7 +86,12 @@ public sealed partial class BlobStoragePool
       {
       }
 
-      Task<INode.IFile.IStream> INode.IFile.IOpen(KeyResource.Transformer transformer, INode.IFile.Access access, INode.IFile.Mode mode)
+      Task<INode.IFile.ISnapshot[]> INode.IFile.ISnapshotList(KeyResource.Transformer transformer)
+      {
+        throw new NotImplementedException();
+      }
+
+      Task<INode.IFile.IStream> INode.IFile.IOpen(KeyResource.Transformer poolTransformer, KeyResource.Transformer nodeTransformer, INode.IFile.ISnapshot snapshot, INode.IFile.Access access)
       {
         throw new NotImplementedException();
       }

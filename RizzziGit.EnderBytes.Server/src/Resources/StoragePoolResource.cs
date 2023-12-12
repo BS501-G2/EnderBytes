@@ -17,7 +17,9 @@ public enum StoragePoolType : byte
 public enum StoragePoolFlags : byte
 {
   None = 0,
-  Internal = 1 << 0
+  Internal = 1 << 0,
+  ReadOnly = 1 << 1,
+  Temporary = 1 << 2
 }
 
 public sealed class StoragePoolResource(StoragePoolResource.ResourceManager manager, StoragePoolResource.ResourceData data) : Resource<StoragePoolResource.ResourceManager, StoragePoolResource.ResourceData, StoragePoolResource>(manager, data)

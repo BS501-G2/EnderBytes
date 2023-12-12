@@ -4,6 +4,7 @@ using Resources;
 using Resources.BlobStorage;
 using Database;
 using Collections;
+using Connections;
 
 public sealed partial class BlobStoragePool : StoragePool
 {
@@ -12,10 +13,12 @@ public sealed partial class BlobStoragePool : StoragePool
 
   public BlobStoragePool(StoragePoolManager manager, StoragePoolResource resource, string password) : base(manager, resource)
   {
+    Server = manager.Server;
     ResourceManager = new(this, password);
     Nodes = [];
   }
 
+  private readonly Server Server;
   private readonly Resources.BlobStorage.ResourceManager ResourceManager;
   private readonly WeakDictionary<BlobNodeResource, INode> Nodes;
   private IBlobFolder? RootFolder;
@@ -39,14 +42,28 @@ public sealed partial class BlobStoragePool : StoragePool
     return node;
   }
 
-  protected override async Task<INode.IFolder> IGetRootFolder(KeyResource.Transformer transformer) =>
-    RootFolder ??= (IBlobFolder)ResolveNode(await RunTask((cancellationToken) =>
-      Database.RunTransaction((transaction) =>
-        ResourceManager.Nodes.GetByName(transaction, ROOT_FOLDER, null)
-          ?? ResourceManager.Nodes.Create(transaction, ROOT_FOLDER, BlobNodeType.Folder, null, transformer)
-      ), CancellationToken.None));
+  protected override async Task<INode.IFolder> IGetRootFolder(Connection connection)
+  {
+    var (privateKey, publicKey) = Server.KeyGenerator.GetNew();
 
-  protected override Task<TrashItem[]> IListTrashItems(KeyResource.Transformer transformer)
+    return RootFolder ??= (IBlobFolder)ResolveNode(await RunTask((cancellationToken) =>
+      Database.RunTransaction((transaction) =>
+      {
+        BlobNodeResource? node = ResourceManager.Nodes.GetByName(transaction, ROOT_FOLDER, null);
+
+        if (node == null)
+        {
+          KeyResource key = ResourceManager.Keys.Create(transaction, connection.Session!.UserKeyTransformer, privateKey, publicKey);
+
+          node = ResourceManager.Nodes.Create(transaction, ROOT_FOLDER, BlobNodeType.Folder, null, key.GetTransformer());
+        }
+
+        return node;
+      }), CancellationToken.None)
+    );
+  }
+
+  protected override Task<TrashItem[]> IListTrashItems(Connection connection)
   {
     throw new NotImplementedException();
   }

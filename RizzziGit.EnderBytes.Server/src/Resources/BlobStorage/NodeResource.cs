@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 namespace RizzziGit.EnderBytes.Resources.BlobStorage;
 
 using Database;
+using Connections;
 
 public enum BlobNodeType : byte { File, Folder, SymbolicLink }
 public sealed class BlobNodeResource(BlobNodeResource.ResourceManager manager, BlobNodeResource.ResourceData data) : Resource<BlobNodeResource.ResourceManager, BlobNodeResource.ResourceData, BlobNodeResource>(manager, data)

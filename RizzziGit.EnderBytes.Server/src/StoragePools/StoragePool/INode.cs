@@ -1,5 +1,6 @@
 namespace RizzziGit.EnderBytes.StoragePools;
 
+using Connections;
 using Resources;
 
 public abstract partial class StoragePool
@@ -8,6 +9,7 @@ public abstract partial class StoragePool
   {
     public StoragePool Pool { get; }
 
+    public long Id { get; }
     public long CreateTime { get; }
     public long AccessTime { get; }
     public long ModifyTime { get; }

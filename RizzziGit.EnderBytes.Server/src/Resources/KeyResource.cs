@@ -15,6 +15,7 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
 
     private const string KEY_SHARED_ID = "SharedId";
     private const string KEY_USER_KEY_SHARED_ID = "UserKeySharedId";
+    private const string KEY_USER_ID = "UserId";
     private const string KEY_PRIVATE_KEY = "PrivateKey";
     private const string KEY_PUBLIC_KEY = "PublicKey";
 
@@ -28,6 +29,7 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
 
       (long)reader[KEY_SHARED_ID],
       reader[KEY_USER_KEY_SHARED_ID] is null ? null : (long)reader[KEY_USER_KEY_SHARED_ID],
+      reader[KEY_USER_ID] is null ? null : (long)reader[KEY_USER_ID],
       (byte[])reader[KEY_PRIVATE_KEY],
       (byte[])reader[KEY_PUBLIC_KEY]
     );
@@ -38,6 +40,7 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
       {
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_SHARED_ID} integer not null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_USER_KEY_SHARED_ID} integer;");
+        transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_USER_ID} integer;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PRIVATE_KEY} blob not null;");
         transaction.ExecuteNonQuery($"alter table {NAME} add column {KEY_PUBLIC_KEY} blob not null");
       }
@@ -65,6 +68,7 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
       {
         { KEY_SHARED_ID, sharedId },
         { KEY_USER_KEY_SHARED_ID, transformer?.UserKey.SharedId },
+        { KEY_USER_ID, transformer?.UserKey.UserId },
         { KEY_PRIVATE_KEY, transformer?.Encrypt(privateKey) ?? privateKey },
         { KEY_PUBLIC_KEY, publicKey }
       });
@@ -91,6 +95,11 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
         { KEY_PUBLIC_KEY, existing.PublicKey }
       });
     }
+
+    public IEnumerable<KeyResource> StreamKeysByUser(DatabaseTransaction transaction, UserResource user) => DbStream(transaction, new()
+    {
+      { KEY_USER_ID, ("=", user.Id) }
+    });
   }
 
   public new sealed record ResourceData(
@@ -99,6 +108,7 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
     long UpdateTime,
     long SharedId,
     long? UserKeySharedId,
+    long? UserId,
     byte[] PrivateKey,
     byte[] PublicKey
   ) : Resource<ResourceManager, ResourceData, KeyResource>.ResourceData(Id, CreateTime, UpdateTime);
@@ -126,6 +136,7 @@ public sealed class KeyResource(KeyResource.ResourceManager manager, KeyResource
 
   public long SharedId => Data.SharedId;
   public long? UserKeySharedId => Data.UserKeySharedId;
+  public long? UserId => Data.UserId;
   public byte[] PrivateKey => Data.PrivateKey;
   public byte[] PublicKey => Data.PublicKey;
 

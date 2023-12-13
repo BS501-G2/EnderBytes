@@ -5,8 +5,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>preview</LangVersion>
-
-    <WhisperAIDependency>C++</WhisperAIDependency>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -18,38 +16,8 @@
     <DebugType>Embedded</DebugType>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(WhisperAIDependency)' == 'C++'">
-    <DefineConstants>$(DefineConstants);WHISPER_CPP</DefineConstants>
-  </PropertyGroup>
-
-  <ItemGroup Condition="'$(WhisperAIDependency)' == 'C++'">
-    <PackageReference Include="Whisper.net" Version="1.4.7" />
-    <PackageReference Include="Whisper.net.Runtime" Version="1.4.7" />
-
-    <Compile Remove="src/ArtificialIntelligence/WhisperAiPy.cs" />
-  </ItemGroup>
-
-  <PropertyGroup Condition="'$(WhisperAIDependency)' == 'Python'">
-    <DefineConstants>$(DefineConstants);WHISPER_PYTHON</DefineConstants>
-  </PropertyGroup>
-
-  <ItemGroup Condition="'$(WhisperAIDependency)' == 'Python'">
-    <PackageReference Include="IronPython" Version="3.4.1" />
-    <PackageReference Include="IronPython.StdLib" Version="3.4.1" />
-
-    <Compile Remove="src/ArtificialIntelligence/WhisperAiCpp.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <File Include="$(MSBuildThisFileDirectory)res\*.*"></File>
-  </ItemGroup>
-
-  <Target Condition="'$(WhisperAIDependency)' == 'Python'" Name="PublishExtraFiles" AfterTargets="Publish">
-    <Copy SourceFiles="@(File)" DestinationFolder="$(BaseOutputPath)" />
-  </Target>
-
   <ItemGroup>
     <PackageReference Include="MongoDB.Driver" Version="2.22.0" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="7.0.12" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 

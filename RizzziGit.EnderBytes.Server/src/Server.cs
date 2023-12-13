@@ -1,85 +1,52 @@
-using System.Net;
+using MongoDB.Driver;
 
 namespace RizzziGit.EnderBytes;
 
-using Resources;
-using Connections;
-using Protocols;
-using ArtificialIntelligence;
-using Keys;
-using StoragePools;
+using Records;
+using RizzziGit.EnderBytes.Users;
+using RizzziGit.EnderBytes.Utilities;
 
-public struct ServerConfiguration()
+public sealed record ServerConfiguration(
+  string ServerPath,
+  MongoClientSettings? MongoClientSettings,
+  MongoCollectionSettings? MongoCollectionSettings
+);
+
+public sealed class Server : Service
 {
-  private static readonly string BASE_PATH = Environment.CurrentDirectory;
-
-  public string DatabasePath = Path.Join(BASE_PATH, ".db");
-  public string BlobPath = Path.Join(BASE_PATH, ".db", "BlobStorageData");
-
-  #if WHISPER_CPP
-  // Get the dataset from the source: https://huggingface.co/openai/whisper-large-v2
-  // GGML: https://huggingface.co/4bit/whisper-large-v2-ggml/resolve/main/ggml-large-v2.bin
-  public string WhisperDatasetPath = Path.Join(BASE_PATH, ".ai", "WhisperDataset.bin");
-  #endif
-
-  public IPAddress IpAddress = IPAddress.Parse("0.0.0.0");
-
-  public int FileTransferProtocolPort = 8021;
-  public int SecureShellProtocolPort = 8022;
-
-  public int DefaultUserAuthenticationPayloadHashIterationCount = 1000;
-  public int DefaultBlobStorageFileBufferSize = 256 * 1024;
-
-  public int MaxCachedDataSize = 1024 * 1024 * 2;
-}
-
-public class Server : Service
-{
-  public Server() : this(new()) { }
   public Server(ServerConfiguration configuration) : base("Server")
   {
-    Configuration = configuration;
-    Resources = new(this);
-    KeyGenerator = new(this);
-    Connections = new(this);
-    Protocols = new(this);
-    StoragePools = new(this);
-    ArtificialIntelligence = new(this);
+    MongoClient = new(configuration.MongoClientSettings);
+    UserService = new(this);
+    KeyGeneratorService = new(this);
   }
 
-  public readonly ServerConfiguration Configuration;
-  public readonly ResourceManager Resources;
-  public readonly KeyGenerator KeyGenerator;
-  public readonly ConnectionManager Connections;
-  public readonly ProtocolManager Protocols;
-  public readonly StoragePoolManager StoragePools;
-  public readonly ArtificialIntelligenceManager ArtificialIntelligence;
+  public abstract class SubService(Server server, string name) : Service(name, server)
+  {
+    public readonly Server Server = server;
+  }
+
+  public readonly MongoClient MongoClient;
+  public IMongoDatabase Database => MongoClient.GetDatabase("EnderBytes");
+  public IMongoCollection<R> GetCollection<R>() where R : Record => Database.GetCollection<R>(nameof(R));
+
+  public readonly UserService UserService;
+  public readonly KeyGeneratorService KeyGeneratorService;
+
+  protected override Task OnRun(CancellationToken cancellationToken)
+  {
+    return WatchDog([UserService, KeyGeneratorService], cancellationToken);
+  }
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
-    await Resources.Start();
-    await KeyGenerator.Start();
-    await Connections.Start();
-    await Protocols.Start();
-    await StoragePools.Start();
-    // await ArtificialIntelligence.Start();
-  }
-
-  protected override async Task OnRun(CancellationToken cancellationToken)
-  {
-    Logger.Log(LogLevel.Info, "Server is now running.");
-    await (await WatchDog([Resources, Connections, Protocols, KeyGenerator], cancellationToken)).task;
+    await UserService.Start();
+    await KeyGeneratorService.Start();
   }
 
   protected override async Task OnStop(Exception? exception)
   {
-    Logger.Log(LogLevel.Info, "server is shutting down.");
-    await Connections.Stop();
-    await Protocols.Stop();
-    await StoragePools.Stop();
-    await KeyGenerator.Stop();
-    await Resources.Stop();
-    // await ArtificialIntelligence.Stop();
-    Logger.Log(LogLevel.Info, "Server has shut down.");
+    await UserService.Stop();
+    await KeyGeneratorService.Stop();
   }
 }

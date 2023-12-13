@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 
-namespace RizzziGit.EnderBytes.Extensions;
+namespace RizzziGit.EnderBytes.Utilities;
 
 public static class ICryptoTransformExtensions
 {

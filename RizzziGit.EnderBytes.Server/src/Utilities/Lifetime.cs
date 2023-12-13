@@ -8,11 +8,13 @@ public interface ILifetime
 
 public abstract class Lifetime : ILifetime
 {
-  protected Lifetime(string name)
+  protected Lifetime(string name, Lifetime lifetime) : this(name, lifetime.Logger) { }
+  protected Lifetime(string name, Logger? logger = null)
   {
     Name = name;
     Logger = new(name);
-    TaskQueue = new();
+
+    logger?.Subscribe(Logger);
   }
 
   ~Lifetime() => Stop();
@@ -24,7 +26,7 @@ public abstract class Lifetime : ILifetime
   public readonly Logger Logger;
 
   private CancellationTokenSource? Source;
-  private readonly TaskQueue TaskQueue;
+  private readonly TaskQueue TaskQueue = new();
 
   public bool IsRunning => Source != null;
   public Exception? Exception = null;

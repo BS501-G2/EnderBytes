@@ -3,8 +3,7 @@ using MongoDB.Driver;
 namespace RizzziGit.EnderBytes;
 
 using Records;
-using RizzziGit.EnderBytes.Users;
-using RizzziGit.EnderBytes.Utilities;
+using Services;
 
 public sealed record ServerConfiguration(
   string ServerPath,

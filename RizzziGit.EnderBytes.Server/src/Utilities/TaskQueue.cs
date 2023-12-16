@@ -50,7 +50,7 @@ internal class TaskQueue : IDisposable
         cancellationToken.ThrowIfCancellationRequested();
         var (callback, remoteCancellationToken, taskCompletionSource) = await WaitQueue.Dequeue(cancellationToken);
 
-        CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+        using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
           remoteCancellationToken,
           cancellationToken
         );
@@ -63,10 +63,6 @@ internal class TaskQueue : IDisposable
         catch (Exception exception)
         {
           taskCompletionSource.SetException(exception);
-        }
-        finally
-        {
-          linkedCancellationTokenSource.Dispose();
         }
       }
     }

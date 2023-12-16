@@ -52,7 +52,7 @@ public abstract class Service
   public Task<T> RunTask<T>(Func<T> callback) => RequireTaskQueue().RunTask(callback);
   public Task RunTask(Action callback) => RequireTaskQueue().RunTask(callback);
 
-  public CancellationToken GetCancellationToken() => Context!.CancellationTokenSource.Token;
+  public CancellationToken GetCancellationToken() => Context?.CancellationTokenSource.Token ?? new(true);
 
   private void SetState(ServiceState state)
   {
@@ -160,7 +160,7 @@ public abstract class Service
       {
         using TaskQueue taskQueue = TaskQueue = new();
 
-        await Task.WhenAny(
+        await await Task.WhenAny(
           taskQueue.Start(context.CancellationTokenSource.Token),
           OnRun(context.CancellationTokenSource.Token)
         );

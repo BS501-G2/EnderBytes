@@ -28,7 +28,16 @@ public abstract class Lifetime : ILifetime
   private CancellationTokenSource? Source;
   private readonly TaskQueue TaskQueue = new();
 
-  public bool IsRunning => Source != null;
+  public bool IsRunning
+  {
+    get
+    {
+      lock (this)
+      {
+        return Source != null;
+      }
+    }
+  }
   public Exception? Exception = null;
   public CancellationToken GetCancellationToken() => Source!.Token;
 
@@ -43,28 +52,40 @@ public abstract class Lifetime : ILifetime
 
   private async void Run(CancellationTokenSource cancellationTokenSource, CancellationTokenSource linkedCancellationTokenSource)
   {
-    Logger.Log(LogLevel.Verbose, "Lifetime started.");
-    try
+    using (linkedCancellationTokenSource)
     {
-      Started?.Invoke(this, new());
-      await await Task.WhenAny(
-        OnRun(linkedCancellationTokenSource.Token),
-        TaskQueue.Start(linkedCancellationTokenSource.Token)
-      );
-    }
-    catch (OperationCanceledException) { }
-    catch (Exception exception) { Exception = exception; }
-    finally
-    {
-      lock (this)
+      linkedCancellationTokenSource.Token.Register(() =>
       {
-        linkedCancellationTokenSource.Dispose();
-        cancellationTokenSource.Dispose();
+        lock (this)
+        {
+          Source = null;
+        }
+      });
 
-        Source = null;
+      using (cancellationTokenSource)
+      {
+        Logger.Log(LogLevel.Verbose, "Lifetime started.");
+        try
+        {
+          Started?.Invoke(this, new());
+          await await Task.WhenAny(
+            OnRun(linkedCancellationTokenSource.Token),
+            TaskQueue.Start(linkedCancellationTokenSource.Token)
+          );
+
+          lock (this)
+          {
+            Source = null;
+          }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { Exception = exception; }
+        finally
+        {
+          Logger.Log(LogLevel.Verbose, "Lifetime stopped.");
+          Stopped?.Invoke(this, new());
+        }
       }
-      Logger.Log(LogLevel.Verbose, "Lifetime stopped.");
-      Stopped?.Invoke(this, new());
     }
   }
 

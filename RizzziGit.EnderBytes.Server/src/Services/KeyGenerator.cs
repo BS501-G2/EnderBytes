@@ -11,7 +11,7 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
 {
   public sealed record RsaKeyPair(byte[] Privatekey, byte[] PublicKey);
 
-  public abstract class Transformer(RSACryptoServiceProvider provider, long sharedId) : IDisposable
+  public abstract class Transformer(RSACryptoServiceProvider provider) : IDisposable
   {
     public void Dispose()
     {
@@ -19,13 +19,19 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
       provider.Dispose();
     }
 
-    public readonly long SharedId = sharedId;
     public byte[] Encrypt(byte[] bytes) => provider.Encrypt(bytes, true);
     public byte[] Decrypt(byte[] bytes) => provider.Decrypt(bytes, true);
     public bool PublicOnly => provider.PublicOnly;
 
-    public sealed class Key(RSACryptoServiceProvider provider, long sharedId) : Transformer(provider, sharedId);
-    public sealed class UserKey(RSACryptoServiceProvider provider, long sharedId) : Transformer(provider, sharedId);
+    public sealed class Key(RSACryptoServiceProvider provider, long sharedId) : Transformer(provider)
+    {
+      public readonly long SharedId = sharedId;
+    }
+
+    public sealed class UserAuthentication(RSACryptoServiceProvider provider, long userId) : Transformer(provider)
+    {
+      public readonly long UserId = userId;
+    }
   }
 
   public const int KEY_SIZE = 512 * 8;
@@ -34,13 +40,14 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
 
   public readonly Server Server = server;
 
-  public IMongoCollection<Record.UserKey> UserKeys => Server.GetCollection<Record.UserKey>();
-  public IMongoCollection<Record.Key> Keys => Server.GetCollection<Record.Key>();
+  public IMongoCollection<Record.Key> KeyRecords => Server.GetCollection<Record.Key>();
+  public IMongoCollection<Record.UserAuthentication> UserAuthenticationRecords => Server.GetCollection<Record.UserAuthentication>();
 
   private readonly TaskFactory TaskFactory = new(TaskCreationOptions.LongRunning, TaskContinuationOptions.None);
   private readonly List<RsaKeyPair> WaitQueue = [];
+
   private readonly WeakDictionary<long, Transformer.Key> KeyTransformers = [];
-  private readonly WeakDictionary<long, Transformer.UserKey> UserKeyTransformers = [];
+  private readonly WeakDictionary<long, Transformer.UserAuthentication> UserAuthenticationTransformers = [];
 
   private void RunIndividualGenerationJob()
   {
@@ -105,26 +112,18 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
 
   protected override Task OnRun(CancellationToken cancellationToken)
   {
-    IMongoCollection<Record.User> users = Server.UserService.Users;
-
-    UserKeys.BeginWatching((change) =>
+    Server.UserService.UserRecords.BeginWatching((change) =>
     {
       if (change.OperationType != ChangeStreamOperationType.Delete)
       {
         return;
       }
 
-      Keys.DeleteMany($"{{ {nameof(Record.Key.UserKeyId)}: {change.FullDocument.Id} }}");
-    }, cancellationToken);
-
-    users.BeginWatching((change) =>
-    {
-      if (change.OperationType != ChangeStreamOperationType.Delete)
-      {
-        return;
-      }
-
-      UserKeys.DeleteMany($"{{ {nameof(Record.UserKey.UserId)}: {change.FullDocument.Id} }}");
+      UserAuthenticationRecords.DeleteMany(
+        from userAuthentication in UserAuthenticationRecords.AsQueryable()
+        where userAuthentication.UserId == change.FullDocument.Id
+        select userAuthentication
+      );
     }, cancellationToken);
 
     return RunKeyGenerationJob(cancellationToken);
@@ -150,53 +149,12 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
     return Generate();
   }
 
-  public byte[] DecryptPrivateKey(Record.Key key, Transformer.UserKey? transformer)
+  public Transformer.UserAuthentication GetTransformer(Record.UserAuthentication userAuthentication, byte[]? hashCache)
   {
-    if (key.UserKeySharedId != null)
-    {
-      if (transformer == null)
-      {
-        throw new InvalidOperationException("Requires key transformer.");
-      }
-      else if (transformer?.SharedId != key.UserKeySharedId)
-      {
-        throw new InvalidOperationException("Requires matching user key shared id.");
-      }
-
-      return transformer.Decrypt(key.PrivateKey);
-    }
-
-    return key.PrivateKey;
-  }
-
-  public Transformer.Key GetTransformer(Record.Key key, Transformer.UserKey? userKeyTransformer = null)
-  {
-    lock (KeyTransformers)
+    lock (UserAuthenticationTransformers)
     {
       if (
-        (!KeyTransformers.TryGetValue(key.Id, out Transformer.Key? transformer)) ||
-        (userKeyTransformer != null && transformer.PublicOnly)
-      )
-      {
-        RSACryptoServiceProvider provider = new()
-        {
-          PersistKeyInCsp = false,
-          KeySize = KEY_SIZE
-        };
-
-        transformer = KeyTransformers[key.SharedId] = new(provider, key.SharedId);
-        provider.ImportCspBlob(key.UserKeySharedId == null ? key.PrivateKey : userKeyTransformer == null ? key.PublicKey : userKeyTransformer.Decrypt(key.PrivateKey));
-      }
-
-      return transformer;
-    }
-  }
-  public Transformer.UserKey GetTransformer(Record.UserKey userKey, byte[]? hashCache = null)
-  {
-    lock (UserKeyTransformers)
-    {
-      if (
-        (!UserKeyTransformers.TryGetValue(userKey.Id, out Transformer.UserKey? transformer)) ||
+        (!UserAuthenticationTransformers.TryGetValue(userAuthentication.UserId, out Transformer.UserAuthentication? transformer)) ||
         (hashCache != null && transformer.PublicOnly)
       )
       {
@@ -206,17 +164,11 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
           KeySize = KEY_SIZE
         };
 
-        transformer = new(provider, userKey.SharedId);
-        provider.ImportCspBlob(hashCache != null ? Aes.Create().CreateDecryptor(hashCache, userKey.PrivateIv).TransformFinalBlock(userKey.EncryptedPrivateKey) : userKey.PublicKey);
+        transformer = UserAuthenticationTransformers[userAuthentication.UserId] = new(provider, userAuthentication.UserId);
+        provider.ImportCspBlob(hashCache != null ? userAuthentication.GetDecryptedEncryptionPrivateKey(hashCache) : userAuthentication.EncryptionPublicKey);
       }
 
       return transformer;
     }
   }
-
-  public Task<Record.UserKey?> GetUserKey(Record.User user, Record.UserAuthentication userAuthentication) =>
-    Server.MongoClient.RunTransaction(() =>
-      (from userKey in UserKeys.AsQueryable() where userKey.UserId == user.Id && userAuthentication.Id == userKey.UserAuthenticationId select userKey).First()
-      ?? null
-    );
 }

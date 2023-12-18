@@ -18,6 +18,7 @@ public sealed class Server : Service
     MongoClient = new(configuration.MongoClientSettings);
     UserService = new(this);
     KeyGeneratorService = new(this);
+    ConnectionService = new(this);
   }
 
   public abstract class SubService(Server server, string name) : Service(name, server)
@@ -31,20 +32,23 @@ public sealed class Server : Service
 
   public readonly UserService UserService;
   public readonly KeyGeneratorService KeyGeneratorService;
+  public readonly ConnectionService ConnectionService;
 
   protected override Task OnRun(CancellationToken cancellationToken)
   {
-    return WatchDog([UserService, KeyGeneratorService], cancellationToken);
+    return WatchDog([UserService, KeyGeneratorService, ConnectionService], cancellationToken);
   }
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
     await UserService.Start();
     await KeyGeneratorService.Start();
+    await ConnectionService.Start();
   }
 
   protected override async Task OnStop(Exception? exception)
   {
+    await ConnectionService.Stop();
     await UserService.Stop();
     await KeyGeneratorService.Stop();
   }

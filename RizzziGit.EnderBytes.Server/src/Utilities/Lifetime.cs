@@ -38,15 +38,35 @@ public abstract class Lifetime : ILifetime
       }
     }
   }
-  public Exception? Exception = null;
-  public CancellationToken GetCancellationToken() => Source!.Token;
 
-  public virtual void Stop() => Source?.Cancel();
+  public Exception? Exception { get; private set; } = null;
+  private bool IsStarted;
 
   public Task RunTask(Func<CancellationToken, Task> callback, CancellationToken? cancellationToken = null) => TaskQueue!.RunTask(callback, cancellationToken);
   public Task<T> RunTask<T>(Func<CancellationToken, Task<T>> callback, CancellationToken? cancellationToken = null) => TaskQueue!.RunTask(callback, cancellationToken);
   public Task RunTask(Action callback) => TaskQueue!.RunTask(callback);
   public Task<T> RunTask<T>(Func<T> callback) => TaskQueue!.RunTask(callback);
+
+  public CancellationToken GetCancellationToken() => Source!.Token;
+  public void Reset()
+  {
+    lock (this)
+    {
+      if (!IsStarted)
+      {
+        return;
+      }
+      else if (IsRunning)
+      {
+        throw new InvalidOperationException("Cannot reset while running.");
+      }
+
+      IsStarted = false;
+      Exception = null;
+    }
+  }
+
+  public virtual void Stop() => Source?.Cancel();
 
   protected virtual Task OnRun(CancellationToken cancellationToken) => Task.Delay(-1, cancellationToken);
 
@@ -93,9 +113,13 @@ public abstract class Lifetime : ILifetime
   {
     lock (this)
     {
-      if (Source != null)
+      if (IsRunning)
       {
         throw new InvalidOperationException("Already running.");
+      }
+      else if (IsStarted)
+      {
+        throw new InvalidOperationException("Must be reset.");
       }
 
       Run(Source = new(), CancellationTokenSource.CreateLinkedTokenSource(

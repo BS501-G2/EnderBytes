@@ -3,6 +3,7 @@ namespace RizzziGit.EnderBytes.Services;
 using Collections;
 using Buffer;
 using Utilities;
+using RizzziGit.EnderBytes.Records;
 
 [Flags]
 public enum HubFileAccess : byte
@@ -26,24 +27,53 @@ public sealed partial class StorageHubService
 {
   public abstract partial class Hub(StorageHubService service, long hubId, KeyGeneratorService.Transformer.Key hubKey) : Lifetime($"{hubId}", service.Logger)
   {
-    public abstract record NodeInformation(long Id, long CreateTime, long UpdateTime, string Name)
+    public abstract class Node
     {
-      public sealed record Folder(long Id, long CreateTime, long UpdateTime, string Name) : NodeInformation(Id, CreateTime, UpdateTime, Name);
-      public sealed record SymbolicLink(long Id, long CreateTime, long UpdateTime, string Name) : NodeInformation(Id, CreateTime, UpdateTime, Name);
-      public sealed record File(long Id, long CreateTime, long UpdateTime, string Name) : NodeInformation(Id, CreateTime, UpdateTime, Name)
+      public abstract class File(long id, long keyId) : Node(id, keyId)
       {
-        public sealed record Snapshot(long Id, long? BaseId, long CreateTime, long UpdateTime);
+        public sealed class Snapshot(long id, long fileId)
+        {
+          public readonly long Id = id;
+          public readonly long FileId = fileId;
+        }
       }
+
+      public abstract class Folder(long id, long keyId) : Node(id, keyId)
+      {
+
+      }
+
+      public abstract class SymbolicLink(long id, long keyId) : Node(id, keyId)
+      {
+
+      }
+
+      private Node(long id, long keyId)
+      {
+        Id = id;
+        KeyId = keyId;
+      }
+
+      public readonly long Id;
+      public readonly long KeyId;
     }
 
     public sealed record TashItem(
       long Id,
       long CreateTime,
-      NodeInformation Node
+      Node Node
     );
 
-    public abstract class FileHandle(Hub hub, long fileId, long snapshotId, KeyGeneratorService.Transformer.Key transformer) : Lifetime($"File #{fileId} Stream #{snapshotId}", hub)
+    public abstract class FileHandle : Lifetime
     {
+      private static void ThrowIfFlagIsMissing(HubFileAccess flag, HubFileAccess test)
+      {
+        if (!flag.HasFlag(test))
+        {
+          throw new InvalidOperationException($"{test} access flag is not present in the handle.");
+        }
+      }
+
       public abstract class LazyBuffer
       {
         public delegate Task<List<LazyBuffer>?> TraverseCallback(LazyBuffer cache);
@@ -111,12 +141,31 @@ public sealed partial class StorageHubService
         }
       }
 
-      private readonly KeyGeneratorService.Transformer.Key Transformer = transformer;
-      private readonly List<LazyBuffer> Cache = [];
+      public FileHandle(Hub hub, long fileId, long snapshotId, KeyGeneratorService.Transformer.Key transformer, HubFileAccess access) : base($"File #{fileId} Stream #{snapshotId}", hub)
+      {
+        Transformer = transformer;
+        Hub = hub;
+        FileId = fileId;
+        SnapshotId = snapshotId;
+        Access = access;
 
-      public readonly Hub Hub = hub;
-      public readonly long FileId = fileId;
-      public readonly long SnapshotId = snapshotId;
+        lock (hub.FileHandleCache)
+        {
+          if (!hub.FileHandleCache.TryGetValue(this, out List<LazyBuffer>? cache))
+          {
+            hub.FileHandleCache.Add(this, cache = []);
+          }
+          Cache = cache;
+        }
+      }
+
+      private readonly KeyGeneratorService.Transformer.Key Transformer;
+      private readonly List<LazyBuffer> Cache;
+
+      public readonly Hub Hub;
+      public readonly long FileId;
+      public readonly long SnapshotId;
+      public readonly HubFileAccess Access;
 
       protected abstract long Internal_Position { get; }
       protected abstract long Internal_Size { get; }
@@ -208,33 +257,34 @@ public sealed partial class StorageHubService
           }
         }
 
-        for (int index = 1; index < Cache.Count; index++)
-        {
-          LazyBuffer cache1 = Cache[index - 1];
-          LazyBuffer cache2 = Cache[index];
+        // for (int index = 1; index < Cache.Count; index++)
+        // {
+        //   LazyBuffer cache1 = Cache[index - 1];
+        //   LazyBuffer cache2 = Cache[index];
 
-          if (cache1.Synced == cache2.Synced)
-          {
-            if (cache1 is LazyBuffer.Buffered bufferedCache1 && cache2 is LazyBuffer.Buffered bufferedCache2)
-            {
-              Cache.RemoveAt(index--);
-              Cache.RemoveAt(index);
+        //   if (cache1.Synced == cache2.Synced)
+        //   {
+        //     if (cache1 is LazyBuffer.Buffered bufferedCache1 && cache2 is LazyBuffer.Buffered bufferedCache2)
+        //     {
+        //       Cache.RemoveAt(index--);
+        //       Cache.RemoveAt(index);
 
-              Cache.Insert(index, new LazyBuffer.Buffered(this, bufferedCache1.Begin, Buffer.Concat(bufferedCache1.Buffer, bufferedCache2.Buffer)));
-            }
-            else if (cache1 is LazyBuffer.Empty && cache2 is LazyBuffer.Empty)
-            {
-              Cache.RemoveAt(index--);
-              Cache.RemoveAt(index);
+        //       Cache.Insert(index, new LazyBuffer.Buffered(this, bufferedCache1.Begin, Buffer.Concat(bufferedCache1.Buffer, bufferedCache2.Buffer)));
+        //     }
+        //     else if (cache1 is LazyBuffer.Empty && cache2 is LazyBuffer.Empty)
+        //     {
+        //       Cache.RemoveAt(index--);
+        //       Cache.RemoveAt(index);
 
-              Cache.Insert(index, new LazyBuffer.Empty(this, cache1.Begin, cache2.End));
-            }
-          }
-        }
+        //       Cache.Insert(index, new LazyBuffer.Empty(this, cache1.Begin, cache2.End));
+        //     }
+        //   }
+        // }
       }
 
       public Task<Buffer> Read(long size) => RunTask(async (__) =>
       {
+        ThrowIfFlagIsMissing(Access, HubFileAccess.Read);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(size, 0);
 
         Buffer output = Buffer.Empty();
@@ -278,6 +328,8 @@ public sealed partial class StorageHubService
 
       public Task Write(Buffer buffer) => RunTask(async (cancellationToken) =>
       {
+        ThrowIfFlagIsMissing(Access, HubFileAccess.Write);
+
         Buffer remainingBytes = buffer.Clone();
         remainingBytes.CopyOnWrite = true;
 
@@ -379,52 +431,6 @@ public sealed partial class StorageHubService
     public readonly KeyGeneratorService.Transformer.Key HubKey = hubKey;
 
     private readonly WeakDictionary<long, FileHandle> FileHandles = [];
-
-    protected abstract Task<long> Internal_ResolveNodeId(string[] path);
-
-    protected abstract Task<NodeInformation> Internal_NodeInfo(long nodeId);
-    protected abstract Task Internal_NodeDelete(long nodeId);
-
-    protected abstract Task<NodeInformation.Folder> Internal_FolderCreate(long parentFolderNodeId, string name);
-    protected abstract Task<NodeInformation[]> Internal_FolderScan(long folderNodeId);
-
-    protected abstract Task<NodeInformation.File> Internal_FileCreate(long parentFolderNodeId, string name);
-    protected abstract Task<NodeInformation.File.Snapshot> Internal_FileSnapshotCreate(long fileNodeId, long? baseSnapshotId, long authorUserId);
-    protected abstract Task<NodeInformation.File.Snapshot[]> Internal_FileSnapshotScan(long fileNodeId);
-    protected abstract Task<FileHandle> Internal_FileOpen(long fileNodeId, long snapshotId, HubFileAccess access);
-
-    protected abstract Task<NodeInformation.SymbolicLink> Internal_SymbolicLinkCreate(long parentFolderNodeId, string[] target, bool replace);
-    protected abstract Task<string[]> Internal_SymbolicLinkRead(long symbolicLinkNodeId);
-
-    public Task<long> ResolveNodeId(string[] path) => Internal_ResolveNodeId(path);
-
-    public Task<NodeInformation> NodeInfo(long nodeId) => Internal_NodeInfo(nodeId);
-    public Task NodeDelete(long nodeId) => Internal_NodeDelete(nodeId);
-
-    public Task<NodeInformation.Folder> FolderCreate(long parentFolderNodeId, string name) => Internal_FolderCreate(parentFolderNodeId, name);
-    public Task<NodeInformation[]> FolderScan(long folderNodeId) => Internal_FolderScan(folderNodeId);
-
-    public Task<NodeInformation.File> FileCreate(long parentFolderNodeId, string name) => Internal_FileCreate(parentFolderNodeId, name);
-    public Task<NodeInformation.File.Snapshot> FileSnapshotCreate(long fileNodeId, long? baseSnapshotId, long authorUserId) => Internal_FileSnapshotCreate(fileNodeId, baseSnapshotId, authorUserId);
-    public Task<NodeInformation.File.Snapshot[]> FileSnapshotScan(long fileNodeId) => Internal_FileSnapshotScan(fileNodeId);
-    public async Task<FileHandle> FileOpen(long fileNode, long snapshotId, HubFileAccess access, HubFileMode mode)
-    {
-      FileHandle handle = await Internal_FileOpen(fileNode, snapshotId, access);
-
-      if (mode.HasFlag(HubFileMode.TruncateToZero))
-      {
-        await handle.SetSize(0);
-      }
-
-      if (mode.HasFlag(HubFileMode.Append))
-      {
-        await handle.Seek(handle.Size);
-      }
-
-      return handle;
-    }
-
-    public Task<NodeInformation.SymbolicLink> SymbolicLinkCreate(long parentFolderNodeId, string[] target, bool replace = false) => Internal_SymbolicLinkCreate(parentFolderNodeId, target, replace);
-    public Task<string[]> SymbolicLinkRead(long symbolicLinkNodeId) => Internal_SymbolicLinkRead(symbolicLinkNodeId);
+    private readonly WeakDictionary<FileHandle, List<FileHandle.LazyBuffer>> FileHandleCache = [];
   }
 }

@@ -82,15 +82,41 @@ public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
     StorageHubType Type,
     StorageHubFlags Flags,
     string Name
-  ) : Record(Id, CreateTime, UpdateTime)
-  {
-    public sealed record BlobNode(
-      long Id,
-      long CreateTime,
-      long UpdateTime,
-      BlobNodeType Type,
-      long? ParentNode,
-      string Name
-    ) : Record(Id, CreateTime, UpdateTime);
-  }
+  ) : Record(Id, CreateTime, UpdateTime);
+
+  public sealed record BlobStorageNode(
+    long Id,
+    long CreateTime,
+    long UpdateTime,
+    long BlobHubId,
+    BlobNodeType Type,
+    long? ParentNode,
+    string Name,
+    long KeySharedId
+  ) : Record(Id, CreateTime, UpdateTime);
+
+  public sealed record BlobStorageFileSnapshot(
+    long Id,
+    long CreateTime,
+    long UpdateTime,
+    long NodeId,
+    long AuthorUserId
+  ) : Record(Id, CreateTime, UpdateTime);
+
+  public sealed record BlobStorageFileDataMapper(
+    long Id,
+    long CreateTime,
+    long UpdateTime,
+    long SnapshotId,
+    long SegmentId,
+    long SequenceIndex
+  ) : Record(Id, CreateTime, UpdateTime);
+
+  public sealed record BlobStorageFileData(
+    long Id,
+    long CreateTime,
+    long UpdateTime,
+    long Size,
+    byte[] Buffer
+  ) : Record(Id, CreateTime, UpdateTime);
 }

@@ -84,26 +84,37 @@ public abstract class Lifetime : ILifetime
 
       using (cancellationTokenSource)
       {
-        Logger.Log(LogLevel.Verbose, "Lifetime started.");
-        try
-        {
-          Started?.Invoke(this, new());
-          await await Task.WhenAny(
-            OnRun(linkedCancellationTokenSource.Token),
-            TaskQueue.Start(linkedCancellationTokenSource.Token)
-          );
+        CancellationTokenSource taskQueueCancellationTokenSource = new();
 
-          lock (this)
-          {
-            Source = null;
-          }
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception exception) { Exception = exception; }
-        finally
+        using (taskQueueCancellationTokenSource)
         {
-          Logger.Log(LogLevel.Verbose, "Lifetime stopped.");
-          Stopped?.Invoke(this, new());
+          Task taskQueueTask = TaskQueue.Start(taskQueueCancellationTokenSource.Token);
+
+          Logger.Log(LogLevel.Verbose, "Lifetime started.");
+          try
+          {
+            Started?.Invoke(this, new());
+            await OnRun(linkedCancellationTokenSource.Token);
+
+            lock (this)
+            {
+              Source = null;
+            }
+          }
+          catch (OperationCanceledException) { }
+          catch (Exception exception) { Exception = exception; }
+          finally
+          {
+            try
+            {
+              await taskQueueTask;
+            }
+            finally
+            {
+              Logger.Log(LogLevel.Verbose, "Lifetime stopped.");
+              Stopped?.Invoke(this, new());
+            }
+          }
         }
       }
     }

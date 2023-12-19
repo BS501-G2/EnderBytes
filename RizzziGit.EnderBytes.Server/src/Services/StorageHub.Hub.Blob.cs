@@ -1,66 +1,56 @@
+using MongoDB.Driver;
+
 namespace RizzziGit.EnderBytes.Services;
+
+using Records;
 
 public enum BlobNodeType { File, Folder, SymbolicLink }
 
 public sealed partial class StorageHubService
 {
+  public const int BUFFER_SIZE = KeyGeneratorService.KEY_SIZE / 8;
+
   public abstract partial class Hub
   {
+    private Server Server => Service.Server;
+    private IMongoDatabase Database => Service.Server.Database;
+
+    private IMongoCollection<Record.BlobStorageNode> Nodes => Server.GetCollection<Record.BlobStorageNode>();
+    private IMongoCollection<Record.BlobStorageFileSnapshot> FileSnapshots => Server.GetCollection<Record.BlobStorageFileSnapshot>();
+    private IMongoCollection<Record.BlobStorageFileDataMapper> FileDataMappers => Server.GetCollection<Record.BlobStorageFileDataMapper>();
+    private IMongoCollection<Record.BlobStorageFileData> FileData => Server.GetCollection<Record.BlobStorageFileData>();
+
     public sealed class Blob(StorageHubService service, long hubId, KeyGeneratorService.Transformer.Key hubKey) : Hub(service, hubId, hubKey)
     {
-      protected override Task<NodeInformation.File> Internal_FileCreate(long parentFolderNodeId, string name)
+      public new sealed class FileHandle(Hub hub, long fileId, long snapshotId, KeyGeneratorService.Transformer.Key transformer, HubFileAccess access) : Hub.FileHandle(hub, fileId, snapshotId, transformer, access)
       {
-        throw new NotImplementedException();
-      }
+        private long CurrentIndex = 0;
+        private long CurrentOffset = 0;
 
-      protected override Task<FileHandle> Internal_FileOpen(long fileNodeId, long snapshotId, HubFileAccess access)
-      {
-        throw new NotImplementedException();
-      }
+        protected override long Internal_Position => Position;
+        protected override long Internal_Size => Size;
 
-      protected override Task<NodeInformation.File.Snapshot> Internal_FileSnapshotCreate(long fileNodeId, long? baseSnapshotId, long authorUserId)
-      {
-        throw new NotImplementedException();
-      }
+        protected override Task<Buffer.Buffer> Internal_Read(long size)
+        {
+          throw new NotImplementedException();
+        }
 
-      protected override Task<NodeInformation.File.Snapshot[]> Internal_FileSnapshotScan(long fileNodeId)
-      {
-        throw new NotImplementedException();
-      }
+        protected override Task Internal_Seek(long position)
+        {
+          ArgumentOutOfRangeException.ThrowIfGreaterThan(Size, position);
+          return Task.CompletedTask;
+        }
 
-      protected override Task<NodeInformation.Folder> Internal_FolderCreate(long parentFolderNodeId, string name)
-      {
-        throw new NotImplementedException();
-      }
+        protected override Task Internal_SetSize(long size)
+        {
+          // Position = long.Min(Position, Size = size);
+          return Task.CompletedTask;
+        }
 
-      protected override Task<NodeInformation[]> Internal_FolderScan(long folderNodeId)
-      {
-        throw new NotImplementedException();
-      }
-
-      protected override Task Internal_NodeDelete(long nodeId)
-      {
-        throw new NotImplementedException();
-      }
-
-      protected override Task<NodeInformation> Internal_NodeInfo(long nodeId)
-      {
-        throw new NotImplementedException();
-      }
-
-      protected override Task<long> Internal_ResolveNodeId(string[] path)
-      {
-        throw new NotImplementedException();
-      }
-
-      protected override Task<NodeInformation.SymbolicLink> Internal_SymbolicLinkCreate(long parentFolderNodeId, string[] target, bool replace)
-      {
-        throw new NotImplementedException();
-      }
-
-      protected override Task<string[]> Internal_SymbolicLinkRead(long symbolicLinkNodeId)
-      {
-        throw new NotImplementedException();
+        protected override Task Internal_Write(Buffer.Buffer buffer)
+        {
+          throw new NotImplementedException();
+        }
       }
     }
   }

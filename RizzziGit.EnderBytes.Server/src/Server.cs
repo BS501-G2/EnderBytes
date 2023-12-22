@@ -34,9 +34,12 @@ public sealed class Server : Service
   public readonly KeyGeneratorService KeyGeneratorService;
   public readonly ConnectionService ConnectionService;
 
-  protected override Task OnRun(CancellationToken cancellationToken)
+  protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    return WatchDog([UserService, KeyGeneratorService, ConnectionService], cancellationToken);
+    await await Task.WhenAny(
+      WatchDog([UserService, KeyGeneratorService, ConnectionService], cancellationToken),
+      Record.RegisterOnUpdateHook(MongoClient, Database, cancellationToken)
+    );
   }
 
   protected override async Task OnStart(CancellationToken cancellationToken)

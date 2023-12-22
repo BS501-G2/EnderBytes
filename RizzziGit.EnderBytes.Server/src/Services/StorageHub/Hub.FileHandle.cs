@@ -1,69 +1,13 @@
 namespace RizzziGit.EnderBytes.Services;
 
-using Collections;
 using Buffer;
 using Utilities;
-using RizzziGit.EnderBytes.Records;
-
-[Flags]
-public enum HubFileAccess : byte
-{
-  Read = 1 << 0,
-  Write = 1 << 1,
-  Exclusive = 1 << 2,
-
-  ReadWrite = Read | Write,
-  ExclusiveReadWrite = Exclusive | ReadWrite
-}
-
-[Flags]
-public enum HubFileMode : byte
-{
-  TruncateToZero = 1 << 0,
-  Append = 1 << 1
-}
+using Collections;
 
 public sealed partial class StorageHubService
 {
-  public abstract partial class Hub(StorageHubService service, long hubId, KeyGeneratorService.Transformer.Key hubKey) : Lifetime($"{hubId}", service.Logger)
+  public abstract partial class Hub : Lifetime
   {
-    public abstract class Node
-    {
-      public abstract class File(long id, long keyId) : Node(id, keyId)
-      {
-        public sealed class Snapshot(long id, long fileId)
-        {
-          public readonly long Id = id;
-          public readonly long FileId = fileId;
-        }
-      }
-
-      public abstract class Folder(long id, long keyId) : Node(id, keyId)
-      {
-
-      }
-
-      public abstract class SymbolicLink(long id, long keyId) : Node(id, keyId)
-      {
-
-      }
-
-      private Node(long id, long keyId)
-      {
-        Id = id;
-        KeyId = keyId;
-      }
-
-      public readonly long Id;
-      public readonly long KeyId;
-    }
-
-    public sealed record TashItem(
-      long Id,
-      long CreateTime,
-      Node Node
-    );
-
     public abstract class FileHandle : Lifetime
     {
       private static void ThrowIfFlagIsMissing(HubFileAccess flag, HubFileAccess test)
@@ -143,10 +87,10 @@ public sealed partial class StorageHubService
 
       public FileHandle(Hub hub, long fileId, long snapshotId, KeyGeneratorService.Transformer.Key transformer, HubFileAccess access) : base($"File #{fileId} Stream #{snapshotId}", hub)
       {
-        Transformer = transformer;
         Hub = hub;
         FileId = fileId;
         SnapshotId = snapshotId;
+        Transformer = transformer;
         Access = access;
 
         lock (hub.FileHandleCache)
@@ -157,10 +101,15 @@ public sealed partial class StorageHubService
           }
           Cache = cache;
         }
+
+        NodeHandles = [];
+        SnapshotHandles = [];
       }
 
       private readonly KeyGeneratorService.Transformer.Key Transformer;
       private readonly List<LazyBuffer> Cache;
+      private readonly WeakDictionary<long, Node> NodeHandles;
+      private readonly WeakDictionary<long, Node.File.Snapshot> SnapshotHandles;
 
       public readonly Hub Hub;
       public readonly long FileId;
@@ -426,11 +375,5 @@ public sealed partial class StorageHubService
       }
     }
 
-    public readonly StorageHubService Service = service;
-    public readonly long HubId = hubId;
-    public readonly KeyGeneratorService.Transformer.Key HubKey = hubKey;
-
-    private readonly WeakDictionary<long, FileHandle> FileHandles = [];
-    private readonly WeakDictionary<FileHandle, List<FileHandle.LazyBuffer>> FileHandleCache = [];
   }
 }

@@ -13,6 +13,8 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
 
   public abstract class Transformer(RSACryptoServiceProvider provider) : IDisposable
   {
+    ~Transformer() => Dispose();
+
     public void Dispose()
     {
       GC.SuppressFinalize(this);
@@ -40,14 +42,17 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
 
   public readonly Server Server = server;
 
-  public IMongoCollection<Record.Key> KeyRecords => Server.GetCollection<Record.Key>();
-  public IMongoCollection<Record.UserAuthentication> UserAuthenticationRecords => Server.GetCollection<Record.UserAuthentication>();
+  public IMongoCollection<Record.Key> Keys => Server.GetCollection<Record.Key>();
+  public IMongoCollection<Record.UserAuthentication> UserAuthentications => Server.GetCollection<Record.UserAuthentication>();
 
   private readonly TaskFactory TaskFactory = new(TaskCreationOptions.LongRunning, TaskContinuationOptions.None);
   private readonly List<RsaKeyPair> WaitQueue = [];
 
-  private readonly WeakDictionary<long, Transformer.Key> KeyTransformers = [];
-  private readonly WeakDictionary<long, Transformer.UserAuthentication> UserAuthenticationTransformers = [];
+  private readonly WeakDictionary<long, Transformer.Key> PrivateKeyTransformers = [];
+  private readonly WeakDictionary<long, Transformer.Key> PublicKeyTransformers = [];
+
+  private readonly WeakDictionary<long, Transformer.UserAuthentication> PrivateUserAuthenticationTransformers = [];
+  private readonly WeakDictionary<long, Transformer.UserAuthentication> PublicUserAuthenticationTransformers = [];
 
   private void RunIndividualGenerationJob()
   {
@@ -112,19 +117,6 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
 
   protected override Task OnRun(CancellationToken cancellationToken)
   {
-    Server.UserService.UserRecords.BeginWatching((change) =>
-    {
-      if (change.OperationType != ChangeStreamOperationType.Delete)
-      {
-        return;
-      }
-
-      UserAuthenticationRecords.DeleteMany(
-        from userAuthentication in UserAuthenticationRecords.AsQueryable()
-        where userAuthentication.UserId == change.FullDocument.Id
-        select userAuthentication
-      );
-    }, cancellationToken);
 
     return RunKeyGenerationJob(cancellationToken);
   }
@@ -132,7 +124,7 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
   protected override Task OnStop(Exception? exception) => Task.CompletedTask;
   protected override Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
 
-  public RsaKeyPair GetNew()
+  public RsaKeyPair GetNewRsaKeyPair()
   {
     lock (WaitQueue)
     {
@@ -151,12 +143,11 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
 
   public Transformer.UserAuthentication GetTransformer(Record.UserAuthentication userAuthentication, byte[]? hashCache)
   {
-    lock (UserAuthenticationTransformers)
+    WeakDictionary<long, Transformer.UserAuthentication> transformers = hashCache == null ? PublicUserAuthenticationTransformers : PrivateUserAuthenticationTransformers;
+
+    lock (transformers)
     {
-      if (
-        (!UserAuthenticationTransformers.TryGetValue(userAuthentication.UserId, out Transformer.UserAuthentication? transformer)) ||
-        (hashCache != null && transformer.PublicOnly)
-      )
+      if (!transformers.TryGetValue(userAuthentication.UserId, out Transformer.UserAuthentication? transformer))
       {
         RSACryptoServiceProvider provider = new()
         {
@@ -164,11 +155,82 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
           KeySize = KEY_SIZE
         };
 
-        transformer = UserAuthenticationTransformers[userAuthentication.UserId] = new(provider, userAuthentication.UserId);
+        transformer = transformers[userAuthentication.UserId] = new(provider, userAuthentication.UserId);
         provider.ImportCspBlob(hashCache != null ? userAuthentication.GetDecryptedEncryptionPrivateKey(hashCache) : userAuthentication.EncryptionPublicKey);
       }
 
       return transformer;
     }
   }
+
+  public Task<Transformer.Key> GetTransformer(long sharedId) => GetTransformer(null, sharedId);
+  public Task<Transformer.Key> GetTransformer(Transformer.UserAuthentication? userAuthenticationTransformer, long sharedId) => RunTask(async (cancellationToken) =>
+  {
+    Record.Key key = await Server.MongoClient.RunTransaction(async (cancellationToken) =>
+    {
+      await foreach (var record in Keys.FindAsync((record) => record.SharedId == sharedId && (userAuthenticationTransformer != null ? record.UserId == userAuthenticationTransformer.UserId : record.UserId == null), cancellationToken: cancellationToken).ToAsyncEnumerable(cancellationToken))
+      {
+        return record;
+      }
+
+      throw new InvalidOperationException($"{(userAuthenticationTransformer != null ? "The specified user" : "The public")} does not have access to the key.");
+    }, cancellationToken: cancellationToken);
+
+    WeakDictionary<long, Transformer.Key> transformers = key.UserId == null ? PublicKeyTransformers : PrivateKeyTransformers;
+    lock (transformers)
+    {
+      if (!transformers.TryGetValue(key.SharedId, out Transformer.Key? transformer))
+      {
+        RSACryptoServiceProvider provider = new()
+        {
+          PersistKeyInCsp = false,
+          KeySize = KEY_SIZE
+        };
+
+        transformer = transformers[key.SharedId] = new(provider, key.SharedId);
+        provider.ImportCspBlob(userAuthenticationTransformer?.Decrypt(key.PrivateKey) ?? key.PrivateKey);
+      }
+
+      return transformer;
+    }
+  });
+
+  private Task<Record.Key> InsertNewKey(long? userId, byte[] privateKey, byte[] publicKey, CancellationToken cancellationToken) => Server.MongoClient.RunTransaction(async (cancellationToken) =>
+  {
+    long sharedId;
+    do
+    {
+      sharedId = Random.Shared.NextInt64();
+    }
+    while (await (await Keys.FindAsync((entry) => entry.SharedId == sharedId, cancellationToken: cancellationToken)).AnyAsync(cancellationToken));
+
+    (long id, long createTime, long updateTime) = Record.GenerateNewId(Keys);
+    Record.Key key = new(id, createTime, updateTime, sharedId, userId, privateKey, publicKey);
+    await Keys.InsertOneAsync(key, cancellationToken: cancellationToken);
+    return key;
+  }, cancellationToken: cancellationToken);
+
+  public Task<Record.Key> CreateNewKey(Transformer.UserAuthentication? userAuthenticationTransformer) => RunTask((cancellationToken) =>
+  {
+    (byte[] privateKey, byte[] publicKey) = GetNewRsaKeyPair();
+
+    return InsertNewKey(userAuthenticationTransformer?.UserId, userAuthenticationTransformer?.Encrypt(privateKey) ?? privateKey, publicKey, cancellationToken);
+  });
+
+  public Task<Record.Key> DuplicateKey(
+    Record.Key key,
+    Transformer.UserAuthentication? existingUserAuthenticationTransformer,
+    Transformer.UserAuthentication? newUserAuthenticationTransformer
+  ) => RunTask((cancellationToken) =>
+  {
+    if (key.UserId != existingUserAuthenticationTransformer?.UserId)
+    {
+      throw new ArgumentException("User authentication does not match the key user id.", nameof(existingUserAuthenticationTransformer));
+    }
+
+    byte[] privateKey = existingUserAuthenticationTransformer != null ? existingUserAuthenticationTransformer.Decrypt(key.PrivateKey) : key.PrivateKey;
+    byte[] publicKey = key.PublicKey;
+
+    return InsertNewKey(newUserAuthenticationTransformer?.UserId, newUserAuthenticationTransformer?.Encrypt(privateKey) ?? privateKey, publicKey, cancellationToken);
+  });
 }

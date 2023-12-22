@@ -1,6 +1,6 @@
 namespace RizzziGit.EnderBytes.Services;
 
-public sealed class ConnectionService(Server server) : Service("Connections", server)
+public sealed partial class ConnectionService(Server server) : Service("Connections", server)
 {
   public readonly Server Server = server;
 

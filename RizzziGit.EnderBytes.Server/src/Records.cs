@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using MongoDB.Driver;
 
 namespace RizzziGit.EnderBytes.Records;
 
@@ -8,6 +9,51 @@ using Services;
 
 public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
 {
+  public static (long Id, long CreateTime, long UpdateTime) GenerateNewId<T>(IMongoCollection<T> collection) where T : Record
+  {
+    long id;
+    do
+    {
+      id = Random.Shared.NextInt64();
+    }
+    while ((from record in collection.AsQueryable() select record.Id == id).Any());
+
+    long createTime;
+    long updateTime = createTime = Random.Shared.NextInt64();
+
+    return (id, createTime, updateTime);
+  }
+
+  public static async Task RegisterOnUpdateHook(MongoClient client, IMongoDatabase database, CancellationToken cancellationToken)
+  {
+    List<Task> tasks = [];
+
+    await foreach (string collectionName in (await database.ListCollectionNamesAsync(cancellationToken: cancellationToken)).ToAsyncEnumerable(cancellationToken))
+    {
+      tasks.Add(watch(database.GetCollection<Record>(collectionName), cancellationToken));
+    }
+
+    await await Task.WhenAny(tasks);
+    async Task watch(IMongoCollection<Record> collection, CancellationToken cancellationToken)
+    {
+      await foreach (ChangeStreamDocument<Record> change in (await collection.WatchAsync(cancellationToken: cancellationToken)).ToAsyncEnumerable(cancellationToken))
+      {
+        if (
+          (change.OperationType != ChangeStreamOperationType.Update) &&
+          (change.OperationType != ChangeStreamOperationType.Replace)
+        )
+        {
+          continue;
+        }
+
+        if (change.FullDocumentBeforeChange.UpdateTime == change.FullDocument.UpdateTime)
+        {
+          await collection.UpdateManyAsync((record) => record.Id == change.FullDocument.Id, Builders<Record>.Update.Set((e) => e.UpdateTime, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), cancellationToken: cancellationToken);
+        }
+      }
+    }
+  }
+
   public sealed record User(
     long Id,
     long CreateTime,
@@ -31,8 +77,8 @@ public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
 
     // Aes Key Challenge
     byte[] ChallengeIv,
-    byte[] EncryptedChallengePayload,
-    byte[] ExpectedChallengePayload,
+    byte[] EncryptedChallengeBytes,
+    byte[] ExpectedChallengeBytes,
 
     // Encryption
     byte[] EncryptionPrivateKeyIv,
@@ -40,14 +86,17 @@ public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
     byte[] EncryptionPublicKey
   ) : Record(Id, CreateTime, UpdateTime)
   {
-    public byte[] GetHash(string payload) => GetHash(Encoding.UTF8.GetBytes(payload));
-    public byte[] GetHash(byte[] payload) => new Rfc2898DeriveBytes(payload, Salt, Iterations, AlgorithmName).GetBytes(32);
+    public static byte[] GetHash(byte[] salt, int iterations, HashAlgorithmName algorithmName, string payload) => GetHash(salt, iterations, algorithmName, Encoding.UTF8.GetBytes(payload));
+    public static byte[] GetHash(byte[] salt, int iterations, HashAlgorithmName algorithmName, byte[] payload) => new Rfc2898DeriveBytes(payload, salt, iterations, algorithmName).GetBytes(32);
+
+    public byte[] GetHash(string payload) => GetHash(Salt, Iterations, AlgorithmName, payload);
+    public byte[] GetHash(byte[] payload) => GetHash(Salt, Iterations, AlgorithmName, payload);
 
     public bool HashMatches(byte[] hash)
     {
       try
       {
-        return Aes.Create().CreateDecryptor(hash, ChallengeIv).TransformFinalBlock(EncryptedChallengePayload).SequenceEqual(ExpectedChallengePayload);
+        return Aes.Create().CreateDecryptor(hash, ChallengeIv).TransformFinalBlock(EncryptedChallengeBytes).SequenceEqual(ExpectedChallengeBytes);
       }
       catch
       {
@@ -99,8 +148,9 @@ public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
     long Id,
     long CreateTime,
     long UpdateTime,
-    long NodeId,
-    long AuthorUserId
+    long FileNodeId,
+    long AuthorUserId,
+    long? BaseSnapshotId
   ) : Record(Id, CreateTime, UpdateTime);
 
   public sealed record BlobStorageFileDataMapper(

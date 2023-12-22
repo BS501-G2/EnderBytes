@@ -3,6 +3,7 @@ using MongoDB.Driver;
 namespace RizzziGit.EnderBytes.Services;
 
 using Records;
+using Utilities;
 
 public enum BlobNodeType { File, Folder, SymbolicLink }
 
@@ -12,14 +13,6 @@ public sealed partial class StorageHubService
 
   public abstract partial class Hub
   {
-    private Server Server => Service.Server;
-    private IMongoDatabase Database => Service.Server.Database;
-
-    private IMongoCollection<Record.BlobStorageNode> Nodes => Server.GetCollection<Record.BlobStorageNode>();
-    private IMongoCollection<Record.BlobStorageFileSnapshot> FileSnapshots => Server.GetCollection<Record.BlobStorageFileSnapshot>();
-    private IMongoCollection<Record.BlobStorageFileDataMapper> FileDataMappers => Server.GetCollection<Record.BlobStorageFileDataMapper>();
-    private IMongoCollection<Record.BlobStorageFileData> FileData => Server.GetCollection<Record.BlobStorageFileData>();
-
     public sealed class Blob(StorageHubService service, long hubId, KeyGeneratorService.Transformer.Key hubKey) : Hub(service, hubId, hubKey)
     {
       public new sealed class FileHandle(Hub hub, long fileId, long snapshotId, KeyGeneratorService.Transformer.Key transformer, HubFileAccess access) : Hub.FileHandle(hub, fileId, snapshotId, transformer, access)
@@ -51,6 +44,25 @@ public sealed partial class StorageHubService
         {
           throw new NotImplementedException();
         }
+      }
+
+      private Server Server => Service.Server;
+      private IMongoDatabase Database => Service.Server.Database;
+      private MongoClient MongoClient => Service.Server.MongoClient;
+
+      private IMongoCollection<Record.BlobStorageNode> Nodes => Server.GetCollection<Record.BlobStorageNode>();
+      private IMongoCollection<Record.BlobStorageFileSnapshot> FileSnapshots => Server.GetCollection<Record.BlobStorageFileSnapshot>();
+      private IMongoCollection<Record.BlobStorageFileDataMapper> FileDataMappers => Server.GetCollection<Record.BlobStorageFileDataMapper>();
+      private IMongoCollection<Record.BlobStorageFileData> FileData => Server.GetCollection<Record.BlobStorageFileData>();
+
+      protected override Task<Node.Folder> Internal_GetRootFolder(ConnectionService.Connection connection)
+      {
+        throw new NotImplementedException();
+      }
+
+      protected override Task<TrashItem> Internal_ScanTrash(ConnectionService.Connection connection)
+      {
+        throw new NotImplementedException();
       }
     }
   }

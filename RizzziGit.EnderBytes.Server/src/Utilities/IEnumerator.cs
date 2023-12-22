@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using MongoDB.Driver;
 
 namespace RizzziGit.EnderBytes.Utilities;
 
@@ -15,13 +16,29 @@ public static class IEnumeratorExtensions
     }
   }
 
-  public static async IAsyncEnumerable<T> Wrap<T>(this MongoDB.Driver.IAsyncCursor<T> enumerator, [EnumeratorCancellation] CancellationToken cancellationToken)
+  public static async IAsyncEnumerable<T> ToAsyncEnumerable<T>(this IFindFluent<T, T> cursor, [EnumeratorCancellation] CancellationToken cancellationToken)
   {
-    using (enumerator)
+    await foreach (T entry in (await cursor.ToCursorAsync(cancellationToken)).ToAsyncEnumerable(cancellationToken))
     {
-      while (await enumerator.MoveNextAsync(cancellationToken))
+      yield return entry;
+    }
+  }
+
+  public static async IAsyncEnumerable<T> ToAsyncEnumerable<T>(this Task<IAsyncCursor<T>> cursor, [EnumeratorCancellation] CancellationToken cancellationToken)
+  {
+    await foreach (T entry in (await cursor).ToAsyncEnumerable(cancellationToken))
+    {
+      yield return entry;
+    }
+  }
+
+  public static async IAsyncEnumerable<T> ToAsyncEnumerable<T>(this IAsyncCursor<T> cursor, [EnumeratorCancellation] CancellationToken cancellationToken)
+  {
+    using (cursor)
+    {
+      while (await cursor.MoveNextAsync(cancellationToken))
       {
-        foreach (T? entry in enumerator.Current)
+        foreach (T? entry in cursor.Current)
         {
           if (entry == null)
           {

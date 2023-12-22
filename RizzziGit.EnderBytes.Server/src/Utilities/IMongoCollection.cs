@@ -31,7 +31,7 @@ public static class IMongoCollection
   {
     try
     {
-      await foreach (ChangeStreamDocument<T> document in mongoCollection.Watch(options, cancellationToken).Wrap(cancellationToken))
+      await foreach (ChangeStreamDocument<T> document in mongoCollection.Watch(options, cancellationToken).ToAsyncEnumerable(cancellationToken))
       {
         await hook(document);
       }

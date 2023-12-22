@@ -21,7 +21,7 @@ public sealed partial class StorageHubService(Server server) : Server.SubService
   public async Task<Hub> Get(long hubId, KeyGeneratorService.Transformer.Key inputKey, CancellationToken cancellationToken)
   {
     Record.StorageHub storageHub = (from record in HubRecords.AsQueryable() where record.Id == hubId select record).FirstOrDefault() ?? throw new ArgumentException("Invalid storage hub id.", nameof(hubId));
-    Record.Key key = (from record in Server.KeyGeneratorService.KeyRecords.AsQueryable() where record.SharedId == storageHub.KeySharedId select record).FirstOrDefault() ?? throw new InvalidDataException("Invalid key shared id stored in storage pool.");
+    Record.Key key = (from record in Server.KeyGeneratorService.Keys.AsQueryable() where record.SharedId == storageHub.KeySharedId select record).FirstOrDefault() ?? throw new InvalidDataException("Invalid key shared id stored in storage pool.");
 
     if (key.SharedId != inputKey.SharedId)
     {
@@ -62,7 +62,7 @@ public sealed partial class StorageHubService(Server server) : Server.SubService
 
   protected override Task OnStart(CancellationToken cancellationToken)
   {
-    Server.UserService.UserRecords.BeginWatching((change) =>
+    Server.UserService.Users.BeginWatching((change) =>
     {
       if (change.OperationType != ChangeStreamOperationType.Delete)
       {

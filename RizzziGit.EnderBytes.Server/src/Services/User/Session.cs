@@ -8,6 +8,7 @@ public sealed partial class UserService
   {
     public readonly GlobalSession Global = global;
     public readonly long Id = id;
+    public long UserId => Global.UserId;
     public readonly KeyGeneratorService.Transformer.UserAuthentication Transformer = transformer;
   }
 }

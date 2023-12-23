@@ -1,8 +1,8 @@
 namespace RizzziGit.EnderBytes.Services;
 
-using Buffer;
-using Utilities;
-using Collections;
+using Framework.Services;
+using Framework.Memory;
+using Framework.Collections;
 
 public sealed partial class StorageHubService
 {
@@ -49,9 +49,9 @@ public sealed partial class StorageHubService
         );
 
         public sealed class Empty(FileHandle handle, long begin, long end) : LazyBuffer(handle, begin, end);
-        public sealed class Buffered(FileHandle handle, long begin, Buffer buffer) : LazyBuffer(handle, begin, begin + buffer.Length)
+        public sealed class Buffered(FileHandle handle, long begin, CompositeBuffer buffer) : LazyBuffer(handle, begin, begin + buffer.Length)
         {
-          public readonly Buffer Buffer = buffer.Clone();
+          public readonly CompositeBuffer Buffer = buffer.Clone();
           public long BufferOffset(long position) => position - Begin;
 
           public Task Sync()
@@ -64,13 +64,13 @@ public sealed partial class StorageHubService
             return Handle.Internal_Write(Begin, Buffer);
           }
 
-          public void Write(long begin, Buffer buffer)
+          public void Write(long begin, CompositeBuffer buffer)
           {
             Buffer.Write(BufferOffset(begin), buffer);
             Synced = false;
           }
 
-          public Buffer Read(long begin, long end) => Buffer.Read(BufferOffset(begin), end - begin);
+          public CompositeBuffer Read(long begin, long end) => Buffer.Read(BufferOffset(begin), end - begin);
 
           public override (LazyBuffer Left, LazyBuffer Right) Split(long position) => new(
             new Buffered(Handle, Begin, Buffer.Slice(BufferOffset(Begin), BufferOffset(position))),
@@ -123,12 +123,12 @@ public sealed partial class StorageHubService
       public long Size { get; private set; }
       public long CacheSize => Cache.Select((cache) => cache is LazyBuffer.Buffered ? cache.Length : 0).Sum();
 
-      protected abstract Task<Buffer> Internal_Read(long size);
-      protected abstract Task Internal_Write(Buffer buffer);
+      protected abstract Task<CompositeBuffer> Internal_Read(long size);
+      protected abstract Task Internal_Write(CompositeBuffer buffer);
       protected abstract Task Internal_Seek(long position);
       protected abstract Task Internal_SetSize(long size);
 
-      private async Task<Buffer> Internal_Read(long begin, long end)
+      private async Task<CompositeBuffer> Internal_Read(long begin, long end)
       {
         if (Internal_Position != begin)
         {
@@ -138,7 +138,7 @@ public sealed partial class StorageHubService
         return await Internal_Read(end - begin);
       }
 
-      private async Task Internal_Write(long begin, Buffer buffer)
+      private async Task Internal_Write(long begin, CompositeBuffer buffer)
       {
         if (Internal_Position != begin)
         {
@@ -205,38 +205,14 @@ public sealed partial class StorageHubService
             processResult(await callback(Cache[index]));
           }
         }
-
-        // for (int index = 1; index < Cache.Count; index++)
-        // {
-        //   LazyBuffer cache1 = Cache[index - 1];
-        //   LazyBuffer cache2 = Cache[index];
-
-        //   if (cache1.Synced == cache2.Synced)
-        //   {
-        //     if (cache1 is LazyBuffer.Buffered bufferedCache1 && cache2 is LazyBuffer.Buffered bufferedCache2)
-        //     {
-        //       Cache.RemoveAt(index--);
-        //       Cache.RemoveAt(index);
-
-        //       Cache.Insert(index, new LazyBuffer.Buffered(this, bufferedCache1.Begin, Buffer.Concat(bufferedCache1.Buffer, bufferedCache2.Buffer)));
-        //     }
-        //     else if (cache1 is LazyBuffer.Empty && cache2 is LazyBuffer.Empty)
-        //     {
-        //       Cache.RemoveAt(index--);
-        //       Cache.RemoveAt(index);
-
-        //       Cache.Insert(index, new LazyBuffer.Empty(this, cache1.Begin, cache2.End));
-        //     }
-        //   }
-        // }
       }
 
-      public Task<Buffer> Read(long size) => RunTask(async (__) =>
+      public Task<CompositeBuffer> Read(long size) => RunTask(async (__) =>
       {
         ThrowIfFlagIsMissing(Access, HubFileAccess.Read);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(size, 0);
 
-        Buffer output = Buffer.Empty();
+        CompositeBuffer output = CompositeBuffer.Empty();
 
         long requestBegin() => Position + output.Length;
         long requestEnd() => long.Min(Position + size, Size);
@@ -251,7 +227,7 @@ public sealed partial class StorageHubService
           {
             long end = long.Min(cache.End, requestEnd());
 
-            Buffer buffer = await Internal_Read(cache.Begin, end);
+            CompositeBuffer buffer = await Internal_Read(cache.Begin, end);
             output.Append(buffer);
 
             (_, LazyBuffer right) = cache.Split(end);
@@ -261,7 +237,7 @@ public sealed partial class StorageHubService
           {
             long begin = long.Max(cache.Begin, requestBegin());
 
-            Buffer buffer = await Internal_Read(begin, cache.End);
+            CompositeBuffer buffer = await Internal_Read(begin, cache.End);
             output.Append(buffer);
 
             (LazyBuffer left, _) = cache.Split(begin);
@@ -275,11 +251,11 @@ public sealed partial class StorageHubService
         return output;
       });
 
-      public Task Write(Buffer buffer) => RunTask(async (cancellationToken) =>
+      public Task Write(CompositeBuffer buffer) => RunTask(async (cancellationToken) =>
       {
         ThrowIfFlagIsMissing(Access, HubFileAccess.Write);
 
-        Buffer remainingBytes = buffer.Clone();
+        CompositeBuffer remainingBytes = buffer.Clone();
         remainingBytes.CopyOnWrite = true;
 
         long requestBegin() => Position + (buffer.Length - remainingBytes.Length);
@@ -305,7 +281,7 @@ public sealed partial class StorageHubService
 
             (_, LazyBuffer right) = cache.Split(end);
 
-            LazyBuffer.Buffered left = new(this, cache.Begin, Buffer.Allocate(end - cache.Begin));
+            LazyBuffer.Buffered left = new(this, cache.Begin, CompositeBuffer.Allocate(end - cache.Begin));
             left.Write(left.Begin, remainingBytes.TruncateStart(end - cache.Begin));
 
             return Task.FromResult<List<LazyBuffer>?>([left, right]);
@@ -316,7 +292,7 @@ public sealed partial class StorageHubService
 
             (LazyBuffer left, _) = cache.Split(begin);
 
-            LazyBuffer.Buffered right = new(this, begin, Buffer.Allocate(cache.End - begin));
+            LazyBuffer.Buffered right = new(this, begin, CompositeBuffer.Allocate(cache.End - begin));
             right.Write(right.Begin, remainingBytes.TruncateStart(cache.End - begin));
 
             return Task.FromResult<List<LazyBuffer>?>([left, right]);

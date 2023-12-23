@@ -3,8 +3,8 @@ using MongoDB.Driver;
 namespace RizzziGit.EnderBytes.Services;
 
 using Records;
-using Collections;
 using Utilities;
+using Framework.Collections;
 
 public enum StorageHubType : byte { Blob }
 

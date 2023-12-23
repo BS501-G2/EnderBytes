@@ -22,15 +22,11 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)' == 'Release'">
-    <PackageReference Include="RizzziGit.Buffer" Version="1.2.5" />
-    <PackageReference Include="RizzziGit.RBMP" Version="1.0.16" />
-    <PackageReference Include="RizzziGit.Collections" Version="1.0.15" />
+    <ProjectReference Include="..\..\RizzziGit.Framework\RizzziGit.Framework.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)' == 'Debug'">
-    <ProjectReference Include="..\..\RizzziGit.Buffer\Buffer\Buffer.csproj" />
-    <ProjectReference Include="..\..\RizzziGit.RBMP\RBMP\RBMP.csproj" />
-    <ProjectReference Include="..\..\RizzziGit.Collections\RizzziGit.Collections.csproj" />
+    <ProjectReference Include="..\..\RizzziGit.Framework\RizzziGit.Framework.csproj" />
   </ItemGroup>
 
 </Project>

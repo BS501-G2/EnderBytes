@@ -1,9 +1,6 @@
 namespace RizzziGit.EnderBytes.Services;
 
-using Buffer;
-using Utilities;
-using Collections;
-using Records;
+using Framework.Services;
 
 public sealed partial class StorageHubService
 {
@@ -20,14 +17,14 @@ public sealed partial class StorageHubService
           public readonly long SnapshotId = id;
           public readonly long? BaseSnapshotId = baseSnapshotId;
 
-          public Task<Snapshot> CreateSnapshot(ConnectionService.Connection connection) => File.CreateSnapshot(connection, SnapshotId);
+          public Task<Snapshot> CreateSnapshot(ConnectionService.IConnection connection) => File.CreateSnapshot(connection, SnapshotId);
         }
 
-        protected abstract Task<Snapshot[]> Internal_ScanSnapshots(ConnectionService.Connection connection, long? baseSnapshotId);
-        protected abstract Task<Snapshot> Internal_CreateSnapshot(ConnectionService.Connection connection);
+        protected abstract Task<Snapshot[]> Internal_ScanSnapshots(ConnectionService.IConnection connection, long? baseSnapshotId);
+        protected abstract Task<Snapshot> Internal_CreateSnapshot(ConnectionService.IConnection connection);
 
-        public Task<Snapshot[]> ScanSnapshots(ConnectionService.Connection connection, long? baseSnapshotId = null) => Hub.RunTask((_) => Internal_ScanSnapshots(connection, baseSnapshotId));
-        public Task<Snapshot> CreateSnapshot(ConnectionService.Connection connection, long? baseSnapshotId = null) => Hub.RunTask(async (_) =>
+        public Task<Snapshot[]> ScanSnapshots(ConnectionService.IConnection connection, long? baseSnapshotId = null) => Hub.RunTask((_) => Internal_ScanSnapshots(connection, baseSnapshotId));
+        public Task<Snapshot> CreateSnapshot(ConnectionService.IConnection connection, long? baseSnapshotId = null) => Hub.RunTask(async (_) =>
         {
           if (baseSnapshotId == null && (await ScanSnapshots(connection)).Length != 0)
           {
@@ -40,16 +37,16 @@ public sealed partial class StorageHubService
 
       public abstract class Folder(Hub hub, long nodeId, long keyId) : Node(hub, nodeId, keyId)
       {
-        protected abstract Task<Node[]> Internal_Scan(ConnectionService.Connection connection);
+        protected abstract Task<Node[]> Internal_Scan(ConnectionService.IConnection connection);
 
-        protected abstract Task<File> Internal_CreateFile(ConnectionService.Connection connection, string name);
-        protected abstract Task<Folder> Internal_CreateFolder(ConnectionService.Connection connection, string name);
-        protected abstract Task<SymbolicLink> Internal_CreateSymbolicLink(ConnectionService.Connection connection, string name, string[] target);
+        protected abstract Task<File> Internal_CreateFile(ConnectionService.IConnection connection, string name);
+        protected abstract Task<Folder> Internal_CreateFolder(ConnectionService.IConnection connection, string name);
+        protected abstract Task<SymbolicLink> Internal_CreateSymbolicLink(ConnectionService.IConnection connection, string name, string[] target);
       }
 
       public abstract class SymbolicLink(Hub hub, long nodeId, long keyId) : Node(hub, nodeId, keyId)
       {
-        protected abstract Task Internal_Delete(ConnectionService.Connection connection, string name);
+        protected abstract Task Internal_Delete(ConnectionService.IConnection connection, string name);
       }
 
       private Node(Hub hub, long nodeId, long keyId)

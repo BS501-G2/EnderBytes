@@ -3,6 +3,7 @@ using MongoDB.Driver;
 namespace RizzziGit.EnderBytes.Services;
 
 using Records;
+using Framework.Memory;
 using Utilities;
 
 public enum BlobNodeType { File, Folder, SymbolicLink }
@@ -23,7 +24,7 @@ public sealed partial class StorageHubService
         protected override long Internal_Position => Position;
         protected override long Internal_Size => Size;
 
-        protected override Task<Buffer.Buffer> Internal_Read(long size)
+        protected override Task<CompositeBuffer> Internal_Read(long size)
         {
           throw new NotImplementedException();
         }
@@ -40,7 +41,7 @@ public sealed partial class StorageHubService
           return Task.CompletedTask;
         }
 
-        protected override Task Internal_Write(Buffer.Buffer buffer)
+        protected override Task Internal_Write(CompositeBuffer buffer)
         {
           throw new NotImplementedException();
         }
@@ -55,12 +56,12 @@ public sealed partial class StorageHubService
       private IMongoCollection<Record.BlobStorageFileDataMapper> FileDataMappers => Server.GetCollection<Record.BlobStorageFileDataMapper>();
       private IMongoCollection<Record.BlobStorageFileData> FileData => Server.GetCollection<Record.BlobStorageFileData>();
 
-      protected override Task<Node.Folder> Internal_GetRootFolder(ConnectionService.Connection connection)
+      protected override Task<Node.Folder> Internal_GetRootFolder(ConnectionService.IConnection connection)
       {
         throw new NotImplementedException();
       }
 
-      protected override Task<TrashItem> Internal_ScanTrash(ConnectionService.Connection connection)
+      protected override Task<TrashItem> Internal_ScanTrash(ConnectionService.IConnection connection)
       {
         throw new NotImplementedException();
       }

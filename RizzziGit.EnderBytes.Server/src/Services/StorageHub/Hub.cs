@@ -1,11 +1,7 @@
-using MongoDB.Driver;
-
 namespace RizzziGit.EnderBytes.Services;
 
-using Collections;
-using Buffer;
-using Utilities;
-using Records;
+using Framework.Collections;
+using Framework.Services;
 
 [Flags]
 public enum HubFileAccess : byte
@@ -43,9 +39,9 @@ public sealed partial class StorageHubService
     private readonly WeakDictionary<long, FileHandle> FileHandles = [];
     private readonly WeakDictionary<FileHandle, List<FileHandle.LazyBuffer>> FileHandleCache = [];
 
-    protected abstract Task<Node.Folder> Internal_GetRootFolder(ConnectionService.Connection connection);
-    protected abstract Task<TrashItem> Internal_ScanTrash(ConnectionService.Connection connection);
+    protected abstract Task<Node.Folder> Internal_GetRootFolder(ConnectionService.IConnection connection);
+    protected abstract Task<TrashItem> Internal_ScanTrash(ConnectionService.IConnection connection);
 
-    public Task<Node.Folder> GetRoot(ConnectionService.Connection connection) => RunTask((_) => Internal_GetRootFolder(connection));
+    public Task<Node.Folder> GetRoot(ConnectionService.IConnection connection) => RunTask((_) => Internal_GetRootFolder(connection));
   }
 }

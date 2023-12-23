@@ -4,6 +4,7 @@ namespace RizzziGit.EnderBytes;
 
 using Records;
 using Services;
+using Framework.Services;
 
 public sealed record ServerConfiguration(
   string ServerPath,

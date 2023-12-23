@@ -3,9 +3,9 @@ using MongoDB.Driver;
 
 namespace RizzziGit.EnderBytes.Services;
 
-using Collections;
 using Records;
 using Utilities;
+using Framework.Collections;
 
 public enum UserAuthenticationType : byte { Password, SessionToken }
 

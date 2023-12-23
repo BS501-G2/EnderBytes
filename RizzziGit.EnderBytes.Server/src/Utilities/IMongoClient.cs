@@ -2,7 +2,7 @@ using MongoDB.Driver;
 
 namespace RizzziGit.EnderBytes.Utilities;
 
-using Collections;
+using Framework.Collections;
 
 public static class IMongoClientExtensions
 {

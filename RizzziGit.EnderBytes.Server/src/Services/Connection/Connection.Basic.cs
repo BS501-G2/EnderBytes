@@ -1,17 +1,18 @@
+
 namespace RizzziGit.EnderBytes.Services;
 
 public sealed partial class ConnectionService
 {
-  public abstract partial class Configuration
+  public abstract partial record Configuration
   {
-    public sealed class Basic() : Configuration;
+    public sealed record Basic() : Configuration;
   }
 
-  public abstract partial class Connection<C>
+  public abstract partial class Connection
   {
-    public sealed class Basic : Connection<Configuration.Basic>
+    public sealed class Basic(Configuration.Basic configuration) : Connection(configuration)
     {
-
+      public new readonly Configuration.Basic Configuration = configuration;
     }
   }
 }

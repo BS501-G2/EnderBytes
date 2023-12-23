@@ -4,7 +4,6 @@ namespace RizzziGit.EnderBytes.Services;
 
 using Records;
 using Framework.Memory;
-using Utilities;
 
 public enum BlobNodeType { File, Folder, SymbolicLink }
 
@@ -56,12 +55,12 @@ public sealed partial class StorageHubService
       private IMongoCollection<Record.BlobStorageFileDataMapper> FileDataMappers => Server.GetCollection<Record.BlobStorageFileDataMapper>();
       private IMongoCollection<Record.BlobStorageFileData> FileData => Server.GetCollection<Record.BlobStorageFileData>();
 
-      protected override Task<Node.Folder> Internal_GetRootFolder(ConnectionService.IConnection connection)
+      protected override Task<Node.Folder> Internal_GetRootFolder()
       {
         throw new NotImplementedException();
       }
 
-      protected override Task<TrashItem> Internal_ScanTrash(ConnectionService.IConnection connection)
+      protected override Task<TrashItem[]> Internal_ScanTrash()
       {
         throw new NotImplementedException();
       }

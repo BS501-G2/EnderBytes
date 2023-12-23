@@ -33,15 +33,16 @@ public sealed partial class StorageHubService
 
     public readonly StorageHubService Service = service;
     public readonly long HubId = hubId;
-    public readonly KeyGeneratorService.Transformer.Key HubKey = hubKey;
+    protected readonly KeyGeneratorService.Transformer.Key HubKey = hubKey;
 
     private readonly WeakDictionary<long, TrashItem> TrashItems = [];
     private readonly WeakDictionary<long, FileHandle> FileHandles = [];
     private readonly WeakDictionary<FileHandle, List<FileHandle.LazyBuffer>> FileHandleCache = [];
 
-    protected abstract Task<Node.Folder> Internal_GetRootFolder(ConnectionService.IConnection connection);
-    protected abstract Task<TrashItem> Internal_ScanTrash(ConnectionService.IConnection connection);
+    protected abstract Task<Node.Folder> Internal_GetRootFolder();
+    protected abstract Task<TrashItem[]> Internal_ScanTrash();
 
-    public Task<Node.Folder> GetRoot(ConnectionService.IConnection connection) => RunTask((_) => Internal_GetRootFolder(connection));
+    public Task<Node.Folder> GetRootFolder() => RunTask((_) => Internal_GetRootFolder());
+    public Task<TrashItem[]> ScanTrash() => RunTask((_) => Internal_ScanTrash());
   }
 }

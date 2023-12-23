@@ -1,6 +1,6 @@
 namespace RizzziGit.EnderBytes.Services;
 
-using Utilities;
+using Framework.Services;
 
 public sealed partial class UserService
 {
@@ -10,5 +10,17 @@ public sealed partial class UserService
     public readonly long Id = id;
     public long UserId => Global.UserId;
     public readonly KeyGeneratorService.Transformer.UserAuthentication Transformer = transformer;
+
+    protected override async Task OnRun(CancellationToken cancellationToken)
+    {
+      try
+      {
+        await base.OnRun(cancellationToken);
+      }
+      finally
+      {
+
+      }
+    }
   }
 }

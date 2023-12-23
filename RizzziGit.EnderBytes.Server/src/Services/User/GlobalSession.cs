@@ -1,7 +1,7 @@
 namespace RizzziGit.EnderBytes.Services;
 
 using Framework.Collections;
-using Utilities;
+using Framework.Services;
 
 public sealed partial class UserService
 {

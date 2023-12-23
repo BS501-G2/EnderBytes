@@ -4,18 +4,31 @@ using Framework.Services;
 
 public sealed partial class ConnectionService
 {
-  public interface IConnection;
-
-  public abstract partial class Configuration
+  public abstract partial record Configuration
   {
     private Configuration() { }
   }
 
-  public abstract partial class Connection<C> : Lifetime, IConnection
-    where C : Configuration
+  public abstract partial class Connection : Lifetime
   {
-    private Connection() : base("Connection") { }
+    private Connection(Configuration configuration) : base("Connection")
+    {
+      Configuration = configuration;
+    }
 
+    public readonly Configuration Configuration;
     public UserService.Session? Session { get; private set; } = null;
+
+    protected override async Task OnRun(CancellationToken cancellationToken)
+    {
+      try
+      {
+        await base.OnRun(cancellationToken);
+      }
+      finally
+      {
+
+      }
+    }
   }
 }

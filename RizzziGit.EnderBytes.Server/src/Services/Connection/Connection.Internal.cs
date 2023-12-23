@@ -2,16 +2,16 @@ namespace RizzziGit.EnderBytes.Services;
 
 public sealed partial class ConnectionService
 {
-  public abstract partial class Configuration
+  public abstract partial record Configuration
   {
-    public sealed class Internal() : Configuration;
+    public sealed record Internal() : Configuration;
   }
 
-  public abstract partial class Connection<C>
+  public abstract partial class Connection
   {
-    public sealed class Internal : Connection<Configuration.Internal>
+    public sealed class Internal(Configuration.Internal configuration) : Connection(configuration)
     {
-
+      public new readonly Configuration.Internal Configuration = configuration;
     }
   }
 }

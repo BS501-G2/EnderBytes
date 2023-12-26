@@ -10,11 +10,11 @@ public sealed partial class StorageHubService
     public abstract partial class FileHandle : Lifetime
     {
 
-      public abstract class LazyBuffer
+      public abstract class BufferCache
       {
-        public delegate Task<List<LazyBuffer>?> TraverseCallback(LazyBuffer cache);
+        public delegate Task<List<BufferCache>?> TraverseCallback(BufferCache cache);
 
-        private LazyBuffer(FileHandle handle, long begin, long end)
+        private BufferCache(FileHandle handle, long begin, long end)
         {
           Handle = handle;
           Begin = begin;
@@ -29,19 +29,19 @@ public sealed partial class StorageHubService
 
         public bool Synced { get; private set; } = true;
 
-        public virtual (LazyBuffer Left, LazyBuffer Right) Split(long position) => (
+        public virtual (BufferCache Left, BufferCache Right) Split(long position) => (
           new Empty(Handle, Begin, position),
           new Empty(Handle, position, End)
         );
 
-        public virtual (LazyBuffer Left, LazyBuffer Center, LazyBuffer Right) Split(long position1, long position2) => (
+        public virtual (BufferCache Left, BufferCache Center, BufferCache Right) Split(long position1, long position2) => (
           new Empty(Handle, Begin, position1),
           new Empty(Handle, position1, position2),
           new Empty(Handle, position2, End)
         );
 
-        public sealed class Empty(FileHandle handle, long begin, long end) : LazyBuffer(handle, begin, end);
-        public sealed class Buffered(FileHandle handle, long begin, CompositeBuffer buffer) : LazyBuffer(handle, begin, begin + buffer.Length)
+        public sealed class Empty(FileHandle handle, long begin, long end) : BufferCache(handle, begin, end);
+        public sealed class Buffered(FileHandle handle, long begin, CompositeBuffer buffer) : BufferCache(handle, begin, begin + buffer.Length)
         {
           public readonly CompositeBuffer Buffer = buffer.Clone();
           public long BufferOffset(long position) => position - Begin;
@@ -64,12 +64,12 @@ public sealed partial class StorageHubService
 
           public CompositeBuffer Read(long begin, long end) => Buffer.Read(BufferOffset(begin), end - begin);
 
-          public override (LazyBuffer Left, LazyBuffer Right) Split(long position) => new(
+          public override (BufferCache Left, BufferCache Right) Split(long position) => new(
             new Buffered(Handle, Begin, Buffer.Slice(BufferOffset(Begin), BufferOffset(position))),
             new Buffered(Handle, position, Buffer.Slice(BufferOffset(position), BufferOffset(End)))
           );
 
-          public override (LazyBuffer Left, LazyBuffer Center, LazyBuffer Right) Split(long position1, long position2) => new(
+          public override (BufferCache Left, BufferCache Center, BufferCache Right) Split(long position1, long position2) => new(
             new Buffered(Handle, Begin, Buffer.Slice(BufferOffset(Begin), BufferOffset(position1))),
             new Buffered(Handle, position1, Buffer.Slice(BufferOffset(position1), BufferOffset(position2))),
             new Buffered(Handle, position2, Buffer.Slice(BufferOffset(position2), BufferOffset(End)))

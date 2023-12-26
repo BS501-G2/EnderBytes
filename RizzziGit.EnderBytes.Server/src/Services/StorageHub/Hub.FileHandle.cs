@@ -29,7 +29,7 @@ public sealed partial class StorageHubService
 
         lock (hub.FileHandleCache)
         {
-          if (!hub.FileHandleCache.TryGetValue(this, out List<LazyBuffer>? cache))
+          if (!hub.FileHandleCache.TryGetValue(this, out List<BufferCache>? cache))
           {
             hub.FileHandleCache.Add(this, cache = []);
           }
@@ -40,8 +40,7 @@ public sealed partial class StorageHubService
         SnapshotHandles = [];
       }
 
-      private readonly KeyGeneratorService.Transformer.Key Transformer;
-      private readonly List<LazyBuffer> Cache;
+      private readonly List<BufferCache> Cache;
       private readonly WeakDictionary<long, Node> NodeHandles;
       private readonly WeakDictionary<long, Node.File.Snapshot> SnapshotHandles;
 
@@ -51,12 +50,13 @@ public sealed partial class StorageHubService
       public readonly long SnapshotId;
       public readonly HubFileAccess Access;
 
+      protected readonly KeyGeneratorService.Transformer.Key Transformer;
       protected abstract long Internal_Position { get; }
       protected abstract long Internal_Size { get; }
 
       public long Position { get; private set; }
       public long Size { get; private set; }
-      public long CacheSize => Cache.Select((cache) => cache is LazyBuffer.Buffered ? cache.Length : 0).Sum();
+      public long CacheSize => Cache.Select((cache) => cache is BufferCache.Buffered ? cache.Length : 0).Sum();
 
       protected abstract Task<CompositeBuffer> Internal_Read(long size);
       protected abstract Task Internal_Write(CompositeBuffer buffer);
@@ -83,22 +83,22 @@ public sealed partial class StorageHubService
         await Internal_Write(buffer);
       }
 
-      private async Task TraverseCache(LazyBuffer.TraverseCallback callback, long? hintBegin = null, long? hintEnd = null)
+      private async Task TraverseCache(BufferCache.TraverseCallback callback, long? hintBegin = null, long? hintEnd = null)
       {
         if (Cache.Count == 0)
         {
-          Cache.Add(new LazyBuffer.Empty(this, 0, Size));
+          Cache.Add(new BufferCache.Empty(this, 0, Size));
         }
 
         long cacheSize = Cache.Select((cache) => cache.Length).Sum();
         if (cacheSize < Size)
         {
-          Cache.Add(new LazyBuffer.Empty(this, cacheSize, Size));
+          Cache.Add(new BufferCache.Empty(this, cacheSize, Size));
         }
 
         for (int index = 0; index < Cache.Count; index++)
         {
-          LazyBuffer cache = Cache[index];
+          BufferCache cache = Cache[index];
 
           if (
             ((hintEnd != null) && (hintEnd <= cache.Begin)) ||
@@ -108,7 +108,7 @@ public sealed partial class StorageHubService
             continue;
           }
 
-          void processResult(List<LazyBuffer>? result)
+          void processResult(List<BufferCache>? result)
           {
             if (result == null || result.Count == 0)
             {
@@ -154,7 +154,7 @@ public sealed partial class StorageHubService
 
         await TraverseCache(async (cache) =>
         {
-          if (cache is LazyBuffer.Buffered bufferedCache)
+          if (cache is BufferCache.Buffered bufferedCache)
           {
             output.Append(bufferedCache.Read(long.Max(cache.Begin, requestBegin()), long.Min(cache.End, requestEnd())));
           }
@@ -165,8 +165,8 @@ public sealed partial class StorageHubService
             CompositeBuffer buffer = await Internal_Read(cache.Begin, end);
             output.Append(buffer);
 
-            (_, LazyBuffer right) = cache.Split(end);
-            return [new LazyBuffer.Buffered(this, cache.Begin, buffer), right];
+            (_, BufferCache right) = cache.Split(end);
+            return [new BufferCache.Buffered(this, cache.Begin, buffer), right];
           }
           else if (requestEnd() == cache.End)
           {
@@ -175,8 +175,8 @@ public sealed partial class StorageHubService
             CompositeBuffer buffer = await Internal_Read(begin, cache.End);
             output.Append(buffer);
 
-            (LazyBuffer left, _) = cache.Split(begin);
-            return [left, new LazyBuffer.Buffered(this, begin, buffer)];
+            (BufferCache left, _) = cache.Split(begin);
+            return [left, new BufferCache.Buffered(this, begin, buffer)];
           }
 
           return null;
@@ -203,7 +203,7 @@ public sealed partial class StorageHubService
 
         await TraverseCache((cache) =>
         {
-          if (cache is LazyBuffer.Buffered bufferedCache)
+          if (cache is BufferCache.Buffered bufferedCache)
           {
             long begin = long.Max(requestBegin(), cache.Begin);
             long end = long.Min(requestEnd(), cache.End);
@@ -214,26 +214,26 @@ public sealed partial class StorageHubService
           {
             long end = long.Min(cache.End, requestEnd());
 
-            (_, LazyBuffer right) = cache.Split(end);
+            (_, BufferCache right) = cache.Split(end);
 
-            LazyBuffer.Buffered left = new(this, cache.Begin, CompositeBuffer.Allocate(end - cache.Begin));
+            BufferCache.Buffered left = new(this, cache.Begin, CompositeBuffer.Allocate(end - cache.Begin));
             left.Write(left.Begin, remainingBytes.TruncateStart(end - cache.Begin));
 
-            return Task.FromResult<List<LazyBuffer>?>([left, right]);
+            return Task.FromResult<List<BufferCache>?>([left, right]);
           }
           else if (requestBegin() == cache.End)
           {
             long begin = long.Max(cache.Begin, requestBegin());
 
-            (LazyBuffer left, _) = cache.Split(begin);
+            (BufferCache left, _) = cache.Split(begin);
 
-            LazyBuffer.Buffered right = new(this, begin, CompositeBuffer.Allocate(cache.End - begin));
+            BufferCache.Buffered right = new(this, begin, CompositeBuffer.Allocate(cache.End - begin));
             right.Write(right.Begin, remainingBytes.TruncateStart(cache.End - begin));
 
-            return Task.FromResult<List<LazyBuffer>?>([left, right]);
+            return Task.FromResult<List<BufferCache>?>([left, right]);
           }
 
-          return Task.FromResult<List<LazyBuffer>?>(null);
+          return Task.FromResult<List<BufferCache>?>(null);
         }, requestBegin(), requestEnd());
 
         Position = requestEnd();
@@ -257,9 +257,9 @@ public sealed partial class StorageHubService
         await Task.WhenAll(sync());
         IEnumerable<Task> sync()
         {
-          foreach (LazyBuffer cache in Cache)
+          foreach (BufferCache cache in Cache)
           {
-            if (cache is LazyBuffer.Buffered bufferedCache)
+            if (cache is BufferCache.Buffered bufferedCache)
             {
               yield return bufferedCache.Sync();
             }

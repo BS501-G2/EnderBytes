@@ -31,13 +31,14 @@ public sealed partial class StorageHubService
       public readonly long Id = id;
     }
 
+    public Server Server => Service.Server;
     public readonly StorageHubService Service = service;
     public readonly long HubId = hubId;
     protected readonly KeyGeneratorService.Transformer.Key HubKey = hubKey;
 
     private readonly WeakDictionary<long, TrashItem> TrashItems = [];
     private readonly WeakDictionary<long, FileHandle> FileHandles = [];
-    private readonly WeakDictionary<FileHandle, List<FileHandle.LazyBuffer>> FileHandleCache = [];
+    private readonly WeakDictionary<FileHandle, List<FileHandle.BufferCache>> FileHandleCache = [];
 
     protected abstract Task<Node.Folder> Internal_GetRootFolder();
     protected abstract Task<TrashItem[]> Internal_ScanTrash();

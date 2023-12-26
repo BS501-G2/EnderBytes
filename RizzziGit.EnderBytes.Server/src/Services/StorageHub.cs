@@ -62,7 +62,24 @@ public sealed partial class StorageHubService(Server server) : Server.SubService
 
   protected override Task OnStart(CancellationToken cancellationToken)
   {
-    Server.UserService.Users.BeginWatching((change) =>
+    IMongoCollection<Record.BlobStorageFileDataMapper> fileDataMappers = Server.GetCollection<Record.BlobStorageFileDataMapper>();
+    IMongoCollection<Record.BlobStorageFileData> fileData = Server.GetCollection<Record.BlobStorageFileData>();
+
+    fileDataMappers.Watch(async (change, cancellationToken) =>
+    {
+      if (change.OperationType != ChangeStreamOperationType.Delete)
+      {
+        return;
+      }
+      else if (await (await fileDataMappers.FindAsync((mapper) => mapper.DataId == change.FullDocument.DataId, cancellationToken: cancellationToken)).FirstOrDefaultAsync(cancellationToken) != null)
+      {
+        return;
+      }
+
+      await fileData.DeleteManyAsync((record) => record.Id == change.FullDocument.DataId, cancellationToken);
+    }, cancellationToken);
+
+    Server.UserService.Users.Watch((change) =>
     {
       if (change.OperationType != ChangeStreamOperationType.Delete)
       {

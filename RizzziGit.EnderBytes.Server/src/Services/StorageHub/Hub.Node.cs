@@ -22,7 +22,7 @@ public sealed partial class StorageHubService
           protected abstract Task<FileHandle> Internal_Open(KeyGeneratorService.Transformer.Key nodeKey, HubFileAccess access);
 
           public Task<Snapshot> CreateSnapshot() => File.CreateSnapshot(SnapshotId);
-          public Task<FileHandle> Open(KeyGeneratorService.Transformer.Key nodeKey, HubFileAccess access, HubFileMode mode) => Hub.RunTask(async (_) =>
+          public Task<FileHandle> Open(HubFileAccess access, HubFileMode mode) => Hub.RunTask(async (_) =>
           {
             foreach (FileHandle handle in Hub.FileHandles.Values.Where((handle) => handle.SnapshotId == SnapshotId))
             {

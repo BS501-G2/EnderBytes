@@ -67,7 +67,7 @@ public sealed partial class UserService(Server server) : Server.SubService(serve
 
   protected override Task OnStart(CancellationToken cancellationToken)
   {
-    Users.BeginWatching((change) =>
+    Users.Watch((change) =>
     {
       if (change.OperationType != ChangeStreamOperationType.Delete)
       {
@@ -77,7 +77,7 @@ public sealed partial class UserService(Server server) : Server.SubService(serve
       UserAuthentications.DeleteMany((record) => change.FullDocument.Id == record.UserId);
     }, cancellationToken);
 
-    Users.BeginWatching((change) =>
+    Users.Watch((change) =>
     {
       if (change.OperationType != ChangeStreamOperationType.Delete)
       {

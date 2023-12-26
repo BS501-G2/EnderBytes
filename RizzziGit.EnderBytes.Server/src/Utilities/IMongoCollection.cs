@@ -7,7 +7,7 @@ namespace RizzziGit.EnderBytes.Utilities;
 
 public static class IMongoCollection
 {
-  public delegate Task HookAsync<T>(ChangeStreamDocument<T> t);
+  public delegate Task HookAsync<T>(ChangeStreamDocument<T> t, CancellationToken cancellationToken);
   public delegate void Hook<T>(ChangeStreamDocument<T> t);
 
   public static long GetNewId<T>(this IMongoCollection<T> mongoCollection) where T : Record
@@ -23,8 +23,8 @@ public static class IMongoCollection
     return id;
   }
 
-  public static void BeginWatching<T>(this IMongoCollection<T> mongoCollection, Hook<T> hook, CancellationToken cancellationToken) => mongoCollection.Watch((change) => { hook(change); return Task.CompletedTask; }, null, cancellationToken);
-  public static void BeginWatching<T>(this IMongoCollection<T> mongoCollection, Hook<T> hook, ChangeStreamOptions? options = null, CancellationToken cancellationToken = default) => mongoCollection.Watch((change) => { hook(change); return Task.CompletedTask; }, options, cancellationToken);
+  public static void Watch<T>(this IMongoCollection<T> mongoCollection, Hook<T> hook, CancellationToken cancellationToken) => mongoCollection.Watch((change, _) => { hook(change); return Task.CompletedTask; }, null, cancellationToken);
+  public static void Watch<T>(this IMongoCollection<T> mongoCollection, Hook<T> hook, ChangeStreamOptions? options = null, CancellationToken cancellationToken = default) => mongoCollection.Watch((change, _) => { hook(change); return Task.CompletedTask; }, options, cancellationToken);
 
   public static void Watch<T>(this IMongoCollection<T> mongoCollection, HookAsync<T> hook, CancellationToken cancellationToken) => mongoCollection.Watch(hook, null, cancellationToken);
   public static async void Watch<T>(this IMongoCollection<T> mongoCollection, HookAsync<T> hook, ChangeStreamOptions? options = null, CancellationToken cancellationToken = default)
@@ -33,7 +33,7 @@ public static class IMongoCollection
     {
       await foreach (ChangeStreamDocument<T> document in mongoCollection.Watch(options, cancellationToken).ToAsyncEnumerable(cancellationToken))
       {
-        await hook(document);
+        await hook(document, cancellationToken);
       }
     }
     catch (OperationCanceledException) { }

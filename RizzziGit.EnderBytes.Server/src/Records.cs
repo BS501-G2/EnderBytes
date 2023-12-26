@@ -6,6 +6,7 @@ namespace RizzziGit.EnderBytes.Records;
 
 using Utilities;
 using Services;
+using RizzziGit.Framework.Collections;
 
 public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
 {
@@ -16,7 +17,7 @@ public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
     {
       id = Random.Shared.NextInt64();
     }
-    while ((from record in collection.AsQueryable() select record.Id == id).Any());
+    while (collection.Find((record) => record.Id == id).FirstOrDefault() != null);
 
     long createTime;
     long updateTime = createTime = Random.Shared.NextInt64();
@@ -24,7 +25,7 @@ public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
     return (id, createTime, updateTime);
   }
 
-  public static async Task RegisterOnUpdateHook(MongoClient client, IMongoDatabase database, CancellationToken cancellationToken)
+  public static async Task WatchRecordUpdates(MongoClient client, IMongoDatabase database, CancellationToken cancellationToken)
   {
     List<Task> tasks = [];
 
@@ -150,6 +151,7 @@ public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
     long UpdateTime,
     long FileNodeId,
     long AuthorUserId,
+    long Size,
     long? BaseSnapshotId
   ) : Record(Id, CreateTime, UpdateTime);
 
@@ -158,7 +160,7 @@ public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
     long CreateTime,
     long UpdateTime,
     long SnapshotId,
-    long SegmentId,
+    long DataId,
     long SequenceIndex
   ) : Record(Id, CreateTime, UpdateTime);
 
@@ -166,7 +168,30 @@ public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
     long Id,
     long CreateTime,
     long UpdateTime,
+    long KeySharedId,
     long Size,
     byte[] Buffer
-  ) : Record(Id, CreateTime, UpdateTime);
+  ) : Record(Id, CreateTime, UpdateTime)
+  {
+    private readonly static WeakDictionary<long, byte[]> DecryptedBuffer = [];
+
+    public byte[] DecryptBuffer(KeyGeneratorService.Transformer.Key key)
+    {
+      if (KeySharedId != key.SharedId)
+      {
+        throw new ArgumentException("Invalid key share id.", nameof(key));
+      }
+
+      lock (DecryptedBuffer)
+      {
+        if (!DecryptedBuffer.TryGetValue(Id, out byte[]? buffer))
+        {
+          DecryptedBuffer.Add(Id, buffer = key.Decrypt(Buffer));
+          return buffer;
+        }
+
+        return buffer;
+      }
+    }
+  }
 }

@@ -19,6 +19,7 @@ public sealed class Server : Service
     MongoClient = new(configuration.MongoClientSettings);
     UserService = new(this);
     KeyGeneratorService = new(this);
+    StorageHubService = new(this);
     ConnectionService = new(this);
   }
 
@@ -33,13 +34,14 @@ public sealed class Server : Service
 
   public readonly UserService UserService;
   public readonly KeyGeneratorService KeyGeneratorService;
+  public readonly StorageHubService StorageHubService;
   public readonly ConnectionService ConnectionService;
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
     await await Task.WhenAny(
       WatchDog([UserService, KeyGeneratorService, ConnectionService], cancellationToken),
-      Record.RegisterOnUpdateHook(MongoClient, Database, cancellationToken)
+      Record.WatchRecordUpdates(MongoClient, Database, cancellationToken)
     );
   }
 
@@ -47,12 +49,14 @@ public sealed class Server : Service
   {
     await UserService.Start();
     await KeyGeneratorService.Start();
+    await StorageHubService.Start();
     await ConnectionService.Start();
   }
 
   protected override async Task OnStop(Exception? exception)
   {
     await ConnectionService.Stop();
+    await StorageHubService.Stop();
     await UserService.Stop();
     await KeyGeneratorService.Stop();
   }

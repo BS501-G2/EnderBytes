@@ -13,17 +13,16 @@ public enum StorageHubFlags : byte { Internal }
 
 public sealed partial class StorageHubService(Server server) : Server.SubService(server, "File systems")
 {
-  public IMongoCollection<Record.StorageHub> HubRecords => Server.GetCollection<Record.StorageHub>();
+  public IMongoDatabase MainDatabase => Server.MainDatabase;
+  public IMongoCollection<Record.StorageHub> HubRecords => MainDatabase.GetCollection<Record.StorageHub>();
 
   private readonly WeakDictionary<long, Hub> Hubs = [];
-  private readonly WaitQueue<(TaskCompletionSource<Hub> source, Record.StorageHub storageHub, KeyGeneratorService.Transformer.Key inputKey)> WaitQueue = new(0);
+  private readonly WaitQueue<(TaskCompletionSource<Hub> source, Record.StorageHub storageHub, KeyService.Transformer.Key inputKey)> WaitQueue = new(0);
 
-  public async Task<Hub> Get(long hubId, KeyGeneratorService.Transformer.Key inputKey, CancellationToken cancellationToken)
+  public async Task<Hub> Get(Record.StorageHub storageHub, KeyService.Transformer.Key inputKey, CancellationToken cancellationToken)
   {
-    Record.StorageHub storageHub = (from record in HubRecords.AsQueryable() where record.Id == hubId select record).FirstOrDefault() ?? throw new ArgumentException("Invalid storage hub id.", nameof(hubId));
-    Record.Key key = (from record in Server.KeyGeneratorService.Keys.AsQueryable() where record.SharedId == storageHub.KeySharedId select record).FirstOrDefault() ?? throw new InvalidDataException("Invalid key shared id stored in storage pool.");
-
-    if (key.SharedId != inputKey.SharedId)
+    Record.Key? key = await Server.KeyService.Keys.FindOneAsync((key) => key.SharedId == inputKey.SharedId, cancellationToken: cancellationToken);
+    if (key?.SharedId != inputKey.SharedId)
     {
       throw new ArgumentException("Invalid input key share id.", nameof(inputKey));
     }
@@ -46,14 +45,7 @@ public sealed partial class StorageHubService(Server server) : Server.SubService
 
       if (!Hubs.TryGetValue(record.Id, out Hub? hub))
       {
-        hub = Hubs[record.Id] = record.Type switch
-        {
-          StorageHubType.Blob => new Hub.Blob(this, record.Id, inputKey),
-
-          _ => throw new InvalidDataException("Unknown storage hub type.")
-        };
-
-        hub.Start(cancellationToken);
+        hub = Hubs[record.Id] = Hub.StartHub(this, record, inputKey, cancellationToken);
       }
 
       source.SetResult(hub);
@@ -62,8 +54,8 @@ public sealed partial class StorageHubService(Server server) : Server.SubService
 
   protected override Task OnStart(CancellationToken cancellationToken)
   {
-    IMongoCollection<Record.BlobStorageFileDataMapper> fileDataMappers = Server.GetCollection<Record.BlobStorageFileDataMapper>();
-    IMongoCollection<Record.BlobStorageFileData> fileData = Server.GetCollection<Record.BlobStorageFileData>();
+    IMongoCollection<Record.BlobStorageFileDataMapper> fileDataMappers = MainDatabase.GetCollection<Record.BlobStorageFileDataMapper>();
+    IMongoCollection<Record.BlobStorageFileData> fileData = MainDatabase.GetCollection<Record.BlobStorageFileData>();
 
     fileDataMappers.Watch(async (change, cancellationToken) =>
     {
@@ -71,26 +63,26 @@ public sealed partial class StorageHubService(Server server) : Server.SubService
       {
         return;
       }
-      else if (await (await fileDataMappers.FindAsync((mapper) => mapper.DataId == change.FullDocument.DataId, cancellationToken: cancellationToken)).FirstOrDefaultAsync(cancellationToken) != null)
+      else if (await (await fileDataMappers.FindAsync((fileDataMapper) => fileDataMapper.DataId == change.FullDocument.DataId, cancellationToken: cancellationToken)).FirstOrDefaultAsync(cancellationToken) != null)
       {
         return;
       }
 
-      await fileData.DeleteManyAsync((record) => record.Id == change.FullDocument.DataId, cancellationToken);
+      await fileData.DeleteManyAsync((fileData) => fileData.Id == change.FullDocument.DataId, cancellationToken);
     }, cancellationToken);
 
-    Server.UserService.Users.Watch((change) =>
+    Server.UserService.Users.Watch(async (change, cancellationToken) =>
     {
       if (change.OperationType != ChangeStreamOperationType.Delete)
       {
         return;
       }
-      else if (Hubs.TryGetValue(change.FullDocument.Id, out Hub? hub))
+      else if (Hubs.TryGetValue(change.FullDocument.Id, out Hub? storageHub))
       {
-        hub.Stop();
+        storageHub.Stop();
       }
 
-      HubRecords.DeleteMany(from filesystem in HubRecords.AsQueryable() where filesystem.OwnerUserId == change.FullDocument.Id select filesystem);
+      await HubRecords.DeleteManyAsync((hub) => hub.OwnerUserId == change.FullDocument.Id, cancellationToken);
     }, cancellationToken);
 
     return Task.CompletedTask;

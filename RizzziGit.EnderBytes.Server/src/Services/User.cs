@@ -22,10 +22,12 @@ public sealed partial class UserService(Server server) : Server.SubService(serve
   private readonly WeakDictionary<long, GlobalSession> Sessions = [];
   private readonly WaitQueue<(TaskCompletionSource<GlobalSession> source, long userId)> WaitQueue = new(1);
 
-  public IMongoCollection<Record.User> Users => Server.GetCollection<Record.User>();
-  public IMongoCollection<Record.UserAuthentication> UserAuthentications => Server.GetCollection<Record.UserAuthentication>();
+  public IMongoDatabase MainDatabase => Server.MainDatabase;
 
-  public async Task<Session> GetSession(Record.User user, KeyGeneratorService.Transformer.UserAuthentication transformer)
+  public IMongoCollection<Record.User> Users => MainDatabase.GetCollection<Record.User>();
+  public IMongoCollection<Record.UserAuthentication> UserAuthentications => MainDatabase.GetCollection<Record.UserAuthentication>();
+
+  public async Task<Session> GetSession(Record.User user, KeyService.Transformer.UserAuthentication transformer)
   {
     GlobalSession globalSession;
     {
@@ -94,13 +96,14 @@ public sealed partial class UserService(Server server) : Server.SubService(serve
 
   protected override Task OnStop(Exception? exception) => Task.CompletedTask;
 
-  private Task<Record.UserAuthentication> CreateUserAuthentication(long userId, UserAuthenticationType type, byte[] salt, byte[] challengeIv, byte[] encryptedChallengeBytes, byte[] expectedChallengeBytes, byte[] privateKeyIv, byte[] privateKey, byte[] publicKey) => Server.MongoClient.RunTransaction(async (cancellationToken) =>
+  private async Task<Record.UserAuthentication> CreateUserAuthentication(long userId, UserAuthenticationType type, byte[] salt, byte[] challengeIv, byte[] encryptedChallengeBytes, byte[] expectedChallengeBytes, byte[] privateKeyIv, byte[] privateKey, byte[] publicKey)
   {
     (long id, long createTime, long updateTime) = Record.GenerateNewId(UserAuthentications);
     Record.UserAuthentication userAuthentication = new(id, createTime, updateTime, userId, type, DefaultHashAlgorithmName, ITERATIONS, salt, challengeIv, encryptedChallengeBytes, expectedChallengeBytes, privateKeyIv, privateKey, publicKey);
-    await UserAuthentications.InsertOneAsync(userAuthentication, cancellationToken: cancellationToken);
+    await UserAuthentications.InsertOneAsync(userAuthentication);
     return userAuthentication;
-  });
+
+  }
 
   public Task<Record.UserAuthentication> CreateUserAuthentication(Record.User user, Record.UserAuthentication existingUserAuthentication, byte[] existingHashCache, UserAuthenticationType type, byte[] payload) => RunTask((cancellationToken) =>
   {
@@ -140,7 +143,7 @@ public sealed partial class UserService(Server server) : Server.SubService(serve
     byte[] challengeBytes = RandomNumberGenerator.GetBytes(CHALLENGE_PAYLOAD_SIZE);
     byte[] encryptedChallengeBytes = Aes.Create().CreateEncryptor(hash, challengeIv).TransformFinalBlock(challengeBytes);
 
-    (byte[] privateKey, byte[] publicKey) = Server.KeyGeneratorService.GetNewRsaKeyPair();
+    (byte[] privateKey, byte[] publicKey) = Server.KeyService.GetNewRsaKeyPair();
     byte[] privateKeyIv = RandomNumberGenerator.GetBytes(IV_SIZE);
     byte[] encryptedPrivateKey = Aes.Create().CreateEncryptor(hash, privateKeyIv).TransformFinalBlock(privateKey);
 

@@ -9,7 +9,7 @@ public sealed partial class ConnectionService
 
   public abstract partial class Connection
   {
-    public sealed class Advanced(Configuration.Advanced configuration) : Connection(configuration)
+    public sealed class Advanced(ConnectionService service, Configuration.Advanced configuration) : Connection(service, configuration)
     {
       public new readonly Configuration.Advanced Configuration = configuration;
     }

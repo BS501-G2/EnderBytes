@@ -7,6 +7,7 @@ public sealed partial class ConnectionService(Server server) : Service("Connecti
 {
   public readonly Server Server = server;
 
+  private long NextConnectionId = 0;
   private readonly WaitQueue<(TaskCompletionSource<Connection> source, Configuration configuration)> WaitQueue = new(0);
 
   protected override async Task OnRun(CancellationToken cancellationToken)
@@ -19,9 +20,9 @@ public sealed partial class ConnectionService(Server server) : Service("Connecti
 
         Connection connection = configuration switch
         {
-          Configuration.Advanced advancedConfiguration => new Connection.Advanced(advancedConfiguration),
-          Configuration.Basic basicConfiguration => new Connection.Basic(basicConfiguration),
-          Configuration.Internal internalConfiguration => new Connection.Internal(internalConfiguration),
+          Configuration.Advanced advancedConfiguration => new Connection.Advanced(this, advancedConfiguration),
+          Configuration.Basic basicConfiguration => new Connection.Basic(this, basicConfiguration),
+          Configuration.Internal internalConfiguration => new Connection.Internal(this, internalConfiguration),
 
           _ => throw new InvalidOperationException("Unknown configuration type.")
         };

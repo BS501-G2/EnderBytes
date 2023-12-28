@@ -13,9 +13,9 @@ public sealed partial class UserService
     public readonly long UserId = userId;
 
     private readonly WeakDictionary<long, Session> Sessions = [];
-    private readonly WaitQueue<(TaskCompletionSource<Session> source, KeyGeneratorService.Transformer.UserAuthentication transformer)> WaitQueue = new();
+    private readonly WaitQueue<(TaskCompletionSource<Session> source, KeyService.Transformer.UserAuthentication transformer)> WaitQueue = new();
 
-    public async Task<Session> Get(KeyGeneratorService.Transformer.UserAuthentication transformer, long? sessionId = null)
+    public async Task<Session> Get(KeyService.Transformer.UserAuthentication transformer, long? sessionId = null)
     {
       if (transformer.PublicOnly)
       {

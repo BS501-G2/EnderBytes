@@ -4,6 +4,7 @@ namespace RizzziGit.EnderBytes;
 
 using Records;
 using Services;
+using Utilities;
 using Framework.Services;
 
 public sealed record ServerConfiguration(
@@ -18,7 +19,7 @@ public sealed class Server : Service
   {
     MongoClient = new(configuration.MongoClientSettings);
     UserService = new(this);
-    KeyGeneratorService = new(this);
+    KeyService = new(this);
     StorageHubService = new(this);
     ConnectionService = new(this);
   }
@@ -29,26 +30,25 @@ public sealed class Server : Service
   }
 
   public readonly MongoClient MongoClient;
-  public IMongoDatabase Database => MongoClient.GetDatabase("EnderBytes");
-  public IMongoCollection<R> GetCollection<R>() where R : Record => Database.GetCollection<R>(nameof(R));
+  public IMongoDatabase MainDatabase => MongoClient.GetDatabase("EnderBytes");
 
   public readonly UserService UserService;
-  public readonly KeyGeneratorService KeyGeneratorService;
+  public readonly KeyService KeyService;
   public readonly StorageHubService StorageHubService;
   public readonly ConnectionService ConnectionService;
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
     await await Task.WhenAny(
-      WatchDog([UserService, KeyGeneratorService, ConnectionService], cancellationToken),
-      Record.WatchRecordUpdates(MongoClient, Database, cancellationToken)
+      WatchDog([UserService, KeyService, ConnectionService], cancellationToken),
+      Record.WatchRecordUpdates(MongoClient, MainDatabase, cancellationToken)
     );
   }
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
     await UserService.Start();
-    await KeyGeneratorService.Start();
+    await KeyService.Start();
     await StorageHubService.Start();
     await ConnectionService.Start();
   }
@@ -58,6 +58,6 @@ public sealed class Server : Service
     await ConnectionService.Stop();
     await StorageHubService.Stop();
     await UserService.Stop();
-    await KeyGeneratorService.Stop();
+    await KeyService.Stop();
   }
 }

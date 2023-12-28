@@ -9,7 +9,7 @@ public sealed partial class ConnectionService
 
   public abstract partial class Connection
   {
-    public sealed class Internal(Configuration.Internal configuration) : Connection(configuration)
+    public sealed class Internal(ConnectionService service, Configuration.Internal configuration) : Connection(service, configuration)
     {
       public new readonly Configuration.Internal Configuration = configuration;
     }

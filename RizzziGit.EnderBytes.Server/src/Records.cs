@@ -6,7 +6,7 @@ namespace RizzziGit.EnderBytes.Records;
 
 using Utilities;
 using Services;
-using RizzziGit.Framework.Collections;
+using Framework.Collections;
 
 public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
 {
@@ -139,7 +139,7 @@ public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
     long CreateTime,
     long UpdateTime,
     long BlobHubId,
-    BlobNodeType Type,
+    StorageHubService.NodeType Type,
     long? ParentNode,
     string Name,
     long KeySharedId
@@ -175,7 +175,7 @@ public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
   {
     private readonly static WeakDictionary<long, byte[]> DecryptedBuffer = [];
 
-    public byte[] DecryptBuffer(KeyGeneratorService.Transformer.Key key)
+    public byte[] DecryptBuffer(KeyService.Transformer.Key key)
     {
       if (KeySharedId != key.SharedId)
       {

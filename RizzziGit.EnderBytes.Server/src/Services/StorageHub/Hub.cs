@@ -1,49 +1,83 @@
 namespace RizzziGit.EnderBytes.Services;
 
-using Framework.Collections;
 using Framework.Services;
-
-[Flags]
-public enum HubFileAccess : byte
-{
-  Read = 1 << 0,
-  Write = 1 << 1,
-  Exclusive = 1 << 2,
-
-  ReadWrite = Read | Write,
-  ExclusiveReadWrite = Exclusive | ReadWrite
-}
-
-[Flags]
-public enum HubFileMode : byte
-{
-  TruncateToZero = 1 << 0,
-  Append = 1 << 1
-}
+using Framework.Collections;
+using RizzziGit.EnderBytes.Records;
 
 public sealed partial class StorageHubService
 {
-  public abstract partial class Hub(StorageHubService service, long hubId, KeyGeneratorService.Transformer.Key hubKey) : Lifetime($"{hubId}", service.Logger)
+  public enum NodeType : byte
   {
-    public abstract class TrashItem(Hub hub, long id)
+    File, Folder, SymbolicLink
+  }
+
+  [Flags]
+  public enum FileAccess : byte
+  {
+    Read = 1 << 0,
+    Write = 1 << 1,
+    Exclusive = 1 << 2,
+
+    ReadWrite = Read | Write,
+    ExclusiveReadWrite = Exclusive | ReadWrite
+  }
+
+  [Flags]
+  public enum FileMode : byte
+  {
+    TruncateToZero = 1 << 0,
+    Append = 1 << 1
+  }
+
+  public abstract partial class Hub(StorageHubService service, long hubId, KeyService.Transformer.Key hubKey) : Lifetime($"{hubId}", service.Logger)
+  {
+    public static Hub StartHub(StorageHubService service, Record.StorageHub record, KeyService.Transformer.Key inputKey, CancellationToken cancellationToken)
     {
-      public readonly Hub Hub = hub;
-      public readonly long Id = id;
+      Hub hub = record.Type switch
+      {
+        StorageHubType.Blob => new Blob(service, record.Id, inputKey),
+
+        _ => throw new InvalidDataException("Unknown storage hub type.")
+      };
+
+      hub.Start(cancellationToken);
+      return hub;
     }
 
     public Server Server => Service.Server;
     public readonly StorageHubService Service = service;
     public readonly long HubId = hubId;
-    protected readonly KeyGeneratorService.Transformer.Key HubKey = hubKey;
 
-    private readonly WeakDictionary<long, TrashItem> TrashItems = [];
-    private readonly WeakDictionary<long, FileHandle> FileHandles = [];
-    private readonly WeakDictionary<FileHandle, List<FileHandle.BufferCache>> FileHandleCache = [];
+    protected readonly KeyService.Transformer.Key HubKey = hubKey;
 
-    protected abstract Task<Node.Folder> Internal_GetRootFolder();
-    protected abstract Task<TrashItem[]> Internal_ScanTrash();
+    private readonly WaitQueue<(TaskCompletionSource<Session> source, ConnectionService.Connection connection)> WaitQueue = new(0);
+    private readonly WeakDictionary<ConnectionService.Connection, Session> Sessions = [];
 
-    public Task<Node.Folder> GetRootFolder() => RunTask((_) => Internal_GetRootFolder());
-    public Task<TrashItem[]> ScanTrash() => RunTask((_) => Internal_ScanTrash());
+    protected abstract Session Internal_NewSession(ConnectionService.Connection connection);
+
+    protected override async Task OnRun(CancellationToken cancellationToken)
+    {
+      await foreach (var (source, connection) in WaitQueue.WithCancellation(cancellationToken))
+      {
+        try
+        {
+          if (!connection.IsRunning)
+          {
+            throw new InvalidOperationException("Connection is not active.");
+          }
+
+          if (!Sessions.TryGetValue(connection, out Session? session))
+          {
+            (Sessions[connection] = session = Internal_NewSession(connection)).Start(cancellationToken);
+          }
+
+          source.SetResult(session);
+        }
+        catch (Exception exception)
+        {
+          source.SetException(exception);
+        }
+      }
+    }
   }
 }

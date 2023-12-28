@@ -9,7 +9,7 @@ using Framework.Collections;
 using Framework.Services;
 using Framework.Logging;
 
-public sealed class KeyGeneratorService(Server server) : Service("Key Generator", server)
+public sealed class KeyService(Server server) : Service("Key Generator", server)
 {
   public sealed record RsaKeyPair(byte[] Privatekey, byte[] PublicKey);
 
@@ -43,9 +43,10 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
   public const int MAX_PREGENERATED_KEY_COUNT = 10000;
 
   public readonly Server Server = server;
+  public IMongoDatabase MainDatabase => Server.MainDatabase;
 
-  public IMongoCollection<Record.Key> Keys => Server.GetCollection<Record.Key>();
-  public IMongoCollection<Record.UserAuthentication> UserAuthentications => Server.GetCollection<Record.UserAuthentication>();
+  public IMongoCollection<Record.Key> Keys => MainDatabase.GetCollection<Record.Key>();
+  public IMongoCollection<Record.UserAuthentication> UserAuthentications => MainDatabase.GetCollection<Record.UserAuthentication>();
 
   private readonly TaskFactory TaskFactory = new(TaskCreationOptions.LongRunning, TaskContinuationOptions.None);
   private readonly List<RsaKeyPair> WaitQueue = [];
@@ -197,7 +198,7 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
     }
   });
 
-  private Task<Record.Key> InsertNewKey(long? userId, byte[] privateKey, byte[] publicKey, CancellationToken cancellationToken) => Server.MongoClient.RunTransaction(async (cancellationToken) =>
+  private async Task<Record.Key> InsertNewKey(long? userId, byte[] privateKey, byte[] publicKey, CancellationToken cancellationToken)
   {
     long sharedId;
     do
@@ -210,7 +211,7 @@ public sealed class KeyGeneratorService(Server server) : Service("Key Generator"
     Record.Key key = new(id, createTime, updateTime, sharedId, userId, privateKey, publicKey);
     await Keys.InsertOneAsync(key, cancellationToken: cancellationToken);
     return key;
-  }, cancellationToken: cancellationToken);
+  }
 
   public Task<Record.Key> CreateNewKey(Transformer.UserAuthentication? userAuthenticationTransformer) => RunTask((cancellationToken) =>
   {

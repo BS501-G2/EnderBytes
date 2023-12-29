@@ -11,6 +11,8 @@ public sealed partial class UserService
     public long UserId => Global.UserId;
     public readonly KeyService.Transformer.UserAuthentication Transformer = transformer;
 
+    public Task<KeyService.Transformer.Key> GetKeyTransformer(long keySharedId) => Global.Service.Server.KeyService.GetTransformer(Transformer, keySharedId);
+
     protected override async Task OnRun(CancellationToken cancellationToken)
     {
       try

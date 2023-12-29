@@ -55,6 +55,13 @@ public sealed partial class StorageHubService
 
     protected abstract Session Internal_NewSession(ConnectionService.Connection connection);
 
+    public async Task<Session> NewSession(ConnectionService.Connection connection, CancellationToken cancellationToken)
+    {
+      TaskCompletionSource<Session> source = new();
+      await WaitQueue.Enqueue((source, connection), cancellationToken);
+      return await source.Task;
+    }
+
     protected override async Task OnRun(CancellationToken cancellationToken)
     {
       await foreach (var (source, connection) in WaitQueue.WithCancellation(cancellationToken))
@@ -69,6 +76,10 @@ public sealed partial class StorageHubService
           if (!Sessions.TryGetValue(connection, out Session? session))
           {
             (Sessions[connection] = session = Internal_NewSession(connection)).Start(cancellationToken);
+            connection.Stopped += (_, _) =>
+            {
+              session.Stop();
+            };
           }
 
           source.SetResult(session);

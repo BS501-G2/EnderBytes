@@ -12,6 +12,7 @@ using Framework.Logging;
 public sealed class KeyService(Server server) : Service("Key Generator", server)
 {
   public sealed record RsaKeyPair(byte[] Privatekey, byte[] PublicKey);
+  public sealed record AesKeyPair(byte[] Key, byte[] Iv);
 
   public abstract class Transformer(RSACryptoServiceProvider provider) : IDisposable
   {
@@ -127,6 +128,14 @@ public sealed class KeyService(Server server) : Service("Key Generator", server)
   protected override Task OnStop(Exception? exception) => Task.CompletedTask;
   protected override Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
 
+  public AesKeyPair GetNewAesPair()
+  {
+    byte[] key = RandomNumberGenerator.GetBytes(32);
+    byte[] iv = RandomNumberGenerator.GetBytes(16);
+
+    return new(key, iv);
+  }
+
   public RsaKeyPair GetNewRsaKeyPair()
   {
     lock (WaitQueue)
@@ -166,18 +175,18 @@ public sealed class KeyService(Server server) : Service("Key Generator", server)
     }
   }
 
-  public Task<Transformer.Key> GetTransformer(long sharedId) => GetTransformer(null, sharedId);
-  public Task<Transformer.Key> GetTransformer(Transformer.UserAuthentication? userAuthenticationTransformer, long sharedId) => RunTask(async (cancellationToken) =>
+  public Task<Transformer.Key> GetTransformer(long sharedId, CancellationToken cancellationToken = default) => GetTransformer(null, sharedId, cancellationToken);
+  public Task<Transformer.Key> GetTransformer(Transformer.UserAuthentication? userAuthenticationTransformer, long sharedId, CancellationToken cancellationToken = default) => RunTask((cancellationToken) =>
   {
-    Record.Key key = await Server.MongoClient.RunTransaction(async (cancellationToken) =>
-    {
-      await foreach (var record in Keys.FindAsync((record) => record.SharedId == sharedId && (userAuthenticationTransformer != null ? record.UserId == userAuthenticationTransformer.UserId : record.UserId == null), cancellationToken: cancellationToken).ToAsyncEnumerable(cancellationToken))
-      {
-        return record;
-      }
-
-      throw new InvalidOperationException($"{(userAuthenticationTransformer != null ? "The specified user" : "The public")} does not have access to the key.");
-    }, cancellationToken: cancellationToken);
+    Record.Key key = Server.MongoClient.RunTransaction(() =>
+      Keys.FindOne((record) =>
+        record.SharedId == sharedId &&
+        (
+          userAuthenticationTransformer != null
+            ? record.UserId == userAuthenticationTransformer.UserId
+            : record.UserId == null
+        )
+      ) ?? throw new InvalidOperationException($"{(userAuthenticationTransformer != null ? "The specified user" : "The public")} does not have access to the key."), cancellationToken: cancellationToken);
 
     WeakDictionary<long, Transformer.Key> transformers = key.UserId == null ? PublicKeyTransformers : PrivateKeyTransformers;
     lock (transformers)
@@ -194,9 +203,9 @@ public sealed class KeyService(Server server) : Service("Key Generator", server)
         provider.ImportCspBlob(userAuthenticationTransformer?.Decrypt(key.PrivateKey) ?? key.PrivateKey);
       }
 
-      return transformer;
+      return Task.FromResult(transformer);
     }
-  });
+  }, cancellationToken);
 
   private async Task<Record.Key> InsertNewKey(long? userId, byte[] privateKey, byte[] publicKey, CancellationToken cancellationToken)
   {
@@ -207,7 +216,7 @@ public sealed class KeyService(Server server) : Service("Key Generator", server)
     }
     while (await (await Keys.FindAsync((entry) => entry.SharedId == sharedId, cancellationToken: cancellationToken)).AnyAsync(cancellationToken));
 
-    (long id, long createTime, long updateTime) = Record.GenerateNewId(Keys);
+    (long id, long createTime, long updateTime) = Keys.GenerateNewId(cancellationToken);
     Record.Key key = new(id, createTime, updateTime, sharedId, userId, privateKey, publicKey);
     await Keys.InsertOneAsync(key, cancellationToken: cancellationToken);
     return key;

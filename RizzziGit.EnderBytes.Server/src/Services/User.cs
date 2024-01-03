@@ -96,13 +96,12 @@ public sealed partial class UserService(Server server) : Server.SubService(serve
 
   protected override Task OnStop(Exception? exception) => Task.CompletedTask;
 
-  private async Task<Record.UserAuthentication> CreateUserAuthentication(long userId, UserAuthenticationType type, byte[] salt, byte[] challengeIv, byte[] encryptedChallengeBytes, byte[] expectedChallengeBytes, byte[] privateKeyIv, byte[] privateKey, byte[] publicKey)
+  private Record.UserAuthentication CreateUserAuthentication(long userId, UserAuthenticationType type, byte[] salt, byte[] challengeIv, byte[] encryptedChallengeBytes, byte[] expectedChallengeBytes, byte[] privateKeyIv, byte[] privateKey, byte[] publicKey, CancellationToken cancellationToken = default)
   {
-    (long id, long createTime, long updateTime) = Record.GenerateNewId(UserAuthentications);
+    (long id, long createTime, long updateTime) = UserAuthentications.GenerateNewId(cancellationToken);
     Record.UserAuthentication userAuthentication = new(id, createTime, updateTime, userId, type, DefaultHashAlgorithmName, ITERATIONS, salt, challengeIv, encryptedChallengeBytes, expectedChallengeBytes, privateKeyIv, privateKey, publicKey);
-    await UserAuthentications.InsertOneAsync(userAuthentication);
+    UserAuthentications.InsertOne(userAuthentication, cancellationToken: cancellationToken);
     return userAuthentication;
-
   }
 
   public Task<Record.UserAuthentication> CreateUserAuthentication(Record.User user, Record.UserAuthentication existingUserAuthentication, byte[] existingHashCache, UserAuthenticationType type, byte[] payload) => RunTask((cancellationToken) =>
@@ -127,10 +126,10 @@ public sealed partial class UserService(Server server) : Server.SubService(serve
     byte[] privateKeyIv = RandomNumberGenerator.GetBytes(IV_SIZE);
     byte[] encryptedPrivateKey = Aes.Create().CreateEncryptor(hash, privateKeyIv).TransformFinalBlock(privateKey);
 
-    return CreateUserAuthentication(user.Id, type, salt, challengeIv, encryptedChallengeBytes, challengeBytes, privateKeyIv, privateKey, publicKey);
+    return CreateUserAuthentication(user.Id, type, salt, challengeIv, encryptedChallengeBytes, challengeBytes, privateKeyIv, privateKey, publicKey, cancellationToken);
   });
 
-  public Task<Record.UserAuthentication> CreateUserAuthentication(Record.User user, UserAuthenticationType type, byte[] payload) => RunTask(async (cancellationToken) =>
+  public Task<Record.UserAuthentication> CreateUserAuthentication(Record.User user, UserAuthenticationType type, byte[] payload, CancellationToken cancellationToken = default) => RunTask(async (cancellationToken) =>
   {
     if (await (await UserAuthentications.FindAsync((userAuthentication) => userAuthentication.UserId == user.Id, cancellationToken: cancellationToken)).AnyAsync(cancellationToken: cancellationToken))
     {
@@ -147,6 +146,6 @@ public sealed partial class UserService(Server server) : Server.SubService(serve
     byte[] privateKeyIv = RandomNumberGenerator.GetBytes(IV_SIZE);
     byte[] encryptedPrivateKey = Aes.Create().CreateEncryptor(hash, privateKeyIv).TransformFinalBlock(privateKey);
 
-    return await CreateUserAuthentication(user.Id, type, salt, challengeIv, encryptedChallengeBytes, challengeBytes, privateKeyIv, privateKey, publicKey);
-  });
+    return CreateUserAuthentication(user.Id, type, salt, challengeIv, encryptedChallengeBytes, challengeBytes, privateKeyIv, privateKey, publicKey, cancellationToken);
+  }, cancellationToken);
 }

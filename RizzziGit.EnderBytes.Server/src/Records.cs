@@ -10,51 +10,6 @@ using Framework.Collections;
 
 public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
 {
-  public static (long Id, long CreateTime, long UpdateTime) GenerateNewId<T>(IMongoCollection<T> collection) where T : Record
-  {
-    long id;
-    do
-    {
-      id = Random.Shared.NextInt64();
-    }
-    while (collection.Find((record) => record.Id == id).FirstOrDefault() != null);
-
-    long createTime;
-    long updateTime = createTime = Random.Shared.NextInt64();
-
-    return (id, createTime, updateTime);
-  }
-
-  public static async Task WatchRecordUpdates(MongoClient client, IMongoDatabase database, CancellationToken cancellationToken)
-  {
-    List<Task> tasks = [];
-
-    await foreach (string collectionName in (await database.ListCollectionNamesAsync(cancellationToken: cancellationToken)).ToAsyncEnumerable(cancellationToken))
-    {
-      tasks.Add(watch(database.GetCollection<Record>(collectionName), cancellationToken));
-    }
-
-    await await Task.WhenAny(tasks);
-    async Task watch(IMongoCollection<Record> collection, CancellationToken cancellationToken)
-    {
-      await foreach (ChangeStreamDocument<Record> change in (await collection.WatchAsync(cancellationToken: cancellationToken)).ToAsyncEnumerable(cancellationToken))
-      {
-        if (
-          (change.OperationType != ChangeStreamOperationType.Update) &&
-          (change.OperationType != ChangeStreamOperationType.Replace)
-        )
-        {
-          continue;
-        }
-
-        if (change.FullDocumentBeforeChange.UpdateTime == change.FullDocument.UpdateTime)
-        {
-          await collection.UpdateManyAsync((record) => record.Id == change.FullDocument.Id, Builders<Record>.Update.Set((e) => e.UpdateTime, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), cancellationToken: cancellationToken);
-        }
-      }
-    }
-  }
-
   public sealed record User(
     long Id,
     long CreateTime,
@@ -123,75 +78,13 @@ public abstract partial record Record(long Id, long CreateTime, long UpdateTime)
     byte[] PublicKey
   ) : Record(Id, CreateTime, UpdateTime);
 
-  public sealed record StorageHub(
+  public sealed record Storage(
     long Id,
     long CreateTime,
     long UpdateTime,
     long OwnerUserId,
-    long KeySharedId,
-    StorageHubType Type,
-    StorageHubFlags Flags,
-    string Name
-  ) : Record(Id, CreateTime, UpdateTime);
-
-  public sealed record BlobStorageNode(
-    long Id,
-    long CreateTime,
-    long UpdateTime,
-    long BlobHubId,
-    StorageHubService.NodeType Type,
-    long? ParentNode,
     string Name,
+    StorageService.StorageType Type,
     long KeySharedId
   ) : Record(Id, CreateTime, UpdateTime);
-
-  public sealed record BlobStorageFileSnapshot(
-    long Id,
-    long CreateTime,
-    long UpdateTime,
-    long FileNodeId,
-    long AuthorUserId,
-    long Size,
-    long? BaseSnapshotId
-  ) : Record(Id, CreateTime, UpdateTime);
-
-  public sealed record BlobStorageFileDataMapper(
-    long Id,
-    long CreateTime,
-    long UpdateTime,
-    long SnapshotId,
-    long DataId,
-    long SequenceIndex
-  ) : Record(Id, CreateTime, UpdateTime);
-
-  public sealed record BlobStorageFileData(
-    long Id,
-    long CreateTime,
-    long UpdateTime,
-    long KeySharedId,
-    long Size,
-    byte[] Buffer
-  ) : Record(Id, CreateTime, UpdateTime)
-  {
-    private readonly static WeakDictionary<long, byte[]> DecryptedBuffer = [];
-
-    public byte[] DecryptBuffer(KeyService.Transformer.Key key)
-    {
-      if (KeySharedId != key.SharedId)
-      {
-        throw new ArgumentException("Invalid key share id.", nameof(key));
-      }
-
-      lock (DecryptedBuffer)
-      {
-        if (!DecryptedBuffer.TryGetValue(Id, out byte[]? buffer))
-        {
-          DecryptedBuffer.Add(Id, buffer = key.Decrypt(Buffer));
-          return buffer;
-        }
-
-        return buffer;
-      }
-    }
-  }
 }

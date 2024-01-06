@@ -6,6 +6,7 @@ namespace RizzziGit.EnderBytes.Services;
 using Records;
 using Utilities;
 using Framework.Collections;
+using Framework.Services;
 
 public enum UserAuthenticationType : byte { Password, SessionToken }
 
@@ -19,73 +20,137 @@ public sealed partial class UserService(Server server) : Server.SubService(serve
 
   public static readonly HashAlgorithmName DefaultHashAlgorithmName = HashAlgorithmName.SHA256;
 
-  private readonly WeakDictionary<long, GlobalSession> Sessions = [];
-  private readonly WaitQueue<(TaskCompletionSource<GlobalSession> source, long userId)> WaitQueue = new(1);
-
-  public IMongoDatabase MainDatabase => Server.MainDatabase;
-
-  public IMongoCollection<Record.User> Users => MainDatabase.GetCollection<Record.User>();
-  public IMongoCollection<Record.UserAuthentication> UserAuthentications => MainDatabase.GetCollection<Record.UserAuthentication>();
-
-  public async Task<Session> GetSession(Record.User user, KeyService.Transformer.UserAuthentication transformer)
+  public sealed class Session(UserService service, long id, long userId) : Lifetime($"User #{userId} session #{id}")
   {
-    GlobalSession globalSession;
+    public sealed class ConnectionBinding(Session global, ConnectionService.Connection connection, KeyService.Transformer.UserAuthentication transformer) : Lifetime($"Bindings for connection #{connection.Id}", global)
     {
-      TaskCompletionSource<GlobalSession> globalSource = new();
-      await WaitQueue.Enqueue((globalSource, user.Id));
-      globalSession = await globalSource.Task;
+      public readonly Session Session = global;
+      public readonly ConnectionService.Connection Connection = connection;
+      public long UserId => Session.UserId;
+      public readonly KeyService.Transformer.UserAuthentication Transformer = transformer;
 
-      if (transformer.UserId != user.Id || transformer.PublicOnly)
+      public KeyService.Transformer.Key GetKeyTransformer(long keySharedId) => Session.Service.Server.KeyService.GetTransformer(Transformer, keySharedId);
+
+      protected override async Task OnRun(CancellationToken cancellationToken)
       {
-        throw new ArgumentException("Transformer does not match the user id.", nameof(transformer));
+        try
+        {
+          lock (Session)
+          {
+            Session.ConnectionBindings.Add(Connection, this);
+          }
+
+          using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            Connection.GetCancellationToken()
+          );
+
+          await base.OnRun(linkedCancellationTokenSource.Token);
+        }
+        finally
+        {
+          lock (Session)
+          {
+            Session.ConnectionBindings.Remove(Connection);
+          }
+        }
+      }
+    }
+
+    public readonly UserService Service = service;
+    public readonly long Id = id;
+    public readonly long UserId = userId;
+
+    private readonly Dictionary<ConnectionService.Connection, ConnectionBinding> ConnectionBindings = [];
+
+    public Record.User UserRecord => Service.UserCollection.FindOne((record) => record.Id == UserId)!;
+
+    public ConnectionBinding GetBinding(ConnectionService.Connection connection, KeyService.Transformer.UserAuthentication transformer)
+    {
+      if (transformer.PublicOnly)
+      {
+        throw new ArgumentException("Transformer cannot be public only.", nameof(transformer));
       }
 
-      return await globalSession.Get(transformer, LastSessionId++);
-    }
-  }
+      lock (this)
+      {
+        if (!ConnectionBindings.TryGetValue(connection, out ConnectionBinding? connectionBinding))
+        {
+          connectionBinding = new(this, connection, transformer);
+          connectionBinding.Start(GetCancellationToken());
+        }
 
-  protected override async Task OnRun(CancellationToken cancellationToken)
-  {
-    await foreach (var (source, userId) in WaitQueue)
+        return connectionBinding;
+      }
+    }
+
+    protected override async Task OnRun(CancellationToken cancellationToken)
     {
       try
       {
-        lock (Sessions)
+        lock (Service)
         {
-          if (!Sessions.TryGetValue(userId, out var value))
-          {
-            (value = new(this, userId)).Start(cancellationToken);
-          }
-
-          source.SetResult(Sessions[userId] = value);
+          Service.Sessions.Add(UserId, this);
         }
+
+        await base.OnRun(cancellationToken);
       }
-      catch (Exception exception)
+      finally
       {
-        source.SetException(exception);
+        lock (Service)
+        {
+          Service.Sessions.Remove(UserId);
+        }
       }
     }
   }
 
+  private readonly WeakDictionary<long, Session> Sessions = [];
+  private long NextId = 0;
+
+  public IMongoDatabase MainDatabase => Server.MainDatabase;
+
+  public IMongoCollection<Record.User> UserCollection => MainDatabase.GetCollection<Record.User>();
+  public IMongoCollection<Record.UserAuthentication> UserAuthenticationCollections => MainDatabase.GetCollection<Record.UserAuthentication>();
+
+  public Session GetSession(KeyService.Transformer.UserAuthentication transformer, long? sessionId = null, CancellationToken cancellationToken = default)
+  {
+    cancellationToken.ThrowIfCancellationRequested();
+
+    lock (this)
+    {
+      cancellationToken.ThrowIfCancellationRequested();
+
+      if (!Sessions.TryGetValue(transformer.UserId, out Session? session))
+      {
+        session = new(this, NextId++, transformer.UserId);
+        session.Start(GetCancellationToken());
+      }
+
+      return session;
+    }
+  }
+
+  protected override Task OnRun(CancellationToken cancellationToken) => Task.Delay(-1, cancellationToken);
   protected override Task OnStart(CancellationToken cancellationToken)
   {
-    Users.Watch((change) =>
+    UserCollection.Watch((change) =>
     {
       if (change.OperationType != ChangeStreamOperationType.Delete)
       {
         return;
       }
 
-      UserAuthentications.DeleteMany((record) => change.FullDocument.Id == record.UserId);
+      UserAuthenticationCollections.DeleteMany((record) => change.FullDocument.Id == record.UserId);
     }, cancellationToken);
 
-    Users.Watch((change) =>
+    UserCollection.Watch((change) =>
     {
       if (change.OperationType != ChangeStreamOperationType.Delete)
       {
         return;
       }
-      else if (Sessions.TryGetValue(change.FullDocument.Id, out GlobalSession? session))
+      else if (Sessions.TryGetValue(change.FullDocument.Id, out Session? session))
       {
         session.Stop();
       }
@@ -98,13 +163,13 @@ public sealed partial class UserService(Server server) : Server.SubService(serve
 
   private Record.UserAuthentication CreateUserAuthentication(long userId, UserAuthenticationType type, byte[] salt, byte[] challengeIv, byte[] encryptedChallengeBytes, byte[] expectedChallengeBytes, byte[] privateKeyIv, byte[] privateKey, byte[] publicKey, CancellationToken cancellationToken = default)
   {
-    (long id, long createTime, long updateTime) = UserAuthentications.GenerateNewId(cancellationToken);
+    (long id, long createTime, long updateTime) = UserAuthenticationCollections.GenerateNewId(cancellationToken);
     Record.UserAuthentication userAuthentication = new(id, createTime, updateTime, userId, type, DefaultHashAlgorithmName, ITERATIONS, salt, challengeIv, encryptedChallengeBytes, expectedChallengeBytes, privateKeyIv, privateKey, publicKey);
-    UserAuthentications.InsertOne(userAuthentication, cancellationToken: cancellationToken);
+    UserAuthenticationCollections.InsertOne(userAuthentication, cancellationToken: cancellationToken);
     return userAuthentication;
   }
 
-  public Task<Record.UserAuthentication> CreateUserAuthentication(Record.User user, Record.UserAuthentication existingUserAuthentication, byte[] existingHashCache, UserAuthenticationType type, byte[] payload) => RunTask((cancellationToken) =>
+  public Record.UserAuthentication CreateUserAuthentication(Record.User user, Record.UserAuthentication existingUserAuthentication, byte[] existingHashCache, UserAuthenticationType type, byte[] payload, CancellationToken cancellationToken = default)
   {
     if (existingUserAuthentication.UserId == user.Id)
     {
@@ -115,37 +180,43 @@ public sealed partial class UserService(Server server) : Server.SubService(serve
       throw new ArgumentException("Provided hash does not match the user authentication.");
     }
 
-    byte[] salt = RandomNumberGenerator.GetBytes(SALT_SIZE);
-    byte[] hash = Record.UserAuthentication.GetHash(salt, ITERATIONS, DefaultHashAlgorithmName, payload);
-    byte[] challengeIv = RandomNumberGenerator.GetBytes(IV_SIZE);
-    byte[] challengeBytes = RandomNumberGenerator.GetBytes(CHALLENGE_PAYLOAD_SIZE);
-    byte[] encryptedChallengeBytes = Aes.Create().CreateDecryptor(hash, challengeIv).TransformFinalBlock(challengeBytes);
+    lock (this)
+    {
+      byte[] salt = RandomNumberGenerator.GetBytes(SALT_SIZE);
+      byte[] hash = Record.UserAuthentication.GetHash(salt, ITERATIONS, DefaultHashAlgorithmName, payload);
+      byte[] challengeIv = RandomNumberGenerator.GetBytes(IV_SIZE);
+      byte[] challengeBytes = RandomNumberGenerator.GetBytes(CHALLENGE_PAYLOAD_SIZE);
+      byte[] encryptedChallengeBytes = Aes.Create().CreateDecryptor(hash, challengeIv).TransformFinalBlock(challengeBytes);
 
-    byte[] privateKey = Aes.Create().CreateDecryptor(existingHashCache, existingUserAuthentication.EncryptionPrivateKeyIv).TransformFinalBlock(existingUserAuthentication.EncryptionPrivateKey);
-    byte[] publicKey = existingUserAuthentication.EncryptionPublicKey;
-    byte[] privateKeyIv = RandomNumberGenerator.GetBytes(IV_SIZE);
-    byte[] encryptedPrivateKey = Aes.Create().CreateEncryptor(hash, privateKeyIv).TransformFinalBlock(privateKey);
+      byte[] privateKey = Aes.Create().CreateDecryptor(existingHashCache, existingUserAuthentication.EncryptionPrivateKeyIv).TransformFinalBlock(existingUserAuthentication.EncryptionPrivateKey);
+      byte[] publicKey = existingUserAuthentication.EncryptionPublicKey;
+      byte[] privateKeyIv = RandomNumberGenerator.GetBytes(IV_SIZE);
+      byte[] encryptedPrivateKey = Aes.Create().CreateEncryptor(hash, privateKeyIv).TransformFinalBlock(privateKey);
 
-    return CreateUserAuthentication(user.Id, type, salt, challengeIv, encryptedChallengeBytes, challengeBytes, privateKeyIv, privateKey, publicKey, cancellationToken);
-  });
+      return CreateUserAuthentication(user.Id, type, salt, challengeIv, encryptedChallengeBytes, challengeBytes, privateKeyIv, encryptedPrivateKey, publicKey, cancellationToken);
+    }
+  }
 
-  public Task<Record.UserAuthentication> CreateUserAuthentication(Record.User user, UserAuthenticationType type, byte[] payload, CancellationToken cancellationToken = default) => RunTask(async (cancellationToken) =>
+  public Record.UserAuthentication CreateUserAuthentication(Record.User user, UserAuthenticationType type, byte[] payload, CancellationToken cancellationToken = default)
   {
-    if (await (await UserAuthentications.FindAsync((userAuthentication) => userAuthentication.UserId == user.Id, cancellationToken: cancellationToken)).AnyAsync(cancellationToken: cancellationToken))
+    if (UserAuthenticationCollections.FindOne((userAuthentication) => userAuthentication.UserId == user.Id, cancellationToken: cancellationToken) != null)
     {
       throw new InvalidOperationException("Must use an existing user authentication record to create a new one.");
     }
 
-    byte[] salt = RandomNumberGenerator.GetBytes(SALT_SIZE);
-    byte[] hash = Record.UserAuthentication.GetHash(salt, ITERATIONS, DefaultHashAlgorithmName, payload);
-    byte[] challengeIv = RandomNumberGenerator.GetBytes(IV_SIZE);
-    byte[] challengeBytes = RandomNumberGenerator.GetBytes(CHALLENGE_PAYLOAD_SIZE);
-    byte[] encryptedChallengeBytes = Aes.Create().CreateEncryptor(hash, challengeIv).TransformFinalBlock(challengeBytes);
+    lock (this)
+    {
+      byte[] salt = RandomNumberGenerator.GetBytes(SALT_SIZE);
+      byte[] hash = Record.UserAuthentication.GetHash(salt, ITERATIONS, DefaultHashAlgorithmName, payload);
+      byte[] challengeIv = RandomNumberGenerator.GetBytes(IV_SIZE);
+      byte[] challengeBytes = RandomNumberGenerator.GetBytes(CHALLENGE_PAYLOAD_SIZE);
+      byte[] encryptedChallengeBytes = Aes.Create().CreateEncryptor(hash, challengeIv).TransformFinalBlock(challengeBytes);
 
-    (byte[] privateKey, byte[] publicKey) = Server.KeyService.GetNewRsaKeyPair();
-    byte[] privateKeyIv = RandomNumberGenerator.GetBytes(IV_SIZE);
-    byte[] encryptedPrivateKey = Aes.Create().CreateEncryptor(hash, privateKeyIv).TransformFinalBlock(privateKey);
+      (byte[] privateKey, byte[] publicKey) = Server.KeyService.GetNewRsaKeyPair();
+      byte[] privateKeyIv = RandomNumberGenerator.GetBytes(IV_SIZE);
+      byte[] encryptedPrivateKey = Aes.Create().CreateEncryptor(hash, privateKeyIv).TransformFinalBlock(privateKey);
 
-    return CreateUserAuthentication(user.Id, type, salt, challengeIv, encryptedChallengeBytes, challengeBytes, privateKeyIv, privateKey, publicKey, cancellationToken);
-  }, cancellationToken);
+      return CreateUserAuthentication(user.Id, type, salt, challengeIv, encryptedChallengeBytes, challengeBytes, privateKeyIv, encryptedPrivateKey, publicKey, cancellationToken);
+    }
+  }
 }

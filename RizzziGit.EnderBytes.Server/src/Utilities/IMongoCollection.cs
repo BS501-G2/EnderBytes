@@ -1,11 +1,7 @@
 using System.Linq.Expressions;
 using MongoDB.Driver;
-using MongoDB.Driver.Linq;
-using Newtonsoft.Json.Linq;
 
 namespace RizzziGit.EnderBytes.Utilities;
-
-using Records;
 
 public static class IMongoCollection
 {
@@ -19,8 +15,6 @@ public static class IMongoCollection
       hook(change);
     }
   }
-
-  private static string GenerateQueryString<T>(IQueryable<T> queryable) => new JObject { { nameof(Record.Id), new JObject { { "$in", new JArray([.. queryable]) } } } }.ToString();
 
   public static T? FindOne<T> (this IMongoCollection<T> mongoCollection, Expression<Func<T, bool>> filter, FindOptions? options = null, CancellationToken cancellationToken = default) => mongoCollection.Find(filter, options).FirstOrDefault(cancellationToken);
 

@@ -12,7 +12,7 @@ using Framework.Logging;
 public sealed class KeyService(Server server) : Service("Key Generator", server)
 {
   public sealed record RsaKeyPair(byte[] Privatekey, byte[] PublicKey);
-  public sealed record AesKeyPair(byte[] Key, byte[] Iv);
+  public sealed record AesPair(byte[] Key, byte[] Iv);
 
   public abstract class Transformer(RSACryptoServiceProvider provider) : IDisposable
   {
@@ -128,7 +128,7 @@ public sealed class KeyService(Server server) : Service("Key Generator", server)
   protected override Task OnStop(Exception? exception) => Task.CompletedTask;
   protected override Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
 
-  public AesKeyPair GetNewAesPair()
+  public AesPair GetNewAesPair()
   {
     byte[] key = RandomNumberGenerator.GetBytes(32);
     byte[] iv = RandomNumberGenerator.GetBytes(16);
@@ -175,74 +175,87 @@ public sealed class KeyService(Server server) : Service("Key Generator", server)
     }
   }
 
-  public Task<Transformer.Key> GetTransformer(long sharedId, CancellationToken cancellationToken = default) => GetTransformer(null, sharedId, cancellationToken);
-  public Task<Transformer.Key> GetTransformer(Transformer.UserAuthentication? userAuthenticationTransformer, long sharedId, CancellationToken cancellationToken = default) => RunTask((cancellationToken) =>
+  public Transformer.Key GetTransformer(long sharedId, CancellationToken cancellationToken = default) => GetTransformer(null, sharedId, cancellationToken);
+  public Transformer.Key GetTransformer(Transformer.UserAuthentication? userAuthenticationTransformer, long sharedId, CancellationToken cancellationToken = default)
   {
-    Record.Key key = Server.MongoClient.RunTransaction(() =>
-      Keys.FindOne((record) =>
-        record.SharedId == sharedId &&
-        (
-          userAuthenticationTransformer != null
-            ? record.UserId == userAuthenticationTransformer.UserId
-            : record.UserId == null
-        )
-      ) ?? throw new InvalidOperationException($"{(userAuthenticationTransformer != null ? "The specified user" : "The public")} does not have access to the key."), cancellationToken: cancellationToken);
-
-    WeakDictionary<long, Transformer.Key> transformers = key.UserId == null ? PublicKeyTransformers : PrivateKeyTransformers;
-    lock (transformers)
+    lock (this)
     {
-      if (!transformers.TryGetValue(key.SharedId, out Transformer.Key? transformer))
+      Record.Key key = Server.MongoClient.RunTransaction(() =>
+        Keys.FindOne((record) =>
+          record.SharedId == sharedId &&
+          (
+            userAuthenticationTransformer != null
+              ? record.UserId == userAuthenticationTransformer.UserId
+              : record.UserId == null
+          )
+        ) ?? throw new InvalidOperationException($"{(userAuthenticationTransformer != null ? "The specified user" : "The public")} does not have access to the key."), cancellationToken: cancellationToken);
+
+      WeakDictionary<long, Transformer.Key> transformers = key.UserId == null ? PublicKeyTransformers : PrivateKeyTransformers;
+      lock (transformers)
       {
-        RSACryptoServiceProvider provider = new()
+        if (!transformers.TryGetValue(key.SharedId, out Transformer.Key? transformer))
         {
-          PersistKeyInCsp = false,
-          KeySize = KEY_SIZE
-        };
+          RSACryptoServiceProvider provider = new()
+          {
+            PersistKeyInCsp = false,
+            KeySize = KEY_SIZE
+          };
 
-        transformer = transformers[key.SharedId] = new(provider, key.SharedId);
-        provider.ImportCspBlob(userAuthenticationTransformer?.Decrypt(key.PrivateKey) ?? key.PrivateKey);
+          transformer = transformers[key.SharedId] = new(provider, key.SharedId);
+          provider.ImportCspBlob(userAuthenticationTransformer?.Decrypt(key.PrivateKey) ?? key.PrivateKey);
+        }
+
+        return transformer;
       }
-
-      return Task.FromResult(transformer);
     }
-  }, cancellationToken);
-
-  private async Task<Record.Key> InsertNewKey(long? userId, byte[] privateKey, byte[] publicKey, CancellationToken cancellationToken)
-  {
-    long sharedId;
-    do
-    {
-      sharedId = Random.Shared.NextInt64();
-    }
-    while (await (await Keys.FindAsync((entry) => entry.SharedId == sharedId, cancellationToken: cancellationToken)).AnyAsync(cancellationToken));
-
-    (long id, long createTime, long updateTime) = Keys.GenerateNewId(cancellationToken);
-    Record.Key key = new(id, createTime, updateTime, sharedId, userId, privateKey, publicKey);
-    await Keys.InsertOneAsync(key, cancellationToken: cancellationToken);
-    return key;
   }
 
-  public Task<Record.Key> CreateNewKey(Transformer.UserAuthentication? userAuthenticationTransformer) => RunTask((cancellationToken) =>
+  private Record.Key InsertNewKey(long? userId, byte[] privateKey, byte[] publicKey, CancellationToken cancellationToken = default)
   {
-    (byte[] privateKey, byte[] publicKey) = GetNewRsaKeyPair();
+    lock (this)
+    {
+      long sharedId;
+      do
+      {
+        sharedId = Random.Shared.NextInt64();
+      }
+      while (Keys.FindOne((entry) => entry.SharedId == sharedId, cancellationToken: cancellationToken) != null);
 
-    return InsertNewKey(userAuthenticationTransformer?.UserId, userAuthenticationTransformer?.Encrypt(privateKey) ?? privateKey, publicKey, cancellationToken);
-  });
+      (long id, long createTime, long updateTime) = Keys.GenerateNewId(cancellationToken);
+      Record.Key key = new(id, createTime, updateTime, sharedId, userId, privateKey, publicKey);
+      Keys.InsertOne(key, cancellationToken: cancellationToken);
+      return key;
+    }
+  }
 
-  public Task<Record.Key> DuplicateKey(
+  public Record.Key CreateNewKey(Transformer.UserAuthentication? userAuthenticationTransformer, CancellationToken  cancellationToken = default)
+  {
+    lock (this)
+    {
+      (byte[] privateKey, byte[] publicKey) = GetNewRsaKeyPair();
+
+      return InsertNewKey(userAuthenticationTransformer?.UserId, userAuthenticationTransformer?.Encrypt(privateKey) ?? privateKey, publicKey, cancellationToken);
+    }
+  }
+
+  public Record.Key DuplicateKey(
     Record.Key key,
     Transformer.UserAuthentication? existingUserAuthenticationTransformer,
-    Transformer.UserAuthentication? newUserAuthenticationTransformer
-  ) => RunTask((cancellationToken) =>
+    Transformer.UserAuthentication? newUserAuthenticationTransformer,
+    CancellationToken  cancellationToken = default
+  )
   {
-    if (key.UserId != existingUserAuthenticationTransformer?.UserId)
+    lock (this)
     {
-      throw new ArgumentException("User authentication does not match the key user id.", nameof(existingUserAuthenticationTransformer));
+      if (key.UserId != existingUserAuthenticationTransformer?.UserId)
+      {
+        throw new ArgumentException("User authentication does not match the key user id.", nameof(existingUserAuthenticationTransformer));
+      }
+
+      byte[] privateKey = existingUserAuthenticationTransformer != null ? existingUserAuthenticationTransformer.Decrypt(key.PrivateKey) : key.PrivateKey;
+      byte[] publicKey = key.PublicKey;
+
+      return InsertNewKey(newUserAuthenticationTransformer?.UserId, newUserAuthenticationTransformer?.Encrypt(privateKey) ?? privateKey, publicKey, cancellationToken);
     }
-
-    byte[] privateKey = existingUserAuthenticationTransformer != null ? existingUserAuthenticationTransformer.Decrypt(key.PrivateKey) : key.PrivateKey;
-    byte[] publicKey = key.PublicKey;
-
-    return InsertNewKey(newUserAuthenticationTransformer?.UserId, newUserAuthenticationTransformer?.Encrypt(privateKey) ?? privateKey, publicKey, cancellationToken);
-  });
+  }
 }

@@ -1,12 +1,12 @@
 using System.Security.Cryptography;
 using MongoDB.Driver;
 
-namespace RizzziGit.EnderBytes.Services.Key;
+namespace RizzziGit.EnderBytes.Services;
 
-using Framework.Services;
+using Core;
 using Framework.Logging;
 
-public sealed class KeyService(Server server) : Service("Key Generator", server)
+public sealed class KeyService(Server server) : Server.SubService(server, "Key Generator")
 {
   public sealed record RsaKeyPair(byte[] Privatekey, byte[] PublicKey);
   public sealed record AesPair(byte[] Key, byte[] Iv);
@@ -40,7 +40,6 @@ public sealed class KeyService(Server server) : Service("Key Generator", server)
   public const int MAX_CONCURRENT_GENERATOR = 4;
   public const int MAX_PREGENERATED_KEY_COUNT = 10000;
 
-  public readonly Server Server = server;
   public IMongoDatabase MainDatabase => Server.MainDatabase;
 
   private readonly TaskFactory TaskFactory = new(TaskCreationOptions.LongRunning, TaskContinuationOptions.None);

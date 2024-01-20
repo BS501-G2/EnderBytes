@@ -1,13 +1,9 @@
 using MongoDB.Driver;
 
-namespace RizzziGit.EnderBytes;
+namespace RizzziGit.EnderBytes.Core;
 
 using Framework.Services;
-using Services.Connection;
-using Services.Key;
-using Services.Session;
-using Services.Subsystem;
-using Services.Resource;
+using Services;
 
 public sealed record ServerConfiguration(
   string? ServerPath,
@@ -23,9 +19,6 @@ public sealed class Server : Service
 
     KeyService = new(this);
     ResourceService = new(this);
-    SessionService = new(this);
-    ConnectionService = new(this);
-    SubsystemService = new(this);
 
     StateChanged += (sender, state) =>
     {
@@ -44,33 +37,27 @@ public sealed class Server : Service
   public IMongoClient MongoClient { get; private set; }
   public IMongoDatabase MainDatabase => MongoClient.GetDatabase("EnderBytes");
 
-  public readonly ResourceService.Main ResourceService;
   public readonly KeyService KeyService;
-  public readonly Session.SessionService SessionService;
-  public readonly Connection.ConnectionService ConnectionService;
-  public readonly Subsystem.SubsystemService SubsystemService;
+  public readonly ResourceService ResourceService;
+  public readonly ConnectionService ConnectionService;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
-    await ResourceService.Start();
     await KeyService.Start();
-    await ConnectionService.Start();
-    await SubsystemService.Start();
+    await ResourceService.Start();
 
     await base.OnStart(cancellationToken);
   }
 
   protected override Task OnRun(CancellationToken cancellationToken)
   {
-    return WatchDog([ResourceService, KeyService, SessionService, ConnectionService], cancellationToken);
+    return WatchDog([KeyService, ResourceService], cancellationToken);
   }
 
   protected override async Task OnStop(Exception? exception)
   {
-    await ConnectionService.Stop();
-    await SessionService.Stop();
-    await KeyService.Stop();
     await ResourceService.Stop();
+    await KeyService.Stop();
 
     await base.OnStop(exception);
   }

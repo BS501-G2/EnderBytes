@@ -40,22 +40,27 @@ public sealed class Server : Service
   public readonly KeyService KeyService;
   public readonly ResourceService ResourceService;
   public readonly ConnectionService ConnectionService;
+  public readonly SessionService SessionService;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
     await KeyService.Start();
     await ResourceService.Start();
+    await SessionService.Start();
+    await ConnectionService.Start();
 
     await base.OnStart(cancellationToken);
   }
 
   protected override Task OnRun(CancellationToken cancellationToken)
   {
-    return WatchDog([KeyService, ResourceService], cancellationToken);
+    return WatchDog([KeyService, ResourceService, SessionService, ConnectionService], cancellationToken);
   }
 
   protected override async Task OnStop(Exception? exception)
   {
+    await ConnectionService.Stop();
+    await SessionService.Stop();
     await ResourceService.Stop();
     await KeyService.Stop();
 

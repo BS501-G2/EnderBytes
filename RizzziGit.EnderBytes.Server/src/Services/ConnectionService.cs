@@ -1,9 +1,20 @@
 namespace RizzziGit.EnderBytes.Services;
 
+using Framework.Collections;
+
 using Core;
 
 public sealed partial class ConnectionService(Server server) : Server.SubService(server, "Connections")
 {
+  private readonly WeakDictionary<long, Connection> Connections = [];
+
+  public bool IsValid(Connection connection)
+  {
+    lock (this)
+    {
+      return Connections.TryGetValue(connection.Id, out Connection? existingConnection) && existingConnection == connection;
+    }
+  }
 
   public Connection NewConnection(Parameters configuration, CancellationToken cancellationToken = default) => Run((cancellationToken) =>
   {
@@ -16,6 +27,7 @@ public sealed partial class ConnectionService(Server server) : Server.SubService
       _ => throw new ArgumentException("Invalid configuration class.", nameof(configuration))
     };
 
+    Connections.Add(connection.Id, connection);
     return connection;
   }, cancellationToken);
 }

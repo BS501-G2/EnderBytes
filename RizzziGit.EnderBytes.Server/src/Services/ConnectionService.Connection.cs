@@ -1,34 +1,33 @@
 namespace RizzziGit.EnderBytes.Services;
 
-using Framework.Collections;
 using Framework.Lifetime;
 
 public sealed partial class ConnectionService
 {
   public abstract partial class Connection : Lifetime
   {
-    private Connection(ConnectionService service, Parameters configuration) : base($"Connection")
+    private Connection(ConnectionService service, Parameters parameters)
     {
       Service = service;
-      Configuration = configuration;
+      Parameters = parameters;
 
-      Id = service.NextId++;
+      Id = Service.NextId++;
     }
 
     public readonly ConnectionService Service;
     public readonly long Id;
 
-    private readonly Parameters Configuration;
+    private readonly Parameters Parameters;
 
-    protected override void OnCreate()
+    public virtual bool IsValid => Service.IsValid(this);
+    public void ThrowIfInvalid()
     {
-      lock (Service)
+      if (!IsValid)
       {
-        Service.Connections.Add(Id, this);
+        throw new InvalidOperationException("Connection is invalid.");
       }
     }
   }
 
   private long NextId;
-  private readonly WeakDictionary<long, Connection> Connections = [];
 }

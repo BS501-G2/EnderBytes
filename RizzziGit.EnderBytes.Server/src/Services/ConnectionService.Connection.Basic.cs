@@ -6,9 +6,9 @@ public sealed partial class ConnectionService
 {
   public abstract partial class Connection
   {
-    public sealed class Basic(ConnectionService service, Parameters.Basic configuration) : Connection(service, configuration)
+    public sealed class Basic(ConnectionService service, Parameters.Basic parameters) : Connection(service, parameters)
     {
-      private new readonly Parameters.Basic Configuration = configuration;
+      private new readonly Parameters.Basic Parameters = parameters;
     }
   }
 }

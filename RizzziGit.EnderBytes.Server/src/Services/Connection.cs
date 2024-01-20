@@ -1,103 +1,66 @@
-namespace RizzziGit.EnderBytes.Services;
+namespace RizzziGit.EnderBytes.Services.Connection;
 
 using Framework.Collections;
-using Framework.Services;
+using Framework.Lifetime;
+using Resources;
+using Services.Session;
 
-public sealed partial class ConnectionService(Server server) : Service("Connections", server)
+public abstract class Connection : Lifetime
 {
-  public abstract partial record Configuration
+  public abstract class Configuration
   {
     private Configuration() { }
 
-    public sealed record Basic() : Configuration;
-    public sealed record Internal(KeyService.Transformer.UserAuthentication UserAuthentication) : Configuration;
-    public sealed record Advanced() : Configuration;
+    public sealed class BasicConfiguration() : Configuration;
+    public sealed class AdvancedConfiguration() : Configuration;
+    public sealed class InternalConnection() : Configuration;
   }
 
-  public abstract partial class Connection : Lifetime
+  public sealed class BasicConnection(ConnectionService manager, long id) : Connection(manager, id)
   {
-    public sealed class Basic(ConnectionService service, Configuration.Basic configuration) : Connection(service, configuration)
-    {
-      public new readonly Configuration.Basic Configuration = configuration;
-    }
 
-    public sealed class Internal(ConnectionService service, Configuration.Internal configuration) : Connection(service, configuration)
-    {
-      public new readonly Configuration.Internal Configuration = configuration;
-    }
+  }
 
-    public sealed class Advanced(ConnectionService service, Configuration.Advanced configuration) : Connection(service, configuration)
-    {
-      public new readonly Configuration.Advanced Configuration = configuration;
-    }
+  public sealed class AdvancedConnection(ConnectionService manager, long id) : Connection(manager, id)
+  {
 
-    private Connection(ConnectionService service, Configuration configuration) : base("Connection")
-    {
-      Service = service;
-      Configuration = configuration;
-      Id = Service.NextId++;
-    }
+  }
 
-    public readonly long Id;
-    public readonly ConnectionService Service;
-    public readonly Configuration Configuration;
+  public sealed class InternalConnection(ConnectionService manager, long id) : Connection(manager, id)
+  {
 
-    public Server Server => Service.Server;
-    public UserService.Session.ConnectionBinding? Session { get; private set; } = null;
+  }
 
-    public StorageService.Storage.Session GetStorage(long storageId, CancellationToken cancellationToken)
+  public sealed class ConnectionService(Server server) : Server.SubService(server, "Connections")
+  {
+    private long NextId = 0;
+    private readonly WeakDictionary<long, Connection> Connections = [];
+
+    public Connection CreateConnection()
     {
       lock (this)
       {
-        return Server.StorageService.GetStorageSession(storageId, this, cancellationToken);
-      }
-    }
+        long connectionId = NextId++;
+        AdvancedConnection connection = new(this, connectionId);
 
-    protected override async Task OnRun(CancellationToken cancellationToken)
-    {
-      try
-      {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (Service)
-        {
-          Service.Connections.Add(Id, this);
-        }
+        connection.Stopped += (_, _) => Connections.Remove(connectionId);
+        Connections.Add(connection.Id, connection);
+        connection.Start(GetCancellationToken());
 
-        await base.OnRun(cancellationToken);
-      }
-      finally
-      {
-        lock (Service)
-        {
-          Service.Connections.Remove(Id);
-        }
+        return connection;
       }
     }
   }
 
-  public readonly Server Server = server;
-
-  private long NextId = 0;
-  private readonly WeakDictionary<long, Connection> Connections = [];
-
-  public Connection NewConnection(Configuration configuration)
+  private Connection(ConnectionService manager, long id) : base($"#{id}", manager.Logger)
   {
-    lock (this)
-    {
-      Connection connection = configuration switch
-      {
-        Configuration.Advanced advancedConfiguration => new Connection.Advanced(this, advancedConfiguration),
-        Configuration.Basic basicConfiguration => new Connection.Basic(this, basicConfiguration),
-        Configuration.Internal internalConfiguration => new Connection.Internal(this, internalConfiguration),
-
-        _ => throw new InvalidOperationException("Unknown configuration type.")
-      };
-
-      connection.Start(GetCancellationToken());
-      return connection;
-    }
+    Service = manager;
+    Id = id;
   }
 
-  protected override Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
-  protected override Task OnStop(Exception? exception) => Task.CompletedTask;
+  public readonly ConnectionService Service;
+  public readonly long Id;
+
+  public Session? CurrentSession => Service.Server.SessionService.GetSession(this, default);
+  public Session CreateSession(User user, UserAuthentication userAuthentication, byte[] payloadHash, CancellationToken cancellationToken = default) => Service.Server.SessionService.CreateSession(this, user, userAuthentication, payloadHash, cancellationToken);
 }

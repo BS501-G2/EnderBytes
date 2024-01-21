@@ -2,7 +2,7 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Framework.Lifetime;
 
-public abstract partial class Resource<M, D, R>(M manager, Resource<M, D, R>.ResourceRecord record) : Lifetime($"#{record.Id}")
+public abstract partial class Resource<M, D, R>(M manager, Resource<M, D, R>.ResourceRecord record) : Lifetime
   where M : Resource<M, D, R>.ResourceManager
   where D : Resource<M, D, R>.ResourceData
   where R : Resource<M, D, R>
@@ -22,4 +22,14 @@ public abstract partial class Resource<M, D, R>(M manager, Resource<M, D, R>.Res
   public long UpdateTime => Record.UpdateTime;
 
   public bool IsValid => Manager.IsValid((R)this);
+  public void ThrowIfInvalid()
+  {
+    lock (this)
+    {
+      if (!IsValid)
+      {
+        throw new InvalidOperationException("Invalid resource.");
+      }
+    }
+  }
 }

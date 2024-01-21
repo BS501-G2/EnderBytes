@@ -13,7 +13,7 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
 
   public const int KEY_SIZE = 512 * 8;
   public const int MAX_CONCURRENT_GENERATOR = 4;
-  public const int MAX_PREGENERATED_KEY_COUNT = 10000;
+  public const int MAX_PREGENERATED_KEY_COUNT = 100;
 
   public IMongoDatabase MainDatabase => Server.MainDatabase;
 
@@ -26,7 +26,6 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
     lock (WaitQueue)
     {
       WaitQueue.Add(entry);
-      Logger.Log(LogLevel.Verbose, $"Available Keys: {WaitQueue.Count}/{MAX_PREGENERATED_KEY_COUNT}");
     }
   }
 
@@ -65,7 +64,10 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
 
         if (tasks.Count != 0)
         {
-          tasks.Remove(await Task.WhenAny(tasks));
+          Task task = await Task.WhenAny(tasks);
+
+          await task;
+          tasks.Remove(task);
           continue;
         }
 

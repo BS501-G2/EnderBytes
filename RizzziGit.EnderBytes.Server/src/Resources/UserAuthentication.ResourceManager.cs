@@ -42,7 +42,7 @@ public sealed partial class  UserAuthentication
         privateKey = encryptor.TransformFinalBlock(privateKey);
       }
 
-      return Run((cancellationToken) => RunTransaction((cancellationToken) => Insert(new(user.Id, newType, hashAlgorithmName, iterations, salt, challengeIv, challengeBytes, challengeEncryptedBytes, privateKeyIv, privateKey, publicKey), cancellationToken), cancellationToken: cancellationToken), cancellationToken);
+      return ExecuteSynchronized((cancellationToken) => RunTransaction((cancellationToken) => Insert(new(user.Id, newType, hashAlgorithmName, iterations, salt, challengeIv, challengeBytes, challengeEncryptedBytes, privateKeyIv, privateKey, publicKey), cancellationToken), cancellationToken: cancellationToken), cancellationToken);
     }
 
     public UserAuthentication Create(User user, UserAuthenticationType type, byte[] payload, CancellationToken cancellationToken = default)
@@ -72,7 +72,7 @@ public sealed partial class  UserAuthentication
         privateKey = cryptoTransform.TransformFinalBlock(privateKey);
       }
 
-      return Run((cancellationToken) =>
+      return ExecuteSynchronized((cancellationToken) =>
       {
         return RunTransaction((cancellationToken) =>
         {

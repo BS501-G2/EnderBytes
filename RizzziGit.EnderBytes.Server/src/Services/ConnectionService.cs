@@ -16,7 +16,7 @@ public sealed partial class ConnectionService(Server server) : Server.SubService
     }
   }
 
-  public Connection NewConnection(Parameters configuration, CancellationToken cancellationToken = default) => Run((cancellationToken) =>
+  public Connection NewConnection(Parameters configuration, CancellationToken cancellationToken = default) => ExecuteSynchronized((cancellationToken) =>
   {
     Connection connection = configuration switch
     {

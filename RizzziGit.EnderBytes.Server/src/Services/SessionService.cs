@@ -7,7 +7,7 @@ using Resources;
 
 using Connection = ConnectionService.Connection;
 
-public sealed partial class SessionService(Server server, string name) : Server.SubService(server, name)
+public sealed partial class SessionService(Server server) : Server.SubService(server, "Sessions")
 {
   private long NextId;
   private readonly WeakDictionary<Connection, Session> Sessions = [];
@@ -35,6 +35,15 @@ public sealed partial class SessionService(Server server, string name) : Server.
     }
   }
 
+  public Session? GetSession(Connection connection)
+  {
+    lock (this)
+    {
+      Sessions.TryGetValue(connection, out Session? session);
+      return session;
+    }
+  }
+
   public Session CreateSessionWithPayload(Connection connection, UserAuthentication userAuthentication, byte[] payload) => CreateSessionWithPayloadHash(connection, userAuthentication, userAuthentication.GetPayloadHash(payload));
   public Session CreateSessionWithPayloadHash(Connection connection, UserAuthentication userAuthentication, byte[] payloadHash)
   {
@@ -42,11 +51,13 @@ public sealed partial class SessionService(Server server, string name) : Server.
 
     lock (this)
     {
-      if (!Sessions.TryGetValue(connection, out Session? session))
+      if (Sessions.TryGetValue(connection, out Session? _))
       {
-        Sessions.Add(connection, session = new(this, connection, userAuthentication, payloadHash));
+        throw new InvalidOperationException("Session already exists.");
       }
 
+      Session session = new(this, connection, userAuthentication, payloadHash);
+      Sessions.Add(connection, session);
       return session;
     }
   }

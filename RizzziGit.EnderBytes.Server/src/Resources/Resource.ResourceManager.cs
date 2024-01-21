@@ -6,6 +6,7 @@ using MongoDB.Driver;
 namespace RizzziGit.EnderBytes.Resources;
 
 using Framework.Lifetime;
+using Framework.Logging;
 using Framework.Collections;
 using Framework.Services;
 
@@ -15,7 +16,7 @@ using Services;
 
 public abstract partial class Resource<M, D, R>
 {
-  public abstract partial class ResourceManager(ResourceService main, IMongoDatabase database, string name, long version) : Service(name)
+  public abstract partial class ResourceManager(ResourceService main, IMongoDatabase database, string name, long version) : Service(name, main)
   {
     public readonly ResourceService Main = main;
     public readonly long Version = version;
@@ -34,7 +35,7 @@ public abstract partial class Resource<M, D, R>
     {
       try
       {
-        return Run(() => Resources.TryGetValue(resource.Id, out R? value) && value == resource);
+        return ExecuteSynchronized(() => Resources.TryGetValue(resource.Id, out R? value) && value == resource);
       }
       catch
       {
@@ -57,7 +58,7 @@ public abstract partial class Resource<M, D, R>
       }
     }
 
-    protected ResourceRecord CreateNewRecord(D data, CancellationToken cancellationToken = default) => Run<ResourceRecord>((cancellationToken) =>
+    protected ResourceRecord CreateNewRecord(D data, CancellationToken cancellationToken = default) => ExecuteSynchronized<ResourceRecord>((cancellationToken) =>
     {
       long createTime, updateTime = createTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
@@ -65,15 +66,17 @@ public abstract partial class Resource<M, D, R>
     }, cancellationToken);
 
     private static IClientSessionHandle? CurrentSessionHandle;
-    protected void RunTransaction(Action<CancellationToken> callback, ClientSessionOptions? sessionOptions = null, TransactionOptions? transactionOptions = null, CancellationToken cancellationToken = default) => Run((cancellationToken) =>
+    protected void RunTransaction(Action<CancellationToken> callback, ClientSessionOptions? sessionOptions = null, TransactionOptions? transactionOptions = null, CancellationToken cancellationToken = default) => ExecuteSynchronized((cancellationToken) =>
     {
       cancellationToken.ThrowIfCancellationRequested();
       IMongoClient client = Collection.Database.Client;
 
+      Logger.Log(LogLevel.Info, "Waiting...");
       lock (client)
       {
         if (CurrentSessionHandle != null)
         {
+          Logger.Log(LogLevel.Info, "Executing in an existing transaction...");
           callback(cancellationToken);
           return;
         }
@@ -83,6 +86,7 @@ public abstract partial class Resource<M, D, R>
           using IClientSessionHandle clientSession = CurrentSessionHandle = client.StartSession(sessionOptions, cancellationToken);
           List<Action> onFailureCallbacks = [];
 
+          Logger.Log(LogLevel.Info, "Executing in a new transaction...");
           try
           {
             clientSession.StartTransaction(transactionOptions);
@@ -202,17 +206,13 @@ public abstract partial class Resource<M, D, R>
 
     protected override Task OnStart(CancellationToken cancellationToken)
     {
-      return base.OnStart(cancellationToken);
-    }
-
-    protected override Task OnRun(CancellationToken cancellationToken)
-    {
       checkForUpgrade(cancellationToken);
 
-      return Task.Delay(-1, cancellationToken);
+      return base.OnStart(cancellationToken);
+
       void checkForUpgrade(CancellationToken cancellationToken)
       {
-        MongoClient.RunTransaction((cancellationToken) =>
+        RunTransaction((cancellationToken) =>
         {
           long? version = VersionCollection.FindOne((record) => record.Name == Name, cancellationToken: cancellationToken)?.Version;
           if (Version != version)

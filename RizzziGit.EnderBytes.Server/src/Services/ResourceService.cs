@@ -9,23 +9,34 @@ public sealed class ResourceService : Server.SubService
   {
     Users = new(this);
     UserAuthentications = new(this);
+    Storage = new(this);
   }
 
   public readonly User.ResourceManager Users;
   public readonly UserAuthentication.ResourceManager UserAuthentications;
+  public readonly Storage.ResourceManager Storage;
 
-  protected override Task OnStart(CancellationToken cancellationToken)
+  protected override async Task OnStart(CancellationToken cancellationToken)
   {
-    return base.OnStart(cancellationToken);
+    await Users.Start();
+    await UserAuthentications.Start();
+    await Storage.Start();
+
+    await base.OnStart(cancellationToken);
   }
 
-  protected override Task OnRun(CancellationToken cancellationToken)
+  protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    return base.OnRun(cancellationToken);
+    await WatchDog([Users, UserAuthentications, Storage], cancellationToken);
+    await base.OnRun(cancellationToken);
   }
 
-  protected override Task OnStop(Exception? exception)
+  protected override async Task OnStop(Exception? exception)
   {
-    return base.OnStop(exception);
+    await Storage.Stop();
+    await UserAuthentications.Stop();
+    await Users.Stop();
+
+    await base.OnStop(exception);
   }
 }

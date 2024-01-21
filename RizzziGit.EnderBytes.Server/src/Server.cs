@@ -19,6 +19,9 @@ public sealed class Server : Service
 
     KeyService = new(this);
     ResourceService = new(this);
+    ConnectionService = new(this);
+    SessionService = new(this);
+    StorageService = new(this);
 
     StateChanged += (sender, state) =>
     {
@@ -41,11 +44,13 @@ public sealed class Server : Service
   public readonly ResourceService ResourceService;
   public readonly ConnectionService ConnectionService;
   public readonly SessionService SessionService;
+  public readonly StorageService StorageService;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
     await KeyService.Start();
     await ResourceService.Start();
+    await StorageService.Start();
     await SessionService.Start();
     await ConnectionService.Start();
 
@@ -54,13 +59,14 @@ public sealed class Server : Service
 
   protected override Task OnRun(CancellationToken cancellationToken)
   {
-    return WatchDog([KeyService, ResourceService, SessionService, ConnectionService], cancellationToken);
+    return WatchDog([KeyService, ResourceService, StorageService, SessionService, ConnectionService], cancellationToken);
   }
 
   protected override async Task OnStop(Exception? exception)
   {
     await ConnectionService.Stop();
     await SessionService.Stop();
+    await StorageService.Stop();
     await ResourceService.Stop();
     await KeyService.Stop();
 

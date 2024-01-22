@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using MongoDB.Driver;
 
 namespace RizzziGit.EnderBytes.Services;
 
@@ -14,8 +13,6 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
   public const int KEY_SIZE = 512 * 8;
   public const int MAX_CONCURRENT_GENERATOR = 4;
   public const int MAX_PREGENERATED_KEY_COUNT = 100;
-
-  public IMongoDatabase MainDatabase => Server.MainDatabase;
 
   private readonly TaskFactory TaskFactory = new(TaskCreationOptions.LongRunning, TaskContinuationOptions.None);
   private readonly List<RsaKeyPair> WaitQueue = [];
@@ -57,18 +54,26 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
       {
         cancellationToken.ThrowIfCancellationRequested();
 
-        while ((tasks.Count < MAX_CONCURRENT_GENERATOR) && ((WaitQueue.Count + tasks.Count) < MAX_PREGENERATED_KEY_COUNT))
+        lock (tasks)
         {
-          tasks.Add(TaskFactory.StartNew(RunIndividualGenerationJob, cancellationToken));
+          while ((tasks.Count < MAX_CONCURRENT_GENERATOR) && ((WaitQueue.Count + tasks.Count) < MAX_PREGENERATED_KEY_COUNT))
+          {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            tasks.Add(TaskFactory.StartNew(RunIndividualGenerationJob, cancellationToken));
+          }
         }
 
         if (tasks.Count != 0)
         {
           Task task = await Task.WhenAny(tasks);
-
           await task;
-          tasks.Remove(task);
-          continue;
+
+          lock (tasks)
+          {
+            tasks.Remove(task);
+            continue;
+          }
         }
 
         await Task.Delay(1000, cancellationToken);
@@ -85,12 +90,8 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
 
   protected override Task OnRun(CancellationToken cancellationToken)
   {
-
     return RunKeyGenerationJob(cancellationToken);
   }
-
-  protected override Task OnStop(Exception? exception) => Task.CompletedTask;
-  protected override Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
 
   public AesPair GetNewAesPair()
   {

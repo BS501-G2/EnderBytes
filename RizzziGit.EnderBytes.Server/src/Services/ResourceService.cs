@@ -1,42 +1,76 @@
+using Microsoft.Data.Sqlite;
+
 namespace RizzziGit.EnderBytes.Services;
 
+using System.Threading;
 using Core;
-using Resources;
+using RizzziGit.EnderBytes.Resources;
 
-public sealed class ResourceService : Server.SubService
+public sealed partial class ResourceService : Server.SubService
 {
+  public enum Scope { Main, DataStorage }
+
   public ResourceService(Server server) : base(server, "Resources")
   {
+    WorkingPath = Path.Join(Server.WorkingPath, "Database");
+    if (!File.Exists(WorkingPath))
+    {
+      Directory.CreateDirectory(WorkingPath);
+    }
+
     Users = new(this);
-    UserAuthentications = new(this);
-    Storage = new(this);
   }
 
-  public readonly User.ResourceManager Users;
-  public readonly UserAuthentication.ResourceManager UserAuthentications;
-  public readonly Storage.ResourceManager Storage;
+  private readonly Dictionary<Scope, SqliteConnection> Connections = [];
 
-  protected override async Task OnStart(CancellationToken cancellationToken)
+  public readonly string WorkingPath;
+  public readonly UserResource.ResourceManager Users;
+
+  private SqliteConnection GetDatabase(Scope scope)
   {
-    await Users.Start();
-    await UserAuthentications.Start();
-    await Storage.Start();
+    lock (this)
+    {
+      if (!Connections.TryGetValue(scope, out SqliteConnection? connection))
+      {
+        Connections.Add(scope, connection = new(new SqliteConnectionStringBuilder()
+        {
+          DataSource = Path.Join(WorkingPath, $"{scope}.sqlite3")
+        }.ConnectionString));
 
-    await base.OnStart(cancellationToken);
+        connection.Open();
+      }
+
+      return connection;
+    }
+  }
+
+  protected override Task OnStart(CancellationToken cancellationToken)
+  {
+    _ = Users.Start(cancellationToken);
+
+    return Task.CompletedTask;
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    await WatchDog([Users, UserAuthentications, Storage], cancellationToken);
-    await base.OnRun(cancellationToken);
+    await await Task.WhenAny([
+      .. Enum.GetValues<Scope>().Select((scope) => RunTransactionQueue(scope, cancellationToken)),
+      WatchDog([Users], cancellationToken)
+    ]);
   }
 
-  protected override async Task OnStop(Exception? exception)
+  protected override Task OnStop(Exception? exception = null)
   {
-    await Storage.Stop();
-    await UserAuthentications.Stop();
-    await Users.Stop();
+    foreach (Scope scope in Enum.GetValues<Scope>())
+    {
+      if (!Connections.TryGetValue(scope, out SqliteConnection? connection))
+      {
+        continue;
+      }
 
-    await base.OnStop(exception);
+      connection.Dispose();
+    }
+
+    return Task.CompletedTask;
   }
 }

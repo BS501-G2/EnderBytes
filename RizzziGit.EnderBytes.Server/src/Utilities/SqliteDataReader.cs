@@ -20,6 +20,7 @@ public static class SqliteDataReaderExtensions
   public static int? GetInt32Optional(this SqliteDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
   public static short? GetInt16Optional(this SqliteDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetInt16(ordinal);
   public static byte? GetByteOptional(this SqliteDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetByte(ordinal);
+  public static object? GetValueOptional(this SqliteDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
 
   public static long GetBytesOptional(this SqliteDataReader reader, int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length)
   {

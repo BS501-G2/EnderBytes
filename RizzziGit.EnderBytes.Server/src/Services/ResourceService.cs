@@ -2,7 +2,9 @@ using Microsoft.Data.Sqlite;
 
 namespace RizzziGit.EnderBytes.Services;
 
+using System.Collections.ObjectModel;
 using System.Threading;
+using System.Transactions;
 using Core;
 using RizzziGit.EnderBytes.Resources;
 
@@ -17,11 +19,11 @@ public sealed partial class ResourceService : Server.SubService
     {
       Directory.CreateDirectory(WorkingPath);
     }
-
+    Connections = [];
     Users = new(this);
   }
 
-  private readonly Dictionary<Scope, SqliteConnection> Connections = [];
+  private readonly Dictionary<Scope, SqliteConnection> Connections;
 
   public readonly string WorkingPath;
   public readonly UserResource.ResourceManager Users;
@@ -44,19 +46,27 @@ public sealed partial class ResourceService : Server.SubService
     }
   }
 
-  protected override Task OnStart(CancellationToken cancellationToken)
+  private ReadOnlyCollection<Task> TransactionQueueTasks = new([]);
+  protected override async Task OnStart(CancellationToken cancellationToken)
   {
-    _ = Users.Start(cancellationToken);
+    TransactionQueueTasks = new([.. Enum.GetValues<Scope>().Select((scope) => RunTransactionQueue(scope, cancellationToken))]);
 
-    return Task.CompletedTask;
+    await Users.Start(cancellationToken);
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    await await Task.WhenAny([
-      .. Enum.GetValues<Scope>().Select((scope) => RunTransactionQueue(scope, cancellationToken)),
+    try
+    {
+      await await Task.WhenAny([
+        .. TransactionQueueTasks,
       WatchDog([Users], cancellationToken)
-    ]);
+      ]);
+    }
+    finally
+    {
+      TransactionQueueTasks = new([]);
+    }
   }
 
   protected override Task OnStop(Exception? exception = null)

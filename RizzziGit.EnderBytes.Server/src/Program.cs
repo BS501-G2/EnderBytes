@@ -1,8 +1,10 @@
 namespace RizzziGit.EnderBytes;
 
+using System.Security.Cryptography;
 using System.Text;
 using Core;
 using Resources;
+using RizzziGit.Framework.Memory;
 using Services;
 using Utilities;
 
@@ -12,7 +14,7 @@ public static class Program
   {
     Server server = new();
 
-    server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"[{timestamp} / {level}] [{scope}] {message}");
+    server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{timestamp} / {level}] [{scope}] {message}");
 
     Console.CancelKeyPress += (_, _) =>
     {
@@ -21,6 +23,34 @@ public static class Program
     };
 
     await server.Start();
-    await server.Join();
+    try
+    {
+      UserResource.ResourceManager users = server.ResourceService.Users;
+
+      await server.ResourceService.Transact(ResourceService.Scope.Main, (transaction) =>
+      {
+        static string randomHex () => ((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString();
+
+        UserResource user = users.Create(transaction, randomHex(), randomHex());
+        Console.WriteLine(users.Update(transaction, user, randomHex(), randomHex()));
+
+        Console.WriteLine($"User: {user.Username}, Display: {user.DisplayName}");
+      });
+
+      await server.Join();
+    }
+    catch (Exception exception)
+    {
+      try
+      {
+        await server.Stop();
+      }
+      catch (Exception stopException)
+      {
+        throw new AggregateException(exception, stopException);
+      }
+
+      throw;
+    }
   }
 }

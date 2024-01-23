@@ -33,13 +33,32 @@ public sealed class UserResource(UserResource.ResourceManager manager, UserResou
     {
       if (oldVersion < 1)
       {
-        SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_USERNAME} varchar(16) not null;");
+        SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_USERNAME} varchar(16) not null collate nocase;");
         SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_DISPLAY_NAME} varchar(32) null;");
 
-        SqlNonQuery(transaction, $"create index {INDEX_USERNAME} on {Name}({COLUMN_USERNAME});");
+        SqlNonQuery(transaction, $"create unique index {INDEX_USERNAME} on {Name}({COLUMN_USERNAME});");
       }
+    }
+
+    public UserResource Create(ResourceService.Transaction transaction, string username, string? displayName)
+    {
+      return Insert(transaction, new(
+        (COLUMN_USERNAME, username),
+        (COLUMN_DISPLAY_NAME, displayName)
+      ));
+    }
+
+    public bool Update(ResourceService.Transaction transaction, UserResource resource, string username, string? displayName)
+    {
+      return Update(transaction, resource, new(
+        (COLUMN_USERNAME, username),
+        (COLUMN_DISPLAY_NAME, displayName)
+      ));
     }
   }
 
   public new sealed record ResourceData(long Id, long CreateTime, long UpdateTime, string Username, string? DisplayName) : Resource<ResourceManager, ResourceData, UserResource>.ResourceData(Id, CreateTime, UpdateTime);
+
+  public string Username => Data.Username;
+  public string? DisplayName => Data.DisplayName;
 }

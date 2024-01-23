@@ -109,12 +109,12 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
       {
         RsaKeyPair entry = WaitQueue.ElementAt(0);
         WaitQueue.RemoveAt(0);
-        Logger.Log(LogLevel.Verbose, $"Took 1 pregenerated key. Available Keys: {WaitQueue.Count}/{MAX_PREGENERATED_KEY_COUNT}");
+        Logger.Log(LogLevel.Debug, $"Took 1 pregenerated key. Available Keys: {WaitQueue.Count}/{MAX_PREGENERATED_KEY_COUNT}");
         return entry;
       }
     }
 
-    Logger.Log(LogLevel.Verbose, $"No pregenerated keys are available. Generating on the fly.");
+    Logger.Log(LogLevel.Debug, $"No pregenerated keys are available. Generating on the fly.");
     return Generate();
   }
 }

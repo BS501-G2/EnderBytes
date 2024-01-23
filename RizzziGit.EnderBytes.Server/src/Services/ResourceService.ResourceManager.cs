@@ -11,9 +11,9 @@ public sealed partial class ResourceService
 {
   public abstract class ResourceManager(ResourceService service, Scope scope, string name, int version) : Service(name, service)
   {
-    private const string COLUMN_ID = "Id";
-    private const string COLUMN_CREATE_TIME = "CreateTime";
-    private const string COLUMN_UPDATE_TIME = "UpdateTime";
+    protected const string COLUMN_ID = "Id";
+    protected const string COLUMN_CREATE_TIME = "CreateTime";
+    protected const string COLUMN_UPDATE_TIME = "UpdateTime";
 
     public readonly ResourceService Service = service;
     public readonly Scope Scope = scope;
@@ -27,7 +27,7 @@ public sealed partial class ResourceService
     protected Task<T> Transact<T>(TransactionHandler<T> handler, CancellationToken cancellationToken = default) => Service.Transact(this, handler, cancellationToken);
     protected Task Transact(TransactionHandler handler, CancellationToken cancellationToken = default) => Service.Transact(this, handler, cancellationToken);
 
-    private void ThrowIfInvalidScope(Transaction transaction)
+    protected void ThrowIfInvalidScope(Transaction transaction)
     {
       if (transaction.Scope != Scope)
       {
@@ -35,12 +35,13 @@ public sealed partial class ResourceService
       }
     }
 
-    private SqliteCommand CreateCommand(Transaction transaction, string sql, object[] parameters)
+    private SqliteCommand CreateCommand(Transaction transaction, string sql, object?[] parameters)
     {
       ThrowIfInvalidScope(transaction);
 
       SqliteCommand command = Database.CreateCommand();
       command.CommandText = string.Format(sql, createParameterArray());
+
       return command;
 
       string[] createParameterArray()
@@ -63,27 +64,33 @@ public sealed partial class ResourceService
       }
     }
 
-    protected SqliteDataReader SqlQuery(Transaction transaction, string sqlQuery, params object[] parameters)
+    protected SqliteDataReader SqlQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
+      ThrowIfInvalidScope(transaction);
       SqliteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-      Logger.Log(LogLevel.Verbose, $"SQL Query: {string.Format(sqlQuery, parameters)}");
+      // Logger.Log(LogLevel.Verbose, $"SQL Query ({parameters.Length}): {sqlQuery}");
+      Logger.Log(LogLevel.Debug, $"SQL Query on {Scope}: {string.Format(sqlQuery, parameters)}");
       return command.ExecuteReader();
     }
 
-    protected int SqlNonQuery(Transaction transaction, string sqlQuery, params object[] parameters)
+    protected int SqlNonQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
+      ThrowIfInvalidScope(transaction);
       SqliteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-      Logger.Log(LogLevel.Verbose, $"SQL Non-query: {string.Format(sqlQuery, parameters)}");
+      // Logger.Log(LogLevel.Verbose, $"SQL Non-query ({parameters.Length}): {sqlQuery}");
+      Logger.Log(LogLevel.Debug, $"SQL Non-query on {Scope}: {string.Format(sqlQuery, parameters)}");
       return command.ExecuteNonQuery();
     }
 
-    protected object? SqlScalar(Transaction transaction, string sqlQuery, params object[] parameters)
+    protected object? SqlScalar(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
+      ThrowIfInvalidScope(transaction);
       SqliteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-      Logger.Log(LogLevel.Verbose, $"SQL Scalar: {string.Format(sqlQuery, parameters)}");
+      // Logger.Log(LogLevel.Verbose, $"SQL Scalar ({parameters.Length}): {sqlQuery}");
+      Logger.Log(LogLevel.Debug, $"SQL Scalar on {Scope}: {string.Format(sqlQuery, parameters)}");
       return command.ExecuteScalar();
     }
 
@@ -95,7 +102,7 @@ public sealed partial class ResourceService
         int? version = null;
 
         {
-          using SqliteDataReader reader = SqlQuery(transaction, "select Version from __VERSIONS where Name = {0}", Name);
+          using SqliteDataReader reader = SqlQuery(transaction, "select Version from __VERSIONS where Name = {0};", Name);
           if (reader.Read())
           {
             version = reader.GetInt32Optional(reader.GetOrdinal("Version"));
@@ -103,14 +110,17 @@ public sealed partial class ResourceService
           reader.Close();
         }
 
-        if (version == null)
-        {
-          SqlNonQuery(transaction, $"create table {Name}({COLUMN_ID} integer primary key autoincrement, {COLUMN_CREATE_TIME} integer not null, {COLUMN_UPDATE_TIME} integer not null);");
-        }
-
         if (version != Version)
         {
-          Upgrade(transaction, version ?? default);
+          if (version == null)
+          {
+            SqlNonQuery(transaction, $"create table {Name}({COLUMN_ID} integer primary key autoincrement, {COLUMN_CREATE_TIME} integer not null, {COLUMN_UPDATE_TIME} integer not null);");
+            Upgrade(transaction);
+          }
+          else
+          {
+            Upgrade(transaction, (int)version);
+          }
 
           if (SqlNonQuery(transaction, $"update __VERSIONS set Version = {{0}} where Name = {{1}};", Version, Name) == 0)
           {

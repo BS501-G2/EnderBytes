@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+using System.Data.SQLite;
 
 namespace RizzziGit.EnderBytes.Services;
 
@@ -20,7 +20,7 @@ public sealed partial class ResourceService
 
     public int Version = version;
 
-    protected SqliteConnection Database => Service.GetDatabase(Scope);
+    protected SQLiteConnection Database => Service.GetDatabase(Scope);
 
     protected abstract void Upgrade(Transaction transaction, int oldVersion = default);
 
@@ -35,11 +35,11 @@ public sealed partial class ResourceService
       }
     }
 
-    private SqliteCommand CreateCommand(Transaction transaction, string sql, object?[] parameters)
+    private SQLiteCommand CreateCommand(Transaction transaction, string sql, object?[] parameters)
     {
       ThrowIfInvalidScope(transaction);
 
-      SqliteCommand command = Database.CreateCommand();
+      SQLiteCommand command = Database.CreateCommand();
       command.CommandText = string.Format(sql, createParameterArray());
 
       return command;
@@ -64,33 +64,33 @@ public sealed partial class ResourceService
       }
     }
 
-    protected SqliteDataReader SqlQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
+    protected SQLiteDataReader SqlQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
       ThrowIfInvalidScope(transaction);
-      SqliteCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
       // Logger.Log(LogLevel.Verbose, $"SQL Query ({parameters.Length}): {sqlQuery}");
-      Logger.Log(LogLevel.Debug, $"SQL Query on {Scope}: {string.Format(sqlQuery, parameters)}");
+      // Logger.Log(LogLevel.Debug, $"SQL Query on {Scope}: {string.Format(sqlQuery, parameters)}");
       return command.ExecuteReader();
     }
 
     protected int SqlNonQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
       ThrowIfInvalidScope(transaction);
-      SqliteCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
       // Logger.Log(LogLevel.Verbose, $"SQL Non-query ({parameters.Length}): {sqlQuery}");
-      Logger.Log(LogLevel.Debug, $"SQL Non-query on {Scope}: {string.Format(sqlQuery, parameters)}");
+      // Logger.Log(LogLevel.Debug, $"SQL Non-query on {Scope}: {string.Format(sqlQuery, parameters)}");
       return command.ExecuteNonQuery();
     }
 
     protected object? SqlScalar(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
       ThrowIfInvalidScope(transaction);
-      SqliteCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
       // Logger.Log(LogLevel.Verbose, $"SQL Scalar ({parameters.Length}): {sqlQuery}");
-      Logger.Log(LogLevel.Debug, $"SQL Scalar on {Scope}: {string.Format(sqlQuery, parameters)}");
+      // Logger.Log(LogLevel.Debug, $"SQL Scalar on {Scope}: {string.Format(sqlQuery, parameters)}");
       return command.ExecuteScalar();
     }
 
@@ -102,7 +102,7 @@ public sealed partial class ResourceService
         int? version = null;
 
         {
-          using SqliteDataReader reader = SqlQuery(transaction, "select Version from __VERSIONS where Name = {0};", Name);
+          using SQLiteDataReader reader = SqlQuery(transaction, "select Version from __VERSIONS where Name = {0};", Name);
           if (reader.Read())
           {
             version = reader.GetInt32Optional(reader.GetOrdinal("Version"));

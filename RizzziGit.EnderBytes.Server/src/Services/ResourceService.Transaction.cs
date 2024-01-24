@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+using System.Data.SQLite;
 using System.Runtime.CompilerServices;
 
 namespace RizzziGit.EnderBytes.Services;
@@ -15,7 +15,7 @@ public sealed partial class ResourceService
   public delegate IEnumerable<T> TransactionEnumerableHandler<T>(Transaction transaction);
   public delegate void TransactionFailureHandler();
 
-  public sealed record Transaction(Scope Scope, Action<TransactionFailureHandler> RegisterOnFailureHandler);
+  public sealed record Transaction(Scope Scope, Action<TransactionFailureHandler> RegisterOnFailureHandler, CancellationToken CancellationToken);
 
   private readonly WeakDictionary<Scope, WaitQueue> TransactionQueues = [];
   private WaitQueue GetTransactionWaitQueue(Scope scope)
@@ -102,10 +102,10 @@ public sealed partial class ResourceService
       {
         using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(serviceCancellationToken, cancellationToken);
         Logger.Log(LogLevel.Debug, "Transaction begin.");
-        using SqliteTransaction dbTransaction = GetDatabase(scope).BeginTransaction();
+        using SQLiteTransaction dbTransaction = GetDatabase(scope).BeginTransaction();
 
         List<TransactionFailureHandler> failureHandlers = [];
-        Transaction transaction = new(scope, failureHandlers.Add);
+        Transaction transaction = new(scope, failureHandlers.Add, linkedCancellationTokenSource.Token);
 
         try
         {

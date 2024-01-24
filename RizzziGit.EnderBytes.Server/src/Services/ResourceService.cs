@@ -1,12 +1,10 @@
-using Microsoft.Data.Sqlite;
+using System.Data.SQLite;
+using System.Collections.ObjectModel;
 
 namespace RizzziGit.EnderBytes.Services;
 
-using System.Collections.ObjectModel;
-using System.Threading;
-using System.Transactions;
 using Core;
-using RizzziGit.EnderBytes.Resources;
+using Resources;
 
 public sealed partial class ResourceService : Server.SubService
 {
@@ -23,20 +21,21 @@ public sealed partial class ResourceService : Server.SubService
     Users = new(this);
   }
 
-  private readonly Dictionary<Scope, SqliteConnection> Connections;
+  private readonly Dictionary<Scope, SQLiteConnection> Connections;
 
   public readonly string WorkingPath;
   public readonly UserResource.ResourceManager Users;
 
-  private SqliteConnection GetDatabase(Scope scope)
+  private SQLiteConnection GetDatabase(Scope scope)
   {
     lock (this)
     {
-      if (!Connections.TryGetValue(scope, out SqliteConnection? connection))
+      if (!Connections.TryGetValue(scope, out SQLiteConnection? connection))
       {
-        Connections.Add(scope, connection = new(new SqliteConnectionStringBuilder()
+        Connections.Add(scope, connection = new(new SQLiteConnectionStringBuilder()
         {
-          DataSource = Path.Join(WorkingPath, $"{scope}.sqlite3")
+          DataSource = Path.Join(WorkingPath, $"{scope}.sqlite3"),
+          JournalMode = SQLiteJournalModeEnum.Memory
         }.ConnectionString));
 
         connection.Open();
@@ -60,7 +59,7 @@ public sealed partial class ResourceService : Server.SubService
     {
       await await Task.WhenAny([
         .. TransactionQueueTasks,
-      WatchDog([Users], cancellationToken)
+        WatchDog([Users], cancellationToken)
       ]);
     }
     finally
@@ -73,7 +72,7 @@ public sealed partial class ResourceService : Server.SubService
   {
     foreach (Scope scope in Enum.GetValues<Scope>())
     {
-      if (!Connections.TryGetValue(scope, out SqliteConnection? connection))
+      if (!Connections.TryGetValue(scope, out SQLiteConnection? connection))
       {
         continue;
       }

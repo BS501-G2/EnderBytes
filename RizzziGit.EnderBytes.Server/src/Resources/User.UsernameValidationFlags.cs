@@ -46,14 +46,19 @@ public sealed partial class UserResource
       return flag;
     }
 
-    public string ThrowIfInvalidUsername(string username) => ThrowIfInvalidUsername(null, username);
-    public string ThrowIfInvalidUsername(ResourceService.Transaction? transaction, string username)
+    public void ThrowIfInvalidUsername(string username) => ThrowIfInvalidUsername(null, username);
+    public void ThrowIfInvalidUsername(ResourceService.Transaction? transaction, string username)
     {
       if ((transaction == null ? ValidateUsername(username) : ValidateUsername(transaction, username)) != UsernameValidationFlag.NoErrors)
       {
         throw new ArgumentException("Invalid username.", nameof(username));
       }
+    }
 
+    public string FilterValidUsername(string username) => FilterValidUsername(username);
+    public string FilterValidUsername(ResourceService.Transaction? transaction, string username)
+    {
+      ThrowIfInvalidUsername(transaction, username);
       return username;
     }
   }

@@ -42,12 +42,12 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
     }
 
     public UserResource Create(ResourceService.Transaction transaction, string username, string? displayName) => Insert(transaction, new(
-      (COLUMN_USERNAME, ThrowIfInvalidUsername(transaction, username)),
+      (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
       (COLUMN_DISPLAY_NAME, displayName)
     ));
 
     public bool Update(ResourceService.Transaction transaction, UserResource resource, string username, string? displayName) => Update(transaction, resource, new(
-      (COLUMN_USERNAME, ThrowIfInvalidUsername(transaction, username)),
+      (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
       (COLUMN_DISPLAY_NAME, displayName)
     ));
 

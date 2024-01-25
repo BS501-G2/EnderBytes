@@ -9,6 +9,8 @@ using System.Text;
 
 public sealed partial class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
+  public sealed record Pair(UserAuthenticationResource UserAuthentication, byte[] PayloadHash);
+
   public enum UserAuthenticationType { Password }
 
   private const string NAME = "UserAuthentication";
@@ -78,10 +80,10 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       }
     }
 
-    public UserAuthenticationResource CreatePassword(ResourceService.Transaction transaction, UserResource user, UserAuthenticationResource existing, byte[] existingPayloadHash, string password) => Create(transaction, user, existing, existingPayloadHash, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
-    public UserAuthenticationResource CreatePassword(ResourceService.Transaction transaction, UserResource user, string password) => Create(transaction, user, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
+    public Pair CreatePassword(ResourceService.Transaction transaction, UserResource user, UserAuthenticationResource existing, byte[] existingPayloadHash, string password) => Create(transaction, user, existing, existingPayloadHash, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
+    public Pair CreatePassword(ResourceService.Transaction transaction, UserResource user, string password) => Create(transaction, user, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
 
-    public UserAuthenticationResource Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationResource existing, byte[] existingPayloadHash, UserAuthenticationType type, byte[] payload)
+    public Pair Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationResource existing, byte[] existingPayloadHash, UserAuthenticationType type, byte[] payload)
     {
       user.ThrowIfInalid();
       existing.ThrowIfInalid();
@@ -104,7 +106,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
       byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
 
-      return Insert(transaction, new(
+      return new(Insert(transaction, new(
         (COLUMN_USER_ID, user.Id),
         (COLUMN_TYPE, (byte)type),
 
@@ -118,10 +120,10 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
         (COLUMN_ENCRYPTED_PRIVATE_KEY, encryptedPrivateKey),
         (COLUMN_ENCRYPTED_PRIVATE_KEY_IV, encryptedPrivateKeyIv),
         (COLUMN_PUBLIC_KEY, publicKey)
-      ));
+      )), payloadHash);
     }
 
-    public UserAuthenticationResource Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationType type, byte[] payload)
+    public Pair Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationType type, byte[] payload)
     {
       user.ThrowIfInalid();
 
@@ -146,7 +148,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
       byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
 
-      return Insert(transaction, new(
+      return new(Insert(transaction, new(
         (COLUMN_USER_ID, user.Id),
         (COLUMN_TYPE, (byte)type),
 
@@ -160,7 +162,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
         (COLUMN_ENCRYPTED_PRIVATE_KEY, encryptedPrivateKey),
         (COLUMN_ENCRYPTED_PRIVATE_KEY_IV, encryptedPrivateKeyIv),
         (COLUMN_PUBLIC_KEY, publicKey)
-      ));
+      )), payloadHash);
     }
 
     public IEnumerable<UserAuthenticationResource> List(ResourceService.Transaction transaction, UserResource user, LimitClause? limitClause = null, OrderByClause? orderByClause = null) => Select(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), limitClause, orderByClause);
@@ -279,12 +281,17 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
     }
   }
 
+  public byte[] FilterValidPayloadHash(byte[] payloadHash)
+  {
+    ThrowIfPayloadHashInvalid(payloadHash);
+
+    return payloadHash;
+  }
+
   public byte[] GetPayloadHash(byte[] Payload)
   {
     using Rfc2898DeriveBytes rfc2898DeriveBytes = new(Payload, Salt, Iterations, HashAlgorithmName.SHA256);
-    byte[] payloadHash = rfc2898DeriveBytes.GetBytes(32);
 
-    ThrowIfPayloadHashInvalid(payloadHash);
-    return payloadHash;
+    return FilterValidPayloadHash(rfc2898DeriveBytes.GetBytes(32));
   }
 }

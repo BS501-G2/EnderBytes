@@ -15,13 +15,17 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
   where D : Resource<M, D, R>.ResourceData
   where R : Resource<M, D, R>
 {
+  public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, R resource);
+  public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, D oldData);
+  public delegate void ResourceInsertHandler(ResourceService.Transaction transaction, R resource);
+
   public abstract partial class ResourceManager(ResourceService service, ResourceService.Scope scope, string name, int version) : ResourceService.ResourceManager(service, scope, name, version)
   {
-    public delegate void ResourceDeleteHandler(R resource);
-    public delegate void ResourceUpdateHandler(R resource, D oldData);
-    public delegate void ResourceInsertHandler(R resource);
-
     private readonly WeakDictionary<long, R> Resources = [];
+
+    public event ResourceInsertHandler? ResourceInserted;
+    public event ResourceUpdateHandler? ResourceUpdated;
+    public event ResourceDeleteHandler? ResourceDeleted;
 
     public bool IsValid(R resource) => Resources.TryGetValue(resource.Id, out R? testResource) && testResource == resource;
     public void ThrowIfInvalid(R resource)
@@ -75,6 +79,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         R resource = GetResource(CastToData(selectReader));
 
         transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
+        ResourceInserted?.Invoke(transaction, resource);
         return resource;
       }
 
@@ -131,24 +136,53 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
       string temporaryTableName = $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
 
-      using SQLiteDataReader reader = SqlQuery(
-        transaction,
-        $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
-        $"delete from {Name} where {whereClause}; " +
-        $"select {COLUMN_ID} from {temporaryTableName}; " +
-        $"drop table {temporaryTableName};",
-        [.. parameterList]
-      );
-
       long count = 0;
-      while (reader.Read())
+      if (ResourceDeleted != null)
       {
-        long affectedId = reader.GetInt64(reader.GetOrdinal(COLUMN_ID));
+        using SQLiteDataReader reader = SqlQuery(
+          transaction,
+          $"create temporary table {temporaryTableName} as select * from {Name} where {whereClause}; " +
+          $"delete from {Name} where {whereClause}; " +
+          $"select * from {temporaryTableName}; " +
+          $"drop table {temporaryTableName};",
+          [.. parameterList]
+        );
 
-        if (Resources.TryGetValue(affectedId, out R? resource))
+        foreach (D data in EnumerateAndCastToData(reader))
         {
-          transaction.RegisterOnFailureHandler(() => Resources.Add(affectedId, resource));
-          Resources.Remove(affectedId);
+          if (Resources.TryGetValue(data.Id, out R? resource))
+          {
+            transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
+            Resources.Remove(data.Id);
+            ResourceDeleted?.Invoke(transaction, resource);
+            continue;
+          }
+
+          resource = NewResource(data);
+          transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
+          ResourceDeleted?.Invoke(transaction,  resource);
+        }
+      }
+      else
+      {
+        using SQLiteDataReader reader = SqlQuery(
+          transaction,
+          $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
+          $"delete from {Name} where {whereClause}; " +
+          $"select {COLUMN_ID} from {temporaryTableName}; " +
+          $"drop table {temporaryTableName};",
+          [.. parameterList]
+        );
+
+        while (reader.Read())
+        {
+          long affectedId = reader.GetInt64(reader.GetOrdinal(COLUMN_ID));
+
+          if (Resources.TryGetValue(affectedId, out R? resource))
+          {
+            transaction.RegisterOnFailureHandler(() => Resources.Add(affectedId, resource));
+            Resources.Remove(affectedId);
+          }
         }
       }
 
@@ -168,7 +202,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       string temporaryTableName = $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
 
       long count = 0;
-      foreach (D newData in CastToEnumerableData(SqlQuery(
+      foreach (D newData in EnumerateAndCastToData(SqlQuery(
         transaction,
         $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
         $"update {Name} set {setClause} where {whereClause}; " +
@@ -183,6 +217,15 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
           transaction.RegisterOnFailureHandler(() => resource.Data = oldData);
           resource.Data = newData;
+
+          ResourceUpdated?.Invoke(transaction, resource, oldData);
+        }
+        else if (ResourceUpdated != null)
+        {
+          resource = GetResource(newData);
+
+          transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
+          ResourceUpdated.Invoke(transaction, resource, newData);
         }
 
         count++;
@@ -191,7 +234,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       return count;
     }
 
-    protected IEnumerable<D> CastToEnumerableData(SQLiteDataReader reader)
+    protected IEnumerable<D> EnumerateAndCastToData(SQLiteDataReader reader)
     {
       using (reader)
       {

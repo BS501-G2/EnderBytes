@@ -7,12 +7,13 @@ using Framework.Logging;
 
 public sealed partial class KeyService(Server server) : Server.SubService(server, "Key Generator")
 {
+  public const int KEY_SIZE = 512 * 8;
+
   public sealed record RsaKeyPair(byte[] Privatekey, byte[] PublicKey);
   public sealed record AesPair(byte[] Key, byte[] Iv);
 
-  public const int KEY_SIZE = 512 * 8;
-  public const int MAX_CONCURRENT_GENERATOR = 4;
-  public const int MAX_PREGENERATED_KEY_COUNT = 100;
+  public readonly int Threads = server.Configuration.KeyGeneratorThreads;
+  public readonly int MaxKeyCount = server.Configuration.MaxPregeneratedKeyCount;
 
   private readonly TaskFactory TaskFactory = new(TaskCreationOptions.LongRunning, TaskContinuationOptions.None);
   private readonly List<RsaKeyPair> WaitQueue = [];
@@ -23,6 +24,7 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
     lock (WaitQueue)
     {
       WaitQueue.Add(entry);
+      Logger.Log(LogLevel.Debug, $"Available Keys: {WaitQueue.Count}/{MaxKeyCount}");
     }
   }
 
@@ -56,7 +58,7 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
 
         lock (tasks)
         {
-          while ((tasks.Count < MAX_CONCURRENT_GENERATOR) && ((WaitQueue.Count + tasks.Count) < MAX_PREGENERATED_KEY_COUNT))
+          while ((tasks.Count < Threads) && ((WaitQueue.Count + tasks.Count) < MaxKeyCount))
           {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -109,7 +111,7 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
       {
         RsaKeyPair entry = WaitQueue.ElementAt(0);
         WaitQueue.RemoveAt(0);
-        Logger.Log(LogLevel.Debug, $"Took 1 pregenerated key. Available Keys: {WaitQueue.Count}/{MAX_PREGENERATED_KEY_COUNT}");
+        Logger.Log(LogLevel.Debug, $"Took 1 pregenerated key. Available Keys: {WaitQueue.Count}/{MaxKeyCount}");
         return entry;
       }
     }

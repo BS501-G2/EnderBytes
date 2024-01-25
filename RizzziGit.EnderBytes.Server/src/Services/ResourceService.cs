@@ -12,19 +12,22 @@ public sealed partial class ResourceService : Server.SubService
 
   public ResourceService(Server server) : base(server, "Resources")
   {
-    WorkingPath = Path.Join(Server.WorkingPath, "Database");
+    Connections = [];
+
+    Users = new(this);
+    UserAuthentications = new(this);
+
     if (!File.Exists(WorkingPath))
     {
       Directory.CreateDirectory(WorkingPath);
     }
-    Connections = [];
-    Users = new(this);
   }
 
   private readonly Dictionary<Scope, SQLiteConnection> Connections;
 
-  public readonly string WorkingPath;
+  public string WorkingPath => Path.Join(Server.WorkingPath, "Database");
   public readonly UserResource.ResourceManager Users;
+  public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
 
   private SQLiteConnection GetDatabase(Scope scope)
   {
@@ -46,11 +49,14 @@ public sealed partial class ResourceService : Server.SubService
   }
 
   private ReadOnlyCollection<Task> TransactionQueueTasks = new([]);
+  private CancellationTokenSource? TransactionQueueTaskCancellationTokenSource = new();
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
-    TransactionQueueTasks = new([.. Enum.GetValues<Scope>().Select((scope) => RunTransactionQueue(scope, cancellationToken))]);
+    TransactionQueueTaskCancellationTokenSource = new();
+    TransactionQueueTasks = new([.. Enum.GetValues<Scope>().Select((scope) => RunTransactionQueue(scope, TransactionQueueTaskCancellationTokenSource.Token))]);
 
     await Users.Start(cancellationToken);
+    await UserAuthentications.Start(cancellationToken);
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
@@ -59,7 +65,8 @@ public sealed partial class ResourceService : Server.SubService
     {
       await await Task.WhenAny([
         .. TransactionQueueTasks,
-        WatchDog([Users], cancellationToken)
+
+        WatchDog([Users, UserAuthentications], cancellationToken)
       ]);
     }
     finally
@@ -68,8 +75,13 @@ public sealed partial class ResourceService : Server.SubService
     }
   }
 
-  protected override Task OnStop(Exception? exception = null)
+  protected override async Task OnStop(Exception? exception = null)
   {
+    await Users.Stop();
+    await UserAuthentications.Stop();
+
+    TransactionQueueTaskCancellationTokenSource?.Cancel();
+
     foreach (Scope scope in Enum.GetValues<Scope>())
     {
       if (!Connections.TryGetValue(scope, out SQLiteConnection? connection))
@@ -79,7 +91,5 @@ public sealed partial class ResourceService : Server.SubService
 
       connection.Dispose();
     }
-
-    return Task.CompletedTask;
   }
 }

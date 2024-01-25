@@ -64,13 +64,18 @@ public sealed partial class ResourceService
       }
     }
 
+    private void Log(string type, string sqlQuery, params object?[] parameters)
+    {
+      // Logger.Log(LogLevel.Verbose, $"SQL Query ({parameters.Length}): {sqlQuery}");
+      Logger.Log(LogLevel.Debug, $"SQL {type} on {Scope}: {string.Format(sqlQuery, parameters)}");
+    }
+
     protected SQLiteDataReader SqlQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
       ThrowIfInvalidScope(transaction);
       SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-      // Logger.Log(LogLevel.Verbose, $"SQL Query ({parameters.Length}): {sqlQuery}");
-      // Logger.Log(LogLevel.Debug, $"SQL Query on {Scope}: {string.Format(sqlQuery, parameters)}");
+      Log("Query", sqlQuery, parameters);
       return command.ExecuteReader();
     }
 
@@ -79,8 +84,7 @@ public sealed partial class ResourceService
       ThrowIfInvalidScope(transaction);
       SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-      // Logger.Log(LogLevel.Verbose, $"SQL Non-query ({parameters.Length}): {sqlQuery}");
-      // Logger.Log(LogLevel.Debug, $"SQL Non-query on {Scope}: {string.Format(sqlQuery, parameters)}");
+      Log("Non-query", sqlQuery, parameters);
       return command.ExecuteNonQuery();
     }
 
@@ -89,14 +93,13 @@ public sealed partial class ResourceService
       ThrowIfInvalidScope(transaction);
       SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-      // Logger.Log(LogLevel.Verbose, $"SQL Scalar ({parameters.Length}): {sqlQuery}");
-      // Logger.Log(LogLevel.Debug, $"SQL Scalar on {Scope}: {string.Format(sqlQuery, parameters)}");
+      Log("Scalar", sqlQuery, parameters);
       return command.ExecuteScalar();
     }
 
     protected override async Task OnStart(CancellationToken cancellationToken)
     {
-      await Transact((transaction) =>
+      await Transact((transaction, cancellationToken) =>
       {
         SqlNonQuery(transaction, $"create table if not exists __VERSIONS(Name varchar(128) primary key not null, Version integer not null);");
         int? version = null;

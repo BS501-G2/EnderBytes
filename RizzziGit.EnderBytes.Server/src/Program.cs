@@ -27,47 +27,63 @@ public static class Program
       };
     }
 
-    await server.Start();
     try
     {
-      UserResource.ResourceManager users = server.ResourceService.Users;
-
-      List<UserResource> a = [];
-
-      long lastTime = 0;
-      await server.ResourceService.Transact(ResourceService.Scope.Main, (transaction) =>
-      {
-        for (int iteration = 0; iteration < 1000000; iteration++)
-        {
-          static string randomHex() => ((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString();
-
-          UserResource user = users.Create(transaction, randomHex(), randomHex());
-          users.Update(transaction, user, randomHex(), randomHex());
-          // users.Delete(transaction, user);
-
-          a.Add(user);
-
-          if (lastTime != (lastTime = DateTimeOffset.Now.ToUnixTimeSeconds()))
-          {
-            Console.WriteLine(user.Id);
-          }
-        }
-      });
-
-      await server.Join();
-    }
-    catch (Exception exception)
-    {
+      await server.Start();
       try
       {
-        await server.Stop();
-      }
-      catch (Exception stopException)
-      {
-        throw new AggregateException(exception, stopException);
-      }
+        await Task.Run(async () =>
+        {
+          UserResource.ResourceManager users = server.ResourceService.Users;
+          UserAuthenticationResource.ResourceManager userAuthentications = server.ResourceService.UserAuthentications;
 
-      throw;
+          List<UserResource> a = [];
+
+          long lastTime = 0;
+
+          CancellationTokenSource source = new();
+          for (int iteration = 0; iteration < 1000; iteration++)
+          {
+            await server.ResourceService.Transact(ResourceService.Scope.Main, (transaction, cancellationToken) =>
+            {
+              cancellationToken.ThrowIfCancellationRequested();
+              static string randomHex() => ((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString();
+
+              UserResource user = users.Create(transaction, randomHex(), randomHex());
+              UserAuthenticationResource userAuthentication = userAuthentications.CreatePassword(transaction, user, "test");
+              UserAuthenticationResource userAuthentication2 = userAuthentications.CreatePassword(transaction, user, "test");
+              users.Update(transaction, user, randomHex(), randomHex());
+              // users.Delete(transaction, user);
+
+              a.Add(user);
+
+              if (lastTime != (lastTime = DateTimeOffset.Now.ToUnixTimeSeconds()))
+              {
+                Console.WriteLine(user.Id);
+              }
+
+              // source.Cancel();
+              // Thread.Sleep(1000);
+            }, source.Token);
+          }
+        });
+
+        await server.Join();
+      }
+      catch (Exception exception)
+      {
+        try
+        {
+          await server.Stop();
+        }
+        catch (Exception stopException)
+        {
+          throw new AggregateException(exception, stopException);
+        }
+
+        throw;
+      }
     }
+    catch { }
   }
 }

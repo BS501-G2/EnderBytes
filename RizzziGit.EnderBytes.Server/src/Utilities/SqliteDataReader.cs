@@ -22,6 +22,9 @@ public static class SQLiteDataReaderExtensions
   public static byte? GetByteOptional(this SQLiteDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetByte(ordinal);
   public static object? GetValueOptional(this SQLiteDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
 
+  public static byte[] GetBytes(this SQLiteDataReader reader, int ordinal) => (byte[])reader.GetValue(ordinal);
+  public static byte[]? GetBytesOptional(this SQLiteDataReader reader, int ordinal) => (byte[]?)reader.GetValueOptional(ordinal);
+
   public static long GetBytesOptional(this SQLiteDataReader reader, int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length)
   {
     if (reader.IsDBNull(ordinal))

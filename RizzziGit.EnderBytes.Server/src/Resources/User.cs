@@ -16,7 +16,7 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
     private const string COLUMN_DISPLAY_NAME = "DisplayName";
 
     private const string INDEX_USERNAME = $"Index_{NAME}_{COLUMN_USERNAME}";
-    private const string CONSTRAINT_USERNAME_LENGTH = $"Constraint_{NAME}_{COLUMN_USERNAME}";
+    private const string CONSTRAINT_USERNAME_LENGTH = $"Constraint_{COLUMN_USERNAME}";
 
     public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Main, NAME, VERSION)
     {
@@ -36,7 +36,6 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
       {
         SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_USERNAME} varchar(16) not null collate nocase;");
         SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_DISPLAY_NAME} varchar(32) null;");
-        SqlNonQuery(transaction, $"alter table {Name} add constraint {CONSTRAINT_USERNAME_LENGTH} check (length({COLUMN_USERNAME}) between 5 and 21);");
 
         SqlNonQuery(transaction, $"create unique index {INDEX_USERNAME} on {Name}({COLUMN_USERNAME});");
       }

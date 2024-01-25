@@ -1,12 +1,11 @@
+using System.Text.RegularExpressions;
+
 namespace RizzziGit.EnderBytes.Resources;
 
-using System.ComponentModel.DataAnnotations;
-using System.Text.RegularExpressions;
 using Services;
 
 public sealed partial class UserResource
 {
-
   [Flags]
   public enum UsernameValidationFlag : byte
   {
@@ -22,7 +21,7 @@ public sealed partial class UserResource
     {
       UsernameValidationFlag flag = UsernameValidationFlag.NoErrors;
 
-      if (username.Length <= 5 || username.Length >= 21)
+      if (username.Length < 6 || username.Length > 20)
       {
         flag |= UsernameValidationFlag.InvalidLength;
       }

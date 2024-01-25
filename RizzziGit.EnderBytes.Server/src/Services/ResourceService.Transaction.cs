@@ -10,9 +10,9 @@ using WaitQueue = Framework.Collections.WaitQueue<(TaskCompletionSource Source, 
 
 public sealed partial class ResourceService
 {
-  public delegate void TransactionHandler(Transaction transaction);
-  public delegate T TransactionHandler<T>(Transaction transaction);
-  public delegate IEnumerable<T> TransactionEnumerableHandler<T>(Transaction transaction);
+  public delegate void TransactionHandler(Transaction transaction, CancellationToken cancellationToken);
+  public delegate T TransactionHandler<T>(Transaction transaction, CancellationToken cancellationToken);
+  public delegate IEnumerable<T> TransactionEnumerableHandler<T>(Transaction transaction, CancellationToken cancellationToken);
   public delegate void TransactionFailureHandler();
 
   public sealed record Transaction(Scope Scope, Action<TransactionFailureHandler> RegisterOnFailureHandler, CancellationToken CancellationToken);
@@ -36,13 +36,13 @@ public sealed partial class ResourceService
 
   public async IAsyncEnumerable<T> Transact<T>(Scope scope, TransactionEnumerableHandler<T> handler, [EnumeratorCancellation] CancellationToken cancellationToken)
   {
-    WaitQueue<TaskCompletionSource<StrongBox<T>?>> waitQueue = new();
+    using WaitQueue<TaskCompletionSource<StrongBox<T>?>> waitQueue = new();
 
-    _ = Transact(scope, async (transaction) =>
+    _ = Transact(scope, async (transaction, cancellationToken) =>
     {
       try
       {
-        foreach (T item in handler(transaction))
+        foreach (T item in handler(transaction, cancellationToken))
         {
           (await waitQueue.Dequeue(cancellationToken)).SetResult(new(item));
         }
@@ -76,7 +76,7 @@ public sealed partial class ResourceService
 
     try
     {
-      await Transact(scope, (transaction) => source.SetResult(handler(transaction)), cancellationToken);
+      await Transact(scope, (transaction, cancellationToken) => source.SetResult(handler(transaction, cancellationToken)), cancellationToken);
     }
     catch (Exception exception)
     {
@@ -89,6 +89,7 @@ public sealed partial class ResourceService
   public async Task Transact(Scope scope, TransactionHandler handler, CancellationToken cancellationToken = default)
   {
     TaskCompletionSource source = new();
+
     await GetTransactionWaitQueue(scope).Enqueue((source, handler, cancellationToken), cancellationToken);
     await source.Task;
   }
@@ -101,6 +102,8 @@ public sealed partial class ResourceService
       await foreach (var (source, handler, cancellationToken) in GetTransactionWaitQueue(scope).WithCancellation(serviceCancellationToken))
       {
         using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(serviceCancellationToken, cancellationToken);
+        linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
+
         Logger.Log(LogLevel.Debug, "Transaction begin.");
         using SQLiteTransaction dbTransaction = GetDatabase(scope).BeginTransaction();
 
@@ -110,7 +113,7 @@ public sealed partial class ResourceService
         try
         {
           linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
-          handler(transaction);
+          handler(transaction, linkedCancellationTokenSource.Token);
           linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
           Logger.Log(LogLevel.Debug, "Transaction commit.");

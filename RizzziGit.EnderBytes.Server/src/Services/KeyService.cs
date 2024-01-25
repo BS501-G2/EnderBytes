@@ -2,31 +2,21 @@ using System.Security.Cryptography;
 
 namespace RizzziGit.EnderBytes.Services;
 
-using Core;
+using Framework.Collections;
 using Framework.Logging;
+
+using Core;
+using Utilities;
 
 public sealed partial class KeyService(Server server) : Server.SubService(server, "Key Generator")
 {
-  public const int KEY_SIZE = 512 * 8;
+  public const int KEY_SIZE = 512;
 
   public sealed record RsaKeyPair(byte[] Privatekey, byte[] PublicKey);
   public sealed record AesPair(byte[] Key, byte[] Iv);
 
-  public readonly int Threads = server.Configuration.KeyGeneratorThreads;
-  public readonly int MaxKeyCount = server.Configuration.MaxPregeneratedKeyCount;
-
   private readonly TaskFactory TaskFactory = new(TaskCreationOptions.LongRunning, TaskContinuationOptions.None);
-  private readonly List<RsaKeyPair> WaitQueue = [];
-
-  private void RunIndividualGenerationJob()
-  {
-    RsaKeyPair entry = Generate();
-    lock (WaitQueue)
-    {
-      WaitQueue.Add(entry);
-      Logger.Log(LogLevel.Debug, $"Available Keys: {WaitQueue.Count}/{MaxKeyCount}");
-    }
-  }
+  private WaitQueue<RsaKeyPair>? PreGeneratedKeys;
 
   private static RsaKeyPair Generate()
   {
@@ -48,45 +38,59 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
 
   private async Task RunKeyGenerationJob(CancellationToken cancellationToken)
   {
-    List<Task> tasks = [];
+    lock (this)
+    {
+      PreGeneratedKeys = new(Server.Configuration.MaxPregeneratedKeyCount);
+    }
 
     try
     {
-      while (true)
+      async Task log()
       {
-        cancellationToken.ThrowIfCancellationRequested();
+        int previousCount = 0;
 
-        lock (tasks)
+        while (true)
         {
-          while ((tasks.Count < Threads) && ((WaitQueue.Count + tasks.Count) < MaxKeyCount))
-          {
-            cancellationToken.ThrowIfCancellationRequested();
+          await Task.Delay(1000, cancellationToken);
 
-            tasks.Add(TaskFactory.StartNew(RunIndividualGenerationJob, cancellationToken));
+          if (previousCount != (previousCount = PreGeneratedKeys.BacklogCount))
+          {
+            Logger.Log(LogLevel.Debug, $"Available Keys: {PreGeneratedKeys.BacklogCount}/{PreGeneratedKeys.Capacity}");
           }
         }
-
-        if (tasks.Count != 0)
-        {
-          Task task = await Task.WhenAny(tasks);
-          await task;
-
-          lock (tasks)
-          {
-            tasks.Remove(task);
-            continue;
-          }
-        }
-
-        await Task.Delay(1000, cancellationToken);
       }
+
+      await Task.WhenAll([
+        log().ContinueWith((_) => Task.CompletedTask),
+        .. await Task.WhenAll(Enumerable.Repeat(async () =>
+        {
+          Logger.Log(LogLevel.Debug, $"Key generation job started on \"{Thread.CurrentThread.Name}\" (#{Environment.CurrentManagedThreadId}).");
+
+          try
+          {
+            while (true)
+            {
+              cancellationToken.ThrowIfCancellationRequested();
+
+              RsaKeyPair keyPair = Generate();
+              await PreGeneratedKeys.Enqueue(keyPair, cancellationToken);
+            }
+          }
+          catch (Exception exception)
+          {
+            if (exception is not OperationCanceledException operationCanceledException || operationCanceledException.CancellationToken != cancellationToken)
+            {
+              Logger.Log(LogLevel.Debug, $"Key generation job (#{Environment.CurrentManagedThreadId}) has crashed.");
+              throw;
+            }
+          }
+          Logger.Log(LogLevel.Debug, $"Key generation job (#{Environment.CurrentManagedThreadId}) has stopped.");
+        }, Server.Configuration.KeyGeneratorThreads).Select((e) => TaskFactory!.StartNew(e)))
+      ]);
     }
     finally
     {
-      if (tasks.Count != 0)
-      {
-        await Task.WhenAll(tasks);
-      }
+      PreGeneratedKeys = null;
     }
   }
 
@@ -105,18 +109,14 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
 
   public RsaKeyPair GetNewRsaKeyPair()
   {
-    lock (WaitQueue)
+    lock (this)
     {
-      if (WaitQueue.Count != 0)
+      if (PreGeneratedKeys == null)
       {
-        RsaKeyPair entry = WaitQueue.ElementAt(0);
-        WaitQueue.RemoveAt(0);
-        Logger.Log(LogLevel.Debug, $"Took 1 pregenerated key. Available Keys: {WaitQueue.Count}/{MaxKeyCount}");
-        return entry;
+        return Generate();
       }
     }
 
-    Logger.Log(LogLevel.Debug, $"No pregenerated keys are available. Generating on the fly.");
-    return Generate();
+    return PreGeneratedKeys.Dequeue().WaitSync();
   }
 }

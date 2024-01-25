@@ -135,7 +135,6 @@ public sealed partial class ResourceService
 
         source.SetResult();
       }
-
     }
     catch (OperationCanceledException) { }
     catch

@@ -1,25 +1,11 @@
 namespace RizzziGit.EnderBytes.Core;
 
 using Framework.Services;
+
 using Services;
 
-public sealed record ServerConfiguration(
-  string? WorkingPath = null,
-
-  int KeyGeneratorThreads = 4,
-  int MaxPregeneratedKeyCount = 1000
-)
+public sealed partial class Server : Service
 {
-  public string WorkingPath = WorkingPath ?? Path.Join(Environment.CurrentDirectory, ".EnderBytes");
-}
-
-public sealed class Server : Service
-{
-  public abstract class SubService(Server server, string name) : Service(name, server)
-  {
-    public readonly Server Server = server;
-  }
-
   public Server(ServerConfiguration? configuration = null) : base("Server")
   {
     Configuration = configuration ?? new();

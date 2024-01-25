@@ -64,19 +64,36 @@ public sealed partial class ResourceService
       }
     }
 
-    private void Log(string type, string sqlQuery, params object?[] parameters)
+    private void LogSql(string type, string sqlQuery, params object?[] parameters)
     {
       // Logger.Log(LogLevel.Verbose, $"SQL Query ({parameters.Length}): {sqlQuery}");
-      Logger.Log(LogLevel.Debug, $"SQL {type} on {Scope}: {string.Format(sqlQuery, parameters)}");
+      // Logger.Log(LogLevel.Debug, $"SQL {type} on {Scope}: {string.Format(sqlQuery, parameters)}");
     }
 
-    protected SQLiteDataReader SqlQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
+    public delegate IEnumerable<T> SqlQueryDataHandler<T>(SQLiteDataReader reader);
+    public delegate T SqlQueryDataHandlerSingle<T>(SQLiteDataReader reader);
+    public delegate void SqlQueryDataHandler(SQLiteDataReader reader);
+
+    protected T SqlQuery<T>(Transaction transaction, SqlQueryDataHandlerSingle<T> dataHandler, string sqlQuery, params object?[] parameters) => SqlQuery<T>(transaction, (reader) => [dataHandler(reader)], sqlQuery, parameters).First();
+
+    protected void SqlQuery(Transaction transaction, SqlQueryDataHandler dataHandler, string sqlQuery, params object?[] parameters) => SqlQuery<byte>(transaction, (reader) =>
+    {
+      dataHandler(reader);
+      return [];
+    }, sqlQuery, parameters);
+
+    protected IEnumerable<T> SqlQuery<T>(Transaction transaction, SqlQueryDataHandler<T> dataHandler, string sqlQuery, params object?[] parameters)
     {
       ThrowIfInvalidScope(transaction);
       SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-      Log("Query", sqlQuery, parameters);
-      return command.ExecuteReader();
+      LogSql("Query", sqlQuery, parameters);
+      SQLiteDataReader reader = command.ExecuteReader(System.Data.CommandBehavior.SingleResult);
+
+      foreach (T item in dataHandler(reader))
+      {
+        yield return item;
+      }
     }
 
     protected int SqlNonQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
@@ -84,7 +101,7 @@ public sealed partial class ResourceService
       ThrowIfInvalidScope(transaction);
       SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-      Log("Non-query", sqlQuery, parameters);
+      LogSql("Non-query", sqlQuery, parameters);
       return command.ExecuteNonQuery();
     }
 
@@ -93,7 +110,7 @@ public sealed partial class ResourceService
       ThrowIfInvalidScope(transaction);
       SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-      Log("Scalar", sqlQuery, parameters);
+      LogSql("Scalar", sqlQuery, parameters);
       return command.ExecuteScalar();
     }
 
@@ -105,12 +122,14 @@ public sealed partial class ResourceService
         int? version = null;
 
         {
-          using SQLiteDataReader reader = SqlQuery(transaction, "select Version from __VERSIONS where Name = {0};", Name);
-          if (reader.Read())
-          {
-            version = reader.GetInt32Optional(reader.GetOrdinal("Version"));
-          }
-          reader.Close();
+          version = SqlQuery(transaction, (reader) => {
+            if (reader.Read())
+            {
+              return reader.GetInt32Optional(reader.GetOrdinal("Version"));
+            }
+
+            return null;
+          }, "select Version from __VERSIONS where Name = {0};", Name);
         }
 
         if (version != Version)

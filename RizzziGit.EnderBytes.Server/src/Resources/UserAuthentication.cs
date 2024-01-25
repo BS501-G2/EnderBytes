@@ -231,23 +231,23 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
   private RSACryptoServiceProvider? CryptoServiceProvider;
 
-  private RSACryptoServiceProvider GetRSACryptoServiceProvider(byte[] cspBlob)
+  private static RSACryptoServiceProvider GetRSACryptoServiceProvider(byte[] cspBlob)
   {
-    CryptoServiceProvider ??= new()
+    RSACryptoServiceProvider cryptoServiceProvider = new()
     {
       PersistKeyInCsp = false,
       KeySize = KeyService.KEY_SIZE
     };
 
-    CryptoServiceProvider.ImportCspBlob(cspBlob);
-    return CryptoServiceProvider;
+    cryptoServiceProvider.ImportCspBlob(cspBlob);
+    return cryptoServiceProvider;
   }
 
   public byte[] Decrypt(byte[] bytes, byte[] payloadHash)
   {
     lock (this)
     {
-      if (CryptoServiceProvider?.PublicOnly != true)
+      if (CryptoServiceProvider?.PublicOnly != false)
       {
         byte[] privateKey = GetPrivateKey(payloadHash);
 

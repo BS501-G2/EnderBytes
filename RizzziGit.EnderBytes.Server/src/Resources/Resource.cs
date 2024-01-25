@@ -67,23 +67,25 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       values.Add(COLUMN_UPDATE_TIME, insertTimestamp);
 
       List<object?> parameterList = [];
-      using SQLiteDataReader selectReader = SqlQuery(
+      return SqlQuery(
         transaction,
+        (reader) =>
+        {
+          if (reader.Read())
+          {
+            R resource = GetResource(CastToData(reader));
+
+            transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
+            ResourceInserted?.Invoke(transaction, resource);
+            return resource;
+          }
+
+          throw new InvalidOperationException("Failed to get the new inserted row.");
+        },
         $"insert into {Name} ({string.Join(", ", values.Keys)}) values {values.Apply(parameterList)}; " +
         $"select * from {Name} where {COLUMN_ID} = last_insert_rowid() limit 1;",
         [.. parameterList]
       );
-
-      if (selectReader.Read())
-      {
-        R resource = GetResource(CastToData(selectReader));
-
-        transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
-        ResourceInserted?.Invoke(transaction, resource);
-        return resource;
-      }
-
-      throw new InvalidOperationException("Failed to get the new inserted row.");
     }
 
     protected R? SelectFirst(ResourceService.Transaction transaction, WhereClause? where = null, OrderByClause? order = null) => SelectOne(transaction, where, 0, order);
@@ -93,21 +95,14 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       ThrowIfInvalidScope(transaction);
 
       List<object?> parameterList = [];
-      using SQLiteDataReader reader = SqlQuery(
+      foreach (D data in SqlQuery<D>(
         transaction,
-        $"select * from {Name}{
-          (where != null ? $" where {where.Apply(parameterList)}" : "")
-        }{
-          (limit != null ? $" limit {limit.Apply()}" : "")
-        }{
-          (order != null ? $" order by {order.Apply()}" : "")
-        };",
+        EnumerateReaderAndCastToData,
+        $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")}{(order != null ? $" order by {order.Apply()}" : "")};",
         [.. parameterList]
-      );
-
-      while (true)
+      ))
       {
-        yield return GetResource(CastToData(reader));
+        yield return GetResource(data);
       }
     }
 
@@ -119,9 +114,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
       return (long)(SqlScalar(
         transaction,
-        $"select count(*) from {Name}{
-          (where != null ? $" where {where.Apply(parameterList)}" : "")
-        };",
+        $"select count(*) from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")};",
         [.. parameterList]
       ) ?? throw new InvalidOperationException("Failed to count rows."));
     }
@@ -139,16 +132,15 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       long count = 0;
       if (ResourceDeleted != null)
       {
-        using SQLiteDataReader reader = SqlQuery(
+        foreach (D data in SqlQuery<D>(
           transaction,
+          EnumerateReaderAndCastToData,
           $"create temporary table {temporaryTableName} as select * from {Name} where {whereClause}; " +
           $"delete from {Name} where {whereClause}; " +
           $"select * from {temporaryTableName}; " +
-          $"drop table {temporaryTableName};",
+          $"drop table {temporaryTableName}; ",
           [.. parameterList]
-        );
-
-        foreach (D data in EnumerateAndCastToData(reader))
+        ))
         {
           if (Resources.TryGetValue(data.Id, out R? resource))
           {
@@ -160,32 +152,36 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
           resource = NewResource(data);
           transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
-          ResourceDeleted?.Invoke(transaction,  resource);
+          ResourceDeleted?.Invoke(transaction, resource);
         }
       }
       else
       {
-        using SQLiteDataReader reader = SqlQuery(
+        foreach (long affectedId in SqlQuery<long>(
           transaction,
+          enumerateAffectedId,
           $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
           $"delete from {Name} where {whereClause}; " +
           $"select {COLUMN_ID} from {temporaryTableName}; " +
-          $"drop table {temporaryTableName};",
+          $"drop table {temporaryTableName}; ",
           [.. parameterList]
-        );
-
-        while (reader.Read())
+        ))
         {
-          long affectedId = reader.GetInt64(reader.GetOrdinal(COLUMN_ID));
-
           if (Resources.TryGetValue(affectedId, out R? resource))
           {
             transaction.RegisterOnFailureHandler(() => Resources.Add(affectedId, resource));
             Resources.Remove(affectedId);
           }
         }
-      }
 
+        static IEnumerable<long> enumerateAffectedId(SQLiteDataReader reader)
+        {
+          while (reader.Read())
+          {
+            yield return reader.GetInt64(reader.GetOrdinal(COLUMN_ID));
+          }
+        }
+      }
       return count;
     }
 
@@ -202,14 +198,15 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       string temporaryTableName = $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
 
       long count = 0;
-      foreach (D newData in EnumerateAndCastToData(SqlQuery(
+      foreach (D newData in SqlQuery<D>(
         transaction,
+        EnumerateReaderAndCastToData,
         $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
         $"update {Name} set {setClause} where {whereClause}; " +
         $"select {Name}.* from {temporaryTableName} left join (select * from {Name}) {Name} on {temporaryTableName}.{COLUMN_ID} = {Name}.{COLUMN_ID}; " +
         $"drop table {temporaryTableName};",
         [.. parameterList]
-      )))
+      ))
       {
         if (Resources.TryGetValue(newData.Id, out R? resource))
         {
@@ -234,14 +231,11 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       return count;
     }
 
-    protected IEnumerable<D> EnumerateAndCastToData(SQLiteDataReader reader)
+    private IEnumerable<D> EnumerateReaderAndCastToData(SQLiteDataReader reader)
     {
-      using (reader)
+      while (reader.Read())
       {
-        while (reader.Read())
-        {
-          yield return CastToData(reader);
-        }
+        yield return CastToData(reader);
       }
     }
 

@@ -50,8 +50,8 @@ public static class Program
               users.Update(transaction, user, "test", randomHex());
 
               (UserAuthenticationResource userAuthentication, byte[] payloadHash) = userAuthentications.CreatePassword(transaction, user, "test");
-              (UserAuthenticationResource userAuthentication2, byte[] payloadHash2) = userAuthentications.CreatePassword(transaction, user, userAuthentication, RandomNumberGenerator.GetBytes(32), randomHex());
-              // users.Delete(transaction, user);
+              (UserAuthenticationResource userAuthentication2, byte[] payloadHash2) = userAuthentications.CreatePassword(transaction, user, userAuthentication, payloadHash, randomHex());
+              users.Delete(transaction, user);
             }, source.Token);
           }
         });

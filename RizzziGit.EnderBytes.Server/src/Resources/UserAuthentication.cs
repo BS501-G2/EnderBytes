@@ -1,11 +1,11 @@
 using System.Data.SQLite;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace RizzziGit.EnderBytes.Resources;
 
 using Utilities;
 using Services;
-using System.Text;
 
 public sealed partial class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {

@@ -1,38 +1,42 @@
-using System.Net;
-
 namespace RizzziGit.EnderBytes.Services;
 
 using Framework.Collections;
 
 using Core;
+using Connections;
 
 public sealed partial class ConnectionService(Server server) : Server.SubService(server, "Connections")
 {
-  public abstract record EndPoint
+  private long NextId = 0;
+  private readonly WeakDictionary<long, Connection> Connections = [];
+
+  public Connection NewConnection(ConnectionConfiguration configuration, CancellationToken cancellationToken = default)
   {
-    private EndPoint() { }
+    lock (this)
+    {
+      cancellationToken.ThrowIfCancellationRequested();
 
-    public sealed record Network(IPEndPoint Endpoint) : EndPoint;
-    public sealed record Unix(string Path) : EndPoint;
-    public sealed record Null() : EndPoint;
+      Connection connection = configuration switch
+      {
+        BasicConnection.ConnectionConfiguration basicConfiguration => new BasicConnection(this, basicConfiguration, NextId++),
+        AdvancedConnection.ConnectionConfiguration advancedConfiguration => new AdvancedConnection(this, advancedConfiguration, NextId++),
+        InternalConnection.ConnectionConfiguration internalConfiguration => new InternalConnection(this, internalConfiguration, NextId++),
 
-    public override abstract string ToString();
+        _ => throw new ArgumentException("Invalid configuration.", nameof(configuration))
+      };
+
+      Connections.Add(connection.Id, connection);
+      return connection;
+    }
   }
 
-  private interface IConnection : Connections.IConnection;
-  private interface IConnectionConfiguration : Connections.IConnectionConfiguration;
-
-  public abstract partial class Connection<C, CC> : IConnection
-    where C : Connection<C, CC>
-    where CC : Connection<C, CC>.ConnectionConfiguration
+  protected override Task OnStop(Exception? exception = null)
   {
-    public abstract partial record ConnectionConfiguration();
+    lock (this)
+    {
+      Connections.Clear();
+    }
+
+    return base.OnStop(exception);
   }
-
-  private readonly WeakDictionary<long, IConnection> Connections = [];
-  private readonly WaitQueue<(TaskCompletionSource<IConnection> Source, IConnectionConfiguration Configuration, CancellationToken CancellationToken)>? WaitQueue;
-
-  // public Task<Connections.IConnection> GetConnection(CancellationToken cancellationToken = default)
-  // {
-  // }
 }

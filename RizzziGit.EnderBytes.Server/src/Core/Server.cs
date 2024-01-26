@@ -12,6 +12,8 @@ public sealed partial class Server : Service
 
     KeyService = new(this);
     ResourceService = new(this);
+    ConnectionService = new(this);
+    SessionService = new(this);
 
     if (!File.Exists(WorkingPath))
     {
@@ -24,22 +26,28 @@ public sealed partial class Server : Service
 
   public readonly KeyService KeyService;
   public readonly ResourceService ResourceService;
+  public readonly ConnectionService ConnectionService;
+  public readonly SessionService SessionService;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
     await KeyService.Start(cancellationToken);
     await ResourceService.Start(cancellationToken);
+    await ConnectionService.Start(cancellationToken);
+    await SessionService.Start(cancellationToken);
 
     await base.OnStart(cancellationToken);
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    await WatchDog([KeyService, ResourceService], cancellationToken);
+    await WatchDog([KeyService, ResourceService, ConnectionService, SessionService], cancellationToken);
   }
 
   protected override async Task OnStop(Exception? exception)
   {
+    await SessionService.Stop();
+    await ConnectionService.Stop();
     await ResourceService.Stop();
     await KeyService.Stop();
 

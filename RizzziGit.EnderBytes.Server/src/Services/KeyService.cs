@@ -45,7 +45,7 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
 
     try
     {
-      async Task log()
+      async Task log(CancellationToken cancellationToken = default)
       {
         int previousCount = 0;
 
@@ -60,12 +60,11 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
         }
       }
 
+      using CancellationTokenSource logCancellationTokenSource = new();
       await Task.WhenAll([
-        log().ContinueWith((_) => Task.CompletedTask),
+        log(logCancellationTokenSource.Token).ContinueWith((_) => Task.CompletedTask),
         .. await Task.WhenAll(Enumerable.Repeat(async () =>
         {
-          Logger.Log(LogLevel.Debug, $"Key generation job started on \"{Thread.CurrentThread.Name}\" (#{Environment.CurrentManagedThreadId}).");
-
           try
           {
             while (true)
@@ -80,11 +79,9 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
           {
             if (exception is not OperationCanceledException operationCanceledException || operationCanceledException.CancellationToken != cancellationToken)
             {
-              Logger.Log(LogLevel.Debug, $"Key generation job (#{Environment.CurrentManagedThreadId}) has crashed.");
               throw;
             }
           }
-          Logger.Log(LogLevel.Debug, $"Key generation job (#{Environment.CurrentManagedThreadId}) has stopped.");
         }, Server.Configuration.KeyGeneratorThreads).Select((e) => TaskFactory!.StartNew(e)))
       ]);
     }

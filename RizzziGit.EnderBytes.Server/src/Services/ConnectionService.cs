@@ -10,6 +10,22 @@ public sealed partial class ConnectionService(Server server) : Server.SubService
   private long NextId = 0;
   private readonly WeakDictionary<long, Connection> Connections = [];
 
+  public void ThrowIfInvalid(long id, Connection connection)
+  {
+    if (!IsValid(id, connection))
+    {
+      throw new InvalidOperationException("Invalid connection.");
+    }
+  }
+
+  public bool IsValid(long id, Connection connection)
+  {
+    lock (this)
+    {
+      return Connections.TryGetValue(id, out Connection? testConnection) && testConnection == connection;
+    }
+  }
+
   public Connection NewConnection(ConnectionConfiguration configuration, CancellationToken cancellationToken = default)
   {
     lock (this)

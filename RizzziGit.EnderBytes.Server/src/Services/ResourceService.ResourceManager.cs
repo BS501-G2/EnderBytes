@@ -66,15 +66,14 @@ public sealed partial class ResourceService
 
     private void LogSql(string type, string sqlQuery, params object?[] parameters)
     {
-      // Logger.Log(LogLevel.Verbose, $"SQL Query ({parameters.Length}): {sqlQuery}");
-      // Logger.Log(LogLevel.Debug, $"SQL {type} on {Scope}: {string.Format(sqlQuery, parameters)}");
+      Logger.Log(LogLevel.Debug, $"SQL {type} on {Scope}: {string.Format(sqlQuery, parameters)}");
     }
 
-    public delegate IEnumerable<T> SqlQueryDataHandler<T>(SQLiteDataReader reader);
-    public delegate T SqlQueryDataHandlerSingle<T>(SQLiteDataReader reader);
+    public delegate T SqlQueryDataHandler<T>(SQLiteDataReader reader);
     public delegate void SqlQueryDataHandler(SQLiteDataReader reader);
+    public delegate IEnumerable<T> SqlQueryDataEnumerator<T>(SQLiteDataReader reader);
 
-    protected T SqlQuery<T>(Transaction transaction, SqlQueryDataHandlerSingle<T> dataHandler, string sqlQuery, params object?[] parameters) => SqlQuery<T>(transaction, (reader) => [dataHandler(reader)], sqlQuery, parameters).First();
+    protected T SqlQuery<T>(Transaction transaction, SqlQueryDataHandler<T> dataHandler, string sqlQuery, params object?[] parameters) => SqlQuery<T>(transaction, (reader) => [dataHandler(reader)], sqlQuery, parameters).First();
 
     protected void SqlQuery(Transaction transaction, SqlQueryDataHandler dataHandler, string sqlQuery, params object?[] parameters) => SqlQuery<byte>(transaction, (reader) =>
     {
@@ -82,7 +81,7 @@ public sealed partial class ResourceService
       return [];
     }, sqlQuery, parameters);
 
-    protected IEnumerable<T> SqlQuery<T>(Transaction transaction, SqlQueryDataHandler<T> dataHandler, string sqlQuery, params object?[] parameters)
+    protected IEnumerable<T> SqlQuery<T>(Transaction transaction, SqlQueryDataEnumerator<T> dataHandler, string sqlQuery, params object?[] parameters)
     {
       ThrowIfInvalidScope(transaction);
       SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);

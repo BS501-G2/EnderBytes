@@ -45,45 +45,43 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
 
     try
     {
-      async Task log(CancellationToken cancellationToken = default)
+      try
       {
-        int previousCount = 0;
-
-        while (true)
-        {
-          await Task.Delay(1000, cancellationToken);
-
-          if (previousCount != (previousCount = PreGeneratedKeys.BacklogCount))
-          {
-            Logger.Log(LogLevel.Debug, $"Available Keys: {PreGeneratedKeys.BacklogCount}/{PreGeneratedKeys.Capacity}");
-          }
-        }
-      }
-
-      using CancellationTokenSource logCancellationTokenSource = new();
-      await Task.WhenAll([
-        log(logCancellationTokenSource.Token).ContinueWith((_) => Task.CompletedTask),
-        .. await Task.WhenAll(Enumerable.Repeat(async () =>
+        await Task.WhenAll(Enumerable.Repeat(() =>
         {
           try
           {
             while (true)
             {
-              cancellationToken.ThrowIfCancellationRequested();
-
-              RsaKeyPair keyPair = Generate();
-              await PreGeneratedKeys.Enqueue(keyPair, cancellationToken);
+              PreGeneratedKeys.Enqueue(Generate(), cancellationToken).WaitSync();
             }
           }
-          catch (Exception exception)
+          catch { }
+        }, Server.Configuration.KeyGeneratorThreads).Append(async () =>
+        {
+          try
           {
-            if (exception is not OperationCanceledException operationCanceledException || operationCanceledException.CancellationToken != cancellationToken)
+            int previousCount = 0;
+            while (true)
             {
-              throw;
+              await Task.Delay(1000, cancellationToken);
+
+              if (previousCount != (previousCount = PreGeneratedKeys.BacklogCount))
+              {
+                Logger.Log(LogLevel.Debug, $"Available Keys: {PreGeneratedKeys.BacklogCount}/{PreGeneratedKeys.Capacity}");
+              }
             }
           }
-        }, Server.Configuration.KeyGeneratorThreads).Select((e) => TaskFactory!.StartNew(e)))
-      ]);
+          catch { }
+        }).Select((function) => TaskFactory!.StartNew(function)));
+      }
+      catch (Exception exception)
+      {
+        if (exception is not OperationCanceledException operationCanceledException || operationCanceledException.CancellationToken != cancellationToken)
+        {
+          throw;
+        }
+      }
     }
     finally
     {

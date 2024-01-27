@@ -11,4 +11,10 @@ public static class TaskExtensions
 
     return task.Result;
   }
+
+  public static void WaitSync(this Task task, CancellationToken cancellationToken = default)
+  {
+    try { task.Wait(cancellationToken); }
+    catch (AggregateException exception) { ExceptionDispatchInfo.Capture(exception.InnerException!).Throw(); throw; }
+  }
 }

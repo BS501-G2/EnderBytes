@@ -80,16 +80,16 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       }
     }
 
-    public Pair CreatePassword(ResourceService.Transaction transaction, UserResource user, UserAuthenticationResource existing, byte[] existingPayloadHash, string password) => Create(transaction, user, existing, existingPayloadHash, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
+    public Pair CreatePassword(ResourceService.Transaction transaction, UserResource user, Pair existing, string password) => Create(transaction, user, existing, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
     public Pair CreatePassword(ResourceService.Transaction transaction, UserResource user, string password) => Create(transaction, user, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
 
-    public Pair Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationResource existing, byte[] existingPayloadHash, UserAuthenticationType type, byte[] payload)
+    public Pair Create(ResourceService.Transaction transaction, UserResource user, Pair existing, UserAuthenticationType type, byte[] payload)
     {
       user.ThrowIfInalid();
-      existing.ThrowIfInalid();
+      existing.UserAuthentication.ThrowIfInalid();
 
-      byte[] privateKey = existing.GetPrivateKey(existingPayloadHash);
-      byte[] publicKey = existing.PublicKey;
+      byte[] privateKey = existing.UserAuthentication.GetPrivateKey(existing.PayloadHash);
+      byte[] publicKey = existing.UserAuthentication.PublicKey;
 
       byte[] salt = RandomNumberGenerator.GetBytes(16);
       int iterations = RandomNumberGenerator.GetInt32(1000, 10000);

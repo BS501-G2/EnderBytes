@@ -11,7 +11,7 @@ public sealed partial class KeyResource(KeyResource.ResourceManager manager, Key
   private const string NAME = "Key";
   private const int VERSION = 1;
 
-  public new sealed partial class ResourceManager(ResourceService service, ResourceService.Scope scope) : Resource<ResourceManager, ResourceData, KeyResource>.ResourceManager(service, scope, NAME, VERSION)
+  public new sealed partial class ResourceManager(ResourceService service) : Resource<ResourceManager, ResourceData, KeyResource>.ResourceManager(service, ResourceService.Scope.Main, NAME, VERSION)
   {
     private const string COLUMN_SHARED_ID = "SharedId";
     private const string COLUMN_TARGET_USER_ID = "TargetUserId";
@@ -35,7 +35,7 @@ public sealed partial class KeyResource(KeyResource.ResourceManager manager, Key
     {
       if (oldVersion < 1)
       {
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_SHARED_ID} integer autoincrement not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_SHARED_ID} integer not null;");
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_USER_ID} integer null;");
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_PRIVATE_KEY} blob not null;");
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_PUBLIC_KEY} blob not null;");

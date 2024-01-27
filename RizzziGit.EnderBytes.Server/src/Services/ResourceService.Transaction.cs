@@ -12,7 +12,7 @@ public sealed partial class ResourceService
 {
   public delegate void TransactionHandler(Transaction transaction, CancellationToken cancellationToken);
   public delegate T TransactionHandler<T>(Transaction transaction, CancellationToken cancellationToken);
-  public delegate IEnumerable<T> TransactionEnumerableHandler<T>(Transaction transaction, CancellationToken cancellationToken);
+  public delegate IEnumerable<T> TransactionEnumeratorHandler<T>(Transaction transaction, CancellationToken cancellationToken);
   public delegate void TransactionFailureHandler();
 
   public sealed record Transaction(Scope Scope, Action<TransactionFailureHandler> RegisterOnFailureHandler, CancellationToken CancellationToken);
@@ -31,10 +31,11 @@ public sealed partial class ResourceService
     }
   }
 
+  public IAsyncEnumerable<T> EnumeratedTransact<T>(ResourceManager resourceManager, TransactionEnumeratorHandler<T> enumeratorHandler, CancellationToken cancellationToken = default) => EnumeratedTransact(resourceManager.Scope, enumeratorHandler, cancellationToken);
   public Task<T> Transact<T>(ResourceManager resourceManager, TransactionHandler<T> handler, CancellationToken cancellationToken = default) => Transact(resourceManager.Scope, handler, cancellationToken);
   public Task Transact(ResourceManager resourceManager, TransactionHandler handler, CancellationToken cancellationToken = default) => Transact(resourceManager.Scope, handler, cancellationToken);
 
-  public async IAsyncEnumerable<T> Transact<T>(Scope scope, TransactionEnumerableHandler<T> handler, [EnumeratorCancellation] CancellationToken cancellationToken)
+  public async IAsyncEnumerable<T> EnumeratedTransact<T>(Scope scope, TransactionEnumeratorHandler<T> handler, [EnumeratorCancellation] CancellationToken cancellationToken)
   {
     using WaitQueue<TaskCompletionSource<StrongBox<T>?>> waitQueue = new();
 

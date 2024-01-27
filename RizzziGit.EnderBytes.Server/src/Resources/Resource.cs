@@ -95,7 +95,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       ThrowIfInvalidScope(transaction);
 
       List<object?> parameterList = [];
-      foreach (D data in SqlQuery<D>(
+      foreach (D data in SqlEnumeratedQuery<D>(
         transaction,
         EnumerateReaderAndCastToData,
         $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")}{(order != null ? $" order by {order.Apply()}" : "")};",
@@ -129,10 +129,11 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
       string temporaryTableName = $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
 
-      long count = 0;
       if (ResourceDeleted != null)
       {
-        foreach (D data in SqlQuery<D>(
+        Queue<Action> actions = [];
+
+        foreach (D data in SqlEnumeratedQuery<D>(
           transaction,
           EnumerateReaderAndCastToData,
           $"create temporary table {temporaryTableName} as select * from {Name} where {whereClause}; " +
@@ -142,22 +143,36 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
           [.. parameterList]
         ))
         {
-          if (Resources.TryGetValue(data.Id, out R? resource))
+          actions.Enqueue(() =>
           {
-            transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
-            Resources.Remove(data.Id);
-            ResourceDeleted?.Invoke(transaction, resource);
-            continue;
-          }
+            if (Resources.TryGetValue(data.Id, out R? resource))
+            {
+              transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
+              Resources.Remove(data.Id);
+              ResourceDeleted?.Invoke(transaction, resource);
+              return;
+            }
 
-          resource = NewResource(data);
-          transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
-          ResourceDeleted?.Invoke(transaction, resource);
+            resource = NewResource(data);
+            transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
+            ResourceDeleted?.Invoke(transaction, resource);
+          });
+        }
+
+        try { return actions.Count; }
+        finally
+        {
+          while (actions.TryDequeue(out Action? action))
+          {
+            action();
+          }
         }
       }
       else
       {
-        foreach (long affectedId in SqlQuery<long>(
+        long count = 0;
+
+        foreach (long affectedId in SqlEnumeratedQuery<long>(
           transaction,
           enumerateAffectedId,
           $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
@@ -172,7 +187,11 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
             transaction.RegisterOnFailureHandler(() => Resources.Add(affectedId, resource));
             Resources.Remove(affectedId);
           }
+
+          count++;
         }
+
+        return count;
 
         static IEnumerable<long> enumerateAffectedId(SQLiteDataReader reader)
         {
@@ -182,7 +201,6 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
           }
         }
       }
-      return count;
     }
 
     protected long Update(ResourceService.Transaction transaction, WhereClause where, SetClause set)
@@ -197,8 +215,8 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
       string temporaryTableName = $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
 
-      long count = 0;
-      foreach (D newData in SqlQuery<D>(
+      Queue<Action> actions = [];
+      foreach (D newData in SqlEnumeratedQuery<D>(
         transaction,
         EnumerateReaderAndCastToData,
         $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
@@ -208,27 +226,38 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         [.. parameterList]
       ))
       {
-        if (Resources.TryGetValue(newData.Id, out R? resource))
+        actions.Enqueue(() =>
         {
-          D oldData = resource.Data;
+          if (Resources.TryGetValue(newData.Id, out R? resource))
+          {
+            D oldData = resource.Data;
 
-          transaction.RegisterOnFailureHandler(() => resource.Data = oldData);
-          resource.Data = newData;
+            transaction.RegisterOnFailureHandler(() => resource.Data = oldData);
+            resource.Data = newData;
 
-          ResourceUpdated?.Invoke(transaction, resource, oldData);
-        }
-        else if (ResourceUpdated != null)
-        {
-          resource = GetResource(newData);
+            ResourceUpdated?.Invoke(transaction, resource, oldData);
+          }
+          else if (ResourceUpdated != null)
+          {
+            resource = GetResource(newData);
 
-          transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
-          ResourceUpdated.Invoke(transaction, resource, newData);
-        }
-
-        count++;
+            transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
+            ResourceUpdated.Invoke(transaction, resource, newData);
+          }
+        });
       }
 
-      return count;
+      try
+      {
+        return actions.Count;
+      }
+      finally
+      {
+        while (actions.TryDequeue(out Action? action))
+        {
+          action();
+        }
+      }
     }
 
     private IEnumerable<D> EnumerateReaderAndCastToData(SQLiteDataReader reader)

@@ -28,35 +28,32 @@ public static class Program
       };
     }
 
+    await server.Start();
     try
     {
-      await server.Start();
+      await RunTest(server);
+      await server.Join();
+    }
+    catch (Exception exception)
+    {
       try
       {
-        // await RunTest(server);
-        await server.Join();
+        await server.Stop();
       }
-      catch (Exception exception)
+      catch (Exception stopException)
       {
-        try
-        {
-          await server.Stop();
-        }
-        catch (Exception stopException)
-        {
-          throw new AggregateException(exception, stopException);
-        }
-
-        throw;
+        throw new AggregateException(exception, stopException);
       }
+
+      throw;
     }
-    catch { }
   }
 
   public static async Task RunTest(Server server) => await Task.Run(async () =>
   {
     UserResource.ResourceManager users = server.ResourceService.Users;
     UserAuthenticationResource.ResourceManager userAuthentications = server.ResourceService.UserAuthentications;
+
     await server.ResourceService.Transact(ResourceService.Scope.Main, (transaction, cancellationToken) =>
     {
       cancellationToken.ThrowIfCancellationRequested();
@@ -64,7 +61,11 @@ public static class Program
 
       UserResource user = users.Create(transaction, randomHex(), randomHex());
 
-      (UserAuthenticationResource userAuthentication1, byte[] payloadHash1) = userAuthentications.CreatePassword(transaction, user, "test");
+      UserAuthenticationResource.Pair pair = userAuthentications.CreatePassword(transaction, user, "test");
+      for (int index = 0; index < 10; index++)
+      {
+        pair = userAuthentications.CreatePassword(transaction, user, pair, "test");
+      }
 
       Console.WriteLine();
       Console.WriteLine($"User: @{user.Username} (#{user.Id})");

@@ -18,9 +18,9 @@ public sealed partial class ResourceService
     public readonly ResourceService Service = service;
     public readonly Scope Scope = scope;
 
-    public int Version = version;
+    public readonly int Version = version;
 
-    protected SQLiteConnection Database => Service.GetDatabase(Scope);
+    private SQLiteConnection Database => Service.GetDatabase(Scope);
 
     protected abstract void Upgrade(Transaction transaction, int oldVersion = default);
 
@@ -71,23 +71,23 @@ public sealed partial class ResourceService
 
     public delegate T SqlQueryDataHandler<T>(SQLiteDataReader reader);
     public delegate void SqlQueryDataHandler(SQLiteDataReader reader);
-    public delegate IEnumerable<T> SqlQueryDataEnumerator<T>(SQLiteDataReader reader);
+    public delegate IEnumerable<T> SqlQueryDataEnumeratorHandler<T>(SQLiteDataReader reader);
 
-    protected T SqlQuery<T>(Transaction transaction, SqlQueryDataHandler<T> dataHandler, string sqlQuery, params object?[] parameters) => SqlQuery<T>(transaction, (reader) => [dataHandler(reader)], sqlQuery, parameters).First();
+    protected T SqlQuery<T>(Transaction transaction, SqlQueryDataHandler<T> dataHandler, string sqlQuery, params object?[] parameters) => SqlEnumeratedQuery<T>(transaction, (reader) => [dataHandler(reader)], sqlQuery, parameters).First();
 
-    protected void SqlQuery(Transaction transaction, SqlQueryDataHandler dataHandler, string sqlQuery, params object?[] parameters) => SqlQuery<byte>(transaction, (reader) =>
+    protected void SqlQuery(Transaction transaction, SqlQueryDataHandler dataHandler, string sqlQuery, params object?[] parameters) => SqlEnumeratedQuery<byte>(transaction, (reader) =>
     {
       dataHandler(reader);
       return [];
     }, sqlQuery, parameters);
 
-    protected IEnumerable<T> SqlQuery<T>(Transaction transaction, SqlQueryDataEnumerator<T> dataHandler, string sqlQuery, params object?[] parameters)
+    protected IEnumerable<T> SqlEnumeratedQuery<T>(Transaction transaction, SqlQueryDataEnumeratorHandler<T> dataHandler, string sqlQuery, params object?[] parameters)
     {
       ThrowIfInvalidScope(transaction);
-      SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      using SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
       LogSql("Query", sqlQuery, parameters);
-      SQLiteDataReader reader = command.ExecuteReader(System.Data.CommandBehavior.SingleResult);
+      using SQLiteDataReader reader = command.ExecuteReader(System.Data.CommandBehavior.SingleResult);
 
       foreach (T item in dataHandler(reader))
       {
@@ -98,7 +98,7 @@ public sealed partial class ResourceService
     protected int SqlNonQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
       ThrowIfInvalidScope(transaction);
-      SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      using SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
       LogSql("Non-query", sqlQuery, parameters);
       return command.ExecuteNonQuery();
@@ -107,7 +107,7 @@ public sealed partial class ResourceService
     protected object? SqlScalar(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
       ThrowIfInvalidScope(transaction);
-      SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      using SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
       LogSql("Scalar", sqlQuery, parameters);
       return command.ExecuteScalar();

@@ -4,11 +4,15 @@ using Framework.Collections;
 
 using Core;
 using Connections;
+using Resources;
+using Extras;
 
 public sealed partial class ConnectionService(Server server) : Server.SubService(server, "Connections")
 {
   private long NextId = 0;
   private readonly WeakDictionary<long, Connection> Connections = [];
+
+  public abstract partial record ConnectionConfiguration(ConnectionEndPoint RemoteEndPoint, ConnectionEndPoint LocalEndPoint);
 
   public void ThrowIfInvalid(long id, Connection connection)
   {
@@ -20,13 +24,32 @@ public sealed partial class ConnectionService(Server server) : Server.SubService
 
   public bool IsValid(long id, Connection connection)
   {
-    lock (this)
+    lock (connection)
     {
-      return Connections.TryGetValue(id, out Connection? testConnection) && testConnection == connection;
+      lock (this)
+      {
+        return Connections.TryGetValue(id, out Connection? testConnection) && testConnection == connection;
+      }
     }
   }
 
-  public Connection NewConnection(ConnectionConfiguration configuration, CancellationToken cancellationToken = default)
+  public void Close(long id, Connection connection)
+  {
+    lock (connection)
+    {
+      lock (this)
+      {
+        ThrowIfInvalid(id, connection);
+        Connections.Remove(id);
+      }
+    }
+  }
+
+  public C NewConnection<C, CC, Rq, Rs>(CC configuration, CancellationToken cancellationToken = default)
+    where C : Connection<C, CC, Rq, Rs>
+    where CC : Connection<C, CC, Rq, Rs>.ConnectionConfiguration
+    where Rq : Connection<C, CC, Rq, Rs>.Request
+    where Rs : Connection<C, CC, Rq, Rs>.Response
   {
     lock (this)
     {
@@ -42,7 +65,7 @@ public sealed partial class ConnectionService(Server server) : Server.SubService
       };
 
       Connections.Add(connection.Id, connection);
-      return connection;
+      return (C)connection;
     }
   }
 

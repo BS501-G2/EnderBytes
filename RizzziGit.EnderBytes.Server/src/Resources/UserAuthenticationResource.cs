@@ -166,6 +166,42 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
     }
 
     public IEnumerable<UserAuthenticationResource> List(ResourceService.Transaction transaction, UserResource user, LimitClause? limitClause = null, OrderByClause? orderByClause = null) => Select(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), limitClause, orderByClause);
+
+    public Pair? GetByPayload(ResourceService.Transaction transaction, UserResource user, byte[] payload, UserAuthenticationType? type = null)
+    {
+      foreach (UserAuthenticationResource userAuthentication in Select(transaction,
+        type == null
+          ? new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)
+          : new WhereClause.Nested("and",
+              new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id),
+              new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)type)
+            )
+      ))
+      {
+        try
+        {
+          return new(userAuthentication, userAuthentication.GetPayloadHash(payload));
+        }
+        catch
+        {
+          continue;
+        }
+      }
+
+      return null;
+    }
+
+    public override bool Delete(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication)
+    {
+      userAuthentication.ThrowIfInalid();
+
+      if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userAuthentication.UserId)) < 2)
+      {
+        throw new InvalidOperationException("Must have at least two user authentications before deleting one.");
+      }
+
+      return base.Delete(transaction, userAuthentication);
+    }
   }
 
   public new sealed partial record ResourceData(

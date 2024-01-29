@@ -6,6 +6,7 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Framework.Collections;
 using Framework.Memory;
+using Framework.Logging;
 
 using Services;
 using Utilities;
@@ -75,6 +76,8 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
           {
             R resource = GetResource(CastToData(reader));
 
+            Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] New {Name} resource: #{resource.Id}");
+
             transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
             ResourceInserted?.Invoke(transaction, resource);
             return resource;
@@ -102,6 +105,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         [.. parameterList]
       ))
       {
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Enumerated {Name} resource: #{data.Id}");
         yield return GetResource(data);
       }
     }
@@ -129,10 +133,9 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
       string temporaryTableName = $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
 
+      long count = 0;
       if (ResourceDeleted != null)
       {
-        Queue<Action> actions = [];
-
         foreach (D data in SqlEnumeratedQuery<D>(
           transaction,
           EnumerateReaderAndCastToData,
@@ -143,35 +146,22 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
           [.. parameterList]
         ))
         {
-          actions.Enqueue(() =>
+          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{data.Id}");
+          if (Resources.TryGetValue(data.Id, out R? resource))
           {
-            if (Resources.TryGetValue(data.Id, out R? resource))
-            {
-              transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
-              Resources.Remove(data.Id);
-              ResourceDeleted?.Invoke(transaction, resource);
-              return;
-            }
-
-            resource = NewResource(data);
             transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
+            Resources.Remove(data.Id);
             ResourceDeleted?.Invoke(transaction, resource);
-          });
-        }
-
-        try { return actions.Count; }
-        finally
-        {
-          while (actions.TryDequeue(out Action? action))
-          {
-            action();
+            continue;
           }
+
+          resource = NewResource(data);
+          transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
+          ResourceDeleted?.Invoke(transaction, resource);
         }
       }
       else
       {
-        long count = 0;
-
         foreach (long affectedId in SqlEnumeratedQuery<long>(
           transaction,
           enumerateAffectedId,
@@ -182,16 +172,13 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
           [.. parameterList]
         ))
         {
+          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{affectedId}");
           if (Resources.TryGetValue(affectedId, out R? resource))
           {
             transaction.RegisterOnFailureHandler(() => Resources.Add(affectedId, resource));
             Resources.Remove(affectedId);
           }
-
-          count++;
         }
-
-        return count;
 
         static IEnumerable<long> enumerateAffectedId(SQLiteDataReader reader)
         {
@@ -201,6 +188,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
           }
         }
       }
+      return count;
     }
 
     protected long Update(ResourceService.Transaction transaction, WhereClause where, SetClause set)
@@ -215,7 +203,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
       string temporaryTableName = $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
 
-      Queue<Action> actions = [];
+      long count = 0;
       foreach (D newData in SqlEnumeratedQuery<D>(
         transaction,
         EnumerateReaderAndCastToData,
@@ -226,38 +214,28 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         [.. parameterList]
       ))
       {
-        actions.Enqueue(() =>
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Updated {Name} resource: #{newData.Id}");
+        if (Resources.TryGetValue(newData.Id, out R? resource))
         {
-          if (Resources.TryGetValue(newData.Id, out R? resource))
-          {
-            D oldData = resource.Data;
+          D oldData = resource.Data;
 
-            transaction.RegisterOnFailureHandler(() => resource.Data = oldData);
-            resource.Data = newData;
+          transaction.RegisterOnFailureHandler(() => resource.Data = oldData);
+          resource.Data = newData;
 
-            ResourceUpdated?.Invoke(transaction, resource, oldData);
-          }
-          else if (ResourceUpdated != null)
-          {
-            resource = GetResource(newData);
-
-            transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
-            ResourceUpdated.Invoke(transaction, resource, newData);
-          }
-        });
-      }
-
-      try
-      {
-        return actions.Count;
-      }
-      finally
-      {
-        while (actions.TryDequeue(out Action? action))
-        {
-          action();
+          ResourceUpdated?.Invoke(transaction, resource, oldData);
         }
+        else if (ResourceUpdated != null)
+        {
+          resource = GetResource(newData);
+
+          transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
+          ResourceUpdated.Invoke(transaction, resource, newData);
+        }
+
+        count++;
       }
+
+      return count;
     }
 
     private IEnumerable<D> EnumerateReaderAndCastToData(SQLiteDataReader reader)
@@ -268,9 +246,10 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       }
     }
 
-    public R? GetById(ResourceService.Transaction transaction, long Id) => Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id)).FirstOrDefault();
-    public bool Delete(ResourceService.Transaction transaction, R resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id)) != 0;
     protected bool Update(ResourceService.Transaction transaction, R resource, SetClause set) => Update(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), set) != 0;
+
+    public virtual R? GetById(ResourceService.Transaction transaction, long Id) => Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id)).FirstOrDefault();
+    public virtual bool Delete(ResourceService.Transaction transaction, R resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id)) != 0;
   }
 
   public abstract partial record ResourceData(long Id, long CreateTime, long UpdateTime);

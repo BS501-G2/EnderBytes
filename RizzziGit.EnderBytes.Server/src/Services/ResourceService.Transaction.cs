@@ -15,7 +15,8 @@ public sealed partial class ResourceService
   public delegate IEnumerable<T> TransactionEnumeratorHandler<T>(Transaction transaction, CancellationToken cancellationToken);
   public delegate void TransactionFailureHandler();
 
-  public sealed record Transaction(Scope Scope, Action<TransactionFailureHandler> RegisterOnFailureHandler, CancellationToken CancellationToken);
+  private long NextTransactionId;
+  public sealed record Transaction(long Id, Scope Scope, Action<TransactionFailureHandler> RegisterOnFailureHandler, CancellationToken CancellationToken);
 
   private readonly WeakDictionary<Scope, WaitQueue> TransactionQueues = [];
   private WaitQueue GetTransactionWaitQueue(Scope scope)
@@ -105,11 +106,11 @@ public sealed partial class ResourceService
         using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(serviceCancellationToken, cancellationToken);
         linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
-        Logger.Log(LogLevel.Debug, "Transaction begin.");
         using SQLiteTransaction dbTransaction = GetDatabase(scope).BeginTransaction();
 
         List<TransactionFailureHandler> failureHandlers = [];
-        Transaction transaction = new(scope, failureHandlers.Add, linkedCancellationTokenSource.Token);
+        Transaction transaction = new(NextTransactionId++, scope, failureHandlers.Add, linkedCancellationTokenSource.Token);
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");
 
         try
         {
@@ -117,12 +118,12 @@ public sealed partial class ResourceService
           handler(transaction, linkedCancellationTokenSource.Token);
           linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
-          Logger.Log(LogLevel.Debug, "Transaction commit.");
+          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");
           dbTransaction.Commit();
         }
         catch (Exception exception)
         {
-          Logger.Log(LogLevel.Warn, $"Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
+          Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
           dbTransaction.Rollback();
 
           foreach (TransactionFailureHandler failureHandler in failureHandlers.Reverse<TransactionFailureHandler>())

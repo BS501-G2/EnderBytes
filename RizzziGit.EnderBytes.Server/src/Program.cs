@@ -56,34 +56,38 @@ public static class Program
 
     await server.ResourceService.Transact(ResourceService.Scope.Main, (transaction, cancellationToken) =>
     {
-      cancellationToken.ThrowIfCancellationRequested();
-      static string randomHex() => ((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString();
+      // UserResource user = users.Create(transaction, "testuser", "Test User");
+      // UserAuthenticationResource.Pair pair = userAuthentications.CreatePassword(transaction, user, "TestPass19@");
 
-      UserResource user = users.Create(transaction, randomHex(), randomHex());
+      // cancellationToken.ThrowIfCancellationRequested();
+      // static string randomHex() => ((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString();
 
-      UserAuthenticationResource.Pair pair = userAuthentications.CreatePassword(transaction, user, "test");
-      for (int index = 0; index < 10; index++)
-      {
-        pair = userAuthentications.CreatePassword(transaction, user, pair, "test");
-      }
+      // UserResource user = users.Create(transaction, randomHex(), randomHex());
 
-      Console.WriteLine();
-      Console.WriteLine($"User: @{user.Username} (#{user.Id})");
-      Console.WriteLine($"Aser Authentications:");
-      foreach (UserAuthenticationResource userAuthentication in userAuthentications.List(transaction, user))
-      {
-        Console.WriteLine($" -> {userAuthentication.Type} #{userAuthentication.Id}");
+      // UserAuthenticationResource.Pair pair = userAuthentications.CreatePassword(transaction, user, "test");
+      // userAuthentications.Delete(transaction, pair.UserAuthentication);
+      // for (int index = 0; index < 10; index++)
+      // {
+      //   pair = userAuthentications.CreatePassword(transaction, user, pair, "test");
+      // }
 
-        byte[] payload = Encoding.UTF8.GetBytes("test");
-        byte[] payloadHash = userAuthentication.GetPayloadHash(payload);
+      // Console.WriteLine();
+      // Console.WriteLine($"User: @{user.Username} (#{user.Id})");
+      // Console.WriteLine($"Aser Authentications:");
+      // foreach (UserAuthenticationResource userAuthentication in userAuthentications.List(transaction, user))
+      // {
+      //   Console.WriteLine($" -> {userAuthentication.Type} #{userAuthentication.Id}");
 
-        byte[] test = RandomNumberGenerator.GetBytes(32);
-        byte[] testEncrypted = userAuthentication.Encrypt(test);
+      //   byte[] payload = Encoding.UTF8.GetBytes("test");
+      //   byte[] payloadHash = userAuthentication.GetPayloadHash(payload);
 
-        Console.WriteLine($"    -> Encryption and Decryption works properly: {userAuthentication.Decrypt(testEncrypted, payloadHash).SequenceEqual(test)}.");
-      }
-      Console.WriteLine();
-      users.Delete(transaction, user);
+      //   byte[] test = RandomNumberGenerator.GetBytes(32);
+      //   byte[] testEncrypted = userAuthentication.Encrypt(test);
+
+      //   Console.WriteLine($"    -> Encryption and Decryption works properly: {userAuthentication.Decrypt(testEncrypted, payloadHash).SequenceEqual(test)}.");
+      // }
+      // Console.WriteLine();
+      // users.Delete(transaction, user);
     });
   });
 }

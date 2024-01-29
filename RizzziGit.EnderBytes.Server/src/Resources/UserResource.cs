@@ -58,9 +58,7 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
         return null;
       }
 
-      return Select(transaction, new WhereClause.CompareColumn(
-        COLUMN_USERNAME, "=", username)
-      ).FirstOrDefault();
+      return Select(transaction, new WhereClause.CompareColumn(COLUMN_USERNAME, "=", username), new(1)).FirstOrDefault();
     }
   }
 

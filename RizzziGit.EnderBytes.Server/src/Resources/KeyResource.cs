@@ -11,8 +11,16 @@ public sealed partial class KeyResource(KeyResource.ResourceManager manager, Key
   private const string NAME = "Key";
   private const int VERSION = 1;
 
-  public new sealed partial class ResourceManager(ResourceService service) : Resource<ResourceManager, ResourceData, KeyResource>.ResourceManager(service, ResourceService.Scope.Main, NAME, VERSION)
+  public new sealed partial class ResourceManager : Resource<ResourceManager, ResourceData, KeyResource>.ResourceManager
   {
+    public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Main, NAME, VERSION)
+    {
+      service.Users.ResourceDeleted += (transaction,  resource) =>
+      {
+
+      };
+    }
+
     private const string COLUMN_SHARED_ID = "SharedId";
     private const string COLUMN_TARGET_USER_ID = "TargetUserId";
     private const string COLUMN_PRIVATE_KEY = "PrivateKey";

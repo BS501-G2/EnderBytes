@@ -12,12 +12,18 @@ public sealed partial class SessionService(Server server) : Server.SubService(se
 
   public bool IsValid(ConnectionService.Connection connection, Session session)
   {
-    lock (this)
+    lock (connection)
     {
-      return Sessions.TryGetValue(connection, out Session? testSession) &&
-        testSession == session &&
-        session.UserAuthentication.IsValid &&
-        session.Connection.IsValid;
+      lock (session)
+      {
+        lock (this)
+        {
+          return Sessions.TryGetValue(connection, out Session? testSession) &&
+            testSession == session &&
+            session.UserAuthentication.IsValid &&
+            session.Connection.IsValid;
+        }
+      }
     }
   }
 
@@ -29,30 +35,52 @@ public sealed partial class SessionService(Server server) : Server.SubService(se
     }
   }
 
+  public void DestroySession(ConnectionService.Connection connection, Session session)
+  {
+    lock (connection)
+    {
+      lock (session)
+      {
+        lock (this)
+        {
+          ThrowIfInvalid(connection, session);
+
+          Sessions.Remove(connection);
+        }
+      }
+    }
+  }
+
   public Session? GetSession(ConnectionService.Connection connection)
   {
-    lock (this)
+    lock (connection)
     {
-      if (Sessions.TryGetValue(connection, out Session? session) && session.IsValid)
+      lock (this)
       {
-        return session;
-      }
+        if (Sessions.TryGetValue(connection, out Session? session) && session.IsValid)
+        {
+          return session;
+        }
 
-      return null;
+        return null;
+      }
     }
   }
 
   public Session NewSession(ConnectionService.Connection connection, UserAuthenticationResource userAuthentication, byte[] payloadHash)
   {
-    lock (this)
+    lock (connection)
     {
-      if (!Sessions.TryGetValue(connection, out Session? session) || !session.IsValid)
+      lock (this)
       {
-        Sessions.AddOrUpdate(connection, session = new(this, NextId++, userAuthentication, payloadHash, connection));
-        return session;
-      }
+        if (!Sessions.TryGetValue(connection, out Session? session) || !session.IsValid)
+        {
+          Sessions.AddOrUpdate(connection, session = new(this, NextId++, userAuthentication, payloadHash, connection));
+          return session;
+        }
 
-      throw new InvalidOperationException("Current session exists.");
+        throw new InvalidOperationException("Current session exists.");
+      }
     }
   }
 

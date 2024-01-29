@@ -48,7 +48,7 @@ public sealed partial class FtpProtocol
     {
       Command.USER userCommand => await HandleCommand(userCommand, cancellationToken),
       Command.PASS passCommand => await HandleCommand(passCommand, cancellationToken),
-      _ => new(500, "Command not implemented."),
+      _ => new(502, "Command not implemented."),
     };
 
     private string? Username;
@@ -56,6 +56,12 @@ public sealed partial class FtpProtocol
     private Task<Reply> HandleCommand(Command.USER command, CancellationToken cancellationToken)
     {
       Username = command.Username;
+
+      if (Username == "anonymous")
+      {
+        return Task.FromResult<Reply>(new(332, "Anonymous not allowed."));
+      }
+
       return Task.FromResult<Reply>(new(330, "Type password."));
     }
 
@@ -68,23 +74,31 @@ public sealed partial class FtpProtocol
 
       ResourceService resourceService = Service.Server.ResourceService;
 
-      UserAuthenticationResource.Pair? auth = await resourceService.Transact(ResourceService.Scope.Main, (transaction, cancellationToken) =>
+      UserConfigurationResource? userConfiguration = null;
+      UserAuthenticationResource.Pair? userAuthentication = null;
+      await resourceService.Transact(ResourceService.Scope.Main, (transaction, cancellationToken) =>
       {
         UserResource? user = resourceService.Users.GetByUsername(transaction, Username);
         if (user == null)
         {
-          return null;
+          return;
         }
 
-        return resourceService.UserAuthentications.GetByPayload(transaction, user, Encoding.ASCII.GetBytes(command.Password));
+        userConfiguration = resourceService.UserConfiguration.Get(transaction, user);
+        userAuthentication = resourceService.UserAuthentications.GetByPayload(transaction, user, Encoding.ASCII.GetBytes(command.Password));
       }, cancellationToken);
 
-      if (auth == null)
+      if (userConfiguration == null || userAuthentication == null)
       {
         return error();
       }
 
-      Service.Server.SessionService.NewSession(UnderlyingConnection!, auth.UserAuthentication, auth.PayloadHash);
+      if (!userConfiguration.AllowFtpAccess)
+      {
+        return new(534, "FTP access not allowed.");
+      }
+
+      Service.Server.SessionService.NewSession(UnderlyingConnection!, userAuthentication.UserAuthentication, userAuthentication.PayloadHash);
       return new(230, "Logged in.");
 
       static Reply error() => new(431, "Invalid username or password.");

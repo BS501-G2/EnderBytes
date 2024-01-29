@@ -110,7 +110,7 @@ public sealed partial class ResourceService
 
         List<TransactionFailureHandler> failureHandlers = [];
         Transaction transaction = new(NextTransactionId++, scope, failureHandlers.Add, linkedCancellationTokenSource.Token);
-        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {scope}] Transaction begin.");
 
         try
         {
@@ -118,12 +118,12 @@ public sealed partial class ResourceService
           handler(transaction, linkedCancellationTokenSource.Token);
           linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
-          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");
+          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {scope}] Transaction commit.");
           dbTransaction.Commit();
         }
         catch (Exception exception)
         {
-          Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
+          Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id} on {scope}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
           dbTransaction.Rollback();
 
           foreach (TransactionFailureHandler failureHandler in failureHandlers.Reverse<TransactionFailureHandler>())

@@ -76,7 +76,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
           {
             R resource = GetResource(CastToData(reader));
 
-            Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] New {Name} resource: #{resource.Id}");
+            Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] New {Name} resource: #{resource.Id}");
 
             transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
             ResourceInserted?.Invoke(transaction, resource);
@@ -105,7 +105,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         [.. parameterList]
       ))
       {
-        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Enumerated {Name} resource: #{data.Id}");
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] Enumerated {Name} resource: #{data.Id}");
         yield return GetResource(data);
       }
     }
@@ -146,7 +146,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
           [.. parameterList]
         ))
         {
-          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{data.Id}");
+          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] Deleted {Name} resource: #{data.Id}");
           if (Resources.TryGetValue(data.Id, out R? resource))
           {
             transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
@@ -162,7 +162,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       }
       else
       {
-        foreach (long affectedId in SqlEnumeratedQuery<long>(
+        foreach (long affectedId in SqlEnumeratedQuery(
           transaction,
           enumerateAffectedId,
           $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
@@ -172,7 +172,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
           [.. parameterList]
         ))
         {
-          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{affectedId}");
+          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] Deleted {Name} resource: #{affectedId}");
           if (Resources.TryGetValue(affectedId, out R? resource))
           {
             transaction.RegisterOnFailureHandler(() => Resources.Add(affectedId, resource));
@@ -214,7 +214,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         [.. parameterList]
       ))
       {
-        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Updated {Name} resource: #{newData.Id}");
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] Updated {Name} resource: #{newData.Id}");
         if (Resources.TryGetValue(newData.Id, out R? resource))
         {
           D oldData = resource.Data;

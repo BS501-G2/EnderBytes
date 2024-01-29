@@ -66,7 +66,7 @@ public sealed partial class ResourceService
 
     private void LogSql(Transaction transaction, string type, string sqlQuery, params object?[] parameters)
     {
-      Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] SQL {type} on {Scope}: {string.Format(sqlQuery, parameters)}");
+      Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] SQL {type}: {string.Format(sqlQuery, parameters)}");
     }
 
     public delegate T SqlQueryDataHandler<T>(SQLiteDataReader reader);

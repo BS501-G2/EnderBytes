@@ -50,11 +50,6 @@ public sealed partial class FtpProtocol
           loopTask = run(linkedCancellationTokenSource.Token)
         );
 
-        if (exitedTask == monitorTask && exitedTask.IsCompletedSuccessfully)
-        {
-          await Send(new(301, "Hello? Is anyone there?"), cancellationToken);
-        }
-
         cancellationTokenSource.Cancel();
         async Task run(CancellationToken cancellationToken)
         {
@@ -103,16 +98,26 @@ public sealed partial class FtpProtocol
           LastCommandTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         }
 
-        Protocol.Logger.Log(Framework.Logging.LogLevel.Debug, $"[{RemoteEndPoint} -> SERVER] {command}");
-        await Send(await HandleCommand(Command.Parse(command), cancellationToken), cancellationToken);
+        {
+          Command? parsedCommand = Command.Parse(command);
+          Protocol.Logger.Log(Framework.Logging.LogLevel.Debug, $"[{RemoteEndPoint} -> SERVER] {(parsedCommand is Command.PASS ? "PASS <censored>" : command)}");
+          await Send(await HandleCommand(parsedCommand, cancellationToken), cancellationToken);
+        }
       }
     }
 
     private async Task RunCommandTimeoutMonitor(CancellationToken cancellationToken)
     {
-      while ((LastCommandTimestamp - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()) < 30000 || CommandBuffer.Length == 0)
+      long timeElapsedSinceLastCommand() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - LastCommandTimestamp;
+
+      while (true)
       {
         await Task.Delay(1000, cancellationToken);
+
+        if (timeElapsedSinceLastCommand() >= 30000)
+        {
+          await Send(new(CommandBuffer.Length != 0 ? 503 : 421, "Connection timed out."), cancellationToken);
+        }
       }
     }
   }

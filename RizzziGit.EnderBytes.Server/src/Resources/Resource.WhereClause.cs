@@ -10,6 +10,21 @@ public abstract partial class Resource<M, D, R>
     {
       private WhereClause() { }
 
+      public sealed record Raw(string RawString, params object?[] RawStringParams) : WhereClause
+      {
+        public override string Apply(List<object?> parameterList)
+        {
+          try
+          {
+            return $"({string.Format(RawString, [.. RawStringParams.Select((_, index) => $"{{{parameterList.Count + index}}}")])})";
+          }
+          finally
+          {
+            parameterList.AddRange(RawStringParams);
+          }
+        }
+      }
+
       public sealed record CompareColumn(string Column, string Comparer, object? Value) : WhereClause
       {
         public override string Apply(List<object?> parameterList)

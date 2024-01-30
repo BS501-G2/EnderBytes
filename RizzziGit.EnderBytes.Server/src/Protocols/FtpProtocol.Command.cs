@@ -93,9 +93,9 @@ public sealed partial class FtpProtocol
         return error();
       }
 
-      if (!userConfiguration.AllowFtpAccess)
+      if (!userConfiguration.EnableFtpAccess)
       {
-        return new(534, "FTP access not allowed.");
+        return new(534, "FTP access not enabled.");
       }
 
       Service.Server.SessionService.NewSession(UnderlyingConnection!, userAuthentication.UserAuthentication, userAuthentication.PayloadHash);

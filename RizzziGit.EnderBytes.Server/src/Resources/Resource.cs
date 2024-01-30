@@ -16,12 +16,15 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
   where D : Resource<M, D, R>.ResourceData
   where R : Resource<M, D, R>
 {
-  public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, R resource);
-  public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, D oldData);
-  public delegate void ResourceInsertHandler(ResourceService.Transaction transaction, R resource);
+  public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction);
+  public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, D oldData);
 
   public abstract partial class ResourceManager(ResourceService service, ResourceService.Scope scope, string name, int version) : ResourceService.ResourceManager(service, scope, name, version)
   {
+    public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, R resource);
+    public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, D oldData);
+    public delegate void ResourceInsertHandler(ResourceService.Transaction transaction, R resource);
+
     private readonly WeakDictionary<long, R> Resources = [];
 
     public event ResourceInsertHandler? ResourceInserted;
@@ -134,59 +137,31 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       string temporaryTableName = $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
 
       long count = 0;
-      if (ResourceDeleted != null)
+      foreach (D data in SqlEnumeratedQuery<D>(
+        transaction,
+        EnumerateReaderAndCastToData,
+        $"create temporary table {temporaryTableName} as select * from {Name} where {whereClause}; " +
+        $"delete from {Name} where {whereClause}; " +
+        $"select * from {temporaryTableName}; " +
+        $"drop table {temporaryTableName}; ",
+        [.. parameterList]
+      ))
       {
-        foreach (D data in SqlEnumeratedQuery<D>(
-          transaction,
-          EnumerateReaderAndCastToData,
-          $"create temporary table {temporaryTableName} as select * from {Name} where {whereClause}; " +
-          $"delete from {Name} where {whereClause}; " +
-          $"select * from {temporaryTableName}; " +
-          $"drop table {temporaryTableName}; ",
-          [.. parameterList]
-        ))
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] Deleted {Name} resource: #{data.Id}");
+        if (Resources.TryGetValue(data.Id, out R? resource))
         {
-          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] Deleted {Name} resource: #{data.Id}");
-          if (Resources.TryGetValue(data.Id, out R? resource))
-          {
-            transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
-            Resources.Remove(data.Id);
-            ResourceDeleted?.Invoke(transaction, resource);
-            continue;
-          }
-
-          resource = NewResource(data);
           transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
+          Resources.Remove(data.Id);
           ResourceDeleted?.Invoke(transaction, resource);
-        }
-      }
-      else
-      {
-        foreach (long affectedId in SqlEnumeratedQuery(
-          transaction,
-          enumerateAffectedId,
-          $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
-          $"delete from {Name} where {whereClause}; " +
-          $"select {COLUMN_ID} from {temporaryTableName}; " +
-          $"drop table {temporaryTableName}; ",
-          [.. parameterList]
-        ))
-        {
-          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] Deleted {Name} resource: #{affectedId}");
-          if (Resources.TryGetValue(affectedId, out R? resource))
-          {
-            transaction.RegisterOnFailureHandler(() => Resources.Add(affectedId, resource));
-            Resources.Remove(affectedId);
-          }
+          resource.Deleted?.Invoke(transaction);
+          continue;
         }
 
-        static IEnumerable<long> enumerateAffectedId(SQLiteDataReader reader)
-        {
-          while (reader.Read())
-          {
-            yield return reader.GetInt64(reader.GetOrdinal(COLUMN_ID));
-          }
-        }
+        resource = NewResource(data);
+        transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
+        ResourceDeleted?.Invoke(transaction, resource);
+
+        count++;
       }
       return count;
     }
@@ -223,6 +198,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
           resource.Data = newData;
 
           ResourceUpdated?.Invoke(transaction, resource, oldData);
+          resource.Updated?.Invoke(transaction, oldData);
         }
         else if (ResourceUpdated != null)
         {
@@ -256,6 +232,9 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
   public readonly M Manager = manager;
   protected D Data { get; private set; } = data;
+
+  public event ResourceUpdateHandler? Updated;
+  public event ResourceDeleteHandler? Deleted;
 
   public long Id => Data.Id;
   public long CreateTime => Data.CreateTime;

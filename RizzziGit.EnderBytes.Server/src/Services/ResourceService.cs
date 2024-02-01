@@ -36,7 +36,7 @@ public sealed partial class ResourceService : Server.SubService
   public readonly UserConfigurationResource.ResourceManager UserConfiguration;
   public readonly KeyResource.ResourceManager Keys;
   public readonly FileHubResource.ResourceManager FileHubs;
-  public readonly FileResource.ResourceManager Files;
+  public readonly FileNodeResource.ResourceManager Files;
 
   private SQLiteConnection GetDatabase(Scope scope)
   {

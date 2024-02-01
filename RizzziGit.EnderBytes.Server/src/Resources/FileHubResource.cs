@@ -1,9 +1,8 @@
 using System.Data.SQLite;
-using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-using System.Security.Cryptography;
 using Services;
 using Utilities;
 
@@ -23,19 +22,13 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
     private const string COLUMN_OWNER_USER_ID = "UserId";
     private const string COLUMN_NAME = "Name";
     private const string COLUMN_FLAGS = "Flags";
-    private const string COLUMN_AES_KEY = "AesKey";
-    private const string COLUMN_AES_IV = "AesIv";
+    private const string COLUMN_ENCRYPTED_AES_KEY = "EncryptedAesKey";
+    private const string COLUMN_ENCRYPTED_AES_IV = "EncryptedAesIv";
     private const string COLUMN_DELETION_SCHEDULE = "DeletionSchedule";
 
     public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Main, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction, resource) =>
-      {
-        Delete(transaction, new WhereClause.Nested("and",
-          new WhereClause.Raw($"({COLUMN_FLAGS} & {{0}}) != 0", (byte)FileHubFlags.Personal),
-          new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", resource.Id)
-        ));
-      };
+      service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", resource.Id));
     }
 
     protected override FileHubResource NewResource(ResourceData data) => new(this, data);
@@ -45,8 +38,8 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
       reader.GetInt64(reader.GetOrdinal(COLUMN_OWNER_USER_ID)),
       (FileHubFlags)reader.GetByte(reader.GetOrdinal(COLUMN_FLAGS)),
       reader.GetString(reader.GetOrdinal(COLUMN_NAME)),
-      reader.GetBytes(reader.GetOrdinal(COLUMN_AES_KEY)),
-      reader.GetBytes(reader.GetOrdinal(COLUMN_AES_IV)),
+      reader.GetBytes(reader.GetOrdinal(COLUMN_ENCRYPTED_AES_KEY)),
+      reader.GetBytes(reader.GetOrdinal(COLUMN_ENCRYPTED_AES_IV)),
       reader.GetInt64Optional(reader.GetOrdinal(COLUMN_DELETION_SCHEDULE))
     );
 
@@ -57,8 +50,10 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_OWNER_USER_ID} integer not null;");
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_FLAGS} integer not null;");
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_NAME} varchar(128) not null;");
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_AES_KEY} blob not null;");
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_AES_IV} blob not null;");
+
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ENCRYPTED_AES_KEY} blob not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ENCRYPTED_AES_IV} blob not null;");
+
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_DELETION_SCHEDULE} integer null;");
       }
     }
@@ -72,15 +67,15 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
 
       FileHubResource insertNew()
       {
-        byte[] aesKey = RandomNumberGenerator.GetBytes(32);
-        byte[] aesIv = RandomNumberGenerator.GetBytes(16);
+        byte[] encryptedAesKey = RandomNumberGenerator.GetBytes(32);
+        byte[] encryptedAesIv = RandomNumberGenerator.GetBytes(16);
 
         return Insert(transaction, new(
           (COLUMN_OWNER_USER_ID, user.Id),
           (COLUMN_FLAGS, (byte)FileHubFlags.Personal),
           (COLUMN_NAME, $"Bucket of User #{user.Id}"),
-          (COLUMN_AES_KEY, userAuthentication.Encrypt(aesKey)),
-          (COLUMN_AES_IV, aesIv),
+          (COLUMN_ENCRYPTED_AES_KEY, userAuthentication.Encrypt(encryptedAesKey)),
+          (COLUMN_ENCRYPTED_AES_IV, userAuthentication.Encrypt(encryptedAesIv)),
           (COLUMN_DELETION_SCHEDULE, null)
         ));
       }
@@ -95,15 +90,34 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
     long OwnerUserId,
     FileHubFlags Flags,
     string Name,
-    byte[] RsaKey,
-    byte[] RsaIv,
+
+    byte[] EncryptedAesKey,
+    byte[] EncryptedAesIv,
+
     long? DeletionSchedule
   ) : Resource<ResourceManager, ResourceData, FileHubResource>.ResourceData(Id, CreateTime, UpdateTime);
 
   public long OwnerUserId => Data.OwnerUserId;
   public FileHubFlags Flags => Data.Flags;
   public string Name => Data.Name;
-  public byte[] RsaKey => Data.RsaKey;
-  public byte[] RsaIv => Data.RsaIv;
+
+  public byte[] EncryptedAesKey => Data.EncryptedAesKey;
+  public byte[] EncryptedAesIv => Data.EncryptedAesIv;
+
   public long? DeletionSchedule => Data.DeletionSchedule;
+
+  public KeyService.AesPair DecryptAesPair(UserAuthenticationResource.Token token)
+  {
+    token.ThrowIfInvalid();
+
+    if (token.UserId != OwnerUserId)
+    {
+      throw new ArgumentException("Token does not belong to the owner.", nameof(token));
+    }
+
+    return new(
+      token.Decrypt(EncryptedAesKey),
+      token.Decrypt(EncryptedAesIv)
+    );
+  }
 }

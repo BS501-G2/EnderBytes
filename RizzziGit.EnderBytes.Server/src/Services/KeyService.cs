@@ -13,7 +13,25 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
   public const int KEY_SIZE = 512;
 
   public sealed record RsaKeyPair(byte[] Privatekey, byte[] PublicKey);
-  public sealed record AesPair(byte[] Key, byte[] Iv);
+
+  public sealed record AesPair(byte[] Key, byte[] Iv)
+  {
+    public byte[] Encrypt(byte[] bytes)
+    {
+      using Aes aes = Aes.Create();
+      using ICryptoTransform cryptoTransform = aes.CreateEncryptor(Key, Iv);
+
+      return cryptoTransform.TransformFinalBlock(bytes);
+    }
+
+    public byte[] Decrypt(byte[] bytes)
+    {
+      using Aes aes = Aes.Create();
+      using ICryptoTransform cryptoTransform = aes.CreateDecryptor(Key, Iv);
+
+      return cryptoTransform.TransformFinalBlock(bytes);
+    }
+  }
 
   private readonly TaskFactory TaskFactory = new(TaskCreationOptions.LongRunning, TaskContinuationOptions.None);
   private WaitQueue<RsaKeyPair>? PreGeneratedKeys;

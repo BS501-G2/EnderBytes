@@ -29,7 +29,7 @@ public sealed partial class SessionService
     public byte[] Encrypt(byte[] bytes) => UserAuthentication.Encrypt(bytes);
     public byte[] Decrypt(byte[] bytes) => UserAuthentication.Decrypt(bytes, PayloadHash);
 
-    public bool IsValid => Service.IsValid(Connection, this);
-    public void ThrowIfValid() => Service.ThrowIfInvalid(Connection, this);
+    public bool IsValid => Service.IsSessionValid(Connection, this);
+    public void ThrowIfValid() => Service.ThrowIfSessionInvalid(Connection, this);
   }
 }

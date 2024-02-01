@@ -14,15 +14,15 @@ public sealed partial class ConnectionService(Server server) : Server.SubService
 
   public abstract partial record ConnectionConfiguration(ConnectionEndPoint RemoteEndPoint, ConnectionEndPoint LocalEndPoint);
 
-  public void ThrowIfInvalid(long id, Connection connection)
+  public void ThrowIfConnectionInvalid(long id, Connection connection)
   {
-    if (!IsValid(id, connection))
+    if (!IsConnectionValid(id, connection))
     {
       throw new InvalidOperationException("Invalid connection.");
     }
   }
 
-  public bool IsValid(long id, Connection connection)
+  public bool IsConnectionValid(long id, Connection connection)
   {
     lock (connection)
     {
@@ -39,7 +39,7 @@ public sealed partial class ConnectionService(Server server) : Server.SubService
     {
       lock (this)
       {
-        ThrowIfInvalid(id, connection);
+        ThrowIfConnectionInvalid(id, connection);
         Connections.Remove(id);
       }
     }
@@ -55,11 +55,13 @@ public sealed partial class ConnectionService(Server server) : Server.SubService
     {
       cancellationToken.ThrowIfCancellationRequested();
 
+      long nextId = NextId++;
+
       Connection connection = configuration switch
       {
-        BasicConnection.ConnectionConfiguration basicConfiguration => new BasicConnection(this, basicConfiguration, NextId++),
-        AdvancedConnection.ConnectionConfiguration advancedConfiguration => new AdvancedConnection(this, advancedConfiguration, NextId++),
-        InternalConnection.ConnectionConfiguration internalConfiguration => new InternalConnection(this, internalConfiguration, NextId++),
+        BasicConnection.ConnectionConfiguration basicConfiguration => new BasicConnection(this, basicConfiguration, NextId),
+        AdvancedConnection.ConnectionConfiguration advancedConfiguration => new AdvancedConnection(this, advancedConfiguration, NextId),
+        InternalConnection.ConnectionConfiguration internalConfiguration => new InternalConnection(this, internalConfiguration, NextId),
 
         _ => throw new ArgumentException("Invalid configuration.", nameof(configuration))
       };

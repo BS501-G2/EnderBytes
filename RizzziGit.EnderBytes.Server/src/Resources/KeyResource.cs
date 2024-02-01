@@ -76,7 +76,7 @@ public sealed partial class KeyResource(KeyResource.ResourceManager manager, Key
 
     public KeyResource CopyFrom(ResourceService.Transaction transaction, long sharedId, (UserAuthenticationResource UserAuthentication, byte[] PayloadHash)? from, UserAuthenticationResource? newUserAuthentication)
     {
-      newUserAuthentication?.ThrowIfInalid();
+      newUserAuthentication?.ThrowIfInvalid();
 
       KeyResource key = SelectOne(transaction,
         new WhereClause.Nested("and",
@@ -99,7 +99,7 @@ public sealed partial class KeyResource(KeyResource.ResourceManager manager, Key
 
     public KeyResource Create(ResourceService.Transaction transaction, UserAuthenticationResource? userAuthentication)
     {
-      userAuthentication?.ThrowIfInalid();
+      userAuthentication?.ThrowIfInvalid();
 
       (byte[] privateKey, byte[] publicKey) = Service.Server.KeyService.GetNewRsaKeyPair();
       return Insert(transaction, new(

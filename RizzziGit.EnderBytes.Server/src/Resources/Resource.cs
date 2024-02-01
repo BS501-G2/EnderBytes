@@ -31,12 +31,12 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
     public event ResourceUpdateHandler? ResourceUpdated;
     public event ResourceDeleteHandler? ResourceDeleted;
 
-    public bool IsValid(R resource) => Resources.TryGetValue(resource.Id, out R? testResource) && testResource == resource;
-    public void ThrowIfInvalid(R resource)
+    public bool IsResourceValid(R resource) => Resources.TryGetValue(resource.Id, out R? testResource) && testResource == resource;
+    public void ThrowIfResourceInvalid(R resource)
     {
-      if (!IsValid(resource))
+      if (!IsResourceValid(resource))
       {
-        throw new InvalidOperationException("Invalid resource.");
+        throw new ArgumentException("Invalid resource.", nameof(resource));
       }
     }
 
@@ -224,7 +224,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
     protected bool Update(ResourceService.Transaction transaction, R resource, SetClause set) => Update(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), set) != 0;
 
-    public virtual R? GetById(ResourceService.Transaction transaction, long Id) => Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id)).FirstOrDefault();
+    public virtual R? GetById(ResourceService.Transaction transaction, long Id) => Resources.TryGetValue(Id, out R? resource) ? resource : Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id)).FirstOrDefault();
     public virtual bool Delete(ResourceService.Transaction transaction, R resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id)) != 0;
   }
 
@@ -240,6 +240,6 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
   public long CreateTime => Data.CreateTime;
   public long UpdateTime => Data.UpdateTime;
 
-  public bool IsValid => Manager.IsValid((R)this);
-  public void ThrowIfInalid() => Manager.ThrowIfInvalid((R)this);
+  public bool IsValid => Manager.IsResourceValid((R)this);
+  public void ThrowIfInvalid() => Manager.ThrowIfResourceInvalid((R)this);
 }

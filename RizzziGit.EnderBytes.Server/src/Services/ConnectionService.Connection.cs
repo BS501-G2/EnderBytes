@@ -13,8 +13,8 @@ public sealed partial class ConnectionService
     private SessionService.Session? SessionBackingField;
     public SessionService.Session? Session => SessionBackingField?.IsValid == true ? SessionBackingField : null;
 
-    public bool IsValid => Service.IsValid(Id, this);
-    public void ThrowIfInvalid() => Service.ThrowIfInvalid(Id, this);
+    public bool IsValid => Service.IsConnectionValid(Id, this);
+    public void ThrowIfInvalid() => Service.ThrowIfConnectionInvalid(Id, this);
 
     protected void AuthenticateWithPayloadHash(UserAuthenticationResource userAuthentication, byte[] payloadHash)
     {

@@ -10,7 +10,7 @@ public sealed partial class SessionService(Server server) : Server.SubService(se
   private long NextId = 0;
   private readonly WeakDictionary<ConnectionService.Connection, Session> Sessions = [];
 
-  public bool IsValid(ConnectionService.Connection connection, Session session)
+  public bool IsSessionValid(ConnectionService.Connection connection, Session session)
   {
     lock (connection)
     {
@@ -18,7 +18,8 @@ public sealed partial class SessionService(Server server) : Server.SubService(se
       {
         lock (this)
         {
-          return Sessions.TryGetValue(connection, out Session? testSession) &&
+          return connection.IsValid &&
+            Sessions.TryGetValue(connection, out Session? testSession) &&
             testSession == session &&
             session.UserAuthentication.IsValid &&
             session.Connection.IsValid;
@@ -27,9 +28,9 @@ public sealed partial class SessionService(Server server) : Server.SubService(se
     }
   }
 
-  public void ThrowIfInvalid(ConnectionService.Connection connection, Session session)
+  public void ThrowIfSessionInvalid(ConnectionService.Connection connection, Session session)
   {
-    if (!IsValid(connection, session))
+    if (!IsSessionValid(connection, session))
     {
       throw new InvalidOperationException("Invalid session.");
     }
@@ -43,7 +44,7 @@ public sealed partial class SessionService(Server server) : Server.SubService(se
       {
         lock (this)
         {
-          ThrowIfInvalid(connection, session);
+          ThrowIfSessionInvalid(connection, session);
 
           Sessions.Remove(connection);
         }

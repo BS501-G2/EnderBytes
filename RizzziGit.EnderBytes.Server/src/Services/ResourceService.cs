@@ -20,6 +20,7 @@ public sealed partial class ResourceService : Server.SubService
     Keys = new(this);
     FileHubs = new(this);
     Files = new(this);
+    FileAccesses = new(this);
 
     if (!File.Exists(WorkingPath))
     {
@@ -37,6 +38,7 @@ public sealed partial class ResourceService : Server.SubService
   public readonly KeyResource.ResourceManager Keys;
   public readonly FileHubResource.ResourceManager FileHubs;
   public readonly FileNodeResource.ResourceManager Files;
+  public readonly FileAccessResource.ResourceManager FileAccesses;
 
   private SQLiteConnection GetDatabase(Scope scope)
   {
@@ -71,6 +73,7 @@ public sealed partial class ResourceService : Server.SubService
     await Keys.Start(cancellationToken);
     await FileHubs.Start(cancellationToken);
     await Files.Start(cancellationToken);
+    await FileAccesses.Start(cancellationToken);
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
@@ -80,7 +83,15 @@ public sealed partial class ResourceService : Server.SubService
       await await Task.WhenAny([
         .. TransactionQueueTasks,
 
-        WatchDog([Users, UserAuthentications, UserConfiguration, Keys, FileHubs, Files], cancellationToken)
+        WatchDog([
+          Users,
+          UserAuthentications,
+          UserConfiguration,
+          Keys,
+          FileHubs,
+          Files,
+          FileAccesses
+        ], cancellationToken)
       ]);
     }
     finally
@@ -97,6 +108,7 @@ public sealed partial class ResourceService : Server.SubService
     await Keys.Stop();
     await FileHubs.Stop();
     await Files.Stop();
+    await FileAccesses.Stop();
 
     TransactionQueueTaskCancellationTokenSource?.Cancel();
 

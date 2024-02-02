@@ -101,8 +101,8 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
   public FileHubFlags Flags => Data.Flags;
   public string Name => Data.Name;
 
-  public byte[] EncryptedAesKey => Data.EncryptedAesKey;
-  public byte[] EncryptedAesIv => Data.EncryptedAesIv;
+  private byte[] EncryptedAesKey => Data.EncryptedAesKey;
+  private byte[] EncryptedAesIv => Data.EncryptedAesIv;
 
   public long? DeletionSchedule => Data.DeletionSchedule;
 

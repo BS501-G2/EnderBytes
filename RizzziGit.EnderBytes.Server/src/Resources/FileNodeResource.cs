@@ -1,17 +1,14 @@
 using System.Data.SQLite;
+using System.Security.Cryptography;
 
 namespace RizzziGit.EnderBytes.Resources;
 
 using Utilities;
 using Services;
-using System.Security.Cryptography;
 
 public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, FileNodeResource.ResourceData data) : Resource<FileNodeResource.ResourceManager, FileNodeResource.ResourceData, FileNodeResource>(manager, data)
 {
-  public enum FileNodeType : byte
-  {
-    File, Folder, SymbolicLink
-  }
+  public enum FileNodeType : byte { File, Folder, SymbolicLink }
 
   private const string NAME = "File";
   private const int VERSION = 1;
@@ -88,9 +85,11 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
       ));
     }
 
-    public KeyService.AesPair DecryptAesPair(ResourceService.Transaction transaction, FileNodeResource node, UserAuthenticationResource.Token token)
+    public KeyService.AesPair DecryptAesPair(ResourceService.Transaction transaction, FileNodeResource node, UserAuthenticationResource.Token? token)
     {
-      FileHubResource hub = Service.FileHubs.GetById(transaction, node.HubId) ?? throw new InvalidOperationException("Failed to get hub resource.");
+      token?.ThrowIfInvalid();
+
+      FileHubResource hub = Service.FileHubs.GetById(transaction, node.HubId)!;
 
       return decryptAesPair(node);
 
@@ -103,21 +102,19 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
           throw new ArgumentException("File is not located the hub.", nameof(node));
         }
 
-        if (hub.OwnerUserId == token.UserId)
+        if (hub.OwnerUserId == token?.UserId)
         {
           KeyService.AesPair aesPair = node.ParentFileId == null
             ? hub.DecryptAesPair(token)
-            : decryptAesPair(GetById(transaction, (long)node.ParentFileId) ?? throw new InvalidOperationException("Failed to retrieve parent file resource."));
+            : decryptAesPair(GetById(transaction, (long)node.ParentFileId)!);
 
-          return new(
-            aesPair.Decrypt(node.EncryptedAesKey),
-            aesPair.Decrypt(node.EncryptedAesIv)
-          );
+          return new(aesPair.Decrypt(node.EncryptedAesKey), aesPair.Decrypt(node.EncryptedAesIv));
         }
-        else
-        {
-          throw new NotImplementedException();
-        }
+
+        return (
+          Service.FileAccesses.GetByToken(transaction, token)
+            ?? throw new ArgumentException("No access granted for token.", nameof(token))
+        ).DecryptAesPair(token);
       }
     }
   }
@@ -141,6 +138,6 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
   public long? ParentFileId => Data.ParentFileId;
   public string Name => Data.Name;
 
-  public byte[] EncryptedAesKey => Data.EncryptedAesKey;
-  public byte[] EncryptedAesIv => Data.EncryptedAesIv;
+  private byte[] EncryptedAesKey => Data.EncryptedAesKey;
+  private byte[] EncryptedAesIv => Data.EncryptedAesIv;
 }

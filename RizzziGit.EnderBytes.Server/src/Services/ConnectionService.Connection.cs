@@ -16,13 +16,7 @@ public sealed partial class ConnectionService
     public bool IsValid => Service.IsConnectionValid(Id, this);
     public void ThrowIfInvalid() => Service.ThrowIfConnectionInvalid(Id, this);
 
-    protected void AuthenticateWithPayloadHash(UserAuthenticationResource userAuthentication, byte[] payloadHash)
-    {
-      userAuthentication.ThrowIfPayloadHashInvalid(payloadHash);
-
-      SessionBackingField = Service.Server.SessionService.NewSession(this, userAuthentication, payloadHash);
-    }
-
-    public void AuthenticateWithPayload(UserAuthenticationResource userAuthentication, byte[] payload) => AuthenticateWithPayloadHash(userAuthentication, userAuthentication.GetPayloadHash(payload));
+    public void Authenticate(UserAuthenticationResource.Token token) => SessionBackingField = Service.Server.SessionService.NewSession(this, token);
+    public void Authenticate(UserAuthenticationResource userAuthentication, byte[] payload) => Authenticate(userAuthentication.GetTokenByPayload(payload));
   }
 }

@@ -10,7 +10,7 @@ public sealed partial class UserResource
   public enum UsernameValidationFlag : byte
   {
     NoErrors = 0,
-    NotAvailable = 1 << 0,
+    AlreadyTaken = 1 << 0,
     InvalidLength = 1 << 1,
     InvalidCharacters = 1 << 2
   }
@@ -40,7 +40,7 @@ public sealed partial class UserResource
 
       if (Exists(transaction, new WhereClause.CompareColumn(COLUMN_USERNAME, "=", username)))
       {
-        flag |= UsernameValidationFlag.NotAvailable;
+        flag |= UsernameValidationFlag.AlreadyTaken;
       }
 
       return flag;
@@ -49,9 +49,11 @@ public sealed partial class UserResource
     public void ThrowIfInvalidUsername(string username) => ThrowIfInvalidUsername(null, username);
     public void ThrowIfInvalidUsername(ResourceService.Transaction? transaction, string username)
     {
-      if ((transaction == null ? ValidateUsername(username) : ValidateUsername(transaction, username)) != UsernameValidationFlag.NoErrors)
+      UsernameValidationFlag validationFlags = transaction == null ? ValidateUsername(username) : ValidateUsername(transaction, username);
+
+      if (validationFlags != UsernameValidationFlag.NoErrors)
       {
-        throw new ArgumentException("Invalid username.", nameof(username));
+        throw new ArgumentException($"Invalid username: Flag {validationFlags}.", nameof(username));
       }
     }
 

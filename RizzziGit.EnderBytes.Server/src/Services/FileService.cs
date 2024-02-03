@@ -5,17 +5,38 @@ using Framework.Collections;
 using Core;
 using Resources;
 
-public sealed partial class FileService(Server server) : Server.SubService(server, "Blobs")
+public sealed partial class FileService : Server.SubService
 {
+  public FileService(Server server) : base(server, "Files")
+  {
+    server.ResourceService.FileHubs.ResourceDeleted += (transaction, resource) =>
+    {
+      lock (this)
+      {
+        if (Hubs.TryGetValue(resource, out Hub? hub))
+        {
+          Hubs.Remove(resource);
+          transaction.RegisterOnFailureHandler(() => Hubs.Add(resource, hub));
+        }
+      }
+    };
+  }
+
   private readonly WeakDictionary<FileHubResource, Hub> Hubs = [];
 
   public bool IsHubValid(FileHubResource resource, Hub hub)
   {
     lock (this)
     {
-      return resource.IsValid
-        && Hubs.TryGetValue(resource, out Hub? testHandle)
-        && testHandle == hub;
+      lock (resource)
+      {
+        lock (hub)
+        {
+          return resource.IsValid
+            && Hubs.TryGetValue(resource, out Hub? testHandle)
+            && testHandle == hub;
+        }
+      }
     }
   }
 
@@ -27,9 +48,10 @@ public sealed partial class FileService(Server server) : Server.SubService(serve
     }
   }
 
-  public Hub GetFileHubHandle(FileHubResource resource)
+  public async Task<Hub> Get(long hubId)
   {
-    resource.ThrowIfInvalid();
+    FileHubResource resource = await Server.ResourceService.Transact(ResourceService.Scope.Files, (transaction, cancellationToken) => Server.ResourceService.FileHubs.GetById(transaction, hubId))
+      ?? throw new ArgumentException("Invalid hub id.", nameof(hubId));
 
     lock (this)
     {

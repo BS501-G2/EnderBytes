@@ -12,13 +12,19 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
   private const string NAME = "FileAccess";
   private const int VERSION = 1;
 
-  public new sealed class ResourceManager(ResourceService service) : Resource<ResourceManager, ResourceData, FileAccessResource>.ResourceManager(service, ResourceService.Scope.Main, NAME, VERSION)
+  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, FileAccessResource>.ResourceManager
   {
     private const string COLUMN_TARGET_USER_ID = "TargetUserId";
     private const string COLUMN_TARGET_NODE_ID = "TargetNodeId";
     private const string COLUMN_AES_KEY = "AesKey";
     private const string COLUMN_AES_IV = "AesIv";
     private const string COLUMN_TYPE = "Type";
+
+    public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Files, NAME, VERSION)
+    {
+      service.Files.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_NODE_ID, "=", resource.Id));
+      service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_USER_ID, "=", resource.Id));
+    }
 
     protected override FileAccessResource NewResource(ResourceData data) => new(this, data);
     protected override ResourceData CastToData(SQLiteDataReader reader, long id, long createTime, long updateTime) => new(
@@ -111,7 +117,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
 
     if (token == null)
     {
-      throw new ArgumentException("Requires user authentication token.");
+      throw new ArgumentException("Requires user authentication token to decrypt pair.");
     }
 
     if (token.UserId != TargetUserId)

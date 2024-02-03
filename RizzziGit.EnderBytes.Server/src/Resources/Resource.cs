@@ -31,7 +31,17 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
     public event ResourceUpdateHandler? ResourceUpdated;
     public event ResourceDeleteHandler? ResourceDeleted;
 
-    public bool IsResourceValid(R resource) => Resources.TryGetValue(resource.Id, out R? testResource) && testResource == resource;
+    public bool IsResourceValid(R resource)
+    {
+      lock (this)
+      {
+        lock (resource)
+        {
+          return Resources.TryGetValue(resource.Id, out R? testResource) && testResource == resource;
+        }
+      }
+    }
+
     public void ThrowIfResourceInvalid(R resource)
     {
       if (!IsResourceValid(resource))

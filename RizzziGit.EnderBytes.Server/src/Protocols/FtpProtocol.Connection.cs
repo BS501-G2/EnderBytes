@@ -34,7 +34,7 @@ public sealed partial class FtpProtocol
       using Socket socket = Socket;
 
       BasicConnection.ConnectionConfiguration connectionConfiguration = new(RemoteEndPoint, LocalEndPoint);
-      BasicConnection connection = UnderlyingConnection = Service.Server.ConnectionService.NewConnection<BasicConnection, BasicConnection.ConnectionConfiguration, BasicConnection.Request, BasicConnection.Response>(connectionConfiguration, cancellationToken);
+      BasicConnection connection = UnderlyingConnection = Service.Server.ConnectionService.NewConnection(connectionConfiguration, cancellationToken);
 
       Task monitorTask;
       Task loopTask;

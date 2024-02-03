@@ -6,28 +6,23 @@ public sealed partial class SessionService
 {
   public sealed class Session
   {
-    public Session(SessionService service, long id, UserAuthenticationResource userAuthentication, byte[] payloadHash, ConnectionService.Connection connection)
+    public Session(SessionService service, long id, UserAuthenticationResource.Token token, ConnectionService.Connection connection)
     {
       Service = service;
       Id = id;
-      UserAuthentication = userAuthentication;
-      PayloadHash = payloadHash;
+      Token = token;
       Connection = connection;
-
-      userAuthentication.ThrowIfPayloadHashInvalid(PayloadHash);
     }
 
     public readonly SessionService Service;
 
     public readonly long Id;
-    public readonly UserAuthenticationResource UserAuthentication;
-
-    private readonly byte[] PayloadHash;
+    public readonly UserAuthenticationResource.Token Token;
 
     public readonly ConnectionService.Connection Connection;
 
-    public byte[] Encrypt(byte[] bytes) => UserAuthentication.Encrypt(bytes);
-    public byte[] Decrypt(byte[] bytes) => UserAuthentication.Decrypt(bytes, PayloadHash);
+    public byte[] Encrypt(byte[] bytes) => Token.Encrypt(bytes);
+    public byte[] Decrypt(byte[] bytes) => Token.Decrypt(bytes);
 
     public bool IsValid => Service.IsSessionValid(Connection, this);
     public void ThrowIfValid() => Service.ThrowIfSessionInvalid(Connection, this);

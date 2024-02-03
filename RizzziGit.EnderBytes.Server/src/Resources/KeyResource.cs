@@ -15,7 +15,7 @@ public sealed partial class KeyResource(KeyResource.ResourceManager manager, Key
   {
     public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Main, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction,  resource) =>
+      service.Users.ResourceDeleted += (transaction, resource) =>
       {
 
       };
@@ -74,20 +74,18 @@ public sealed partial class KeyResource(KeyResource.ResourceManager manager, Key
       return sharedId;
     }
 
-    public KeyResource CopyFrom(ResourceService.Transaction transaction, long sharedId, (UserAuthenticationResource UserAuthentication, byte[] PayloadHash)? from, UserAuthenticationResource? newUserAuthentication)
+    public KeyResource CopyFrom(ResourceService.Transaction transaction, long sharedId, UserAuthenticationResource.Token? from, UserAuthenticationResource? newUserAuthentication)
     {
       newUserAuthentication?.ThrowIfInvalid();
 
       KeyResource key = SelectOne(transaction,
         new WhereClause.Nested("and",
           new WhereClause.CompareColumn(COLUMN_SHARED_ID, "=", sharedId),
-          new WhereClause.CompareColumn(COLUMN_TARGET_USER_ID, "=", from?.UserAuthentication.UserId)
+          new WhereClause.CompareColumn(COLUMN_TARGET_USER_ID, "=", from?.UserId)
         )
       ) ?? throw new ArgumentException("Shared id or target user is invalid.");
 
-      byte[] privateKey = from != null
-        ? from.Value.UserAuthentication.Decrypt(key.PrivateKey, from.Value.PayloadHash)
-        : key.PrivateKey;
+      byte[] privateKey = from?.Decrypt(key.PrivateKey) ?? key.PrivateKey;
 
       return Insert(transaction, new(
         (COLUMN_SHARED_ID, NewSharedId(transaction)),
@@ -165,19 +163,19 @@ public sealed partial class KeyResource(KeyResource.ResourceManager manager, Key
     return Decrypt(bytes, PrivateKey);
   }
 
-  public byte[] Decrypt(byte[] bytes, UserAuthenticationResource userAuthentication, byte[] payloadHash)
+  public byte[] Decrypt(byte[] bytes, UserAuthenticationResource.Token token)
   {
     if (TargetUserId == null)
     {
       return Decrypt(bytes, PrivateKey);
     }
 
-    if (userAuthentication.UserId != TargetUserId)
+    if (token.UserId != TargetUserId)
     {
-      throw new ArgumentException("Invalid user authentication.", nameof(userAuthentication));
+      throw new ArgumentException("Token does not belong to the target user.", nameof(token));
     }
 
-    return Decrypt(bytes, userAuthentication.Decrypt(PrivateKey, payloadHash));
+    return Decrypt(bytes, token.Decrypt(PrivateKey));
   }
 
   public byte[] Encrypt(byte[] bytes)

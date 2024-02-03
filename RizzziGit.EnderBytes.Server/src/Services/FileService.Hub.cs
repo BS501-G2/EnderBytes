@@ -2,6 +2,7 @@ namespace RizzziGit.EnderBytes.Services;
 
 using Framework.Collections;
 
+using Core;
 using Resources;
 
 public sealed partial class FileService
@@ -12,8 +13,6 @@ public sealed partial class FileService
     {
       resource.ThrowIfInvalid();
 
-      Contexts = [];
-
       Service = service;
       Resource = resource;
     }
@@ -21,41 +20,61 @@ public sealed partial class FileService
     public readonly FileService Service;
     public readonly FileHubResource Resource;
 
-    private readonly WeakDictionary<ConnectionService.Connection, Context> Contexts;
+    private readonly WeakDictionary<FileNodeResource, INode> Nodes = [];
+
+    public Server Server => Service.Server;
 
     public bool IsValid => Service.IsHubValid(Resource, this);
     public void ThrowIfInvalid() => Service.ThrowIfHubInvalid(Resource, this);
 
-    public Context GetContext(ConnectionService.Connection connection)
+    public bool IsNodeValid(FileNodeResource resource, Node node)
     {
       lock (this)
       {
-        if (!Contexts.TryGetValue(connection, out Context? context) || connection != context.Connection || connection.Session != context.Session)
+        lock (resource)
         {
-          Contexts.AddOrUpdate(connection, context = new(this, connection, connection.Session));
+          lock (node)
+          {
+            return resource.IsValid
+              && Nodes.TryGetValue(resource, out INode? testNode)
+              && testNode != node;
+          }
         }
-
-        return context;
       }
     }
 
-    public bool IsContextValid(ConnectionService.Connection connection, Context context)
+    public void ThrowIfNodeInvalid(FileNodeResource resource, Node node)
     {
-      lock (this)
+      if (!IsNodeValid(resource, node))
       {
-        return IsValid &&
-          connection.Session?.IsValid != false &&
-          Contexts.TryGetValue(connection, out Context? testBinding) &&
-          testBinding == context &&
-          connection.Session == testBinding.Session;
+        throw new ArgumentException("Invalid node.", nameof(node));
       }
     }
 
-    public void ThrowIfContextInvalid(ConnectionService.Connection connection, Context context)
+    public Node GetNode(FileNodeResource resource)
     {
-      if (!IsContextValid(connection, context))
+      lock (resource)
       {
-        throw new ArgumentException("Invalid context.", nameof(context));
+        resource.ThrowIfInvalid();
+
+        lock (this)
+        {
+          if (!Nodes.TryGetValue(resource, out INode? node))
+          {
+            node = resource.Type switch
+            {
+              FileNodeResource.FileNodeType.File => new Node.File(this, resource),
+              FileNodeResource.FileNodeType.Folder => new Node.Folder(this, resource),
+              FileNodeResource.FileNodeType.SymbolicLink => new Node.SymbolicLink(this, resource),
+
+              _ => throw new ArgumentException("Invalid file node type.", nameof(resource))
+            };
+
+            Nodes.Add(resource, node);
+          }
+
+          return (Node)node;
+        }
       }
     }
   }

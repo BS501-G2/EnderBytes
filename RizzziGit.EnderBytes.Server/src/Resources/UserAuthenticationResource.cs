@@ -92,7 +92,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
     public Token CreatePassword(ResourceService.Transaction transaction, UserResource user, Token existing, string password) => Create(transaction, user, existing, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
     public Token CreatePassword(ResourceService.Transaction transaction, UserResource user, string password) => Create(transaction, user, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
 
-    public Token Create(ResourceService.Transaction transaction, UserResource user, Token existing, UserAuthenticationType type, byte[] payload)
+    private Token Create(ResourceService.Transaction transaction, UserResource user, Token existing, UserAuthenticationType type, byte[] payload)
     {
       user.ThrowIfInvalid();
       existing.UserAuthentication.ThrowIfInvalid();
@@ -132,7 +132,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       )), payloadHash);
     }
 
-    public Token Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationType type, byte[] payload)
+    private Token Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationType type, byte[] payload)
     {
       user.ThrowIfInvalid();
 

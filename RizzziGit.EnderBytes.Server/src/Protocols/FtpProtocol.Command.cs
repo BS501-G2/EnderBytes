@@ -75,7 +75,7 @@ public sealed partial class FtpProtocol
       ResourceService resourceService = Service.Server.ResourceService;
 
       UserConfigurationResource? userConfiguration = null;
-      UserAuthenticationResource.Token? userAuthentication = null;
+      UserAuthenticationResource.Token? token = null;
       await resourceService.Transact(ResourceService.Scope.Main, (transaction, cancellationToken) =>
       {
         UserResource? user = resourceService.Users.GetByUsername(transaction, Username);
@@ -85,10 +85,10 @@ public sealed partial class FtpProtocol
         }
 
         userConfiguration = resourceService.UserConfiguration.Get(transaction, user);
-        userAuthentication = resourceService.UserAuthentications.GetByPayload(transaction, user, Encoding.ASCII.GetBytes(command.Password));
+        token = resourceService.UserAuthentications.GetByPayload(transaction, user, Encoding.ASCII.GetBytes(command.Password), UserAuthenticationResource.UserAuthenticationType.Password);
       }, cancellationToken);
 
-      if (userConfiguration == null || userAuthentication == null)
+      if (userConfiguration == null || token == null)
       {
         return error();
       }
@@ -98,7 +98,7 @@ public sealed partial class FtpProtocol
         return new(534, "FTP access not enabled.");
       }
 
-      Service.Server.SessionService.NewSession(UnderlyingConnection!, userAuthentication.UserAuthentication, userAuthentication.PayloadHash);
+      Service.Server.SessionService.NewSession(UnderlyingConnection!, token);
       return new(230, "Logged in.");
 
       static Reply error() => new(431, "Invalid username or password.");

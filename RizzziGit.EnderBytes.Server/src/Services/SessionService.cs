@@ -12,16 +12,16 @@ public sealed partial class SessionService(Server server) : Server.SubService(se
 
   public bool IsSessionValid(ConnectionService.Connection connection, Session session)
   {
-    lock (connection)
+    lock (this)
     {
-      lock (session)
+      lock (connection)
       {
-        lock (this)
+        lock (session)
         {
           return connection.IsValid &&
             Sessions.TryGetValue(connection, out Session? testSession) &&
             testSession == session &&
-            session.UserAuthentication.IsValid &&
+            session.Token.IsValid &&
             session.Connection.IsValid;
         }
       }
@@ -68,15 +68,18 @@ public sealed partial class SessionService(Server server) : Server.SubService(se
     }
   }
 
-  public Session NewSession(ConnectionService.Connection connection, UserAuthenticationResource userAuthentication, byte[] payloadHash)
+  public Session NewSession(ConnectionService.Connection connection, UserAuthenticationResource.Token token)
   {
+    token.ThrowIfInvalid();
     lock (connection)
     {
       lock (this)
       {
+        token.ThrowIfInvalid();
+
         if (!Sessions.TryGetValue(connection, out Session? session) || !session.IsValid)
         {
-          Sessions.AddOrUpdate(connection, session = new(this, NextId++, userAuthentication, payloadHash, connection));
+          Sessions.AddOrUpdate(connection, session = new(this, NextId++, token, connection));
           return session;
         }
 

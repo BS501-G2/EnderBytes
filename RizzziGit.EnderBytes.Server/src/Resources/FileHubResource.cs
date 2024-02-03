@@ -26,9 +26,9 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
     private const string COLUMN_ENCRYPTED_AES_IV = "EncryptedAesIv";
     private const string COLUMN_DELETION_SCHEDULE = "DeletionSchedule";
 
-    public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Main, NAME, VERSION)
+    public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Files, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", resource.Id));
+      service.Users.ResourceDeleted += (transaction, resource) => Transact((transaction, _) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", resource.Id))).WaitSync();
     }
 
     protected override FileHubResource NewResource(ResourceData data) => new(this, data);
@@ -58,11 +58,11 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
       }
     }
 
-    public FileHubResource GetPersonal(ResourceService.Transaction transaction, UserResource user, UserAuthenticationResource userAuthentication)
+    public FileHubResource GetPersonal(ResourceService.Transaction transaction, UserAuthenticationResource.Token token)
     {
       return SelectOne(transaction, new WhereClause.Nested("and",
         new WhereClause.Raw($"({COLUMN_FLAGS} & {{0}}) != 0", (byte)FileHubFlags.Personal),
-        new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", user.Id)
+        new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", token.UserId)
       )) ?? insertNew();
 
       FileHubResource insertNew()
@@ -71,11 +71,11 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
         byte[] encryptedAesIv = RandomNumberGenerator.GetBytes(16);
 
         return Insert(transaction, new(
-          (COLUMN_OWNER_USER_ID, user.Id),
+          (COLUMN_OWNER_USER_ID, token.UserId),
           (COLUMN_FLAGS, (byte)FileHubFlags.Personal),
-          (COLUMN_NAME, $"Bucket of User #{user.Id}"),
-          (COLUMN_ENCRYPTED_AES_KEY, userAuthentication.Encrypt(encryptedAesKey)),
-          (COLUMN_ENCRYPTED_AES_IV, userAuthentication.Encrypt(encryptedAesIv)),
+          (COLUMN_NAME, $"Bucket of User #{token.UserId}"),
+          (COLUMN_ENCRYPTED_AES_KEY, token.Encrypt(encryptedAesKey)),
+          (COLUMN_ENCRYPTED_AES_IV, token.Encrypt(encryptedAesIv)),
           (COLUMN_DELETION_SCHEDULE, null)
         ));
       }

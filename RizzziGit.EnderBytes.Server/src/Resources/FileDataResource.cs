@@ -8,7 +8,7 @@ public sealed class FileDataResource(FileDataResource.ResourceManager manager, F
   private const string NAME = "FileData";
   private const int VERSION = 1;
 
-  public new sealed class ResourceManager(ResourceService service) : Resource<ResourceManager, ResourceData, FileDataResource>.ResourceManager(service, ResourceService.Scope.Main, NAME, VERSION)
+  public new sealed class ResourceManager(ResourceService service) : Resource<ResourceManager, ResourceData, FileDataResource>.ResourceManager(service, ResourceService.Scope.Files, NAME, VERSION)
   {
     private const string COLUMN_FILE_ID = "FileId";
     private const string COLUMN_FILE_SNAPSHOT_ID = "FileSnapshotId";

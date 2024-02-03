@@ -8,7 +8,7 @@ using Resources;
 
 public sealed partial class ResourceService : Server.SubService
 {
-  public enum Scope { Main, DataStorage }
+  public enum Scope { Main, Files }
 
   public ResourceService(Server server) : base(server, "Resources")
   {

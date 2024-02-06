@@ -3,6 +3,7 @@ using System.Text;
 namespace RizzziGit.EnderBytes.Protocols;
 
 using Resources;
+using RizzziGit.EnderBytes.Connections;
 using Services;
 
 public sealed partial class FtpProtocol
@@ -44,16 +45,16 @@ public sealed partial class FtpProtocol
 
   public new sealed partial class Connection
   {
-    private async Task<Reply> HandleCommand(Command? command, CancellationToken cancellationToken) => command switch
+    private async Task<Reply> HandleCommand(Command? command, BasicConnection connection, CancellationToken cancellationToken) => command switch
     {
-      Command.USER userCommand => await HandleCommand(userCommand, cancellationToken),
-      Command.PASS passCommand => await HandleCommand(passCommand, cancellationToken),
+      Command.USER userCommand => await HandleCommand(userCommand, connection, cancellationToken),
+      Command.PASS passCommand => await HandleCommand(passCommand, connection, cancellationToken),
       _ => new(502, "Command not implemented."),
     };
 
     private string? Username;
 
-    private Task<Reply> HandleCommand(Command.USER command, CancellationToken cancellationToken)
+    private Task<Reply> HandleCommand(Command.USER command, BasicConnection connection, CancellationToken cancellationToken)
     {
       Username = command.Username;
 
@@ -65,18 +66,17 @@ public sealed partial class FtpProtocol
       return Task.FromResult<Reply>(new(330, "Type password."));
     }
 
-    private async Task<Reply> HandleCommand(Command.PASS command, CancellationToken cancellationToken)
+    private async Task<Reply> HandleCommand(Command.PASS command, BasicConnection connection, CancellationToken cancellationToken)
     {
       if (Username == null)
       {
         return error();
       }
 
-      ResourceService resourceService = Service.Server.ResourceService;
-
       UserConfigurationResource? userConfiguration = null;
       UserAuthenticationResource.Token? token = null;
-      await resourceService.Transact(ResourceService.Scope.Main, (transaction, cancellationToken) =>
+
+      await Service.Server.ResourceService.Transact(ResourceService.Scope.Main, (transaction, resourceService, cancellationToken) =>
       {
         UserResource? user = resourceService.Users.GetByUsername(transaction, Username);
         if (user == null)
@@ -98,7 +98,7 @@ public sealed partial class FtpProtocol
         return new(534, "FTP access not enabled.");
       }
 
-      Service.Server.SessionService.NewSession(UnderlyingConnection!, token);
+      Service.Server.SessionService.NewSession(connection, token);
       return new(230, "Logged in.");
 
       static Reply error() => new(431, "Invalid username or password.");

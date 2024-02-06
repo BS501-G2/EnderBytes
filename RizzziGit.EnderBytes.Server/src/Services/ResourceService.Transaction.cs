@@ -10,9 +10,9 @@ using WaitQueue = Framework.Collections.WaitQueue<(TaskCompletionSource Source, 
 
 public sealed partial class ResourceService
 {
-  public delegate void TransactionHandler(Transaction transaction, CancellationToken cancellationToken);
-  public delegate T TransactionHandler<T>(Transaction transaction, CancellationToken cancellationToken);
-  public delegate IEnumerable<T> TransactionEnumeratorHandler<T>(Transaction transaction, CancellationToken cancellationToken);
+  public delegate void TransactionHandler(Transaction transaction, ResourceService resourceService, CancellationToken cancellationToken);
+  public delegate T TransactionHandler<T>(Transaction transaction, ResourceService resourceService, CancellationToken cancellationToken);
+  public delegate IEnumerable<T> TransactionEnumeratorHandler<T>(Transaction transaction, ResourceService resourceService, CancellationToken cancellationToken);
   public delegate void TransactionFailureHandler();
 
   private long NextTransactionId;
@@ -40,11 +40,11 @@ public sealed partial class ResourceService
   {
     using WaitQueue<TaskCompletionSource<StrongBox<T>?>> waitQueue = new();
 
-    _ = Transact(scope, async (transaction, cancellationToken) =>
+    _ = Transact(scope, async (transaction, resourceService, cancellationToken) =>
     {
       try
       {
-        foreach (T item in handler(transaction, cancellationToken))
+        foreach (T item in handler(transaction, resourceService, cancellationToken))
         {
           (await waitQueue.Dequeue(cancellationToken)).SetResult(new(item));
         }
@@ -78,7 +78,7 @@ public sealed partial class ResourceService
 
     try
     {
-      await Transact(scope, (transaction, cancellationToken) => source.SetResult(handler(transaction, cancellationToken)), cancellationToken);
+      await Transact(scope, (transaction, resourceService, cancellationToken) => source.SetResult(handler(transaction, resourceService, cancellationToken)), cancellationToken);
     }
     catch (Exception exception)
     {
@@ -115,7 +115,7 @@ public sealed partial class ResourceService
         try
         {
           linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
-          handler(transaction, linkedCancellationTokenSource.Token);
+          handler(transaction, this, linkedCancellationTokenSource.Token);
           linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
           Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {scope}] Transaction commit.");

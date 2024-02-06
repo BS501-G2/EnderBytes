@@ -10,6 +10,12 @@ public sealed class BasicConnection(ConnectionService service, BasicConnection.C
     ConnectionEndPoint LocalEndPoint
   ) : Connection<BasicConnection, ConnectionConfiguration, Request, Response>.ConnectionConfiguration(RemoteEndPoint, LocalEndPoint);
 
-  public new sealed record Request() : Connection<BasicConnection, ConnectionConfiguration, Request, Response>.Request;
-  public new sealed record Response(int Code, string? Message) : Connection<BasicConnection, ConnectionConfiguration, Request, Response>.Response(Code, Message);
+  public new abstract partial record Request : Connection<BasicConnection, ConnectionConfiguration, Request, Response>.Request
+  {
+
+  }
+
+  public new abstract partial record Response(Response.ResponseStatus Status, string? Message) : Connection<BasicConnection, ConnectionConfiguration, Request, Response>.Response(Status, Message)
+  {
+  }
 }

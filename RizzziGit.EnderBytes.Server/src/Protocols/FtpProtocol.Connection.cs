@@ -25,7 +25,6 @@ public sealed partial class FtpProtocol
       await Socket.SendAsync(Encoding.ASCII.GetBytes($"{reply.Code} {reply.Message}{RETURN}"), cancellationToken);
     }
 
-    private BasicConnection? UnderlyingConnection;
     private string CommandBuffer = "";
     private long LastCommandTimestamp = 0;
 
@@ -34,7 +33,7 @@ public sealed partial class FtpProtocol
       using Socket socket = Socket;
 
       BasicConnection.ConnectionConfiguration connectionConfiguration = new(RemoteEndPoint, LocalEndPoint);
-      BasicConnection connection = UnderlyingConnection = Service.Server.ConnectionService.NewConnection(connectionConfiguration, cancellationToken);
+      BasicConnection connection = Service.Server.ConnectionService.NewConnection(connectionConfiguration, cancellationToken);
 
       Task monitorTask;
       Task loopTask;
@@ -54,7 +53,7 @@ public sealed partial class FtpProtocol
         async Task run(CancellationToken cancellationToken)
         {
           await Send(new(220, "Welcome to EnderBytes FTP Server."), cancellationToken);
-          await RunCommandLoop(cancellationToken);
+          await RunCommandLoop(connection, cancellationToken);
         }
       }
 
@@ -66,7 +65,7 @@ public sealed partial class FtpProtocol
       }
     }
 
-    private async Task RunCommandLoop(CancellationToken cancellationToken)
+    private async Task RunCommandLoop(BasicConnection connection, CancellationToken cancellationToken)
     {
       while (true)
       {
@@ -101,7 +100,7 @@ public sealed partial class FtpProtocol
         {
           Command? parsedCommand = Command.Parse(command);
           Protocol.Logger.Log(Framework.Logging.LogLevel.Debug, $"[{RemoteEndPoint} -> SERVER] {(parsedCommand is Command.PASS ? "PASS <censored>" : command)}");
-          await Send(await HandleCommand(parsedCommand, cancellationToken), cancellationToken);
+          await Send(await HandleCommand(parsedCommand, connection, cancellationToken), cancellationToken);
         }
       }
     }

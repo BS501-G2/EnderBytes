@@ -10,6 +10,13 @@ public sealed class AdvancedConnection(ConnectionService service, AdvancedConnec
     ConnectionEndPoint LocalEndPoint
   ) : Connection<AdvancedConnection, ConnectionConfiguration, Request, Response>.ConnectionConfiguration(RemoteEndPoint, LocalEndPoint);
 
-  public new sealed record Request() : Connection<AdvancedConnection, ConnectionConfiguration, Request, Response>.Request;
-  public new sealed record Response(int Code, string? Message) : Connection<AdvancedConnection, ConnectionConfiguration, Request, Response>.Response(Code, Message);
+  public new abstract partial record Request : Connection<AdvancedConnection, ConnectionConfiguration, Request, Response>.Request
+  {
+
+  }
+
+  public new abstract partial record Response(Response.ResponseStatus Status, string? Message) : Connection<AdvancedConnection, ConnectionConfiguration, Request, Response>.Response(Status, Message)
+  {
+
+  }
 }

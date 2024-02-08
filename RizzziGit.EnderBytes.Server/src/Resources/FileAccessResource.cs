@@ -20,7 +20,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
     private const string COLUMN_AES_IV = "AesIv";
     private const string COLUMN_TYPE = "Type";
 
-    public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Files, NAME, VERSION)
+    public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
       service.Files.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_NODE_ID, "=", resource.Id));
       service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_USER_ID, "=", resource.Id));

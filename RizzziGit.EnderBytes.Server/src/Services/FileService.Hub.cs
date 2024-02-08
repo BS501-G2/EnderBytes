@@ -51,30 +51,29 @@ public sealed partial class FileService
       }
     }
 
-    public Node GetNode(FileNodeResource resource)
+    public Node GetNode(FileNodeResource resource, UserAuthenticationResource.Token token)
     {
-      lock (resource)
+      ThrowIfInvalid();
+      resource.ThrowIfInvalid();
+      token.ThrowIfInvalid();
+
+      lock (this)
       {
-        resource.ThrowIfInvalid();
-
-        lock (this)
+        if (!Nodes.TryGetValue(resource, out INode? node))
         {
-          if (!Nodes.TryGetValue(resource, out INode? node))
+          node = resource.Type switch
           {
-            node = resource.Type switch
-            {
-              FileNodeResource.FileNodeType.File => new Node.File(this, resource),
-              FileNodeResource.FileNodeType.Folder => new Node.Folder(this, resource),
-              FileNodeResource.FileNodeType.SymbolicLink => new Node.SymbolicLink(this, resource),
+            FileNodeResource.FileNodeType.File => new Node.File(this, resource),
+            FileNodeResource.FileNodeType.Folder => new Node.Folder(this, resource),
+            FileNodeResource.FileNodeType.SymbolicLink => new Node.SymbolicLink(this, resource),
 
-              _ => throw new ArgumentException("Invalid file node type.", nameof(resource))
-            };
+            _ => throw new ArgumentException("Invalid file node type.", nameof(resource))
+          };
 
-            Nodes.Add(resource, node);
-          }
-
-          return (Node)node;
+          Nodes.Add(resource, node);
         }
+
+        return (Node)node;
       }
     }
   }

@@ -18,7 +18,7 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
     private const string INDEX_USERNAME = $"Index_{NAME}_{COLUMN_USERNAME}";
     private const string CONSTRAINT_USERNAME_LENGTH = $"Constraint_{COLUMN_USERNAME}";
 
-    public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Main, NAME, VERSION)
+    public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
     }
 

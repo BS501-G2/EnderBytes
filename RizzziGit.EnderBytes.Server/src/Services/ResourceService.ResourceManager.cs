@@ -9,36 +9,25 @@ using Utilities;
 
 public sealed partial class ResourceService
 {
-  public abstract class ResourceManager(ResourceService service, Scope scope, string name, int version) : Service(name, service)
+  public abstract class ResourceManager(ResourceService service, string name, int version) : Service(name, service)
   {
     protected const string COLUMN_ID = "Id";
     protected const string COLUMN_CREATE_TIME = "CreateTime";
     protected const string COLUMN_UPDATE_TIME = "UpdateTime";
 
     public readonly ResourceService Service = service;
-    public readonly Scope Scope = scope;
 
     public readonly int Version = version;
 
-    private SQLiteConnection Database => Service.GetDatabase(Scope);
+    private SQLiteConnection Database => Service.Connection!;
 
     protected abstract void Upgrade(Transaction transaction, int oldVersion = default);
 
-    protected Task<T> Transact<T>(TransactionHandler<T> handler, CancellationToken cancellationToken = default) => Service.Transact(this, handler, cancellationToken);
-    protected Task Transact(TransactionHandler handler, CancellationToken cancellationToken = default) => Service.Transact(this, handler, cancellationToken);
+    protected Task<T> Transact<T>(TransactionHandler<T> handler, CancellationToken cancellationToken = default) => Service.Transact(handler, cancellationToken);
+    protected Task Transact(TransactionHandler handler, CancellationToken cancellationToken = default) => Service.Transact(handler, cancellationToken);
 
-    protected void ThrowIfInvalidScope(Transaction transaction)
+    private SQLiteCommand CreateCommand(string sql, object?[] parameters)
     {
-      if (transaction.Scope != Scope)
-      {
-        throw new ArgumentException($"Invalid scope: {Scope} expected, {transaction.Scope} proided.", nameof(transaction));
-      }
-    }
-
-    private SQLiteCommand CreateCommand(Transaction transaction, string sql, object?[] parameters)
-    {
-      ThrowIfInvalidScope(transaction);
-
       SQLiteCommand command = Database.CreateCommand();
       command.CommandText = string.Format(sql, createParameterArray());
 
@@ -66,7 +55,7 @@ public sealed partial class ResourceService
 
     private void LogSql(Transaction transaction, string type, string sqlQuery, params object?[] parameters)
     {
-      Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] SQL {type}: {string.Format(sqlQuery, parameters)}");
+      Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] SQL {type}: {string.Format(sqlQuery, parameters)}");
     }
 
     public delegate T SqlQueryDataHandler<T>(SQLiteDataReader reader);
@@ -83,8 +72,7 @@ public sealed partial class ResourceService
 
     protected IEnumerable<T> SqlEnumeratedQuery<T>(Transaction transaction, SqlQueryDataEnumeratorHandler<T> dataHandler, string sqlQuery, params object?[] parameters)
     {
-      ThrowIfInvalidScope(transaction);
-      SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      SQLiteCommand command = CreateCommand(sqlQuery, parameters);
 
       LogSql(transaction, "Query", sqlQuery, parameters);
       SQLiteDataReader reader = command.ExecuteReader(System.Data.CommandBehavior.SingleResult);
@@ -97,8 +85,7 @@ public sealed partial class ResourceService
 
     protected int SqlNonQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
-      ThrowIfInvalidScope(transaction);
-      SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      SQLiteCommand command = CreateCommand(sqlQuery, parameters);
 
       LogSql(transaction, "Non-query", sqlQuery, parameters);
       return command.ExecuteNonQuery();
@@ -106,8 +93,7 @@ public sealed partial class ResourceService
 
     protected object? SqlScalar(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
-      ThrowIfInvalidScope(transaction);
-      SQLiteCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      SQLiteCommand command = CreateCommand(sqlQuery, parameters);
 
       LogSql(transaction, "Scalar", sqlQuery, parameters);
       return command.ExecuteScalar();
@@ -115,7 +101,7 @@ public sealed partial class ResourceService
 
     protected override async Task OnStart(CancellationToken cancellationToken)
     {
-      await Transact((transaction, cancellationToken) =>
+      await Transact((transaction, _, cancellationToken) =>
       {
         SqlNonQuery(transaction, $"create table if not exists __VERSIONS(Name varchar(128) primary key not null, Version integer not null);");
         int? version = null;

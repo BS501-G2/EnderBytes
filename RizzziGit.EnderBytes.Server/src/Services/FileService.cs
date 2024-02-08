@@ -48,13 +48,12 @@ public sealed partial class FileService : Server.SubService
     }
   }
 
-  public async Task<Hub> Get(long hubId)
+  public Hub Get(FileHubResource resource)
   {
-    FileHubResource resource = await Server.ResourceService.Transact(ResourceService.Scope.Files, (transaction, cancellationToken) => Server.ResourceService.FileHubs.GetById(transaction, hubId))
-      ?? throw new ArgumentException("Invalid hub id.", nameof(hubId));
-
     lock (this)
     {
+      resource.ThrowIfInvalid();
+
       if (!Hubs.TryGetValue(resource, out Hub? hub))
       {
         Hubs.Add(resource, hub = new(this, resource));

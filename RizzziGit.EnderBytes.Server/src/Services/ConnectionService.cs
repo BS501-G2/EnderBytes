@@ -45,15 +45,13 @@ public sealed partial class ConnectionService(Server server) : Server.SubService
     }
   }
 
-  public BasicConnection NewConnection(BasicConnection.ConnectionConfiguration configuration, CancellationToken cancellationToken = default) => NewConnection<BasicConnection, BasicConnection.ConnectionConfiguration, BasicConnection.Request, BasicConnection.Response>(configuration, cancellationToken);
-  public AdvancedConnection NewConnection(AdvancedConnection.ConnectionConfiguration configuration, CancellationToken cancellationToken = default) => NewConnection<AdvancedConnection, AdvancedConnection.ConnectionConfiguration, AdvancedConnection.Request, AdvancedConnection.Response>(configuration, cancellationToken);
-  public InternalConnection NewConnection(InternalConnection.ConnectionConfiguration configuration, CancellationToken cancellationToken = default) => NewConnection<InternalConnection, InternalConnection.ConnectionConfiguration, InternalConnection.Request, InternalConnection.Response>(configuration, cancellationToken);
+  public BasicConnection NewConnection(BasicConnection.ConnectionConfiguration configuration, CancellationToken cancellationToken = default) => NewConnection<BasicConnection, BasicConnection.ConnectionConfiguration>(configuration, cancellationToken);
+  public AdvancedConnection NewConnection(AdvancedConnection.ConnectionConfiguration configuration, CancellationToken cancellationToken = default) => NewConnection<AdvancedConnection, AdvancedConnection.ConnectionConfiguration>(configuration, cancellationToken);
+  public InternalConnection NewConnection(InternalConnection.ConnectionConfiguration configuration, CancellationToken cancellationToken = default) => NewConnection<InternalConnection, InternalConnection.ConnectionConfiguration>(configuration, cancellationToken);
 
-  private C NewConnection<C, CC, Rq, Rs>(CC configuration, CancellationToken cancellationToken = default)
-    where C : Connection<C, CC, Rq, Rs>
-    where CC : Connection<C, CC, Rq, Rs>.ConnectionConfiguration
-    where Rq : Connection<C, CC, Rq, Rs>.Request
-    where Rs : Connection<C, CC, Rq, Rs>.Response
+  private C NewConnection<C, CC>(CC configuration, CancellationToken cancellationToken = default)
+    where C : Connection<C, CC>
+    where CC : Connection<C, CC>.ConnectionConfiguration
   {
     cancellationToken.ThrowIfCancellationRequested();
     lock (this)

@@ -26,9 +26,9 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
     private const string COLUMN_ENCRYPTED_AES_IV = "EncryptedAesIv";
     private const string COLUMN_DELETION_SCHEDULE = "DeletionSchedule";
 
-    public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Files, NAME, VERSION)
+    public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction, resource) => Transact((transaction, _) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", resource.Id))).WaitSync();
+      service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", resource.Id));
     }
 
     protected override FileHubResource NewResource(ResourceData data) => new(this, data);

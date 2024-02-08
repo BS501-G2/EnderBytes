@@ -1,5 +1,4 @@
 using System.Data.SQLite;
-using System.Text;
 using System.Security.Cryptography;
 
 namespace RizzziGit.EnderBytes.Resources;
@@ -9,7 +8,6 @@ using Framework.Memory;
 using Framework.Logging;
 
 using Services;
-using Utilities;
 
 public abstract partial class Resource<M, D, R>(M manager, D data)
   where M : Resource<M, D, R>.ResourceManager
@@ -19,7 +17,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
   public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction);
   public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, D oldData);
 
-  public abstract partial class ResourceManager(ResourceService service, ResourceService.Scope scope, string name, int version) : ResourceService.ResourceManager(service, scope, name, version)
+  public abstract partial class ResourceManager(ResourceService service, string name, int version) : ResourceService.ResourceManager(service, name, version)
   {
     public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, R resource);
     public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, D oldData);
@@ -73,8 +71,6 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
     protected R Insert(ResourceService.Transaction transaction, ValueClause values)
     {
-      ThrowIfInvalidScope(transaction);
-
       long insertTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
       values.Add(COLUMN_CREATE_TIME, insertTimestamp);
@@ -88,7 +84,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
           reader.Read();
           R resource = GetResource(CastToData(reader));
 
-          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] New {Name} resource: #{resource.Id}");
+          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] New {Name} resource: #{resource.Id}");
 
           transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
           ResourceInserted?.Invoke(transaction, resource);
@@ -104,8 +100,6 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
     protected R? SelectOne(ResourceService.Transaction transaction, WhereClause? where = null, int? offset = null, OrderByClause? order = null) => Select(transaction, where, new(1, offset), order).FirstOrDefault();
     protected IEnumerable<R> Select(ResourceService.Transaction transaction, WhereClause? where = null, LimitClause? limit = null, OrderByClause? order = null)
     {
-      ThrowIfInvalidScope(transaction);
-
       List<object?> parameterList = [];
       foreach (D data in SqlEnumeratedQuery<D>(
         transaction,
@@ -114,7 +108,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         [.. parameterList]
       ))
       {
-        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] Enumerated {Name} resource: #{data.Id}");
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Enumerated {Name} resource: #{data.Id}");
         yield return GetResource(data);
       }
 
@@ -132,7 +126,6 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
     protected bool Exists(ResourceService.Transaction transaction, WhereClause? where = null) => Count(transaction, where) > 0;
     protected long Count(ResourceService.Transaction transaction, WhereClause? where = null)
     {
-      ThrowIfInvalidScope(transaction);
       List<object?> parameterList = [];
 
       return (long)SqlScalar(
@@ -144,8 +137,6 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
     protected long Delete(ResourceService.Transaction transaction, WhereClause where)
     {
-      ThrowIfInvalidScope(transaction);
-
       List<object?> parameterList = [];
 
       string whereClause = where.Apply(parameterList);
@@ -162,7 +153,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         [.. parameterList]
       ))
       {
-        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] Deleted {Name} resource: #{data.Id}");
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{data.Id}");
         if (Resources.TryGetValue(data.Id, out R? resource))
         {
           transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
@@ -192,8 +183,6 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
     protected long Update(ResourceService.Transaction transaction, WhereClause where, SetClause set)
     {
-      ThrowIfInvalidScope(transaction);
-
       List<object?> parameterList = [];
       set.Add(COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
@@ -213,7 +202,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         [.. parameterList]
       ))
       {
-        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id} on {Scope}] Updated {Name} resource: #{newData.Id}");
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Updated {Name} resource: #{newData.Id}");
         if (Resources.TryGetValue(newData.Id, out R? resource))
         {
           D oldData = resource.Data;

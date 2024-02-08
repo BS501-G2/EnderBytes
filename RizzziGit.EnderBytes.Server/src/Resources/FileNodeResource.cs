@@ -24,7 +24,7 @@ public sealed class FileNodeResource(FileNodeResource.ResourceManager manager, F
 
     private const string UNIQUE_NAME = $"Unique_{NAME}_{COLUMN_NAME}";
 
-    public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Files, NAME, VERSION)
+    public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
       service.FileHubs.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_HUB_ID, "=", resource.Id));
     }

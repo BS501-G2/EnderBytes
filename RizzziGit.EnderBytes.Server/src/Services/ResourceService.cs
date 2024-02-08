@@ -1,5 +1,4 @@
 using System.Data.SQLite;
-using System.Collections.ObjectModel;
 
 namespace RizzziGit.EnderBytes.Services;
 
@@ -8,12 +7,8 @@ using Resources;
 
 public sealed partial class ResourceService : Server.SubService
 {
-  public enum Scope { Main, Files }
-
   public ResourceService(Server server) : base(server, "Resources")
   {
-    Connections = [];
-
     Users = new(this);
     UserAuthentications = new(this);
     UserConfiguration = new(this);
@@ -21,16 +16,9 @@ public sealed partial class ResourceService : Server.SubService
     FileHubs = new(this);
     Files = new(this);
     FileAccesses = new(this);
-
-    if (!File.Exists(WorkingPath))
-    {
-      Directory.CreateDirectory(WorkingPath);
-    }
   }
 
-  private readonly Dictionary<Scope, SQLiteConnection> Connections;
-
-  public string WorkingPath => Path.Join(Server.WorkingPath, "Database");
+  private SQLiteConnection? Connection;
 
   public readonly UserResource.ResourceManager Users;
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
@@ -40,32 +28,21 @@ public sealed partial class ResourceService : Server.SubService
   public readonly FileNodeResource.ResourceManager Files;
   public readonly FileAccessResource.ResourceManager FileAccesses;
 
-  private SQLiteConnection GetDatabase(Scope scope)
-  {
-    lock (this)
-    {
-      if (!Connections.TryGetValue(scope, out SQLiteConnection? connection))
-      {
-        Connections.Add(scope, connection = new(new SQLiteConnectionStringBuilder()
-        {
-          DataSource = Path.Join(WorkingPath, $"{scope}.sqlite3"),
-          JournalMode = SQLiteJournalModeEnum.Memory
-        }.ConnectionString));
-
-        connection.Open();
-      }
-
-      return connection;
-    }
-  }
-
-  private ReadOnlyCollection<Task> TransactionQueueTasks = new([]);
+  private Task? TransactionQueueTask;
   private CancellationTokenSource? TransactionQueueTaskCancellationTokenSource = new();
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
+    Connection = new(new SQLiteConnectionStringBuilder()
+    {
+      DataSource = Path.Join(Server.WorkingPath, $"Database.sqlite3"),
+      JournalMode = SQLiteJournalModeEnum.Memory
+    }.ConnectionString);
+
+    await Connection.OpenAsync(cancellationToken);
+
     TransactionQueueTaskCancellationTokenSource = new();
-    TransactionQueueTasks = new([.. Enum.GetValues<Scope>().Select((scope) => RunTransactionQueue(scope, TransactionQueueTaskCancellationTokenSource.Token))]);
+    TransactionQueueTask = RunTransactionQueue(Connection, TransactionQueueTaskCancellationTokenSource.Token);
 
     await Users.Start(cancellationToken);
     await UserAuthentications.Start(cancellationToken);
@@ -81,8 +58,7 @@ public sealed partial class ResourceService : Server.SubService
     try
     {
       await await Task.WhenAny([
-        .. TransactionQueueTasks,
-
+        TransactionQueueTask!,
         WatchDog([
           Users,
           UserAuthentications,
@@ -96,7 +72,7 @@ public sealed partial class ResourceService : Server.SubService
     }
     finally
     {
-      TransactionQueueTasks = new([]);
+      TransactionQueueTask = null;
     }
   }
 
@@ -111,15 +87,7 @@ public sealed partial class ResourceService : Server.SubService
     await FileAccesses.Stop();
 
     TransactionQueueTaskCancellationTokenSource?.Cancel();
-
-    foreach (Scope scope in Enum.GetValues<Scope>())
-    {
-      if (!Connections.TryGetValue(scope, out SQLiteConnection? connection))
-      {
-        continue;
-      }
-
-      connection.Dispose();
-    }
+    Connection?.Dispose();
+    Connection = null;
   }
 }

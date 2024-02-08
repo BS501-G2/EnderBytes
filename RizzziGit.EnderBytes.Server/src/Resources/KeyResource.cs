@@ -13,7 +13,7 @@ public sealed partial class KeyResource(KeyResource.ResourceManager manager, Key
 
   public new sealed partial class ResourceManager : Resource<ResourceManager, ResourceData, KeyResource>.ResourceManager
   {
-    public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Main, NAME, VERSION)
+    public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
       service.Users.ResourceDeleted += (transaction, resource) =>
       {

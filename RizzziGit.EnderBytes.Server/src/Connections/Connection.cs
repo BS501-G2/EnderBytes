@@ -4,32 +4,13 @@ using Services;
 using Resources;
 using Extras;
 
-public abstract partial class Connection<C, CC, Rq, Rs>(ConnectionService service, CC configuration, long id) : ConnectionService.Connection(service, configuration, id), IDisposable
-  where C : Connection<C, CC, Rq, Rs>
-  where CC : Connection<C, CC, Rq, Rs>.ConnectionConfiguration
-  where Rq : Connection<C, CC, Rq, Rs>.Request
-  where Rs : Connection<C, CC, Rq, Rs>.Response
+using Request = Services.ConnectionService.Request;
+using Response = Services.ConnectionService.Response;
+
+public abstract partial class Connection<C, CC>(ConnectionService service, CC configuration, long id) : ConnectionService.Connection(service, configuration, id), IDisposable
+  where C : Connection<C, CC>
+  where CC : Connection<C, CC>.ConnectionConfiguration
 {
-  public abstract record Request
-  {
-    public sealed record Login(string Username, UserAuthenticationResource.UserAuthenticationType AuthenticationType, byte[] AuthenticationPayload);
-    public sealed record LoginWithToken(UserAuthenticationResource.Token Token);
-    public sealed record Logout();
-  }
-
-  public abstract record Response(Response.ResponseStatus Status, string? Message)
-  {
-    public enum ResponseStatus { OK, Error }
-
-    public sealed record OK() : Response(ResponseStatus.OK, null);
-
-    public sealed record InvalidRequest() : Response(ResponseStatus.Error, "Invalid request.");
-    public sealed record InvalidCredentials() : Response(ResponseStatus.Error, "Invalid credentials.");
-
-    public sealed record CurrentSessionExists() : Response(ResponseStatus.Error, "Current session exists.");
-    public sealed record NoCurrentSession() : Response(ResponseStatus.Error, "No current session.");
-  }
-
   public abstract partial record ConnectionConfiguration(
     ConnectionEndPoint RemoteEndPoint,
     ConnectionEndPoint LocalEndPoint
@@ -54,7 +35,7 @@ public abstract partial class Connection<C, CC, Rq, Rs>(ConnectionService servic
 
   private async Task<Response> HandleRequest(Request.Login loginRequest, CancellationToken cancellationToken)
   {
-    UserResource? user = await Service.Server.ResourceService.Transact(ResourceService.Scope.Main, (transaction, resources, cancellationToken) => resources.Users.GetByUsername(transaction, loginRequest.Username), cancellationToken);
+    UserResource? user = await Service.Server.ResourceService.Transact((transaction, resources, cancellationToken) => resources.Users.GetByUsername(transaction, loginRequest.Username), cancellationToken);
 
     if (user == null)
     {

@@ -16,7 +16,7 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
 
     private const string INDEX_USER_ID = $"Index_{NAME}_{COLUMN_USER_ID}";
 
-    public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Main, NAME, VERSION)
+    public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
       service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id));
     }

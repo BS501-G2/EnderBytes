@@ -10,7 +10,7 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, FileSnapshotResource>.ResourceManager
   {
-    public ResourceManager(ResourceService service) : base(service, ResourceService.Scope.Files, NAME, VERSION)
+    public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
     }
 

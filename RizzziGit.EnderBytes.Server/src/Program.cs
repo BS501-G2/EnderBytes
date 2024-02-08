@@ -64,41 +64,32 @@ public static class Program
 
   public static async Task StopTest(Server server) => await Task.Run(async () =>
   {
-    UserResource.ResourceManager users = server.ResourceService.Users;
-
-    await server.ResourceService.Transact(ResourceService.Scope.Main, (transaction, _) =>
-    {
-      users.Delete(transaction, User!);
-    });
-
+    await server.ResourceService.Transact((transaction, service, _) => service.Users.Delete(transaction, User!));
     await server.Stop();
   });
 
   public static async Task RunTest(Logger logger, Server server) => await Task.Run(async () =>
   {
-    UserResource.ResourceManager users = server.ResourceService.Users;
-    UserAuthenticationResource.ResourceManager userAuthentications = server.ResourceService.UserAuthentications;
-    FileHubResource.ResourceManager hubs = server.ResourceService.FileHubs;
-
-    (UserAuthenticationResource.Token token, FileHubResource hubResource) = await server.ResourceService.Transact(ResourceService.Scope.Main, (transaction, _) =>
+    UserAuthenticationResource.Token token = await server.ResourceService.Transact((transaction, service, _) =>
     {
-      UserResource user = User = users.Create(transaction, "testuser", "Test User");
-      UserAuthenticationResource.Token token = userAuthentications.CreatePassword(transaction, user, "TestPass19@");
-      FileHubResource hub = hubs.GetPersonal(transaction, token);
+      UserResource user = User = service.Users.Create(transaction, "testuser", "Test User");
+      UserAuthenticationResource.Token token = service.UserAuthentications.CreatePassword(transaction, user, "TestPass19@");
 
-      return (token, hub);
+      return token;
+    });
+
+    FileHubResource hubResource = await server.ResourceService.Transact((transaction, service, _) =>
+    {
+      return service.FileHubs.GetPersonal(transaction, token);
     });
 
     FileService.Hub hub = server.FileService.Get(hubResource);
     logger.Info("Got FileService.Hub.");
 
-    ConnectionService.Connection connection = server.ConnectionService.NewConnection(new AdvancedConnection.ConnectionConfiguration(new ConnectionEndPoint.Null(), new ConnectionEndPoint.Null()));
+    AdvancedConnection connection = server.ConnectionService.NewConnection(new AdvancedConnection.ConnectionConfiguration(new ConnectionEndPoint.Null(), new ConnectionEndPoint.Null()));
     logger.Info("Got new Connection.");
 
-    connection.Authenticate(token);
+    ConnectionService.Response response = await connection.ExecuteRequest(new ConnectionService.Request.Login("testuser", UserAuthenticationResource.UserAuthenticationType.Password, Encoding.UTF8.GetBytes("TestPass19@")));
     logger.Info("Connection Authenticated.");
-
-    FileService.Hub.Context hubContext = hub.GetContext(connection);
-    logger.Info("Got FileService.Hub.Context.");
   });
 }

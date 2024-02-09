@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { Alert } from 'stwui'
-</script>
+  import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
 
-<Alert type="info">
-	<Alert.Title slot="title">Title</Alert.Title>
-</Alert>
+  onMount(() => goto("/home", { replaceState: true }));
+</script>

@@ -1,5 +1,7 @@
 <script lang="ts">
-  import Home from './home/+page.svelte'
+  import { Alert } from 'stwui'
 </script>
 
-<Home />
+<Alert type="info">
+	<Alert.Title slot="title">Title</Alert.Title>
+</Alert>

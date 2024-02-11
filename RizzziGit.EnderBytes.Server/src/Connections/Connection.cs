@@ -63,7 +63,6 @@ public abstract partial class Connection<C, CC>(ConnectionService service, CC co
       return Task.FromResult<Response>(new Response.NoCurrentSession());
     }
 
-
     Service.Server.SessionService.DestroySession(this, Session);
     return Task.FromResult<Response>(new Response.OK());
   }

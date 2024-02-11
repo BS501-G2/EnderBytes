@@ -58,7 +58,7 @@ public sealed partial class SessionService(Server server) : Server.SubService(se
     {
       lock (this)
       {
-        if (Sessions.TryGetValue(connection, out Session? session) && session.IsValid)
+        if (Sessions.TryGetValue(connection, out Session? session))
         {
           return session;
         }
@@ -70,14 +70,13 @@ public sealed partial class SessionService(Server server) : Server.SubService(se
 
   public Session NewSession(ConnectionService.Connection connection, UserAuthenticationResource.Token token)
   {
-    token.ThrowIfInvalid();
     lock (connection)
     {
+      connection.ThrowIfInvalid();
+
       lock (this)
       {
-        token.ThrowIfInvalid();
-
-        if (!Sessions.TryGetValue(connection, out Session? session) || !session.IsValid)
+        if (!Sessions.TryGetValue(connection, out Session? session))
         {
           Sessions.AddOrUpdate(connection, session = new(this, NextId++, token, connection));
           return session;

@@ -26,6 +26,10 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
     private const string COLUMN_ENCRYPTED_AES_IV = "EncryptedAesIv";
     private const string COLUMN_DELETION_SCHEDULE = "DeletionSchedule";
 
+    private const string COLUMN_ROOT_FOLDER_ID = "RootFolderId";
+    private const string COLUMN_TRASH_FOLDER_ID = "TrashFolderId";
+    private const string COLUMN_INTERNAL_FOLDER_ID = "InternalFolderId";
+
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
       service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", resource.Id));
@@ -38,9 +42,15 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
       reader.GetInt64(reader.GetOrdinal(COLUMN_OWNER_USER_ID)),
       (FileHubFlags)reader.GetByte(reader.GetOrdinal(COLUMN_FLAGS)),
       reader.GetString(reader.GetOrdinal(COLUMN_NAME)),
+
       reader.GetBytes(reader.GetOrdinal(COLUMN_ENCRYPTED_AES_KEY)),
       reader.GetBytes(reader.GetOrdinal(COLUMN_ENCRYPTED_AES_IV)),
-      reader.GetInt64Optional(reader.GetOrdinal(COLUMN_DELETION_SCHEDULE))
+
+      reader.GetInt64Optional(reader.GetOrdinal(COLUMN_DELETION_SCHEDULE)),
+
+      reader.GetInt64Optional(reader.GetOrdinal(COLUMN_ROOT_FOLDER_ID)),
+      reader.GetInt64Optional(reader.GetOrdinal(COLUMN_TRASH_FOLDER_ID)),
+      reader.GetInt64Optional(reader.GetOrdinal(COLUMN_INTERNAL_FOLDER_ID))
     );
 
     protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0)
@@ -55,8 +65,18 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ENCRYPTED_AES_IV} blob not null;");
 
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_DELETION_SCHEDULE} integer null;");
+
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ROOT_FOLDER_ID} integer null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TRASH_FOLDER_ID} integer null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_INTERNAL_FOLDER_ID} integer null;");
       }
     }
+
+    public bool UpdateHubFolderIds(ResourceService.Transaction transaction, FileHubResource resource, long? rootFolderId, long? trashFolderId, long? internalFolderId) => Update(transaction, resource, new(
+      (COLUMN_ROOT_FOLDER_ID, rootFolderId),
+      (COLUMN_TRASH_FOLDER_ID, trashFolderId),
+      (COLUMN_INTERNAL_FOLDER_ID, internalFolderId)
+    ));
 
     public FileHubResource GetPersonal(ResourceService.Transaction transaction, UserAuthenticationResource.Token token)
     {
@@ -94,7 +114,11 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
     byte[] EncryptedAesKey,
     byte[] EncryptedAesIv,
 
-    long? DeletionSchedule
+    long? DeletionSchedule,
+
+    long? RootFolderId,
+    long? TrashFolderId,
+    long? InternalFolderId
   ) : Resource<ResourceManager, ResourceData, FileHubResource>.ResourceData(Id, CreateTime, UpdateTime);
 
   public long OwnerUserId => Data.OwnerUserId;
@@ -106,10 +130,12 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
 
   public long? DeletionSchedule => Data.DeletionSchedule;
 
+  public long? RootFolderId => Data.RootFolderId;
+  public long? TrashFolderId => Data.TrashFolderId;
+  public long? InternalFolderId => Data.InternalFolderId;
+
   public KeyService.AesPair DecryptAesPair(UserAuthenticationResource.Token token)
   {
-    token.ThrowIfInvalid();
-
     if (token.UserId != OwnerUserId)
     {
       throw new ArgumentException("Token does not belong to the owner.", nameof(token));

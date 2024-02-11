@@ -18,14 +18,32 @@ public sealed partial class FileService
   {
     public abstract partial class Node
     {
-      public class File(Hub hub, FileNodeResource resource) : Node(hub, resource, FileNodeResource.FileNodeType.File), INode
+      public sealed partial class File(Hub hub, FileResource resource) : Node(hub, resource, FileResource.FileNodeType.File)
       {
-        public class Handle()
-        {
+        private readonly WeakDictionary<File, List<Handle>> Handles = [];
 
+        public bool IsHandleValid(File file, Handle handle)
+        {
+          lock (this)
+          {
+            lock (file)
+            {
+              lock (handle)
+              {
+                return Handles.TryGetValue(file, out List<Handle>? testValue)
+                  && testValue.Contains(handle);
+              }
+            }
+          }
         }
 
-        private readonly WeakDictionary<long, Handle> Handles = [];
+        public void ThrowIfHandleInvalid(File file, Handle handle)
+        {
+          if (!IsHandleValid(file, handle))
+          {
+            throw new ArgumentException("Invalid file handle.", nameof(handle));
+          }
+        }
       }
     }
   }

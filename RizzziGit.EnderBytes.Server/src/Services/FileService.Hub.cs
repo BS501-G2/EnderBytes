@@ -11,8 +11,6 @@ public sealed partial class FileService
   {
     public Hub(FileService service, FileHubResource resource)
     {
-      resource.ThrowIfInvalid();
-
       Service = service;
       Resource = resource;
     }
@@ -20,14 +18,16 @@ public sealed partial class FileService
     public readonly FileService Service;
     public readonly FileHubResource Resource;
 
-    private readonly WeakDictionary<FileNodeResource, INode> Nodes = [];
+    private readonly WeakDictionary<FileResource, Node> Nodes = [];
 
-    public Server Server => Service.Server;
+    private Server Server => Service.Server;
+    private ResourceService ResourceService => Server.ResourceService;
 
-    public bool IsValid => Service.IsHubValid(Resource, this);
-    public void ThrowIfInvalid() => Service.ThrowIfHubInvalid(Resource, this);
+    public async Task<Node.Folder> GetRootFolder(UserAuthenticationResource.Token token) => (Node.Folder)GetNode(await ResourceService.Transact((transaction, service, cancellationToken) => service.Files.GetRootFolder(transaction, Resource, token)));
+    public async Task<Node.Folder> GetTrashFolder(UserAuthenticationResource.Token token) => (Node.Folder)GetNode(await ResourceService.Transact((transaction, service, cancellationToken) => service.Files.GetTrashFolder(transaction, Resource, token)));
+    public async Task<Node.Folder> GetInternalFolder(UserAuthenticationResource.Token token) => (Node.Folder)GetNode(await ResourceService.Transact((transaction, service, cancellationToken) => service.Files.GetInternalFolder(transaction, Resource, token)));
 
-    public bool IsNodeValid(FileNodeResource resource, Node node)
+    public bool IsNodeValid(FileResource resource, Node node)
     {
       lock (this)
       {
@@ -36,14 +36,14 @@ public sealed partial class FileService
           lock (node)
           {
             return resource.IsValid
-              && Nodes.TryGetValue(resource, out INode? testNode)
+              && Nodes.TryGetValue(resource, out Node? testNode)
               && testNode != node;
           }
         }
       }
     }
 
-    public void ThrowIfNodeInvalid(FileNodeResource resource, Node node)
+    public void ThrowIfNodeInvalid(FileResource resource, Node node)
     {
       if (!IsNodeValid(resource, node))
       {
@@ -51,29 +51,28 @@ public sealed partial class FileService
       }
     }
 
-    public Node GetNode(FileNodeResource resource, UserAuthenticationResource.Token token)
+    public Node GetNode(FileResource resource)
     {
-      ThrowIfInvalid();
-      resource.ThrowIfInvalid();
-      token.ThrowIfInvalid();
-
       lock (this)
       {
-        if (!Nodes.TryGetValue(resource, out INode? node))
+        lock (resource)
         {
-          node = resource.Type switch
+          if (!Nodes.TryGetValue(resource, out Node? node) || !node.IsValid)
           {
-            FileNodeResource.FileNodeType.File => new Node.File(this, resource),
-            FileNodeResource.FileNodeType.Folder => new Node.Folder(this, resource),
-            FileNodeResource.FileNodeType.SymbolicLink => new Node.SymbolicLink(this, resource),
+            node = resource.Type switch
+            {
+              FileResource.FileNodeType.File => new Node.File(this, resource),
+              FileResource.FileNodeType.Folder => new Node.Folder(this, resource),
+              FileResource.FileNodeType.SymbolicLink => new Node.SymbolicLink(this, resource),
 
-            _ => throw new ArgumentException("Invalid file node type.", nameof(resource))
-          };
+              _ => throw new ArgumentException("Invalid file node type.", nameof(resource))
+            };
 
-          Nodes.Add(resource, node);
+            Nodes.AddOrUpdate(resource, node);
+          }
+
+          return node;
         }
-
-        return (Node)node;
       }
     }
   }

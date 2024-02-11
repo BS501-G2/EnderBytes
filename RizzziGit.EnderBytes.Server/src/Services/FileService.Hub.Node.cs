@@ -6,13 +6,10 @@ public sealed partial class FileService
 {
   public sealed partial class Hub
   {
-    private interface INode;
-
     public abstract partial class Node
     {
-      private Node(Hub hub, FileNodeResource resource, FileNodeResource.FileNodeType type)
+      private Node(Hub hub, FileResource resource, FileResource.FileNodeType type)
       {
-        resource.ThrowIfInvalid();
         if (resource.Type != type)
         {
           throw new ArgumentException("Invalid node type.", nameof(resource));
@@ -23,10 +20,22 @@ public sealed partial class FileService
       }
 
       public readonly Hub Hub;
-      public readonly FileNodeResource Resource;
+      public readonly FileResource Resource;
+
+      private ResourceService ResourceService => Hub.ResourceService;
 
       public bool IsValid => Hub.IsNodeValid(Resource, this);
       public void ThrowIfInvalid() => Hub.ThrowIfNodeInvalid(Resource, this);
+
+      public async Task Trash(UserAuthenticationResource.Token token)
+      {
+        ThrowIfInvalid();
+
+        Hub.ResourceService.Transact((transaction, service, _) =>
+        {
+
+        });
+      }
     }
   }
 }

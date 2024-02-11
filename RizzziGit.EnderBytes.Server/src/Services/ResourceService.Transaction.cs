@@ -6,13 +6,17 @@ namespace RizzziGit.EnderBytes.Services;
 using Framework.Collections;
 using Framework.Logging;
 using RizzziGit.EnderBytes.Utilities;
-using WaitQueue = Framework.Collections.WaitQueue<(TaskCompletionSource Source, ResourceService.TransactionHandler Handler, CancellationToken CancellationToken)>;
+using WaitQueue = Framework.Collections.WaitQueue<(TaskCompletionSource Source, ResourceService.AsyncTransactionHandler Handler, CancellationToken CancellationToken)>;
 
 public sealed partial class ResourceService
 {
+  public delegate Task AsyncTransactionHandler(Transaction transaction, ResourceService resourceService, CancellationToken cancellationToken);
   public delegate void TransactionHandler(Transaction transaction, ResourceService resourceService, CancellationToken cancellationToken);
+  public delegate Task<T> AsyncTransactionHandler<T>(Transaction transaction, ResourceService resourceService, CancellationToken cancellationToken);
   public delegate T TransactionHandler<T>(Transaction transaction, ResourceService resourceService, CancellationToken cancellationToken);
+  public delegate IAsyncEnumerable<T> AsyncTransactionEnumeratorHandler<T>(Transaction transaction, ResourceService resourceService, CancellationToken cancellationToken);
   public delegate IEnumerable<T> TransactionEnumeratorHandler<T>(Transaction transaction, ResourceService resourceService, CancellationToken cancellationToken);
+  public delegate Task AsyncTransactionFailureHandler();
   public delegate void TransactionFailureHandler();
 
   private long NextTransactionId;
@@ -20,27 +24,37 @@ public sealed partial class ResourceService
 
   private WaitQueue? TransactionQueue;
 
-  public async IAsyncEnumerable<T> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler, [EnumeratorCancellation] CancellationToken cancellationToken)
+  public IAsyncEnumerable<T> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler, CancellationToken cancellationToken) => EnumeratedTransact((transaction, service, cancellationToken) => handler(transaction, service, cancellationToken).ToAsyncEnumerable(), cancellationToken);
+
+  public Task<T> Transact<T>(TransactionHandler<T> handler, CancellationToken cancellationToken = default) => Transact<T>((transaction, service, cancellationToken) => Task.FromResult(handler(transaction, service, cancellationToken)), cancellationToken);
+
+  public Task Transact(TransactionHandler handler, CancellationToken cancellationToken = default) => Transact((AsyncTransactionHandler)((transaction, service, cancellationToken) =>
+  {
+    handler(transaction, service, cancellationToken);
+    return Task.CompletedTask;
+  }), cancellationToken);
+
+  public async IAsyncEnumerable<T> EnumeratedTransact<T>(AsyncTransactionEnumeratorHandler<T> handler, [EnumeratorCancellation] CancellationToken cancellationToken)
   {
     using WaitQueue<TaskCompletionSource<StrongBox<T>?>> waitQueue = new();
 
-    _ = Transact((transaction, resourceService, cancellationToken) =>
+    _ = Transact((AsyncTransactionHandler)(async (transaction, resourceService, cancellationToken) =>
     {
       try
       {
-        foreach (T item in handler(transaction, resourceService, cancellationToken))
+        await foreach (T item in handler(transaction, resourceService, cancellationToken))
         {
-          waitQueue.Dequeue(cancellationToken).WaitSync(cancellationToken).SetResult(new(item));
+          (await waitQueue.Dequeue(cancellationToken)).SetResult(new(item));
         }
 
-        waitQueue.Dequeue(cancellationToken).WaitSync(cancellationToken).SetResult(null);
+        (await waitQueue.Dequeue(cancellationToken)).SetResult(null);
       }
       catch (Exception exception)
       {
-        waitQueue.Dequeue(cancellationToken).WaitSync(cancellationToken).SetException(exception);
+        (await waitQueue.Dequeue(cancellationToken)).SetException(exception);
         throw;
       }
-    }, cancellationToken);
+    }), cancellationToken);
 
     while (true)
     {
@@ -57,13 +71,13 @@ public sealed partial class ResourceService
     }
   }
 
-  public async Task<T> Transact<T>(TransactionHandler<T> handler, CancellationToken cancellationToken = default)
+  public async Task<T> Transact<T>(AsyncTransactionHandler<T> handler, CancellationToken cancellationToken = default)
   {
     TaskCompletionSource<T> source = new();
 
     try
     {
-      await Transact((transaction, resourceService, cancellationToken) => source.SetResult(handler(transaction, resourceService, cancellationToken)), cancellationToken);
+      await Transact((AsyncTransactionHandler)(async (transaction, resourceService, cancellationToken) => source.SetResult(await handler(transaction, resourceService, cancellationToken))), cancellationToken);
     }
     catch (Exception exception)
     {
@@ -73,7 +87,7 @@ public sealed partial class ResourceService
     return await source.Task;
   }
 
-  public async Task Transact(TransactionHandler handler, CancellationToken cancellationToken = default)
+  public async Task Transact(AsyncTransactionHandler handler, CancellationToken cancellationToken = default)
   {
     TaskCompletionSource source = new();
 
@@ -91,8 +105,6 @@ public sealed partial class ResourceService
         await foreach (var (source, handler, cancellationToken) in (TransactionQueue = new()).WithCancellation(serviceCancellationToken))
         {
           using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(serviceCancellationToken, cancellationToken);
-          linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
-
           using SQLiteTransaction dbTransaction = connection.BeginTransaction();
 
           List<TransactionFailureHandler> failureHandlers = [];
@@ -101,8 +113,7 @@ public sealed partial class ResourceService
 
           try
           {
-            linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
-            handler(transaction, this, linkedCancellationTokenSource.Token);
+            await handler(transaction, this, linkedCancellationTokenSource.Token);
             linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
             Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");

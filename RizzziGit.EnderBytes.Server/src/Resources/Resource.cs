@@ -96,18 +96,19 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       );
     }
 
-    protected R? SelectFirst(ResourceService.Transaction transaction, WhereClause? where = null, OrderByClause? order = null) => SelectOne(transaction, where, 0, order);
-    protected R? SelectOne(ResourceService.Transaction transaction, WhereClause? where = null, int? offset = null, OrderByClause? order = null) => Select(transaction, where, new(1, offset), order).FirstOrDefault();
-    protected IEnumerable<R> Select(ResourceService.Transaction transaction, WhereClause? where = null, LimitClause? limit = null, OrderByClause? order = null)
+    protected R? SelectFirst(ResourceService.Transaction transaction, WhereClause? where = null, OrderByClause? order = null, CancellationToken cancellationToken = default) => SelectOne(transaction, where, 0, order, cancellationToken);
+    protected R? SelectOne(ResourceService.Transaction transaction, WhereClause? where = null, int? offset = null, OrderByClause? order = null, CancellationToken cancellationToken = default) => Select(transaction, where, new(1, offset), order, cancellationToken).FirstOrDefault();
+    protected IEnumerable<R> Select(ResourceService.Transaction transaction, WhereClause? where = null, LimitClause? limit = null, OrderByClause? order = null, CancellationToken cancellationToken = default)
     {
       List<object?> parameterList = [];
-      foreach (D data in SqlEnumeratedQuery<D>(
+      foreach (D data in SqlEnumeratedQuery(
         transaction,
         castToData,
         $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")}{(order != null ? $" order by {order.Apply()}" : "")};",
         [.. parameterList]
       ))
       {
+        cancellationToken.ThrowIfCancellationRequested();
         Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Enumerated {Name} resource: #{data.Id}");
         yield return GetResource(data);
       }
@@ -123,9 +124,10 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       }
     }
 
-    protected bool Exists(ResourceService.Transaction transaction, WhereClause? where = null) => Count(transaction, where) > 0;
-    protected long Count(ResourceService.Transaction transaction, WhereClause? where = null)
+    protected bool Exists(ResourceService.Transaction transaction, WhereClause? where = null, CancellationToken cancellationToken = default) => Count(transaction, where, cancellationToken) > 0;
+    protected long Count(ResourceService.Transaction transaction, WhereClause? where = null, CancellationToken cancellationToken = default)
     {
+      cancellationToken.ThrowIfCancellationRequested();
       List<object?> parameterList = [];
 
       return (long)SqlScalar(
@@ -135,8 +137,10 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       )!;
     }
 
-    protected long Delete(ResourceService.Transaction transaction, WhereClause where)
+    protected long Delete(ResourceService.Transaction transaction, WhereClause where, CancellationToken cancellationToken = default)
     {
+      cancellationToken.ThrowIfCancellationRequested();
+
       List<object?> parameterList = [];
 
       string whereClause = where.Apply(parameterList);
@@ -153,6 +157,8 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         [.. parameterList]
       ))
       {
+        cancellationToken.ThrowIfCancellationRequested();
+
         Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{data.Id}");
         if (Resources.TryGetValue(data.Id, out R? resource))
         {
@@ -181,8 +187,10 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       }
     }
 
-    protected long Update(ResourceService.Transaction transaction, WhereClause where, SetClause set)
+    protected long Update(ResourceService.Transaction transaction, WhereClause where, SetClause set, CancellationToken cancellationToken = default)
     {
+      cancellationToken.ThrowIfCancellationRequested();
+
       List<object?> parameterList = [];
       set.Add(COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
@@ -192,7 +200,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       string temporaryTableName = $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
 
       long count = 0;
-      foreach (D newData in SqlEnumeratedQuery<D>(
+      foreach (D newData in SqlEnumeratedQuery(
         transaction,
         castToData,
         $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
@@ -202,6 +210,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         [.. parameterList]
       ))
       {
+        cancellationToken.ThrowIfCancellationRequested();
         Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Updated {Name} resource: #{newData.Id}");
         if (Resources.TryGetValue(newData.Id, out R? resource))
         {
@@ -235,10 +244,10 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       }
     }
 
-    protected bool Update(ResourceService.Transaction transaction, R resource, SetClause set) => Update(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), set) != 0;
+    protected bool Update(ResourceService.Transaction transaction, R resource, SetClause set, CancellationToken cancellationToken = default) => Update(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), set, cancellationToken) != 0;
 
-    public virtual R? GetById(ResourceService.Transaction transaction, long Id) => Resources.TryGetValue(Id, out R? resource) ? resource : Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id)).FirstOrDefault();
-    public virtual bool Delete(ResourceService.Transaction transaction, R resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id)) != 0;
+    public virtual R? GetById(ResourceService.Transaction transaction, long Id, CancellationToken cancellationToken = default) => Resources.TryGetValue(Id, out R? resource) ? resource : Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id), cancellationToken: cancellationToken).FirstOrDefault();
+    public virtual bool Delete(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken = default) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), cancellationToken) != 0;
   }
 
   public abstract partial record ResourceData(long Id, long CreateTime, long UpdateTime);

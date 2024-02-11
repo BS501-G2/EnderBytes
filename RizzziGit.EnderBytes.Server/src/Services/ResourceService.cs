@@ -25,7 +25,7 @@ public sealed partial class ResourceService : Server.SubService
   public readonly UserConfigurationResource.ResourceManager UserConfiguration;
   public readonly KeyResource.ResourceManager Keys;
   public readonly FileHubResource.ResourceManager FileHubs;
-  public readonly FileNodeResource.ResourceManager Files;
+  public readonly FileResource.ResourceManager Files;
   public readonly FileAccessResource.ResourceManager FileAccesses;
 
   private Task? TransactionQueueTask;

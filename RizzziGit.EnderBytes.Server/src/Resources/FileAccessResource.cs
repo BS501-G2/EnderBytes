@@ -7,7 +7,7 @@ using Services;
 
 public sealed class FileAccessResource(FileAccessResource.ResourceManager manager, FileAccessResource.ResourceData data) : Resource<FileAccessResource.ResourceManager, FileAccessResource.ResourceData, FileAccessResource>(manager, data)
 {
-  public enum AccessType : byte { Manage, ReadWrite, Read }
+  public enum AccessType : byte { Manage, ReadWrite, Read, None }
 
   private const string NAME = "FileAccess";
   private const int VERSION = 1;
@@ -50,12 +50,9 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
       }
     }
 
-    public FileAccessResource Create(ResourceService.Transaction transaction, FileNodeResource node, UserAuthenticationResource.Token token, UserResource? target, AccessType type)
+    public FileAccessResource Create(ResourceService.Transaction transaction, FileHubResource hub, FileResource node, UserAuthenticationResource.Token token, UserResource? target, AccessType type)
     {
-      node.ThrowIfInvalid();
-      token.ThrowIfInvalid();
-
-      KeyService.AesPair aesPair = node.Manager.DecryptAesPair(transaction, node, token);
+      KeyService.AesPair aesPair = node.Manager.DecryptAesPair(transaction, hub, node, token, AccessType.None);
 
       UserAuthenticationResource? userAuthentication = target != null
         ? Service.UserAuthentications.List(transaction, target, new(1)).FirstOrDefault()
@@ -73,8 +70,6 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
 
     public FileAccessResource? GetByToken(ResourceService.Transaction transaction, UserAuthenticationResource.Token? token)
     {
-      token?.ThrowIfInvalid();
-
       return SelectOne(transaction,
         token == null
           ? new WhereClause.CompareColumn(COLUMN_TARGET_NODE_ID, "=", null)

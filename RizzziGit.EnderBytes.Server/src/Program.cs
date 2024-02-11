@@ -78,10 +78,7 @@ public static class Program
       return token;
     });
 
-    FileHubResource hubResource = await server.ResourceService.Transact((transaction, service, _) =>
-    {
-      return service.FileHubs.GetPersonal(transaction, token);
-    });
+    FileHubResource hubResource = await server.ResourceService.Transact((transaction, service, _) => service.FileHubs.GetPersonal(transaction, token));
 
     FileService.Hub hub = server.FileService.Get(hubResource);
     logger.Info("Got FileService.Hub.");

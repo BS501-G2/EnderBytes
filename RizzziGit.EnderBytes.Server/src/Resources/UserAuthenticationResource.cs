@@ -94,9 +94,6 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     private Token Create(ResourceService.Transaction transaction, UserResource user, Token existing, UserAuthenticationType type, byte[] payload)
     {
-      user.ThrowIfInvalid();
-      existing.UserAuthentication.ThrowIfInvalid();
-
       byte[] privateKey = existing.UserAuthentication.GetPrivateKey(existing.PayloadHash);
       byte[] publicKey = existing.UserAuthentication.PublicKey;
 
@@ -134,8 +131,6 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     private Token Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationType type, byte[] payload)
     {
-      user.ThrowIfInvalid();
-
       if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)) != 0)
       {
         throw new InvalidOperationException("Must use an existing rsa key.");
@@ -191,11 +186,9 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       return null;
     }
 
-    public override bool Delete(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication)
+    public override bool Delete(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication, CancellationToken cancellationToken = default)
     {
-      userAuthentication.ThrowIfInvalid();
-
-      if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userAuthentication.UserId)) < 2)
+      if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userAuthentication.UserId), cancellationToken) < 2)
       {
         throw new InvalidOperationException("Must have at least two user authentications before deleting one.");
       }

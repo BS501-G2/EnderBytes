@@ -19,7 +19,7 @@ public sealed class FileDataResource(FileDataResource.ResourceManager manager, F
       id, createTime, updateTime
     );
 
-    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0)
+    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
     {
       throw new NotImplementedException();
     }

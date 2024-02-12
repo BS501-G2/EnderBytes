@@ -38,7 +38,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
       (AccessType)reader.GetByte(reader.GetOrdinal(COLUMN_TYPE))
     );
 
-    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0)
+    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
     {
       if (oldVersion < 1)
       {
@@ -50,20 +50,15 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
       }
     }
 
-    public FileAccessResource Create(ResourceService.Transaction transaction, FileHubResource hub, FileResource node, UserAuthenticationResource.Token token, UserResource? target, AccessType type)
+    public FileAccessResource Create(ResourceService.Transaction transaction, FileHubResource hub, FileResource node, UserAuthenticationResource.Token token, UserAuthenticationResource? targetUserAuthentication, AccessType type)
     {
-      KeyService.AesPair aesPair = node.Manager.DecryptAesPair(transaction, hub, node, token, AccessType.None);
-
-      UserAuthenticationResource? userAuthentication = target != null
-        ? Service.UserAuthentications.List(transaction, target, new(1)).FirstOrDefault()
-          ?? throw new InvalidOperationException("Target user does not have authentication.")
-        : null;
+      KeyService.AesPair aesPair = Service.Files.DecryptAesPair(transaction, hub, node, token, AccessType.Manage);
 
       return Insert(transaction, new(
-        (COLUMN_TARGET_USER_ID, null),
+        (COLUMN_TARGET_USER_ID, targetUserAuthentication?.UserId),
         (COLUMN_TARGET_NODE_ID, node.Id),
-        (COLUMN_AES_KEY, userAuthentication?.Encrypt(aesPair.Key) ?? aesPair.Key),
-        (COLUMN_AES_IV, userAuthentication?.Encrypt(aesPair.Iv) ?? aesPair.Iv),
+        (COLUMN_AES_KEY, targetUserAuthentication?.Encrypt(aesPair.Key) ?? aesPair.Key),
+        (COLUMN_AES_IV, targetUserAuthentication?.Encrypt(aesPair.Iv) ?? aesPair.Iv),
         (COLUMN_TYPE, (byte)type)
       ));
     }
@@ -75,7 +70,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
           ? new WhereClause.CompareColumn(COLUMN_TARGET_NODE_ID, "=", null)
           : new WhereClause.Nested("or",
               new WhereClause.CompareColumn(COLUMN_TARGET_NODE_ID, "=", null),
-              new WhereClause.CompareColumn(COLUMN_TARGET_NODE_ID, "=", token.UserId)
+              new WhereClause.CompareColumn(COLUMN_TARGET_USER_ID, "=", token.UserId)
             )
       );
     }

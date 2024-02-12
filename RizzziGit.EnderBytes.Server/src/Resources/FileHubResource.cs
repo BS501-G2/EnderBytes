@@ -53,7 +53,7 @@ public sealed class FileHubResource(FileHubResource.ResourceManager manager, Fil
       reader.GetInt64Optional(reader.GetOrdinal(COLUMN_INTERNAL_FOLDER_ID))
     );
 
-    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0)
+    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
     {
       if (oldVersion < 1)
       {

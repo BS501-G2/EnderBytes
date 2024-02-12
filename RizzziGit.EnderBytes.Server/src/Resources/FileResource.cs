@@ -30,9 +30,19 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
     }
 
     protected override FileResource NewResource(ResourceData data) => new(this, data);
-    protected override ResourceData CastToData(SQLiteDataReader reader, long id, long createTime, long updateTime) => throw new Exception();
+    protected override ResourceData CastToData(SQLiteDataReader reader, long id, long createTime, long updateTime) => new(
+      id, createTime, updateTime,
 
-    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0)
+      reader.GetInt64(reader.GetOrdinal(COLUMN_HUB_ID)),
+      (FileNodeType)reader.GetByte(reader.GetOrdinal(COLUMN_TYPE)),
+      reader.GetInt64Optional(reader.GetOrdinal(COLUMN_PARENT_FILE_ID)),
+      reader.GetString(reader.GetOrdinal(COLUMN_NAME)),
+
+      reader.GetBytes(reader.GetOrdinal(COLUMN_ENCRYPTED_AES_KEY)),
+      reader.GetBytes(reader.GetOrdinal(COLUMN_ENCRYPTED_AES_IV))
+    );
+
+    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
     {
       if (oldVersion < 1)
       {
@@ -47,7 +57,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
       }
     }
 
-    public FileResource Create(ResourceService.Transaction transaction, FileHubResource hub, FileResource? parentFolder, FileNodeType type, string name, UserAuthenticationResource.Token? token)
+    public FileResource Create(ResourceService.Transaction transaction, FileHubResource hub, FileResource? parentFolder, FileNodeType type, string name, UserAuthenticationResource.Token? token, CancellationToken cancellationToken = default)
     {
       if (parentFolder != null && parentFolder.Type != FileNodeType.Folder)
       {
@@ -58,26 +68,12 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
         new WhereClause.CompareColumn(COLUMN_HUB_ID, "=", hub.Id),
         new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", parentFolder?.Id),
         new WhereClause.CompareColumn(COLUMN_NAME, "=", name)
-      )))
+      ), cancellationToken))
       {
         throw new ArgumentException("File exists.", nameof(name));
       }
 
-      KeyService.AesPair hubAesPair;
-      if (parentFolder == null)
-      {
-        if (token == null)
-        {
-          throw new ArgumentException("Invalid token.", nameof(token));
-        }
-
-        hubAesPair = hub.DecryptAesPair(token);
-      }
-      else
-      {
-        hubAesPair = DecryptAesPair(transaction, hub, parentFolder, token, FileAccessResource.AccessType.ReadWrite);
-      }
-
+      KeyService.AesPair hubAesPair = DecryptAesPair(transaction, hub, parentFolder, token, FileAccessResource.AccessType.ReadWrite, cancellationToken);
       return Insert(transaction, new(
         (COLUMN_HUB_ID, hub.Id),
         (COLUMN_PARENT_FILE_ID, parentFolder?.Id),
@@ -86,11 +82,13 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
         (COLUMN_ENCRYPTED_AES_KEY, hubAesPair.Encrypt(RandomNumberGenerator.GetBytes(32))),
         (COLUMN_ENCRYPTED_AES_IV, hubAesPair.Encrypt(RandomNumberGenerator.GetBytes(16)))
-      ));
+      ), cancellationToken);
     }
 
-    public KeyService.AesPair DecryptAesPair(ResourceService.Transaction transaction, FileHubResource hub, FileResource? node, UserAuthenticationResource.Token? token, FileAccessResource.AccessType accessIntent)
+    public KeyService.AesPair DecryptAesPair(ResourceService.Transaction transaction, FileHubResource hub, FileResource? node, UserAuthenticationResource.Token? token, FileAccessResource.AccessType accessIntent, CancellationToken cancellationToken = default)
     {
+      cancellationToken.ThrowIfCancellationRequested();
+
       hub.ThrowIfInvalid();
       node?.ThrowIfInvalid();
       token?.ThrowIfInvalid();
@@ -99,6 +97,8 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
       KeyService.AesPair decryptAesPair(FileResource? node)
       {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (node == null)
         {
           if (token == null)
@@ -118,33 +118,42 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
         {
           KeyService.AesPair aesPair = node.ParentFileId == null
             ? hub.DecryptAesPair(token)
-            : decryptAesPair(GetById(transaction, (long)node.ParentFileId)!);
+            : decryptAesPair(GetById(transaction, (long)node.ParentFileId, cancellationToken)!);
 
           return new(aesPair.Decrypt(node.EncryptedAesKey), aesPair.Decrypt(node.EncryptedAesIv));
         }
 
-        return (
-          Service.FileAccesses.GetByToken(transaction, token)
-            ?? throw new ArgumentException(token == null ? "Requires token to decrypt" : "No access granted for token.", nameof(token))
-        ).DecryptAesPair(token);
+        FileAccessResource fileAccess = Service.FileAccesses.GetByToken(transaction, token)
+          ?? throw new ArgumentException(token == null ? "Token is required for file access." : "No file access found for token.", nameof(token));
+
+        if (fileAccess.Type > accessIntent)
+        {
+          throw new ArgumentException($"Token access does not allow intent: {accessIntent}", nameof(accessIntent));
+        }
+
+        return fileAccess.DecryptAesPair(token);
       }
     }
 
-    public FileResource GetRootFolder(ResourceService.Transaction transaction, FileHubResource fileHub, UserAuthenticationResource.Token token)
+    public FileResource GetRootFolder(ResourceService.Transaction transaction, FileHubResource fileHub, UserAuthenticationResource.Token token, CancellationToken cancellationToken = default)
     {
-      FileResource? root = fileHub.RootFolderId != null ? GetById(transaction, (long)fileHub.RootFolderId) : null;
+      cancellationToken.ThrowIfCancellationRequested();
+
+      FileResource? root = fileHub.RootFolderId != null ? GetById(transaction, (long)fileHub.RootFolderId, cancellationToken) : null;
 
       if (root == null)
       {
-        Service.FileHubs.UpdateHubFolderIds(transaction, fileHub, (root = Create(transaction, fileHub, null, FileNodeType.Folder, "__ROOT", token)).Id, fileHub.TrashFolderId, fileHub.InternalFolderId);
+        Service.FileHubs.UpdateHubFolderIds(transaction, fileHub, (root = Create(transaction, fileHub, null, FileNodeType.Folder, "__ROOT", token, cancellationToken)).Id, fileHub.TrashFolderId, fileHub.InternalFolderId);
       }
 
       return root;
     }
 
-    public FileResource GetTrashFolder(ResourceService.Transaction transaction, FileHubResource fileHub, UserAuthenticationResource.Token token)
+    public FileResource GetTrashFolder(ResourceService.Transaction transaction, FileHubResource fileHub, UserAuthenticationResource.Token token, CancellationToken cancellationToken = default)
     {
-      FileResource? trash = fileHub.RootFolderId != null ? GetById(transaction, (long)fileHub.RootFolderId) : null;
+      cancellationToken.ThrowIfCancellationRequested();
+
+      FileResource? trash = fileHub.RootFolderId != null ? GetById(transaction, (long)fileHub.RootFolderId, cancellationToken) : null;
 
       if (trash == null)
       {
@@ -154,13 +163,15 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
       return trash;
     }
 
-    public FileResource GetInternalFolder(ResourceService.Transaction transaction, FileHubResource fileHub, UserAuthenticationResource.Token token)
+    public FileResource GetInternalFolder(ResourceService.Transaction transaction, FileHubResource fileHub, UserAuthenticationResource.Token token, CancellationToken cancellationToken = default)
     {
-      FileResource? @internal = fileHub.RootFolderId != null ? GetById(transaction, (long)fileHub.RootFolderId) : null;
+      cancellationToken.ThrowIfCancellationRequested();
+
+      FileResource? @internal = fileHub.RootFolderId != null ? GetById(transaction, (long)fileHub.RootFolderId, cancellationToken) : null;
 
       if (@internal == null)
       {
-        Service.FileHubs.UpdateHubFolderIds(transaction, fileHub, fileHub.RootFolderId, fileHub.TrashFolderId, (@internal = Create(transaction, fileHub, null, FileNodeType.Folder, "__INTERNAL", token)).Id);
+        Service.FileHubs.UpdateHubFolderIds(transaction, fileHub, fileHub.RootFolderId, fileHub.TrashFolderId, (@internal = Create(transaction, fileHub, null, FileNodeType.Folder, "__INTERNAL", token, cancellationToken)).Id);
       }
 
       return @internal;
@@ -168,12 +179,14 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
     public IEnumerable<FileResource> Scan(ResourceService.Transaction transaction, FileHubResource hub, FileResource? parentFolder, UserAuthenticationResource.Token? token, LimitClause? limitClause = null, OrderByClause? orderByClause = null, CancellationToken cancellationToken = default)
     {
+      cancellationToken.ThrowIfCancellationRequested();
+
       if (parentFolder != null && parentFolder.Type != FileNodeType.Folder)
       {
         throw new ArgumentException("Invalid file type.", nameof(parentFolder));
       }
 
-      DecryptAesPair(transaction, hub, parentFolder, token, FileAccessResource.AccessType.Read);
+      DecryptAesPair(transaction, hub, parentFolder, token, FileAccessResource.AccessType.Read, cancellationToken);
 
       return Select(transaction, new WhereClause.Nested("and",
         new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", parentFolder?.Id),
@@ -183,18 +196,20 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
     public bool Move(ResourceService.Transaction transaction, FileHubResource hub, FileResource file, FileResource? newParentFolder, UserAuthenticationResource.Token? token, CancellationToken cancellationToken = default)
     {
+      cancellationToken.ThrowIfCancellationRequested();
+
       if (newParentFolder != null && newParentFolder.Type != FileNodeType.Folder)
       {
         throw new ArgumentException("Invalid destination type.", nameof(newParentFolder));
       }
 
-      KeyService.AesPair pair = DecryptAesPair(transaction, hub, file, token, FileAccessResource.AccessType.None);
-      KeyService.AesPair parentPair = DecryptAesPair(transaction, hub, newParentFolder, token, FileAccessResource.AccessType.ReadWrite);
+      KeyService.AesPair pair = DecryptAesPair(transaction, hub, file, token, FileAccessResource.AccessType.ReadWrite, cancellationToken);
+      KeyService.AesPair newParentPair = DecryptAesPair(transaction, hub, newParentFolder, token, FileAccessResource.AccessType.ReadWrite, cancellationToken);
 
       return Update(transaction, file, new SetClause(
         (COLUMN_PARENT_FILE_ID, newParentFolder?.Id),
-        (COLUMN_ENCRYPTED_AES_KEY, parentPair.Encrypt(pair.Key)),
-        (COLUMN_ENCRYPTED_AES_IV, parentPair.Encrypt(pair.Iv))
+        (COLUMN_ENCRYPTED_AES_KEY, newParentPair.Encrypt(pair.Key)),
+        (COLUMN_ENCRYPTED_AES_IV, newParentPair.Encrypt(pair.Iv))
       ), cancellationToken);
     }
   }

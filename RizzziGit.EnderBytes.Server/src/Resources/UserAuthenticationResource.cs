@@ -67,7 +67,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       reader.GetBytes(reader.GetOrdinal(COLUMN_PUBLIC_KEY))
     );
 
-    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0)
+    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
     {
       if (oldVersion < 1)
       {

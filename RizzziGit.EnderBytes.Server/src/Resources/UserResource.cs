@@ -30,7 +30,7 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
       reader.GetStringOptional(reader.GetOrdinal(COLUMN_DISPLAY_NAME))
     );
 
-    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0)
+    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
     {
       if (oldVersion < 1)
       {

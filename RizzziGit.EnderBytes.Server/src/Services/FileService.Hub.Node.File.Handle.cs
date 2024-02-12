@@ -13,15 +13,17 @@ public sealed partial class FileService
     {
       public sealed partial class File
       {
-        public sealed class Handle(File file)
+        public sealed class Handle(File file, Snapshot snapshot)
         {
           public readonly File File = file;
+          public readonly Snapshot Snapshot = snapshot;
+
           public Hub Hub => File.Hub;
           public FileService FileService => Hub.Service;
 
           public async Task<CompositeBuffer> Read(UserAuthenticationResource.Token token)
           {
-
+            return [];
           }
         }
 

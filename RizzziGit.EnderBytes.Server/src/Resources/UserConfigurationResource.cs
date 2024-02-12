@@ -29,7 +29,7 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
       reader.GetBoolean(reader.GetOrdinal(COLUMN_ENABLE_FTP_ACCESS))
     );
 
-    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0)
+    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
     {
       if (oldVersion < 1)
       {

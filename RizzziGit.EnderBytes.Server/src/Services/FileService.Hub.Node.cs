@@ -30,11 +30,6 @@ public sealed partial class FileService
       public async Task Trash(UserAuthenticationResource.Token token)
       {
         ThrowIfInvalid();
-
-        Hub.ResourceService.Transact((transaction, service, _) =>
-        {
-
-        });
       }
     }
   }

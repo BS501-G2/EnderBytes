@@ -69,8 +69,10 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       return resource;
     }
 
-    protected R Insert(ResourceService.Transaction transaction, ValueClause values)
+    protected R Insert(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default)
     {
+      cancellationToken.ThrowIfCancellationRequested();
+
       long insertTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
       values.Add(COLUMN_CREATE_TIME, insertTimestamp);
@@ -81,6 +83,8 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         transaction,
         (reader) =>
         {
+          cancellationToken.ThrowIfCancellationRequested();
+
           reader.Read();
           R resource = GetResource(CastToData(reader));
 
@@ -100,6 +104,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
     protected R? SelectOne(ResourceService.Transaction transaction, WhereClause? where = null, int? offset = null, OrderByClause? order = null, CancellationToken cancellationToken = default) => Select(transaction, where, new(1, offset), order, cancellationToken).FirstOrDefault();
     protected IEnumerable<R> Select(ResourceService.Transaction transaction, WhereClause? where = null, LimitClause? limit = null, OrderByClause? order = null, CancellationToken cancellationToken = default)
     {
+      cancellationToken.ThrowIfCancellationRequested();
       List<object?> parameterList = [];
       foreach (D data in SqlEnumeratedQuery(
         transaction,

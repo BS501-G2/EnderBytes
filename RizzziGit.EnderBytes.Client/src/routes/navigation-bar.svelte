@@ -4,6 +4,7 @@
   import { goto } from "$app/navigation";
 
   import type { NavigationMenuItem } from "$lib/navigation-menu-items";
+  import { DisplayMode } from "$lib/display-mode";
 
   export let menuItems: NavigationMenuItem[];
 
@@ -16,16 +17,20 @@
     goto(path);
   };
 
-  let clientWidth: number;
+  export let displayMode: DisplayMode;
+
   let clientScroll: number;
 
-  $: isNavTransparent = !((clientWidth <= 720 && isMenuVisible) || (clientScroll != 0))
+  $: isNavTransparent = !(
+    (displayMode & DisplayMode.Mobile && isMenuVisible) ||
+    clientScroll != 0
+  );
 </script>
 
-<svelte:window bind:scrollY={clientScroll}/>
+<svelte:window bind:scrollY={clientScroll} />
 
-<div class="navigation-bar {(isNavTransparent) ? "transparent" : ""}" bind:clientWidth>
-  {#if clientWidth <= 720}
+<div class="navigation-bar {isNavTransparent ? 'transparent' : ''}">
+  {#if displayMode & DisplayMode.Mobile}
     <div class="site-logo"></div>
     <div
       class="mobile-menu-icon"
@@ -57,8 +62,8 @@
   {/if}
 </div>
 
-{#if clientWidth <= 720}
-  <div class="mobile-navigation-container {isMenuVisible ? '' : 'hidden'} {(isNavTransparent) ? "transparent" : ""}">
+{#if displayMode & DisplayMode.Mobile}
+  <div class="mobile-navigation-container {isMenuVisible ? '' : 'hidden'}">
     <ul>
       {#each menuItems as [label, path]}
         <div
@@ -85,7 +90,11 @@
 
   div.navigation-bar {
     background-color: var(--highlight-background-color-01);
-    background-image: linear-gradient(to bottom, rgba(0,0,0,0.5), rgba(255,255,255,0));
+    background-image: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.5),
+      rgba(255, 255, 255, 0)
+    );
     background-position-y: -64px;
     background-repeat: no-repeat;
 
@@ -178,8 +187,9 @@
       }
     }
 
-    div.mobile-navigation-container.transparent {
-      background-color: transparent;
+    div.mobile-navigation-container.hidden {
+      opacity: 0;
+      pointer-events: none;
     }
 
     div.mobile-navigation-container {
@@ -190,12 +200,11 @@
       top: 64px;
 
       width: 100%;
-      height: 80px;
 
       color: white;
       transition-duration: 300ms;
       transition-timing-function: ease-in-out;
-      overflow-y: hidden;
+      opacity: 1;
 
       ul {
         list-style: none;
@@ -209,6 +218,7 @@
           cursor: pointer;
 
           width: calc(100% - 64px);
+          height: min-content;
           margin: auto;
 
           user-select: none;
@@ -216,10 +226,6 @@
           border-bottom: 1px solid white;
         }
       }
-    }
-
-    div.mobile-navigation-container.hidden {
-      height: 0px;
     }
   }
 </style>

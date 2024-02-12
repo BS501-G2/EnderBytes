@@ -1,19 +1,42 @@
-export enum ThemeType {
-  Default = 'default'
+export enum Theme {
+  Default = 'default',
+  Blue = 'blue'
 }
 
-export class ThemeManager {
-  constructor() {
-    throw new Error('Cannot be instantiated.')
+export type OnThemeChangeListener = (theme: Theme) => void
+
+
+const KEY_THEME: string = 'theme-name'
+const onChangeListeners: Array<OnThemeChangeListener> = []
+
+export function addOnThemeChangeListener(onChangeListener: OnThemeChangeListener): boolean {
+  if (onChangeListeners.indexOf(onChangeListener) >= 0) {
+    return false
   }
 
-  static #KEY_THEME: string = 'theme-name'
+  onChangeListeners.push(onChangeListener)
+  return true
+}
 
-  public static get(storage: Storage): ThemeType {
-    return (<ThemeType | null>storage.getItem(this.#KEY_THEME)) ?? ThemeType.Default
+export function removeOnThemeChangeListener(onChangeListener: OnThemeChangeListener): boolean {
+  let onChangeListenerIndex: number
+
+  if ((onChangeListenerIndex = onChangeListeners.indexOf(onChangeListener)) == -1) {
+    return false
   }
 
-  public static set(storage: Storage, theme: ThemeType): void {
-    storage.setItem(this.#KEY_THEME, theme)
+  onChangeListeners.splice(onChangeListenerIndex, 1)
+  return true
+}
+
+export function getTheme(window: Window): Theme {
+  return (<Theme | null>(window.localStorage.getItem(KEY_THEME))) ?? Theme.Default
+}
+
+export function setTheme(window: Window, theme: Theme): void {
+  window.localStorage.setItem(KEY_THEME, theme)
+
+  for (const onChangeListener of onChangeListeners) {
+    onChangeListener(theme)
   }
 }

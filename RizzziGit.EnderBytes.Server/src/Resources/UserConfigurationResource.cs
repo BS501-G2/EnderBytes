@@ -4,7 +4,7 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Services;
 
-public sealed class UserConfigurationResource(UserConfigurationResource.ResourceManager manager, UserResource user, UserConfigurationResource.ResourceData data) : Resource<UserConfigurationResource.ResourceManager, UserConfigurationResource.ResourceData, UserConfigurationResource>(manager, data)
+public sealed class UserConfigurationResource(UserConfigurationResource.ResourceManager manager, UserConfigurationResource.ResourceData data) : Resource<UserConfigurationResource.ResourceManager, UserConfigurationResource.ResourceData, UserConfigurationResource>(manager, data)
 {
   private const string NAME = "UserConfiguration";
   private const int VERSION = 1;
@@ -21,7 +21,7 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
       service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id));
     }
 
-    protected override UserConfigurationResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, Service.Users.GetById(transaction, data.UserId,  cancellationToken), data);
+    protected override UserConfigurationResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, data);
     protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
@@ -69,6 +69,4 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
 
   public long UserId => Data.UserId;
   public bool EnableFtpAccess => Data.EnableFtpAccess;
-
-  public readonly UserResource User = user;
 }

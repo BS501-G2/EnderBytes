@@ -7,7 +7,7 @@ namespace RizzziGit.EnderBytes.Resources;
 using Utilities;
 using Services;
 
-public sealed partial class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserResource user, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
+public sealed partial class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
   public sealed record UserAuthenticationToken(UserResource User, UserAuthenticationResource UserAuthentication, byte[] PayloadHash)
   {
@@ -48,7 +48,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id));
     }
 
-    protected override UserAuthenticationResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, Service.Users.GetById(transaction, data.UserId, cancellationToken), data);
+    protected override UserAuthenticationResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, data);
 
     protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
@@ -248,9 +248,6 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     return cryptoTransform.TransformFinalBlock(bytes);
   }
-
-  public readonly UserResource User = user;
-
   public long UserId => Data.UserId;
   public UserAuthenticationType Type => Data.Type;
 

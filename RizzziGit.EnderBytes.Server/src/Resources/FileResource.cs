@@ -5,7 +5,7 @@ namespace RizzziGit.EnderBytes.Resources;
 using Services;
 using Utilities;
 
-public sealed class FileResource(FileResource.ResourceManager manager, StorageResource storage, FileResource? parent, FileResource.ResourceData data) : Resource<FileResource.ResourceManager, FileResource.ResourceData, FileResource>(manager, data)
+public sealed class FileResource(FileResource.ResourceManager manager, FileResource.ResourceData data) : Resource<FileResource.ResourceManager, FileResource.ResourceData, FileResource>(manager, data)
 {
   public enum FileType : byte { File, Folder, SymbolicLink }
 
@@ -28,12 +28,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, StorageRe
       ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", resource.Id));
     }
 
-    protected override FileResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(
-      this,
-      Service.Storages.GetById(transaction, data.StorageId, cancellationToken),
-      data.ParentId != null ? Service.Files.GetById(transaction, (long)data.ParentId, cancellationToken) : null,
-      data
-    );
+    protected override FileResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, data);
 
     protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
@@ -59,7 +54,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, StorageRe
       }
     }
 
-    public bool MoveParent(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileResource? newParent, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    public bool Move(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileResource? newParent, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       cancellationToken.ThrowIfCancellationRequested();
 
@@ -87,15 +82,15 @@ public sealed class FileResource(FileResource.ResourceManager manager, StorageRe
 
         if ((newParent != null) && (newParent.Type != FileType.Folder))
         {
-          throw new ArgumentException("Invalid new parent.", nameof(parent));
+          throw new ArgumentException("Invalid new parent.", nameof(newParent));
         }
 
-        KeyService.AesPair fileKey = storage.DecryptFileKey(file, userAuthenticationToken);
-
-        return Update(transaction, file, new(
+        bool result = Update(transaction, file, new(
           (COLUMN_PARENT_FILE_ID, newParent?.Id),
-          (COLUMN_KEY, newParent != null ? storage.DecryptFileKey(newParent, userAuthenticationToken).Encrypt(fileKey.Serialize()) : storage.EncryptFileKey(fileKey, userAuthenticationToken))
+          (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken), newParent, userAuthenticationToken, cancellationToken))
         ), cancellationToken);
+
+        return result;
       }
     }
 
@@ -135,11 +130,9 @@ public sealed class FileResource(FileResource.ResourceManager manager, StorageRe
           throw new ArgumentException("Invalid parent.", nameof(parent));
         }
 
-        KeyService.AesPair fileKey = Service.Server.KeyService.GetNewAesPair();
-
         return Insert(transaction, new(
           (COLUMN_STORAGE_ID, storage.Id),
-          (COLUMN_KEY, parent != null ? storage.DecryptFileKey(parent, userAuthenticationToken).Encrypt(fileKey.Serialize()) : storage.EncryptFileKey(fileKey, userAuthenticationToken)),
+          (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, Service.Server.KeyService.GetNewAesPair(), parent, userAuthenticationToken)),
           (COLUMN_PARENT_FILE_ID, parent?.Id),
           (COLUMN_NAME, name),
           (COLUMN_TYPE, (byte)type)
@@ -149,9 +142,6 @@ public sealed class FileResource(FileResource.ResourceManager manager, StorageRe
   }
 
   public new sealed record ResourceData(long Id, long CreateTime, long UpdateTime, long StorageId, byte[] Key, long? ParentId, FileType Type, string Name) : Resource<ResourceManager, ResourceData, FileResource>.ResourceData(Id, CreateTime, UpdateTime);
-
-  public readonly StorageResource Storage = storage;
-  public FileResource? Parent { get; private set; } = parent;
 
   public long StorageId => Data.StorageId;
   public byte[] Key => Data.Key;

@@ -52,7 +52,15 @@ public static class Program
     await server.Start();
     try
     {
-      await RunTest(testLogger, server);
+      try
+      {
+        await RunTest(testLogger, server);
+      }
+      catch
+      {
+        Handler = null;
+        throw;
+      }
       await server.Join();
     }
     catch (Exception exception)
@@ -93,16 +101,21 @@ public static class Program
 
       StorageResource storage = service.Storages.Create(transaction, originalUser, originalToken, cancellationToken);
 
-      FileResource folder1 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder1", originalToken, cancellationToken);
-      FileResource folder2 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
+      FileResource file = service.Files.Create(transaction, storage, null, FileResource.FileType.File, "Test", originalToken, cancellationToken);
+      Console.WriteLine($"File Key: {CompositeBuffer.From(service.Storages.DecryptFileKey(transaction, storage, file, originalToken, cancellationToken).Serialize()).ToHexString()}");
 
-      FileResource file = service.Files.Create(transaction, storage, folder1, FileResource.FileType.File, "Test", originalToken, cancellationToken);
+      for (int index = 0; index < 10000; index++)
+      {
+        FileResource folder = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
 
-      Console.WriteLine($"File Key: {CompositeBuffer.From(storage.DecryptFileKey(file, originalToken).Serialize()).ToHexString()}");
+        service.Files.Move(transaction, storage, file, folder, originalToken, cancellationToken);
+      }
+      // FileResource folder1 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder1", originalToken, cancellationToken);
+      // service.Files.Move(transaction, storage, file, folder1, originalToken, cancellationToken);
+      // FileResource folder2 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
+      // service.Files.Move(transaction, storage, file, folder2, originalToken, cancellationToken);
 
-      service.Files.MoveParent(transaction, storage, file, folder2, originalToken, cancellationToken);
-
-      Console.WriteLine($"File Key: {CompositeBuffer.From(storage.DecryptFileKey(file, originalToken).Serialize()).ToHexString()}");
+      Console.WriteLine($"File Key: {CompositeBuffer.From(service.Storages.DecryptFileKey(transaction, storage, file, originalToken, cancellationToken).Serialize()).ToHexString()}");
     });
   });
 }

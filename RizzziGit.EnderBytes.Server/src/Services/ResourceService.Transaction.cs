@@ -1,11 +1,10 @@
-using System.Data.SQLite;
 using System.Runtime.CompilerServices;
+using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Services;
 
 using Framework.Collections;
 using Framework.Logging;
-using RizzziGit.EnderBytes.Utilities;
 using WaitQueue = Framework.Collections.WaitQueue<(TaskCompletionSource Source, ResourceService.AsyncTransactionHandler Handler, CancellationToken CancellationToken)>;
 
 public sealed partial class ResourceService
@@ -95,7 +94,7 @@ public sealed partial class ResourceService
     await source.Task;
   }
 
-  private async Task RunTransactionQueue(SQLiteConnection connection, CancellationToken serviceCancellationToken)
+  private async Task RunTransactionQueue(DbConnection connection, CancellationToken serviceCancellationToken)
   {
     Logger.Log(LogLevel.Info, $"Transaction queue is running for database.");
     try
@@ -105,7 +104,7 @@ public sealed partial class ResourceService
         await foreach (var (source, handler, cancellationToken) in (TransactionQueue = new()).WithCancellation(serviceCancellationToken))
         {
           using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(serviceCancellationToken, cancellationToken);
-          using SQLiteTransaction dbTransaction = connection.BeginTransaction();
+          using DbTransaction dbTransaction = connection.BeginTransaction();
 
           List<TransactionFailureHandler> failureHandlers = [];
           Transaction transaction = new(NextTransactionId++, failureHandlers.Add, linkedCancellationTokenSource.Token);

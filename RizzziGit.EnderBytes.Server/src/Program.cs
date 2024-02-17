@@ -1,24 +1,34 @@
 using System.Text;
+using MySql.Data.MySqlClient;
 
 namespace RizzziGit.EnderBytes;
 
 using Framework.Logging;
+using Framework.Memory;
 
 using Core;
 using Resources;
 using Utilities;
 using Services;
-using Connections;
-using Extras;
 
 public static class Program
 {
   public static async Task Main()
   {
     Server server = new(new(
-      KeyGeneratorThreads: 8
-    ));
+      KeyGeneratorThreads: 8,
 
+      DatabaseConnectionStringBuilder: new MySqlConnectionStringBuilder()
+      {
+        Server = "10.1.0.117",
+        Database = "enderbytes",
+
+        UserID = "test",
+        Password = "test",
+
+        AllowBatch = true
+      }
+    ));
     {
       StringBuilder buffer = new();
       server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{timestamp} / {level}] [{scope}] {message}");
@@ -80,6 +90,19 @@ public static class Program
 
       (UserResource otherUser, UserAuthenticationResource.UserAuthenticationToken otherToken) = service.Users.Create(transaction, "testuser2", "Other User", "test", cancellationToken);
       Handler += (transaction, service, cancellationToken) => service.Users.Delete(transaction, otherUser, cancellationToken);
+
+      StorageResource storage = service.Storages.Create(transaction, originalUser, originalToken, cancellationToken);
+
+      FileResource folder1 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder1", originalToken, cancellationToken);
+      FileResource folder2 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
+
+      FileResource file = service.Files.Create(transaction, storage, folder1, FileResource.FileType.File, "Test", originalToken, cancellationToken);
+
+      Console.WriteLine($"File Key: {CompositeBuffer.From(storage.DecryptFileKey(file, originalToken).Serialize()).ToHexString()}");
+
+      service.Files.MoveParent(transaction, storage, file, folder2, originalToken, cancellationToken);
+
+      Console.WriteLine($"File Key: {CompositeBuffer.From(storage.DecryptFileKey(file, originalToken).Serialize()).ToHexString()}");
     });
   });
 }

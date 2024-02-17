@@ -65,7 +65,7 @@
 
          User-PI - Server A                User-PI - Server B
          ------------------                ------------------
-         
+
          C->A : Connect                    C->B : Connect
          C->A : PASV
          A->C : 227 Entering Passive Mode. A1,A2,A3,A4,a1,a2
@@ -126,7 +126,7 @@
 
       The syntax is specified below in NVT-ASCII.  All characters in the
       argument field are ASCII characters including any ASCII
-      represented decimal integers.  Square brackets denote an optional
+      represented decimal bigints.  Square brackets denote an optional
       argument field.  If the option is not taken, the appropriate
       default is implied.
 
@@ -153,8 +153,8 @@ NAME="z3" HREF="#z2">&lt;mode-code></A> &lt;CRLF>
             STOR &lt;SP> &lt;pathname> &lt;CRLF>
             STOU &lt;CRLF>
             APPE &lt;SP> &lt;pathname> &lt;CRLF>
-            ALLO &lt;SP> &lt;decimal-integer>
-                [&lt;SP> R &lt;SP> &lt;decimal-integer>] &lt;CRLF>
+            ALLO &lt;SP> &lt;decimal-bigint>
+                [&lt;SP> R &lt;SP> &lt;decimal-bigint>] &lt;CRLF>
             REST &lt;SP> &lt;marker> &lt;CRLF>
             RNFR &lt;SP> &lt;pathname> &lt;CRLF>
             RNTO &lt;SP> &lt;pathname> &lt;CRLF>
@@ -191,7 +191,7 @@ NAME="z7">&lt;byte-size></A> ::= &lt;number>
             &lt;host-port> ::= &lt;host-number>,&lt;port-number>
             &lt;host-number> ::= &lt;number>,&lt;number>,&lt;number>,&lt;number>
             &lt;port-number> ::= &lt;number>,&lt;number>
-            &lt;number> ::= any decimal integer 1 through 255
+            &lt;number> ::= any decimal bigint 1 through 255
             <A
 NAME="z4">&lt;form-code></A> ::= N | T | C
             <A
@@ -206,7 +206,7 @@ NAME="z8" HREF="#z7">&lt;byte-size></A>
             <A
 NAME="z2">&lt;mode-code></A> ::= S | B | C
             &lt;pathname> ::= &lt;string>
-            &lt;decimal-integer> ::= any decimal integer
+            &lt;decimal-bigint> ::= any decimal bigint
 
 </PRE>
 <H3>5.4.  SEQUENCING OF COMMANDS AND
@@ -429,7 +429,7 @@ REPLIES</H3>
    We first present the diagram that represents the largest group of FTP
    commands:
 
-      
+
                                1,3    +---+
                           ----------->| E |
                          |            +---+
@@ -441,7 +441,7 @@ REPLIES</H3>
                          |     4,5    +---+
                           ----------->| F |
                                       +---+
-      
+
 
       This diagram models the commands:
 
@@ -451,7 +451,7 @@ REPLIES</H3>
    The other large group of commands is represented by a very similar
    diagram:
 
-      
+
                                3      +---+
                           ----------->| E |
                          |            +---+
@@ -463,7 +463,7 @@ REPLIES</H3>
                  |     | |     4,5    +---+
                  |  1  |  ----------->| F |
                   -----               +---+
-      
+
 
       This diagram models the commands:
 
@@ -478,7 +478,7 @@ REPLIES</H3>
    The remaining diagrams model command sequences, perhaps the simplest
    of these is the rename sequence:
 
-      
+
       +---+   RNFR    +---+    1,2    +---+
       | B |---------->| W |---------->| E |
       +---+           +---+        -->+---+
@@ -494,12 +494,12 @@ REPLIES</H3>
       +---+   RNTO    +---+ 4,5 ----->+---+
       |   |---------->| W |---------->| F |
       +---+           +---+           +---+
-      
+
 
 
    The next diagram is a simple model of the Restart command:
 
-      
+
       +---+   REST    +---+    1,2    +---+
       | B |---------->| W |---------->| E |
       +---+           +---+        -->+---+
@@ -518,7 +518,7 @@ REPLIES</H3>
                   |      |
                   |  1   |
                    ------
-      
+
 
          Where "cmd" is APPE, STOR, or RETR.
 
@@ -530,7 +530,7 @@ REPLIES</H3>
 
    The most complicated diagram is for the Login sequence:
 
-      
+
                             1
       +---+   USER    +---+------------->+---+
       | B |---------->| W | 2       ---->| E |
@@ -563,7 +563,7 @@ REPLIES</H3>
    Finally, we present a generalized diagram that could be used to model
    the command and reply interchange:
 
-      
+
                ------------------------------------
               |                                    |
       Begin   |                                    |
@@ -584,7 +584,7 @@ REPLIES</H3>
               |
               V
              End
-      
+
 
 </PRE>
 <H2>7.  TYPICAL FTP SCENARIO</H2>
@@ -614,7 +614,7 @@ REPLIES</H3>
                                            connection&lt;CRLF>.
                                      Server makes data connection
                                      to port U.
-      
+
                                      &lt;---- 226 Closing data connection,
                                          file transfer successful&lt;CRLF>.
       type Image&lt;CR>                 TYPE I&lt;CRLF> ---->

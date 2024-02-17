@@ -1,9 +1,12 @@
 using System.Data.SQLite;
+using System.Data.Common;
+using MySql.Data.MySqlClient;
 
 namespace RizzziGit.EnderBytes.Services;
 
 using Core;
 using Resources;
+using DatabaseWrappers;
 
 public sealed partial class ResourceService : Server.SubService
 {
@@ -16,7 +19,7 @@ public sealed partial class ResourceService : Server.SubService
     Files = new(this);
   }
 
-  private SQLiteConnection? Connection;
+  private Database? Database;
 
   public readonly UserResource.ResourceManager Users;
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
@@ -29,16 +32,22 @@ public sealed partial class ResourceService : Server.SubService
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
-    Connection = new(new SQLiteConnectionStringBuilder()
+    Database = Server.Configuration?.DatabaseConnectionStringBuilder switch
     {
-      DataSource = Path.Join(Server.WorkingPath, $"Database.sqlite3"),
-      JournalMode = SQLiteJournalModeEnum.Memory
-    }.ConnectionString);
+      MySqlConnectionStringBuilder connectionStringBuilder => new MySQLDatabase(connectionStringBuilder),
+      SQLiteConnectionStringBuilder connectionStringBuilder => new SQLiteDatabase(connectionStringBuilder),
 
-    await Connection.OpenAsync(cancellationToken);
+      _ => new SQLiteDatabase(new SQLiteConnectionStringBuilder()
+      {
+        DataSource = Path.Join(Server.WorkingPath, $"Database.sqlite3"),
+        JournalMode = SQLiteJournalModeEnum.Memory
+      })
+    };
+
+    await Database.Connection.OpenAsync(cancellationToken);
 
     TransactionQueueTaskCancellationTokenSource = new();
-    TransactionQueueTask = RunTransactionQueue(Connection, TransactionQueueTaskCancellationTokenSource.Token);
+    TransactionQueueTask = RunTransactionQueue(Database.Connection, TransactionQueueTaskCancellationTokenSource.Token);
 
     await Users.Start(cancellationToken);
     await UserAuthentications.Start(cancellationToken);
@@ -77,7 +86,7 @@ public sealed partial class ResourceService : Server.SubService
     await Users.Stop();
 
     TransactionQueueTaskCancellationTokenSource?.Cancel();
-    Connection?.Dispose();
-    Connection = null;
+    Database?.Dispose();
+    Database = null;
   }
 }

@@ -1,4 +1,4 @@
-using System.Data.SQLite;
+using System.Data.Common;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -50,7 +50,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     protected override UserAuthenticationResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, Service.Users.GetById(transaction, data.UserId, cancellationToken), data);
 
-    protected override ResourceData CastToData(SQLiteDataReader reader, long id, long createTime, long updateTime) => new(
+    protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
       reader.GetInt64(reader.GetOrdinal(COLUMN_USER_ID)),
@@ -72,11 +72,11 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
     {
       if (oldVersion < 1)
       {
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_USER_ID} integer not null;");
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TYPE} integer not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_USER_ID} bigint not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TYPE} tinyint not null;");
 
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_SALT} blob not null;");
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ITERATIONS} integer not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ITERATIONS} bigint not null;");
 
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_CHALLENGE_IV} blob not null;");
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_CHALLENGE_BYTES} blob not null;");
@@ -290,14 +290,9 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
     return payloadHash;
   }
 
-  private static RSACryptoServiceProvider GetRSACryptoServiceProvider(byte[] cspBlob)
+  private RSACryptoServiceProvider GetRSACryptoServiceProvider(byte[] cspBlob)
   {
-    RSACryptoServiceProvider cryptoServiceProvider = new()
-    {
-      PersistKeyInCsp = false,
-      KeySize = KeyService.KEY_SIZE
-    };
-
+    RSACryptoServiceProvider cryptoServiceProvider = Manager.Service.Server.KeyService.GetRsaCryptoServiceProvider(cspBlob);
     cryptoServiceProvider.ImportCspBlob(cspBlob);
     return cryptoServiceProvider;
   }

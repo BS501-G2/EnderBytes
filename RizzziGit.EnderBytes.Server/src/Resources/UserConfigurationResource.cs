@@ -1,4 +1,4 @@
-using System.Data.SQLite;
+using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Resources;
 
@@ -22,7 +22,7 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
     }
 
     protected override UserConfigurationResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, Service.Users.GetById(transaction, data.UserId,  cancellationToken), data);
-    protected override ResourceData CastToData(SQLiteDataReader reader, long id, long createTime, long updateTime) => new(
+    protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
       reader.GetInt64(reader.GetOrdinal(COLUMN_USER_ID)),
@@ -33,8 +33,8 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
     {
       if (oldVersion < 1)
       {
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_USER_ID} integer not null;");
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ENABLE_FTP_ACCESS} integer not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_USER_ID} bigint not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ENABLE_FTP_ACCESS} bigint not null;");
 
         SqlNonQuery(transaction, $"create index {INDEX_USER_ID} on {NAME}({COLUMN_USER_ID});");
       }

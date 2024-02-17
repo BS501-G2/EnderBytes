@@ -1,9 +1,10 @@
-using System.Data.SQLite;
+using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 
 namespace RizzziGit.EnderBytes.Resources;
 
 using Utilities;
+using DatabaseWrappers;
 using Services;
 
 public sealed partial class UserResource(UserResource.ResourceManager manager, UserResource.ResourceData data) : Resource<UserResource.ResourceManager, UserResource.ResourceData, UserResource>(manager, data)
@@ -22,7 +23,7 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
     private const string INDEX_USERNAME = $"Index_{NAME}_{COLUMN_USERNAME}";
 
     protected override UserResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, data);
-    protected override ResourceData CastToData(SQLiteDataReader reader, long id, long createTime, long updateTime) => new(
+    protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
       reader.GetString(reader.GetOrdinal(COLUMN_USERNAME)),
@@ -34,7 +35,11 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
     {
       if (oldVersion < 1)
       {
-        SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_USERNAME} varchar(16) not null collate nocase;");
+        SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_USERNAME} varchar(16) not null collate {DatabaseWrapper switch
+        {
+          MySQLDatabase => "utf8_general_ci",
+          _ => "nocase"
+        }};");
         SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_DISPLAY_NAME} varchar(32) null;");
         SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_PUBLIC_KEY} blob null;");
 

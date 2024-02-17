@@ -1,10 +1,11 @@
 using System.Data.SQLite;
+using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Services;
 
 using Framework.Logging;
 using Framework.Services;
-
+using RizzziGit.EnderBytes.DatabaseWrappers;
 using Utilities;
 
 public sealed partial class ResourceService
@@ -19,16 +20,17 @@ public sealed partial class ResourceService
 
     public readonly int Version = version;
 
-    private SQLiteConnection Database => Service.Connection!;
+    protected Database DatabaseWrapper => Service.Database!;
+    protected DbConnection Database => DatabaseWrapper.Connection;
 
     protected abstract void Upgrade(Transaction transaction, int oldVersion = default, CancellationToken cancellationToken = default);
 
     protected Task<T> Transact<T>(TransactionHandler<T> handler, CancellationToken cancellationToken = default) => Service.Transact(handler, cancellationToken);
     protected Task Transact(TransactionHandler handler, CancellationToken cancellationToken = default) => Service.Transact(handler, cancellationToken);
 
-    private SQLiteCommand CreateCommand(string sql, object?[] parameters)
+    private DbCommand CreateCommand(string sql, object?[] parameters)
     {
-      SQLiteCommand command = Database.CreateCommand();
+      DbCommand command = Database.CreateCommand();
       command.CommandText = string.Format(sql, createParameterArray());
 
       return command;
@@ -40,10 +42,10 @@ public sealed partial class ResourceService
         {
           try
           {
-            string parameterName = $"${index}";
-            command.Parameters.Add(new(parameterName, parameters[index]));
+            string parameterName = $"{index}";
 
-            return parameterName;
+            command.Parameters.Add(DatabaseWrapper.CreateParameter(parameterName, parameters[index]));
+            return DatabaseWrapper.ToParameterName(parameterName);
           }
           finally
           {
@@ -58,9 +60,9 @@ public sealed partial class ResourceService
       Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] SQL {type}: {string.Format(sqlQuery, parameters)}");
     }
 
-    public delegate T SqlQueryDataHandler<T>(SQLiteDataReader reader);
-    public delegate void SqlQueryDataHandler(SQLiteDataReader reader);
-    public delegate IEnumerable<T> SqlQueryDataEnumeratorHandler<T>(SQLiteDataReader reader);
+    public delegate T SqlQueryDataHandler<T>(DbDataReader reader);
+    public delegate void SqlQueryDataHandler(DbDataReader reader);
+    public delegate IEnumerable<T> SqlQueryDataEnumeratorHandler<T>(DbDataReader reader);
 
     protected T SqlQuery<T>(Transaction transaction, SqlQueryDataHandler<T> dataHandler, string sqlQuery, params object?[] parameters) => SqlEnumeratedQuery<T>(transaction, (reader) => [dataHandler(reader)], sqlQuery, parameters).First();
 
@@ -72,10 +74,10 @@ public sealed partial class ResourceService
 
     protected IEnumerable<T> SqlEnumeratedQuery<T>(Transaction transaction, SqlQueryDataEnumeratorHandler<T> dataHandler, string sqlQuery, params object?[] parameters)
     {
-      using SQLiteCommand command = CreateCommand(sqlQuery, parameters);
+      using DbCommand command = CreateCommand(sqlQuery, parameters);
 
       LogSql(transaction, "Query", sqlQuery, parameters);
-      using SQLiteDataReader reader = command.ExecuteReader(System.Data.CommandBehavior.SingleResult);
+      using DbDataReader reader = command.ExecuteReader(System.Data.CommandBehavior.SingleResult);
 
       foreach (T item in dataHandler(reader))
       {
@@ -85,7 +87,7 @@ public sealed partial class ResourceService
 
     protected int SqlNonQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
-      using SQLiteCommand command = CreateCommand(sqlQuery, parameters);
+      using DbCommand command = CreateCommand(sqlQuery, parameters);
 
       LogSql(transaction, "Non-query", sqlQuery, parameters);
       return command.ExecuteNonQuery();
@@ -93,7 +95,7 @@ public sealed partial class ResourceService
 
     protected object? SqlScalar(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
-      using SQLiteCommand command = CreateCommand(sqlQuery, parameters);
+      using DbCommand command = CreateCommand(sqlQuery, parameters);
 
       LogSql(transaction, "Scalar", sqlQuery, parameters);
       return command.ExecuteScalar();
@@ -105,7 +107,7 @@ public sealed partial class ResourceService
     {
       await Transact((transaction, _, cancellationToken) =>
       {
-        SqlNonQuery(transaction, $"create table if not exists __VERSIONS(Name varchar(128) primary key not null, Version integer not null);");
+        SqlNonQuery(transaction, $"create table if not exists __VERSIONS(Name varchar(128) primary key not null, Version bigint not null);");
         int? version = null;
 
         {
@@ -117,14 +119,18 @@ public sealed partial class ResourceService
             }
 
             return null;
-          }, "select Version from __VERSIONS where Name = {0};", Name);
+          }, "select Version from __VERSIONS where Name = {0} limit 1;", Name);
         }
 
         if (version != Version)
         {
           if (version == null)
           {
-            SqlNonQuery(transaction, $"create table {Name}({COLUMN_ID} integer primary key autoincrement, {COLUMN_CREATE_TIME} integer not null, {COLUMN_UPDATE_TIME} integer not null);");
+            SqlNonQuery(transaction, $"create table {Name}({COLUMN_ID} bigint primary key {DatabaseWrapper switch
+            {
+              MySQLDatabase => "auto_increment",
+              _ => "auto increment",
+            }}, {COLUMN_CREATE_TIME} bigint not null, {COLUMN_UPDATE_TIME} bigint not null);");
             Upgrade(transaction, cancellationToken: cancellationToken);
           }
           else

@@ -35,7 +35,11 @@ public abstract partial class Connection<C, CC>(ConnectionService service, CC co
 
   private async Task<Response> HandleRequest(Request.Login loginRequest, CancellationToken cancellationToken)
   {
-    UserResource? user = await Service.Server.ResourceService.Transact((transaction, resources, cancellationToken) => resources.Users.GetByUsername(transaction, loginRequest.Username), cancellationToken);
+    UserResource? user = await Service.Server.ResourceService.Transact((transaction, resources, cancellationToken) =>
+    {
+      resources.Users.TryGetByUsername(transaction, loginRequest.Username, out UserResource? user, cancellationToken);
+      return user;
+    }, cancellationToken);
 
     if (user == null)
     {

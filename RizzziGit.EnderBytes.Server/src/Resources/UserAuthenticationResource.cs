@@ -7,9 +7,9 @@ namespace RizzziGit.EnderBytes.Resources;
 using Utilities;
 using Services;
 
-public sealed partial class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
+public sealed partial class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserResource user, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
-  public sealed record Token(UserAuthenticationResource UserAuthentication, byte[] PayloadHash)
+  public sealed record UserAuthenticationToken(UserResource User, UserAuthenticationResource UserAuthentication, byte[] PayloadHash)
   {
     public long UserId => UserAuthentication.UserId;
 
@@ -48,7 +48,8 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id));
     }
 
-    protected override UserAuthenticationResource NewResource(ResourceData data) => new(this, data);
+    protected override UserAuthenticationResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, Service.Users.GetById(transaction, data.UserId, cancellationToken), data);
+
     protected override ResourceData CastToData(SQLiteDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
@@ -89,10 +90,10 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       }
     }
 
-    public Token CreatePassword(ResourceService.Transaction transaction, UserResource user, Token existing, string password) => Create(transaction, user, existing, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
-    public Token CreatePassword(ResourceService.Transaction transaction, UserResource user, string password) => Create(transaction, user, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
+    public UserAuthenticationToken CreatePassword(ResourceService.Transaction transaction, UserResource user, UserAuthenticationToken existing, string password) => Create(transaction, user, existing, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
+    public UserAuthenticationToken CreatePassword(ResourceService.Transaction transaction, UserResource user, string password, byte[] privateKey, byte[] publicKey) => Create(transaction, user, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password), privateKey, publicKey);
 
-    private Token Create(ResourceService.Transaction transaction, UserResource user, Token existing, UserAuthenticationType type, byte[] payload)
+    private UserAuthenticationToken Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationToken existing, UserAuthenticationType type, byte[] payload)
     {
       byte[] privateKey = existing.UserAuthentication.GetPrivateKey(existing.PayloadHash);
       byte[] publicKey = existing.UserAuthentication.PublicKey;
@@ -112,7 +113,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
       byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
 
-      return new(Insert(transaction, new(
+      return new(user, Insert(transaction, new(
         (COLUMN_USER_ID, user.Id),
         (COLUMN_TYPE, (byte)type),
 
@@ -129,7 +130,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       )), payloadHash);
     }
 
-    private Token Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationType type, byte[] payload)
+    private UserAuthenticationToken Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationType type, byte[] payload, byte[] privateKey, byte[] publicKey)
     {
       if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)) != 0)
       {
@@ -148,11 +149,10 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       byte[] challengeBytes = RandomNumberGenerator.GetBytes(64);
       byte[] challengeEncryptedBytes = AesEncrypt(payloadHash, challengeIv, challengeBytes);
 
-      (byte[] privateKey, byte[] publicKey) = Service.Server.KeyService.GetNewRsaKeyPair();
       byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
       byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
 
-      return new(Insert(transaction, new(
+      return new(user, Insert(transaction, new(
         (COLUMN_USER_ID, user.Id),
         (COLUMN_TYPE, (byte)type),
 
@@ -171,29 +171,45 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     public IEnumerable<UserAuthenticationResource> List(ResourceService.Transaction transaction, UserResource user, LimitClause? limitClause = null, OrderByClause? orderByClause = null) => Select(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), limitClause, orderByClause);
 
-    public Token? GetByPayload(ResourceService.Transaction transaction, UserResource user, byte[] payload, UserAuthenticationType type)
+    public UserAuthenticationToken? GetByPayload(ResourceService.Transaction transaction, UserResource user, byte[] payload, UserAuthenticationType type)
     {
-      foreach (UserAuthenticationResource userAuthentication in Select(transaction,
-        new WhereClause.Nested("and",
-          new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id),
-          new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)type)
-        )
-      ))
+      lock (this)
       {
-        try { return new(userAuthentication, userAuthentication.GetPayloadHash(payload)); } catch { }
-      }
+        lock (user)
+        {
+          user.ThrowIfInvalid();
 
-      return null;
+          foreach (UserAuthenticationResource userAuthentication in Select(transaction,
+            new WhereClause.Nested("and",
+              new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id),
+              new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)type)
+            )
+          ))
+          {
+            try { return new(user, userAuthentication, userAuthentication.GetPayloadHash(payload)); } catch { }
+          }
+
+          return null;
+        }
+      }
     }
 
     public override bool Delete(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication, CancellationToken cancellationToken = default)
     {
-      if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userAuthentication.UserId), cancellationToken) < 2)
+      lock (this)
       {
-        throw new InvalidOperationException("Must have at least two user authentications before deleting one.");
-      }
+        lock (userAuthentication)
+        {
+          userAuthentication.ThrowIfInvalid();
 
-      return base.Delete(transaction, userAuthentication);
+          if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userAuthentication.UserId), cancellationToken) < 2)
+          {
+            throw new InvalidOperationException("Must have at least two user authentications before deleting one.");
+          }
+
+          return base.Delete(transaction, userAuthentication, cancellationToken);
+        }
+      }
     }
   }
 
@@ -233,6 +249,8 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
     return cryptoTransform.TransformFinalBlock(bytes);
   }
 
+  public readonly UserResource User = user;
+
   public long UserId => Data.UserId;
   public UserAuthenticationType Type => Data.Type;
 
@@ -257,7 +275,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
   }
 
   private RSACryptoServiceProvider? CryptoServiceProvider;
-  private Token? TokenCache;
+  private UserAuthenticationToken? TokenCache;
 
   private byte[] GetPayloadHash(byte[] payload)
   {
@@ -308,13 +326,20 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
     }
   }
 
-  public Token GetTokenByPayload(byte[] payload)
+  public UserAuthenticationToken GetTokenByPayload(UserResource user, byte[] payload)
   {
     lock (this)
     {
+      user.ThrowIfInvalid();
+
+      if (user.Id != UserId)
+      {
+        throw new ArgumentException("Invalid user.", nameof(user));
+      }
+
       byte[] payloadHash = GetPayloadHash(payload);
 
-      return TokenCache ??= new(this, payloadHash);
+      return TokenCache ??= new(user, this, payloadHash);
     }
   }
 }

@@ -68,7 +68,7 @@ public sealed partial class SessionService(Server server) : Server.SubService(se
     }
   }
 
-  public Session NewSession(ConnectionService.Connection connection, UserAuthenticationResource.Token token)
+  public Session NewSession(ConnectionService.Connection connection, UserAuthenticationResource.UserAuthenticationToken token)
   {
     lock (connection)
     {

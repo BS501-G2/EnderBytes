@@ -6,7 +6,7 @@ public sealed partial class SessionService
 {
   public sealed class Session
   {
-    public Session(SessionService service, long id, UserAuthenticationResource.Token token, ConnectionService.Connection connection)
+    public Session(SessionService service, long id, UserAuthenticationResource.UserAuthenticationToken token, ConnectionService.Connection connection)
     {
       Service = service;
       Id = id;
@@ -17,7 +17,7 @@ public sealed partial class SessionService
     public readonly SessionService Service;
 
     public readonly long Id;
-    public readonly UserAuthenticationResource.Token Token;
+    public readonly UserAuthenticationResource.UserAuthenticationToken Token;
 
     public readonly ConnectionService.Connection Connection;
 

@@ -16,6 +16,9 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
 
   public sealed record AesPair(byte[] Key, byte[] Iv)
   {
+    public static AesPair Deserialize(byte[] Key, int offset = 0) => new(Key[offset..32], Key[(32 + offset)..48]);
+    public byte[] Serialize() => [.. Key, .. Iv];
+
     public byte[] Encrypt(byte[] bytes)
     {
       using Aes aes = Aes.Create();
@@ -52,6 +55,18 @@ public sealed partial class KeyService(Server server) : Server.SubService(server
     {
       provider.Clear();
     }
+  }
+
+  public RSACryptoServiceProvider GetRsaCryptoServiceProvider(byte[] cspBlob)
+  {
+    RSACryptoServiceProvider provider = new()
+    {
+      KeySize = KEY_SIZE,
+      PersistKeyInCsp = false
+    };
+
+    provider.ImportCspBlob(cspBlob);
+    return provider;
   }
 
   private async Task RunKeyGenerationJob(CancellationToken cancellationToken)

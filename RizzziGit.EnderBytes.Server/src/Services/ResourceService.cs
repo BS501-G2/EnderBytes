@@ -12,10 +12,8 @@ public sealed partial class ResourceService : Server.SubService
     Users = new(this);
     UserAuthentications = new(this);
     UserConfiguration = new(this);
-    Keys = new(this);
-    FileHubs = new(this);
+    Storages = new(this);
     Files = new(this);
-    FileAccesses = new(this);
   }
 
   private SQLiteConnection? Connection;
@@ -23,10 +21,8 @@ public sealed partial class ResourceService : Server.SubService
   public readonly UserResource.ResourceManager Users;
   public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
   public readonly UserConfigurationResource.ResourceManager UserConfiguration;
-  public readonly KeyResource.ResourceManager Keys;
-  public readonly FileHubResource.ResourceManager FileHubs;
+  public readonly StorageResource.ResourceManager Storages;
   public readonly FileResource.ResourceManager Files;
-  public readonly FileAccessResource.ResourceManager FileAccesses;
 
   private Task? TransactionQueueTask;
   private CancellationTokenSource? TransactionQueueTaskCancellationTokenSource = new();
@@ -47,10 +43,8 @@ public sealed partial class ResourceService : Server.SubService
     await Users.Start(cancellationToken);
     await UserAuthentications.Start(cancellationToken);
     await UserConfiguration.Start(cancellationToken);
-    await Keys.Start(cancellationToken);
-    await FileHubs.Start(cancellationToken);
+    await Storages.Start(cancellationToken);
     await Files.Start(cancellationToken);
-    await FileAccesses.Start(cancellationToken);
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
@@ -63,10 +57,8 @@ public sealed partial class ResourceService : Server.SubService
           Users,
           UserAuthentications,
           UserConfiguration,
-          Keys,
-          FileHubs,
-          Files,
-          FileAccesses
+          Storages,
+          Files
         ], cancellationToken)
       ]);
     }
@@ -78,13 +70,11 @@ public sealed partial class ResourceService : Server.SubService
 
   protected override async Task OnStop(Exception? exception = null)
   {
-    await Users.Stop();
-    await UserAuthentications.Stop();
-    await UserConfiguration.Stop();
-    await Keys.Stop();
-    await FileHubs.Stop();
     await Files.Stop();
-    await FileAccesses.Stop();
+    await Storages.Stop();
+    await UserConfiguration.Stop();
+    await UserAuthentications.Stop();
+    await Users.Stop();
 
     TransactionQueueTaskCancellationTokenSource?.Cancel();
     Connection?.Dispose();

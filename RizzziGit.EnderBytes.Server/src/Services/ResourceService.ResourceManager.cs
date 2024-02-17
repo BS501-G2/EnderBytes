@@ -72,10 +72,10 @@ public sealed partial class ResourceService
 
     protected IEnumerable<T> SqlEnumeratedQuery<T>(Transaction transaction, SqlQueryDataEnumeratorHandler<T> dataHandler, string sqlQuery, params object?[] parameters)
     {
-      SQLiteCommand command = CreateCommand(sqlQuery, parameters);
+      using SQLiteCommand command = CreateCommand(sqlQuery, parameters);
 
       LogSql(transaction, "Query", sqlQuery, parameters);
-      SQLiteDataReader reader = command.ExecuteReader(System.Data.CommandBehavior.SingleResult);
+      using SQLiteDataReader reader = command.ExecuteReader(System.Data.CommandBehavior.SingleResult);
 
       foreach (T item in dataHandler(reader))
       {
@@ -85,7 +85,7 @@ public sealed partial class ResourceService
 
     protected int SqlNonQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
-      SQLiteCommand command = CreateCommand(sqlQuery, parameters);
+      using SQLiteCommand command = CreateCommand(sqlQuery, parameters);
 
       LogSql(transaction, "Non-query", sqlQuery, parameters);
       return command.ExecuteNonQuery();
@@ -93,7 +93,7 @@ public sealed partial class ResourceService
 
     protected object? SqlScalar(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
-      SQLiteCommand command = CreateCommand(sqlQuery, parameters);
+      using SQLiteCommand command = CreateCommand(sqlQuery, parameters);
 
       LogSql(transaction, "Scalar", sqlQuery, parameters);
       return command.ExecuteScalar();

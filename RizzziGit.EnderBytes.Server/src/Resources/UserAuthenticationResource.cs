@@ -48,7 +48,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id));
     }
 
-    protected override UserAuthenticationResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, data);
+    protected override UserAuthenticationResource NewResource(ResourceData data) => new(this, data);
 
     protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,

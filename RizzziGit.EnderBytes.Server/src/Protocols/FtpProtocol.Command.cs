@@ -76,15 +76,15 @@ public sealed partial class FtpProtocol
       UserConfigurationResource? userConfiguration = null;
       UserAuthenticationResource.UserAuthenticationToken? token = null;
 
-      await Service.Server.ResourceService.Transact((transaction, resourceService, cancellationToken) =>
+      await Service.Server.ResourceService.Transact((transaction, cancellationToken) =>
       {
-        if (!resourceService.Users.TryGetByUsername(transaction, Username, out UserResource? user, cancellationToken))
+        if (!transaction.ResoruceService.Users.TryGetByUsername(transaction, Username, out UserResource? user, cancellationToken))
         {
           return;
         }
 
-        userConfiguration = resourceService.UserConfiguration.Get(transaction, user);
-        token = resourceService.UserAuthentications.GetByPayload(transaction, user, Encoding.ASCII.GetBytes(command.Password), UserAuthenticationResource.UserAuthenticationType.Password);
+        userConfiguration = transaction.ResoruceService.UserConfiguration.Get(transaction, user);
+        token = transaction.ResoruceService.UserAuthentications.GetByPayload(transaction, user, Encoding.ASCII.GetBytes(command.Password), UserAuthenticationResource.UserAuthenticationType.Password);
       }, cancellationToken);
 
       if (userConfiguration == null || token == null)

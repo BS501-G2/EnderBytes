@@ -1,5 +1,6 @@
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
 
 namespace RizzziGit.EnderBytes.Resources;
 
@@ -22,7 +23,7 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
 
     private const string INDEX_USERNAME = $"Index_{NAME}_{COLUMN_USERNAME}";
 
-    protected override UserResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, data);
+    protected override UserResource NewResource(ResourceData data) => new(this, data);
     protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
@@ -99,4 +100,16 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
   public string Username => Data.Username;
   public string? DisplayName => Data.DisplayName;
   public byte[] PublicKey => Data.PublicKey;
+
+  private RSACryptoServiceProvider? RSACryptoServiceProvider;
+
+  public byte[] Encrypt(byte[] bytes)
+  {
+    lock (this)
+    {
+      RSACryptoServiceProvider ??= Manager.Service.Server.KeyService.GetRsaCryptoServiceProvider(PublicKey);
+
+      return RSACryptoServiceProvider.Encrypt(bytes, false);
+    }
+  }
 }

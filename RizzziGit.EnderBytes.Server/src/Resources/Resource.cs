@@ -50,7 +50,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       }
     }
 
-    protected abstract R NewResource(ResourceService.Transaction transaction, D data, CancellationToken cancellationToken = default);
+    protected abstract R NewResource(D data);
     private D CastToData(DbDataReader reader) => CastToData(reader,
       reader.GetInt64(reader.GetOrdinal(COLUMN_ID)),
       reader.GetInt64(reader.GetOrdinal(COLUMN_CREATE_TIME)),
@@ -58,13 +58,13 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
     );
     protected abstract D CastToData(DbDataReader reader, long id, long createTime, long updateTime);
 
-    protected R GetResource(ResourceService.Transaction transaction, D data, CancellationToken cancellationToken = default)
+    protected R GetResource(D data)
     {
       lock (this)
       {
         if (!Resources.TryGetValue(data.Id, out R? resource))
         {
-          Resources.Add(data.Id, resource = NewResource(transaction, data, cancellationToken));
+          Resources.Add(data.Id, resource = NewResource(data));
         }
         else
         {
@@ -94,7 +94,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
             cancellationToken.ThrowIfCancellationRequested();
 
             reader.Read();
-            R resource = GetResource(transaction, CastToData(reader), cancellationToken);
+            R resource = GetResource(CastToData(reader));
 
             Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] New {Name} resource: #{resource.Id}");
 
@@ -131,7 +131,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         {
           cancellationToken.ThrowIfCancellationRequested();
           Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Enumerated {Name} resource: #{data.Id}");
-          yield return GetResource(transaction, data, cancellationToken);
+          yield return GetResource(data);
         }
 
         yield break;
@@ -199,7 +199,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
               return;
             }
 
-            resource = NewResource(transaction, data, cancellationToken);
+            resource = NewResource(data);
             transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
             ResourceDeleted?.Invoke(transaction, resource);
           };
@@ -261,7 +261,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
             }
             else if (ResourceUpdated != null)
             {
-              resource = GetResource(transaction, newData);
+              resource = GetResource(newData);
 
               transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
               ResourceUpdated.Invoke(transaction, resource, newData);

@@ -17,6 +17,7 @@ public sealed partial class ResourceService : Server.SubService
     UserConfiguration = new(this);
     Storages = new(this);
     Files = new(this);
+    FileAccesses = new(this);
   }
 
   private Database? Database;
@@ -26,6 +27,7 @@ public sealed partial class ResourceService : Server.SubService
   public readonly UserConfigurationResource.ResourceManager UserConfiguration;
   public readonly StorageResource.ResourceManager Storages;
   public readonly FileResource.ResourceManager Files;
+  public readonly FileAccessResource.ResourceManager FileAccesses;
 
   private Task? TransactionQueueTask;
   private CancellationTokenSource? TransactionQueueTaskCancellationTokenSource = new();
@@ -54,6 +56,7 @@ public sealed partial class ResourceService : Server.SubService
     await UserConfiguration.Start(cancellationToken);
     await Storages.Start(cancellationToken);
     await Files.Start(cancellationToken);
+    await FileAccesses.Start(cancellationToken);
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
@@ -67,7 +70,8 @@ public sealed partial class ResourceService : Server.SubService
           UserAuthentications,
           UserConfiguration,
           Storages,
-          Files
+          Files,
+          FileAccesses
         ], cancellationToken)
       ]);
     }
@@ -79,6 +83,7 @@ public sealed partial class ResourceService : Server.SubService
 
   protected override async Task OnStop(Exception? exception = null)
   {
+    await FileAccesses.Stop();
     await Files.Stop();
     await Storages.Stop();
     await UserConfiguration.Stop();

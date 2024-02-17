@@ -91,29 +91,35 @@ public static class Program
 
   public static async Task RunTest(Logger logger, Server server) => await Task.Run(async () =>
   {
-    await server.ResourceService.Transact((transaction, service, cancellationToken) =>
+    await server.ResourceService.Transact((transaction, cancellationToken) =>
     {
+      ResourceService service = transaction.ResoruceService;
+
       (UserResource originalUser, UserAuthenticationResource.UserAuthenticationToken originalToken) = service.Users.Create(transaction, "testuser", "Test User", "test", cancellationToken);
-      Handler += (transaction, service, cancellationToken) => service.Users.Delete(transaction, originalUser, cancellationToken);
+      Handler += (transaction, cancellationToken) => service.Users.Delete(transaction, originalUser, cancellationToken);
 
       (UserResource otherUser, UserAuthenticationResource.UserAuthenticationToken otherToken) = service.Users.Create(transaction, "testuser2", "Other User", "test", cancellationToken);
-      Handler += (transaction, service, cancellationToken) => service.Users.Delete(transaction, otherUser, cancellationToken);
+      Handler += (transaction, cancellationToken) => service.Users.Delete(transaction, otherUser, cancellationToken);
 
       StorageResource storage = service.Storages.Create(transaction, originalUser, originalToken, cancellationToken);
 
       FileResource file = service.Files.Create(transaction, storage, null, FileResource.FileType.File, "Test", originalToken, cancellationToken);
       Console.WriteLine($"File Key: {CompositeBuffer.From(service.Storages.DecryptFileKey(transaction, storage, file, originalToken, cancellationToken).Serialize()).ToHexString()}");
 
-      for (int index = 0; index < 10000; index++)
+      FileResource? lastFolder = null;
+      for (int index = 0; index < 10; index++)
       {
         FileResource folder = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
 
+        if (lastFolder != null)
+        {
+          service.Files.Move(transaction, storage, lastFolder, folder, originalToken, cancellationToken);
+        }
+
         service.Files.Move(transaction, storage, file, folder, originalToken, cancellationToken);
+
+        lastFolder = folder;
       }
-      // FileResource folder1 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder1", originalToken, cancellationToken);
-      // service.Files.Move(transaction, storage, file, folder1, originalToken, cancellationToken);
-      // FileResource folder2 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
-      // service.Files.Move(transaction, storage, file, folder2, originalToken, cancellationToken);
 
       Console.WriteLine($"File Key: {CompositeBuffer.From(service.Storages.DecryptFileKey(transaction, storage, file, originalToken, cancellationToken).Serialize()).ToHexString()}");
     });

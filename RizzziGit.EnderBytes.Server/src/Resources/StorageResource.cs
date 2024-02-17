@@ -27,7 +27,7 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
       service.Users.ResourceDeleted += (transaction, user) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", user.Id));
     }
 
-    protected override StorageResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, data);
+    protected override StorageResource NewResource(ResourceData data) => new(this, data);
 
     protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
@@ -114,13 +114,13 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
           }
 
           byte[] encryptFileKey() => parent != null
-            ? DecryptFileKey(transaction, storage, parent, userAuthenticationToken, cancellationToken).Encrypt(key.Serialize())
+            ? DecryptFileKey(transaction, storage, parent, userAuthenticationToken, cancellationToken: cancellationToken).Encrypt(key.Serialize())
             : storageKey.Encrypt(key.Serialize());
         }
       }
     }
 
-    public KeyService.AesPair DecryptFileKey(ResourceService.Transaction transaction, StorageResource storage, FileResource file, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    public KeyService.AesPair DecryptFileKey(ResourceService.Transaction transaction, StorageResource storage, FileResource file, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileAccessResource.FileAccessType? fileAccessType = null, CancellationToken cancellationToken = default)
     {
       lock (this)
       {
@@ -132,27 +132,59 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
           {
             file.ThrowIfInvalid();
 
+            if (userAuthenticationToken == null)
+            {
+              return decryptFileKey();
+            }
+
             lock (userAuthenticationToken)
             {
               userAuthenticationToken.ThrowIfInvalid();
 
-              if (storage.OwnerUserId != userAuthenticationToken.UserId)
+              return decryptFileKey();
+            }
+
+            KeyService.AesPair decryptFileKey()
+            {
+              if (storage.OwnerUserId != userAuthenticationToken?.UserId)
               {
-                throw new ArgumentException("Token does not belong to storage owner.", nameof(userAuthenticationToken));
-              }
+                return decryptFileKey2(file);
 
-              KeyService.AesPair storageKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key));
-
-              return decryptFileKey(file);
-
-              KeyService.AesPair decryptFileKey(FileResource file)
-              {
-                if (file.ParentId != null)
+                KeyService.AesPair decryptFileKey2(FileResource file)
                 {
-                  return KeyService.AesPair.Deserialize(decryptFileKey(Service.Files.GetById(transaction, (long)file.ParentId, cancellationToken)).Decrypt(file.Key));
-                }
+                  foreach (FileAccessResource fileAccess in Service.FileAccesses.List(transaction, file, cancellationToken: cancellationToken))
+                  {
+                    if (fileAccessType != null && fileAccess.Type > fileAccessType)
+                    {
+                      continue;
+                    }
 
-                return KeyService.AesPair.Deserialize(storageKey.Decrypt(file.Key));
+                    if ((userAuthenticationToken != null) && (fileAccess.TargetEntityType == FileAccessResource.FileAccessTargetEntityType.User) && (fileAccess.TargetEntityId == userAuthenticationToken?.UserId))
+                    {
+                      return KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(file.Key));
+                    }
+                    else if (fileAccess.TargetEntityType == FileAccessResource.FileAccessTargetEntityType.None)
+                    {
+                      return KeyService.AesPair.Deserialize(fileAccess.Key);
+                    }
+                  }
+
+                  if (file.ParentId == null)
+                  {
+                    throw new ArgumentException("No access to the file.", nameof(userAuthenticationToken));
+                  }
+
+                  return KeyService.AesPair.Deserialize(decryptFileKey2(Service.Files.GetById(transaction, (long)file.ParentId, cancellationToken)).Decrypt(file.Key));
+                }
+              }
+              else
+              {
+                KeyService.AesPair storageKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key));
+
+                return decryptFileKey2(file);
+                KeyService.AesPair decryptFileKey2(FileResource file) => file.ParentId != null
+                  ? KeyService.AesPair.Deserialize(decryptFileKey2(Service.Files.GetById(transaction, (long)file.ParentId, cancellationToken)).Decrypt(file.Key))
+                  : KeyService.AesPair.Deserialize(storageKey.Decrypt(file.Key));
               }
             }
           }

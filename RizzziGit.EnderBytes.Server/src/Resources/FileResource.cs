@@ -28,7 +28,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
       ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", resource.Id));
     }
 
-    protected override FileResource NewResource(ResourceService.Transaction transaction, ResourceData data, CancellationToken cancellationToken = default) => new(this, data);
+    protected override FileResource NewResource(ResourceData data) => new(this, data);
 
     protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
@@ -71,6 +71,23 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
           lock (newParent)
           {
+            newParent.ThrowIfInvalid();
+
+            FileResource currentParent = newParent;
+            while (currentParent != null)
+            {
+              if (currentParent.Id == file.Id)
+              {
+                throw new ArgumentException("Moving the file inside the new parent folder closes the loop.", nameof(newParent));
+              }
+              else if (currentParent.ParentId == null)
+              {
+                break;
+              }
+
+              currentParent = GetById(transaction, (long)currentParent.ParentId, cancellationToken);
+            }
+
             return moveParent();
           }
         }
@@ -87,7 +104,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
         bool result = Update(transaction, file, new(
           (COLUMN_PARENT_FILE_ID, newParent?.Id),
-          (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken), newParent, userAuthenticationToken, cancellationToken))
+          (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken), newParent, userAuthenticationToken, cancellationToken))
         ), cancellationToken);
 
         return result;

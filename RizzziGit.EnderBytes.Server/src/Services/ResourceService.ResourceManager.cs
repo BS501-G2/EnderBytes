@@ -105,7 +105,7 @@ public sealed partial class ResourceService
     protected sealed override Task OnRun(CancellationToken cancellationToken) => base.OnRun(cancellationToken);
     protected sealed override async Task OnStart(CancellationToken cancellationToken)
     {
-      await Transact((transaction, _, cancellationToken) =>
+      await Transact((transaction, cancellationToken) =>
       {
         SqlNonQuery(transaction, $"create table if not exists __VERSIONS(Name varchar(128) primary key not null, Version bigint not null);");
         int? version = null;

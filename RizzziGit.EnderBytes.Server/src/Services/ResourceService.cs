@@ -46,6 +46,7 @@ public sealed partial class ResourceService : Server.SubService
       })
     };
 
+    Logger.Info("Connecting to the database...");
     await Database.Connection.OpenAsync(cancellationToken);
 
     TransactionQueueTaskCancellationTokenSource = new();

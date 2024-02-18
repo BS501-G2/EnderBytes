@@ -45,7 +45,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id));
+      service.Users.ResourceDeleted += (transaction, resource, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id), cancellationToken);
     }
 
     protected override UserAuthenticationResource NewResource(ResourceData data) => new(this, data);
@@ -266,7 +266,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
   private RSACryptoServiceProvider? CryptoServiceProvider;
   private UserAuthenticationToken? TokenCache;
 
-  ~UserAuthenticationResource()  => CryptoServiceProvider?.Dispose();
+  ~UserAuthenticationResource() => CryptoServiceProvider?.Dispose();
 
   private byte[] GetPrivateKey(byte[] payloadHash)
   {

@@ -5,6 +5,9 @@ namespace RizzziGit.EnderBytes.Services;
 
 using Framework.Collections;
 using Framework.Logging;
+
+using Utilities;
+
 using WaitQueue = Framework.Collections.WaitQueue<(TaskCompletionSource Source, ResourceService.AsyncTransactionHandler Handler, CancellationToken CancellationToken)>;
 
 public sealed partial class ResourceService
@@ -135,9 +138,13 @@ public sealed partial class ResourceService
           source.SetResult();
         }
       }
-      catch (OperationCanceledException) { }
-      catch
+      catch (Exception exception)
       {
+        if (exception.IsDueToCancellationToken(serviceCancellationToken))
+        {
+          return;
+        }
+
         Logger.Log(LogLevel.Info, $"Transaction queue for database has crashed.");
 
         throw;

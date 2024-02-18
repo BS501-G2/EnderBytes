@@ -26,7 +26,7 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction, user) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", user.Id));
+      service.Users.ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", user.Id), cancellationToken);
     }
 
     protected override StorageResource NewResource(ResourceData data) => new(this, data);
@@ -101,23 +101,28 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
         {
           storage.ThrowIfInvalid();
 
-          KeyService.AesPair storageKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key));
-
           if (parent == null)
           {
-            return encryptFileKey();
+            if (storage.OwnerUserId != userAuthenticationToken.UserId)
+            {
+              throw new ArgumentException("Other users cannot encrypt using the storage key.", nameof(userAuthenticationToken));
+            }
+
+            KeyService.AesPair storageKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key));
+
+            return encryptFileKey(storageKey, null);
           }
 
           lock (parent)
           {
             parent.ThrowIfInvalid();
 
-            return encryptFileKey();
+            return encryptFileKey(null, parent);
           }
 
-          byte[] encryptFileKey() => parent != null
+          byte[] encryptFileKey(KeyService.AesPair? storageKey, FileResource? parent) => storageKey == null && parent != null
             ? DecryptFileKey(transaction, storage, parent, userAuthenticationToken, cancellationToken: cancellationToken).Encrypt(key.Serialize())
-            : storageKey.Encrypt(key.Serialize());
+            : storageKey!.Encrypt(key.Serialize());
         }
       }
     }
@@ -156,22 +161,14 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
                 {
                   foreach (FileAccessResource fileAccess in Service.FileAccesses.List(transaction, file, cancellationToken: cancellationToken))
                   {
-                    // Console.WriteLine($"{fileAccess.Key.Length}");
-                    if (fileAccessType != null && fileAccess.Type > fileAccessType)
-                    {
-                      continue;
-                    }
-
                     switch (fileAccess.TargetEntityType)
                     {
                       case FileAccessResource.FileAccessTargetEntityType.User:
-                        if (userAuthenticationToken?.UserId == fileAccess.TargetEntityId)
+                        if (userAuthenticationToken?.UserId != fileAccess.TargetEntityId)
                         {
-                          Console.WriteLine($"File #{file.Id} Key from access decryption: {CompositeBuffer.From(file.Key).ToHexString()}");
-
-                          return KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(file.Key));
+                          break;
                         }
-                        break;
+                        return KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(fileAccess.Key));
 
                       case FileAccessResource.FileAccessTargetEntityType.None:
                         return KeyService.AesPair.Deserialize(fileAccess.Key);
@@ -180,7 +177,7 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
 
                   if (file.ParentId == null)
                   {
-                    throw new ArgumentException("No access to the file.", nameof(userAuthenticationToken));
+                    throw new ArgumentException($"No {fileAccessType} access to the file.", nameof(userAuthenticationToken));
                   }
 
                   return KeyService.AesPair.Deserialize(decryptFileKey2(Service.Files.GetById(transaction, (long)file.ParentId, cancellationToken)).Decrypt(file.Key));
@@ -191,6 +188,7 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
                 KeyService.AesPair storageKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key));
 
                 return decryptFileKey2(file);
+
                 KeyService.AesPair decryptFileKey2(FileResource file) => file.ParentId != null
                   ? KeyService.AesPair.Deserialize(decryptFileKey2(Service.Files.GetById(transaction, (long)file.ParentId, cancellationToken)).Decrypt(file.Key))
                   : KeyService.AesPair.Deserialize(storageKey.Decrypt(file.Key));

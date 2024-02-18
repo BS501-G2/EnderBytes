@@ -2,6 +2,8 @@ using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Resources;
 
+using Framework.Memory;
+
 using Services;
 using Utilities;
 
@@ -24,8 +26,8 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.Storages.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", resource.Id));
-      ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", resource.Id));
+      Service.Storages.ResourceDeleted += (transaction, resource, cancellationToken) => base.Delete(transaction, new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", resource.Id), cancellationToken);
+      ResourceDeleted += (transaction, resource, cancellationToken) => base.Delete(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", resource.Id), cancellationToken);
     }
 
     protected override FileResource NewResource(ResourceData data) => new(this, data);
@@ -150,14 +152,58 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
           throw new ArgumentException("Invalid parent.", nameof(parent));
         }
 
-        return Insert(transaction, new(
+        KeyService.AesPair fileKey = Service.Server.KeyService.GetNewAesPair();
+
+        FileResource file = Insert(transaction, new(
           (COLUMN_STORAGE_ID, storage.Id),
-          (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, Service.Server.KeyService.GetNewAesPair(), parent, userAuthenticationToken, cancellationToken)),
+          (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, fileKey, parent, userAuthenticationToken, cancellationToken)),
           (COLUMN_PARENT_FILE_ID, parent?.Id),
           (COLUMN_NAME, name),
           (COLUMN_TYPE, (byte)type)
         ), cancellationToken);
+
+        Console.WriteLine($"Encrypted file key #{file.Id}: {CompositeBuffer.From(fileKey.Serialize()).ToHexString()}");
+
+        return file;
       }
+    }
+
+    public bool Delete(ResourceService.Transaction transaction, StorageResource storage, FileResource file, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+    {
+      lock (storage)
+      {
+        storage.ThrowIfInvalid();
+
+        lock (file)
+        {
+          file.ThrowIfInvalid();
+          file.ThrowIfDoesNotBelongTo(storage);
+
+          if (userAuthenticationToken == null)
+          {
+            return delete();
+          }
+
+          lock (userAuthenticationToken)
+          {
+            userAuthenticationToken.ThrowIfInvalid();
+
+            return delete();
+          }
+
+          bool delete()
+          {
+            Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+
+            return base.Delete(transaction, file, cancellationToken);
+          }
+        }
+      }
+    }
+
+    public override bool Delete(ResourceService.Transaction transaction, FileResource file, CancellationToken cancellationToken = default)
+    {
+      throw new NotSupportedException("Please specify user token.");
     }
   }
 

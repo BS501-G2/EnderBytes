@@ -18,7 +18,7 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id));
+      service.Users.ResourceDeleted += (transaction, resource, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id), cancellationToken);
     }
 
     protected override UserConfigurationResource NewResource(ResourceData data) => new(this, data);

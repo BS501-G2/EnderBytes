@@ -16,14 +16,14 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
   where D : Resource<M, D, R>.ResourceData
   where R : Resource<M, D, R>
 {
-  public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction);
-  public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, D oldData);
+  public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction,  CancellationToken cancellationToken);
+  public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, D oldData, CancellationToken cancellationToken);
 
   public abstract partial class ResourceManager(ResourceService service, string name, int version) : ResourceService.ResourceManager(service, name, version)
   {
-    public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, R resource);
-    public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, D oldData);
-    public delegate void ResourceInsertHandler(ResourceService.Transaction transaction, R resource);
+    public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken);
+    public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, D oldData, CancellationToken cancellationToken);
+    public delegate void ResourceInsertHandler(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken);
 
     private readonly WeakDictionary<long, R> Resources = [];
 
@@ -99,7 +99,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
             Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] New {Name} resource: #{resource.Id}");
 
             transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
-            ResourceInserted?.Invoke(transaction, resource);
+            ResourceInserted?.Invoke(transaction, resource, cancellationToken);
             return resource;
           },
           $"insert into {Name} ({string.Join(", ", values.Keys)}) values {values.Apply(parameterList)}; " +
@@ -194,14 +194,14 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
             {
               transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
               Resources.Remove(data.Id);
-              ResourceDeleted?.Invoke(transaction, resource);
-              resource.Deleted?.Invoke(transaction);
+              ResourceDeleted?.Invoke(transaction, resource, cancellationToken);
+              resource.Deleted?.Invoke(transaction, cancellationToken);
               return;
             }
 
             resource = NewResource(data);
             transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
-            ResourceDeleted?.Invoke(transaction, resource);
+            ResourceDeleted?.Invoke(transaction, resource, cancellationToken);
           };
 
           count++;
@@ -258,15 +258,15 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
               transaction.RegisterOnFailureHandler(() => resource.Data = oldData);
               resource.Data = newData;
 
-              ResourceUpdated?.Invoke(transaction, resource, oldData);
-              resource.Updated?.Invoke(transaction, oldData);
+              ResourceUpdated?.Invoke(transaction, resource, oldData, cancellationToken);
+              resource.Updated?.Invoke(transaction, oldData, cancellationToken);
             }
             else if (ResourceUpdated != null)
             {
               resource = GetResource(newData);
 
               transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
-              ResourceUpdated.Invoke(transaction, resource, newData);
+              ResourceUpdated.Invoke(transaction, resource, newData, cancellationToken);
             }
           };
 

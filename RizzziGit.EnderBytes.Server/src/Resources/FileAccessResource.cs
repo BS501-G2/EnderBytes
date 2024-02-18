@@ -25,11 +25,11 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.Files.ResourceDeleted += (transaction, file) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id));
-      Service.Users.ResourceDeleted += (transaction, user) => Delete(transaction, new WhereClause.Nested("and",
+      Service.Files.ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), cancellationToken);
+      Service.Users.ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.Nested("and",
         new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", (byte)FileAccessTargetEntityType.User),
         new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id)
-      ));
+      ), cancellationToken);
     }
 
     protected override FileAccessResource NewResource(ResourceData data) => new(this, data);
@@ -64,25 +64,15 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
     {
       lock (this)
       {
-        lock (storage)
-        {
-          storage.ThrowIfInvalid();
+        KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptFileKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
 
-          lock (targetFile)
-          {
-            targetFile.ThrowIfInvalid();
-
-            KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptFileKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
-
-            return Insert(transaction, new(
-              (COLUMN_TARGET_FILE_ID, targetFile.Id),
-              (COLUMN_TARGET_ENTITY_ID, null),
-              (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.None),
-              (COLUMN_KEY, fileKey.Serialize()),
-              (COLUMN_TYPE, (byte)type)
-            ), cancellationToken);
-          }
-        }
+        return Insert(transaction, new(
+          (COLUMN_TARGET_FILE_ID, targetFile.Id),
+          (COLUMN_TARGET_ENTITY_ID, null),
+          (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.None),
+          (COLUMN_KEY, fileKey.Serialize()),
+          (COLUMN_TYPE, (byte)type)
+        ), cancellationToken);
       }
     }
 
@@ -105,7 +95,6 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
 
               KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptFileKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
 
-              Console.WriteLine($"File #{targetFile.Id} Key obtained from access creation: {CompositeBuffer.From(fileKey.Serialize()).ToHexString()}");
               return Insert(transaction, new(
                 (COLUMN_TARGET_FILE_ID, targetFile.Id),
                 (COLUMN_TARGET_ENTITY_ID, targetUser.Id),

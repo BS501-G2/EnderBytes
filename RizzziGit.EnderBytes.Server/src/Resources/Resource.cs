@@ -1,413 +1,335 @@
-using System.Text.Json.Serialization;
-using Microsoft.Data.Sqlite;
-using System.Text;
+using System.Data.Common;
+using System.Security.Cryptography;
+using System.Diagnostics.CodeAnalysis;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-using Database;
-using Collections;
+using Framework.Collections;
+using Framework.Memory;
+using Framework.Logging;
 
-using WhereClause = Dictionary<string, (string condition, object? value, string? collate)>;
-using ValueClause = Dictionary<string, object?>;
-using LimitClause = (int count, int? offset);
-using OrderClause = (string column, string orderBy);
+using DatabaseWrappers;
+using Services;
 
-public abstract class Resource<M, D, R>
+public abstract partial class Resource<M, D, R>(M manager, D data)
   where M : Resource<M, D, R>.ResourceManager
   where D : Resource<M, D, R>.ResourceData
   where R : Resource<M, D, R>
 {
-  public abstract class ResourceManager
+  public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction,  CancellationToken cancellationToken);
+  public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, D oldData, CancellationToken cancellationToken);
+
+  public abstract partial class ResourceManager(ResourceService service, string name, int version) : ResourceService.ResourceManager(service, name, version)
   {
-    private const string KEY_ID = "ID";
-    private const string KEY_CREATE_TIME = "CreateTime";
-    private const string KEY_UPDATE_TIME = "UpdateTime";
+    public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken);
+    public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, D oldData, CancellationToken cancellationToken);
+    public delegate void ResourceInsertHandler(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken);
 
-    public delegate void ResourceInsertHandler(DatabaseTransaction transaction, R resource);
-    public delegate Task AsyncResourceInsertHandler(DatabaseTransaction transaction, R resource, CancellationToken cancellationToken);
+    private readonly WeakDictionary<long, R> Resources = [];
 
-    public delegate void ResourceDeleteHandler(DatabaseTransaction transaction, R resource);
-    public delegate Task AsyncResourceDeleteHandler(DatabaseTransaction transaction, R resource, CancellationToken cancellationToken);
+    public event ResourceInsertHandler? ResourceInserted;
+    public event ResourceUpdateHandler? ResourceUpdated;
+    public event ResourceDeleteHandler? ResourceDeleted;
 
-    public delegate void ResourceUpdateHandler(DatabaseTransaction transaction, R resource, D oldData);
-    public delegate Task AsyncResourceUpdateHandler(DatabaseTransaction transaction, R resource, D oldData, CancellationToken cancellationToken);
-
-    public sealed class ResourceMemory(ResourceManager manager) : WeakDictionary<long, R>
+    public bool IsResourceValid(R resource)
     {
-      public readonly ResourceManager Manager = manager;
-
-      public R ResolveFromData(D data)
+      lock (this)
       {
-        if (TryGetValue(data.Id, out var value))
+        lock (resource)
         {
-          value.Data = data;
-          return value;
+          return Resources.TryGetValue(resource.Id, out R? testResource) && testResource == resource;
+        }
+      }
+    }
+
+    public void ThrowIfResourceInvalid(R resource)
+    {
+      if (!IsResourceValid(resource))
+      {
+        throw new ArgumentException("Invalid resource.", nameof(resource));
+      }
+    }
+
+    protected abstract R NewResource(D data);
+    private D CastToData(DbDataReader reader) => CastToData(reader,
+      reader.GetInt64(reader.GetOrdinal(COLUMN_ID)),
+      reader.GetInt64(reader.GetOrdinal(COLUMN_CREATE_TIME)),
+      reader.GetInt64(reader.GetOrdinal(COLUMN_UPDATE_TIME))
+    );
+    protected abstract D CastToData(DbDataReader reader, long id, long createTime, long updateTime);
+
+    protected R GetResource(D data)
+    {
+      lock (this)
+      {
+        if (!Resources.TryGetValue(data.Id, out R? resource))
+        {
+          Resources.Add(data.Id, resource = NewResource(data));
+        }
+        else
+        {
+          resource.Data = data;
         }
 
-        R resource = Manager.CreateResource(data);
-        TryAdd(data.Id, resource);
         return resource;
       }
     }
 
-    protected ResourceManager(MainResourceManager main, Database database, string name, int version)
+    protected R Insert(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default)
     {
-      Logger = new(name);
-      Main = main;
-      Database = database;
-      Name = name;
-      Version = version;
-
-      Memory = new(this);
-      ResourceUpdateHandlers = [];
-      ResourceDeleteHandlers = [];
-
-      Main.Logger.Subscribe(Logger);
-    }
-
-    public readonly Logger Logger;
-    public readonly MainResourceManager Main;
-    protected readonly Database Database;
-    public readonly string Name;
-    public readonly int Version;
-
-    protected readonly ResourceMemory Memory;
-    private readonly List<AsyncResourceUpdateHandler> ResourceUpdateHandlers;
-    private readonly List<AsyncResourceDeleteHandler> ResourceDeleteHandlers;
-
-    public bool IsValid(R resource) => Memory.TryGetValue(resource.Id, out var value) && resource == value;
-
-    public void OnResourceUpdate(AsyncResourceUpdateHandler handler) => ResourceUpdateHandlers.Add(handler);
-    public void OnResourceUpdate(ResourceUpdateHandler handler) => OnResourceUpdate((transaction, id, oldData, _) =>
-    {
-      handler(transaction, id, oldData);
-      return Task.CompletedTask;
-    });
-
-    public void OnResourceDelete(AsyncResourceDeleteHandler handler) => ResourceDeleteHandlers.Add(handler);
-    public void OnResourceDelete(ResourceDeleteHandler handler) => OnResourceDelete((transaction, id, _) =>
-    {
-      handler(transaction, id);
-      return Task.CompletedTask;
-    });
-
-    protected D CreateData(SqliteDataReader reader) => CreateData(reader,
-      (long)reader[KEY_ID],
-      (long)reader[KEY_CREATE_TIME],
-      (long)reader[KEY_UPDATE_TIME]
-    );
-
-    protected abstract D CreateData(SqliteDataReader reader, long id, long createTime, long updateTime);
-
-    protected abstract R CreateResource(D data);
-
-    protected abstract void OnInit(int oldVersion, DatabaseTransaction transaction);
-    protected abstract void OnInit(DatabaseTransaction transaction);
-
-    public bool Init(DatabaseTransaction transaction)
-    {
-      Validate(transaction);
-
-      int? oldVersion = Main.TableVersion.GetVersion(transaction, Name);
-      if (oldVersion == null)
+      lock (this)
       {
-        transaction.ExecuteNonQuery($"create table {Name}({KEY_ID} integer primary key autoincrement);");
+        cancellationToken.ThrowIfCancellationRequested();
 
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_CREATE_TIME} integer not null");
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_UPDATE_TIME} integer not null");
+        long insertTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        OnInit(transaction);
-        Main.TableVersion.SetVersion(transaction, Name, Version);
-      }
-      else if (oldVersion != Version)
-      {
-        OnInit((int)oldVersion, transaction);
-        Main.TableVersion.SetVersion(transaction, Name, Version);
-      }
-      return oldVersion != Version;
-    }
+        values.Add(COLUMN_CREATE_TIME, insertTimestamp);
+        values.Add(COLUMN_UPDATE_TIME, insertTimestamp);
 
-    public void Validate(DatabaseTransaction transaction)
-    {
-      if (transaction.Database != Database)
-      {
-        throw new ArgumentException("Invalid transaction.", nameof(transaction));
+        List<object?> parameterList = [];
+        return SqlQuery(
+          transaction,
+          (reader) =>
+          {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            reader.Read();
+            R resource = GetResource(CastToData(reader));
+
+            Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] New {Name} resource: #{resource.Id}");
+
+            transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
+            ResourceInserted?.Invoke(transaction, resource, cancellationToken);
+            return resource;
+          },
+          $"insert into {Name} ({string.Join(", ", values.Keys)}) values {values.Apply(parameterList)}; " +
+          $"select * from {Name} where {COLUMN_ID} = {DatabaseWrapper switch
+          {
+            MySQLDatabase => "last_insert_id",
+
+            _ => "last_insert_rowid"
+          }}() limit 1;",
+          [.. parameterList]
+        );
       }
     }
 
-    protected R DbInsert(DatabaseTransaction transaction, ValueClause row)
+    protected R? SelectFirst(ResourceService.Transaction transaction, WhereClause? where = null, OrderByClause? order = null, CancellationToken cancellationToken = default) => SelectOne(transaction, where, 0, order, cancellationToken);
+    protected R? SelectOne(ResourceService.Transaction transaction, WhereClause? where = null, int? offset = null, OrderByClause? order = null, CancellationToken cancellationToken = default) => Select(transaction, where, new(1, offset), order, cancellationToken).FirstOrDefault();
+    protected IEnumerable<R> Select(ResourceService.Transaction transaction, WhereClause? where = null, LimitClause? limit = null, OrderByClause? order = null, CancellationToken cancellationToken = default)
     {
-      Validate(transaction);
-
-      StringBuilder sql = new();
-      List<object?> sqlParams = [];
-
-      sql.Append($"insert into {Name}");
-      if (row.Count != 0)
+      lock (this)
       {
-        StringBuilder columnClause = new();
-        StringBuilder valuesClause = new();
-
-        bool firstEntry = true;
-        foreach (var (key, value) in row.Concat([
-          new(KEY_CREATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
-          new(KEY_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-        ]))
+        cancellationToken.ThrowIfCancellationRequested();
+        List<object?> parameterList = [];
+        foreach (D data in SqlEnumeratedQuery(
+          transaction,
+          castToData,
+          $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")}{(order != null ? $" order by {order.Apply()}" : "")};",
+          [.. parameterList]
+        ))
         {
-          if (!firstEntry)
-          {
-            columnClause.Append(',');
-            valuesClause.Append(',');
-          }
-          else
-          {
-            firstEntry = false;
-          }
-
-          columnClause.Append(key);
-          valuesClause.Append($"{{{sqlParams.Count}}}");
-          sqlParams.Add(value);
+          cancellationToken.ThrowIfCancellationRequested();
+          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Enumerated {Name} resource: #{data.Id}");
+          yield return GetResource(data);
         }
 
-        sql.Append($"({columnClause})values({valuesClause})");
-      }
-      sql.Append(';');
+        yield break;
 
-      transaction.ExecuteNonQuery(sql.ToString(), [.. sqlParams]);
-      SqliteDataReader reader = DbSelect(transaction, new()
-      {
+        IEnumerable<D> castToData(DbDataReader reader)
         {
-          KEY_ID,
-          (
-            "=",
-            (long)(transaction.ExecuteScalar($"select seq from sqlite_sequence where name = {{0}} limit 1;", Name) ?? throw new InvalidOperationException("Failed to get new row ID.")),
-            null
-          )
+          while (reader.Read())
+          {
+            yield return CastToData(reader);
+          }
         }
-      }, []);
-
-      if (!reader.Read())
-      {
-        throw new InvalidOperationException("Failed to read new resource data.");
       }
-
-      return Memory.ResolveFromData(CreateData(reader));
     }
 
-    protected async Task<long> DbUpdate(DatabaseTransaction transaction, ValueClause set, WhereClause where, CancellationToken cancellationToken)
+    protected bool Exists(ResourceService.Transaction transaction, WhereClause? where = null, CancellationToken cancellationToken = default) => Count(transaction, where, cancellationToken) > 0;
+    protected long Count(ResourceService.Transaction transaction, WhereClause? where = null, CancellationToken cancellationToken = default)
     {
-      Validate(transaction);
-
-      if (set.Count == 0)
+      lock (this)
       {
-        return 0;
+        cancellationToken.ThrowIfCancellationRequested();
+        List<object?> parameterList = [];
+
+        return (long)SqlScalar(
+          transaction,
+          $"select count(*) from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")};",
+          [.. parameterList]
+        )!;
       }
-
-      List<object?> sqlParams = [];
-      StringBuilder setCommand = new();
-      {
-        bool firstEntry = true;
-        foreach (var (key, value) in set.Concat([
-          new(KEY_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-        ]))
-        {
-          if (!firstEntry)
-          {
-            setCommand.Append(',');
-          }
-          else
-          {
-            firstEntry = false;
-          }
-
-          setCommand.Append($"{key}={{{sqlParams.Count}}}");
-          sqlParams.Add(value);
-        }
-      }
-
-      string setSql = setCommand.ToString();
-      using SqliteDataReader reader = DbSelect(transaction, where, []);
-      long count = 0;
-      while (reader.Read())
-      {
-        R resource = Memory.ResolveFromData(CreateData(reader));
-        D oldData = resource.Data;
-        transaction.ExecuteNonQuery($"update set {setSql} {Name} where {KEY_ID}={{{sqlParams.Count}}};", [.. sqlParams, resource.Id]);
-        transaction.OnFailure((_, _) =>
-        {
-          resource.Data = oldData;
-          return Task.CompletedTask;
-        });
-
-        using SqliteDataReader newReader = transaction.ExecuteReader($"select * from {Name} where {KEY_ID}={{0}} limit 1;", [resource.Id]);
-        if (!newReader.Read())
-        {
-          throw new InvalidOperationException("Failed to read new resource data.");
-        }
-        resource = Memory.ResolveFromData(CreateData(reader));
-
-        foreach (AsyncResourceUpdateHandler handler in ResourceUpdateHandlers)
-        {
-          await handler(transaction, resource, oldData, cancellationToken);
-        }
-        count++;
-      }
-
-      return count;
     }
 
-    protected async Task<long> DbDelete(DatabaseTransaction transaction, WhereClause where, CancellationToken cancellationToken)
+    protected long Delete(ResourceService.Transaction transaction, WhereClause where, CancellationToken cancellationToken = default)
     {
-      Validate(transaction);
-
-      using SqliteDataReader reader = DbSelect(transaction, where, []);
-
-      long count = 0;
-      while (reader.Read())
+      lock (this)
       {
-        R resource = Memory.ResolveFromData(CreateData(reader));
+        cancellationToken.ThrowIfCancellationRequested();
 
-        transaction.ExecuteNonQuery($"delete from {Name} where {KEY_ID}={{0}}", resource.Id);
-        Memory.Remove(resource.Id);
-        transaction.OnFailure((_, _) =>
-        {
-          Memory.Add(resource.Id, resource);
-          return Task.CompletedTask;
-        });
+        List<object?> parameterList = [];
 
-        foreach (AsyncResourceDeleteHandler handler in ResourceDeleteHandlers)
+        string whereClause = where.Apply(parameterList);
+        string temporaryTableName = $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
+
+        long count = 0;
+
+        Action? actions = null;
+
+        foreach (D data in SqlEnumeratedQuery(
+          transaction,
+          castToData,
+          $"select * from {Name} where {whereClause}; " +
+          $"delete from {Name} where {whereClause};",
+          [.. parameterList]
+        ))
         {
-          await handler(transaction, resource, cancellationToken);
+          actions += () =>
+          {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{data.Id}");
+            if (Resources.TryGetValue(data.Id, out R? resource))
+            {
+              transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
+              Resources.Remove(data.Id);
+              ResourceDeleted?.Invoke(transaction, resource, cancellationToken);
+              resource.Deleted?.Invoke(transaction, cancellationToken);
+              return;
+            }
+
+            resource = NewResource(data);
+            transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
+            ResourceDeleted?.Invoke(transaction, resource, cancellationToken);
+          };
+
+          count++;
         }
 
-        count++;
-      }
+        actions?.Invoke();
+        return count;
 
-      return count;
+        IEnumerable<D> castToData(DbDataReader reader)
+        {
+          while (reader.Read())
+          {
+            yield return CastToData(reader);
+          }
+        }
+      }
     }
 
-    protected SqliteDataReader DbSelect(DatabaseTransaction transaction, WhereClause where, List<string> project, LimitClause? limit = null, List<OrderClause>? order = null)
+    protected long Update(ResourceService.Transaction transaction, WhereClause where, SetClause set, CancellationToken cancellationToken = default)
     {
-      Validate(transaction);
-
-      StringBuilder sql = new();
-      List<object?> sqlParams = [];
-
-      sql.Append($"select ");
-
-      if (project.Count != 0)
+      lock (this)
       {
-        bool firstEntry = true;
-        foreach (string projectEntry in project)
+        cancellationToken.ThrowIfCancellationRequested();
+
+        List<object?> parameterList = [];
+        set.Add(COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+
+        string whereClause = where.Apply(parameterList);
+        string setClause = set.Apply(parameterList);
+
+        string temporaryTableName = $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
+
+        long count = 0;
+
+        Action? actions = null;
+        foreach (D newData in SqlEnumeratedQuery(
+          transaction,
+          castToData,
+          $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
+          $"update {Name} set {setClause} where {whereClause}; " +
+          $"select {Name}.* from {temporaryTableName} left join (select * from {Name}) {Name} on {temporaryTableName}.{COLUMN_ID} = {Name}.{COLUMN_ID}; " +
+          $"drop table {temporaryTableName};",
+          [.. parameterList]
+        ))
         {
-          if (!firstEntry)
+          actions += () =>
           {
-            sql.Append(',');
-          }
-          else
+            cancellationToken.ThrowIfCancellationRequested();
+            Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Updated {Name} resource: #{newData.Id}");
+            if (Resources.TryGetValue(newData.Id, out R? resource))
+            {
+              D oldData = resource.Data;
+
+              transaction.RegisterOnFailureHandler(() => resource.Data = oldData);
+              resource.Data = newData;
+
+              ResourceUpdated?.Invoke(transaction, resource, oldData, cancellationToken);
+              resource.Updated?.Invoke(transaction, oldData, cancellationToken);
+            }
+            else if (ResourceUpdated != null)
+            {
+              resource = GetResource(newData);
+
+              transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
+              ResourceUpdated.Invoke(transaction, resource, newData, cancellationToken);
+            }
+          };
+
+          count++;
+        }
+
+        actions?.Invoke();
+        return count;
+
+        IEnumerable<D> castToData(DbDataReader reader)
+        {
+          while (reader.Read())
           {
-            firstEntry = false;
+            yield return CastToData(reader);
           }
         }
       }
-      else
-      {
-        sql.Append('*');
-      }
-
-      sql.Append($" from {Name}");
-      if (where.Count != 0)
-      {
-        sql.Append(" where ");
-
-        bool firstEntry = true;
-        foreach (var (key, (condition, value, collate)) in where)
-        {
-          if (!firstEntry)
-          {
-            sql.Append(" and ");
-          }
-          else
-          {
-            firstEntry = false;
-          }
-
-          sql.Append($"{key} {condition} {{{sqlParams.Count}}}");
-          sqlParams.Add(value);
-
-          if (collate != null)
-          {
-            sql.Append($" collate {collate}");
-          }
-        }
-      }
-
-      if (limit != null)
-      {
-        sql.Append($" limit {limit.Value.count}");
-
-        if (limit.Value.offset != null)
-        {
-          sql.Append($" offset {limit.Value.offset}");
-        }
-      }
-
-      if (order != null)
-      {
-        sql.Append(" order by ");
-
-        bool firstEntry = true;
-        foreach (var (column, orderBy) in order)
-        {
-          if (!firstEntry)
-          {
-            sql.Append(',');
-          }
-          else
-          {
-            firstEntry = false;
-          }
-
-          sql.Append($"{column} {orderBy}");
-        }
-      }
-
-      sql.Append(';');
-      return transaction.ExecuteReader(sql.ToString(), [..sqlParams]);
     }
 
-    public Task Delete(DatabaseTransaction transaction, R resource, CancellationToken cancellationToken) => DbDelete(transaction, new()
+    protected bool Update(ResourceService.Transaction transaction, R resource, SetClause set, CancellationToken cancellationToken = default)
     {
-      { KEY_ID, ("=", resource.Id, null) }
-    }, cancellationToken);
+      lock (this)
+      {
+        lock (resource)
+        {
+          resource.ThrowIfInvalid();
+
+          return Update(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), set, cancellationToken) != 0;
+        }
+      }
+    }
+
+    public virtual R GetById(ResourceService.Transaction transaction, long Id, CancellationToken cancellationToken = default) => Resources.TryGetValue(Id, out R? resource) ? resource : Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id), cancellationToken: cancellationToken).First();
+    public virtual bool TryGetById(ResourceService.Transaction transaction, long Id, [NotNullWhen(true)] out R? resource, CancellationToken cancellationToken = default) => Resources.TryGetValue(Id, out resource) || ((resource = Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id), cancellationToken: cancellationToken).FirstOrDefault()) != null);
+
+    public virtual bool Delete(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken = default)
+    {
+      lock (this)
+      {
+        lock (resource)
+        {
+          resource.ThrowIfInvalid();
+
+          return Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), cancellationToken) != 0;
+        }
+      }
+    }
   }
 
-  public abstract record ResourceData(long Id, long CreateTime, long UpdateTime)
-  {
-    public const string KEY_ID = "id";
-    [JsonPropertyName(KEY_ID)]
-    public long Id = Id;
+  public abstract partial record ResourceData(long Id, long CreateTime, long UpdateTime);
 
-    public const string KEY_CREATE_TIME = "createTime";
-    [JsonPropertyName(KEY_CREATE_TIME)]
-    public long CreateTime = CreateTime;
+  public readonly M Manager = manager;
+  protected D Data { get; private set; } = data;
 
-    public const string KEY_UPDATE_TIME = "updateTime";
-    [JsonPropertyName(KEY_UPDATE_TIME)]
-    public long UpdateTime = UpdateTime;
-  }
+  public event ResourceUpdateHandler? Updated;
+  public event ResourceDeleteHandler? Deleted;
 
-  protected Resource(M manager, D data)
-  {
-    Manager = manager;
-    Data = data;
-  }
-
-  public readonly M Manager;
-  protected D Data { get; private set; }
-
-  public bool IsValid => Manager.IsValid((R)this);
   public long Id => Data.Id;
   public long CreateTime => Data.CreateTime;
   public long UpdateTime => Data.UpdateTime;
+
+  public bool IsValid => Manager.IsResourceValid((R)this);
+  public void ThrowIfInvalid() => Manager.ThrowIfResourceInvalid((R)this);
+
+  public override string ToString() => Data.ToString();
 }

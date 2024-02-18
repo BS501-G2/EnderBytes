@@ -1,199 +1,339 @@
+using System.Data.Common;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
-using Microsoft.Data.Sqlite;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-using Database;
-using Extensions;
+using Utilities;
+using Services;
 
-public enum UserAuthenticationType : byte
+public sealed partial class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
-  Password
-}
-
-public sealed class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
-{
-  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager
+  public sealed record UserAuthenticationToken(UserResource User, UserAuthenticationResource UserAuthentication, byte[] PayloadHash)
   {
-    public ResourceManager(MainResourceManager main, Database database) : base(main, database, NAME, VERSION)
+    public long UserId => UserAuthentication.UserId;
+
+    public bool IsValid => UserAuthentication.IsValid;
+    public void ThrowIfInvalid() => UserAuthentication.ThrowIfInvalid();
+
+    public byte[] Encrypt(byte[] bytes) => UserAuthentication.Encrypt(bytes);
+    public byte[] Decrypt(byte[] bytes) => UserAuthentication.Decrypt(bytes, PayloadHash);
+  }
+
+  public enum UserAuthenticationType { Password }
+
+  private const string NAME = "UserAuthentication";
+  private const int VERSION = 1;
+
+  public new sealed partial class ResourceManager : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager
+  {
+    private const string COLUMN_USER_ID = "UserId";
+    private const string COLUMN_TYPE = "Type";
+
+    private const string COLUMN_SALT = "Salt";
+    private const string COLUMN_ITERATIONS = "Iterations";
+
+    private const string COLUMN_CHALLENGE_IV = "ChallengeIv";
+    private const string COLUMN_CHALLENGE_BYTES = "ChallengeBytes";
+    private const string COLUMN_CHALLENGE_ENCRYPTED_BYTES = "ChallengeEncryptedBytes";
+
+    private const string COLUMN_ENCRYPTED_PRIVATE_KEY = "EncryptedPrivateKey";
+    private const string COLUMN_ENCRYPTED_PRIVATE_KEY_IV = "EncryptedPrivateKeyIv";
+    private const string COLUMN_PUBLIC_KEY = "PublicKey";
+
+    private const string INDEX_USER_ID = $"Index_{NAME}_{COLUMN_USER_ID}";
+
+    public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      main.Users.OnResourceDelete(async (transaction, resource, cancellationToken) =>
-      {
-        await DbDelete(transaction, new() {
-          { KEY_USER_ID, ("=", resource.Id, null) }
-        }, cancellationToken);
-      });
+      service.Users.ResourceDeleted += (transaction, resource, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id), cancellationToken);
     }
 
-    private static readonly Regex ValidPasswordRegex = new("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[\\W_])[a-zA-Z0-9\\W_]{8,64}$");
+    protected override UserAuthenticationResource NewResource(ResourceData data) => new(this, data);
 
-    public const string NAME = "UserAuthentication";
-    public const int VERSION = 1;
-
-    private const string KEY_USER_ID = "UserID";
-    private const string KEY_TYPE = "Type";
-    private const string KEY_ITERATIONS = "Iterations";
-    private const string KEY_SALT = "Salt";
-    private const string KEY_IV = "IV";
-    private const string KEY_CHALLENGE_BYTES = "ChallengeBytes";
-    private const string KEY_ENCRYPTED_BYTES = "EncryptedBytes";
-
-    private const string INDEX_UNIQUENESS = $"Index_{NAME}_{KEY_USER_ID}_{KEY_TYPE}";
-
-    public readonly RandomNumberGenerator RNG = RandomNumberGenerator.Create();
-
-    protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(
+    protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
-      (long)reader[KEY_USER_ID],
-      (UserAuthenticationType)(long)reader[KEY_TYPE],
-      (int)(long)reader[KEY_ITERATIONS],
-      (byte[])reader[KEY_SALT],
-      (byte[])reader[KEY_IV],
-      (byte[])reader[KEY_CHALLENGE_BYTES],
-      (byte[])reader[KEY_ENCRYPTED_BYTES]
+      reader.GetInt64(reader.GetOrdinal(COLUMN_USER_ID)),
+      (UserAuthenticationType)reader.GetByte(reader.GetOrdinal(COLUMN_TYPE)),
+
+      reader.GetBytes(reader.GetOrdinal(COLUMN_SALT)),
+      reader.GetInt32(reader.GetOrdinal(COLUMN_ITERATIONS)),
+
+      reader.GetBytes(reader.GetOrdinal(COLUMN_CHALLENGE_IV)),
+      reader.GetBytes(reader.GetOrdinal(COLUMN_CHALLENGE_BYTES)),
+      reader.GetBytes(reader.GetOrdinal(COLUMN_CHALLENGE_ENCRYPTED_BYTES)),
+
+      reader.GetBytes(reader.GetOrdinal(COLUMN_ENCRYPTED_PRIVATE_KEY)),
+      reader.GetBytes(reader.GetOrdinal(COLUMN_ENCRYPTED_PRIVATE_KEY_IV)),
+      reader.GetBytes(reader.GetOrdinal(COLUMN_PUBLIC_KEY))
     );
 
-    protected override UserAuthenticationResource CreateResource(ResourceData data) => new(this, data);
-
-    protected override void OnInit(DatabaseTransaction transaction) => OnInit(0, transaction);
-    protected override void OnInit(int oldVersion, DatabaseTransaction transaction)
+    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
     {
       if (oldVersion < 1)
       {
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_USER_ID} integer not null;");
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_TYPE} integer not null;");
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_ITERATIONS} integer not null;");
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_SALT} blob not null;");
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_IV} blob not null;");
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_CHALLENGE_BYTES} blob not null;");
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_ENCRYPTED_BYTES} blob not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_USER_ID} bigint not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TYPE} tinyint not null;");
 
-        transaction.ExecuteNonQuery($"create unique index {INDEX_UNIQUENESS} on {NAME}({KEY_USER_ID},{KEY_TYPE})");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_SALT} blob not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ITERATIONS} bigint not null;");
+
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_CHALLENGE_IV} blob not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_CHALLENGE_BYTES} blob not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_CHALLENGE_ENCRYPTED_BYTES} blob not null;");
+
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ENCRYPTED_PRIVATE_KEY} blob not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ENCRYPTED_PRIVATE_KEY_IV} blob not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_PUBLIC_KEY} blob not null;");
+
+        SqlNonQuery(transaction, $"create index {INDEX_USER_ID} on {NAME}({COLUMN_USER_ID});");
       }
     }
 
-    private UserAuthenticationResource Create(DatabaseTransaction transaction, long userId, UserAuthenticationType type, byte[] payload)
+    public UserAuthenticationToken CreatePassword(ResourceService.Transaction transaction, UserResource user, UserAuthenticationToken existing, string password) => Create(transaction, user, existing, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
+    public UserAuthenticationToken CreatePassword(ResourceService.Transaction transaction, UserResource user, string password, byte[] privateKey, byte[] publicKey) => Create(transaction, user, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password), privateKey, publicKey);
+
+    private UserAuthenticationToken Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationToken existing, UserAuthenticationType type, byte[] payload)
     {
-      int iterations = Main.Server.Config.DefaultUserAuthenticationResourceIterationCount;
+      byte[] privateKey = existing.UserAuthentication.GetPrivateKey(existing.PayloadHash);
+      byte[] publicKey = existing.UserAuthentication.PublicKey;
 
-      byte[] salt = RNG.GetBytes(16);
-      byte[] hash = new Rfc2898DeriveBytes(payload, salt, iterations, HashAlgorithmName.SHA256).GetBytes(32);
-      byte[] iv = RNG.GetBytes(16);
-      byte[] challengeBytes = RNG.GetBytes(32);
-      byte[] encryptedBytes = Aes.Create().CreateEncryptor(hash, iv).TransformFinalBlock(challengeBytes, 0, challengeBytes.Length);
-
-      return DbInsert(transaction, new()
+      byte[] salt = RandomNumberGenerator.GetBytes(16);
+      int iterations = RandomNumberGenerator.GetInt32(1000, 10000);
+      byte[] payloadHash;
       {
-        { KEY_USER_ID, userId },
-        { KEY_TYPE, (byte)type },
-        { KEY_ITERATIONS, iterations },
-        { KEY_SALT, salt },
-        { KEY_IV, iv },
-        { KEY_CHALLENGE_BYTES, challengeBytes },
-        { KEY_ENCRYPTED_BYTES, encryptedBytes }
-      });
-    }
-
-    public UserAuthenticationResource CreatePassword(DatabaseTransaction transaction, long userId, string password)
-    {
-      if (!ValidPasswordRegex.IsMatch(password))
-      {
-        throw new ArgumentException("Invalid password.", nameof(password));
+        using Rfc2898DeriveBytes rfc2898DeriveBytes = new(payload, salt, iterations, HashAlgorithmName.SHA256);
+        payloadHash = rfc2898DeriveBytes.GetBytes(32);
       }
 
-      return Create(transaction, userId, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
+      byte[] challengeIv = RandomNumberGenerator.GetBytes(16);
+      byte[] challengeBytes = RandomNumberGenerator.GetBytes(16);
+      byte[] challengeEncryptedBytes = AesEncrypt(payloadHash, challengeIv, challengeBytes);
+
+      byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
+      byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
+
+      return new(user, Insert(transaction, new(
+        (COLUMN_USER_ID, user.Id),
+        (COLUMN_TYPE, (byte)type),
+
+        (COLUMN_SALT, salt),
+        (COLUMN_ITERATIONS, iterations),
+
+        (COLUMN_CHALLENGE_IV, challengeIv),
+        (COLUMN_CHALLENGE_BYTES, challengeBytes),
+        (COLUMN_CHALLENGE_ENCRYPTED_BYTES, challengeEncryptedBytes),
+
+        (COLUMN_ENCRYPTED_PRIVATE_KEY, encryptedPrivateKey),
+        (COLUMN_ENCRYPTED_PRIVATE_KEY_IV, encryptedPrivateKeyIv),
+        (COLUMN_PUBLIC_KEY, publicKey)
+      )), payloadHash);
     }
 
-    public (UserAuthenticationResource userAuthentication, byte[] hashCache)? GetByPassword(DatabaseTransaction transaction, long userId, string password)
+    private UserAuthenticationToken Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationType type, byte[] payload, byte[] privateKey, byte[] publicKey)
     {
-      if (!ValidPasswordRegex.IsMatch(password))
+      if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)) != 0)
       {
-        return null;
+        throw new InvalidOperationException("Must use an existing rsa key.");
       }
 
-      using SqliteDataReader reader = DbSelect(transaction, new()
+      byte[] salt = RandomNumberGenerator.GetBytes(16);
+      int iterations = RandomNumberGenerator.GetInt32(1000, 10000);
+      byte[] payloadHash;
       {
-        { KEY_TYPE, ("=", (byte)UserAuthenticationType.Password, null) },
-        { KEY_USER_ID, ("=", userId, null) }
-      }, []);
+        using Rfc2898DeriveBytes rfc2898DeriveBytes = new(payload, salt, iterations, HashAlgorithmName.SHA256);
+        payloadHash = rfc2898DeriveBytes.GetBytes(32);
+      }
 
-      byte[] passwordBytes = Encoding.UTF8.GetBytes(password);
-      while (reader.Read())
+      byte[] challengeIv = RandomNumberGenerator.GetBytes(16);
+      byte[] challengeBytes = RandomNumberGenerator.GetBytes(64);
+      byte[] challengeEncryptedBytes = AesEncrypt(payloadHash, challengeIv, challengeBytes);
+
+      byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
+      byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
+
+      return new(user, Insert(transaction, new(
+        (COLUMN_USER_ID, user.Id),
+        (COLUMN_TYPE, (byte)type),
+
+        (COLUMN_SALT, salt),
+        (COLUMN_ITERATIONS, iterations),
+
+        (COLUMN_CHALLENGE_IV, challengeIv),
+        (COLUMN_CHALLENGE_BYTES, challengeBytes),
+        (COLUMN_CHALLENGE_ENCRYPTED_BYTES, challengeEncryptedBytes),
+
+        (COLUMN_ENCRYPTED_PRIVATE_KEY, encryptedPrivateKey),
+        (COLUMN_ENCRYPTED_PRIVATE_KEY_IV, encryptedPrivateKeyIv),
+        (COLUMN_PUBLIC_KEY, publicKey)
+      )), payloadHash);
+    }
+
+    public IEnumerable<UserAuthenticationResource> List(ResourceService.Transaction transaction, UserResource user, LimitClause? limitClause = null, OrderByClause? orderByClause = null) => Select(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), limitClause, orderByClause);
+
+    public UserAuthenticationToken? GetByPayload(ResourceService.Transaction transaction, UserResource user, byte[] payload, UserAuthenticationType type)
+    {
+      lock (this)
       {
-        UserAuthenticationResource userAuthentication = Memory.ResolveFromData(CreateData(reader));
-
-        if (userAuthentication.IsMatch(passwordBytes))
+        lock (user)
         {
-          return (userAuthentication, userAuthentication.GetHash(passwordBytes));
+          user.ThrowIfInvalid();
+
+          foreach (UserAuthenticationResource userAuthentication in Select(transaction,
+            new WhereClause.Nested("and",
+              new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id),
+              new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)type)
+            )
+          ))
+          {
+            try { return new(user, userAuthentication, userAuthentication.GetPayloadHash(payload)); } catch { }
+          }
+
+          return null;
         }
       }
-
-      return null;
     }
 
-    public (UserAuthenticationResource userAuthentication, byte[] hashCache)? GetByPayload(DatabaseTransaction transaction, byte[] payload)
+    public override bool Delete(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication, CancellationToken cancellationToken = default)
     {
-      using SqliteDataReader reader = DbSelect(transaction, [], []);
-
-      while (reader.Read())
+      lock (this)
       {
-        UserAuthenticationResource userAuthentication = Memory.ResolveFromData(CreateData(reader));
-
-        if (userAuthentication.IsMatch(payload))
+        lock (userAuthentication)
         {
-          return (userAuthentication, userAuthentication.GetHash(payload));
+          userAuthentication.ThrowIfInvalid();
+
+          if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userAuthentication.UserId), cancellationToken) < 2)
+          {
+            throw new InvalidOperationException("Must have at least two user authentications before deleting one.");
+          }
+
+          return base.Delete(transaction, userAuthentication, cancellationToken);
         }
       }
-
-      return null;
     }
   }
 
-  public new sealed record ResourceData(
+  public new sealed partial record ResourceData(
     long Id,
     long CreateTime,
     long UpdateTime,
+
     long UserId,
     UserAuthenticationType Type,
-    int Iterations,
-    byte[] Salt,
-    byte[] IV,
-    byte[] ChallengeBytes,
-    byte[] EncryptedBytes
-  ) : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceData(Id, CreateTime, UpdateTime)
-  {
-    public const string KEY_USER_ID = "userId";
-    [JsonPropertyName(KEY_USER_ID)]
-    public long UserId = UserId;
 
-    public const string KEY_TYPE = "type";
-    [JsonPropertyName(KEY_TYPE)]
-    public UserAuthenticationType Type = Type;
+    byte[] Salt,
+    int Iterations,
+
+    byte[] ChallengeIv,
+    byte[] ChallengeBytes,
+    byte[] ChallengeEncryptedBytes,
+
+    byte[] EncryptedPrivateKey,
+    byte[] EncryptedPrivateKeyIv,
+    byte[] PublicKey
+  ) : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceData(Id, CreateTime, UpdateTime);
+
+  public static byte[] AesEncrypt(byte[] key, byte[] iv, byte[] bytes)
+  {
+    using Aes aes = Aes.Create();
+    using ICryptoTransform cryptoTransform = aes.CreateEncryptor(key, iv);
+
+    return cryptoTransform.TransformFinalBlock(bytes);
   }
 
+  public static byte[] AesDecrypt(byte[] key, byte[] iv, byte[] bytes)
+  {
+    using Aes aes = Aes.Create();
+    using ICryptoTransform cryptoTransform = aes.CreateDecryptor(key, iv);
+
+    return cryptoTransform.TransformFinalBlock(bytes);
+  }
   public long UserId => Data.UserId;
   public UserAuthenticationType Type => Data.Type;
-  public int Iterations => Data.Iterations;
-  public byte[] Salt => Data.Salt;
-  public byte[] IV => Data.IV;
-  public byte[] ChallengeBytes => Data.ChallengeBytes;
-  public byte[] EncryptedBytes => Data.EncryptedBytes;
 
-  public byte[] GetHash(byte[] payload) => new Rfc2898DeriveBytes(payload, Salt, Iterations, HashAlgorithmName.SHA256).GetBytes(32);
-  public bool IsMatch(byte[] payload)
+  private byte[] Salt => Data.Salt;
+  private int Iterations => Data.Iterations;
+
+  private byte[] ChallengeIv => Data.ChallengeIv;
+  private byte[] ChallengeBytes => Data.ChallengeBytes;
+  private byte[] ChallengeEncryptedBytes => Data.ChallengeEncryptedBytes;
+
+  private byte[] EncryptedPrivateKey => Data.EncryptedPrivateKey;
+  private byte[] EncryptedPrivateKeyIv => Data.EncryptedPrivateKeyIv;
+  private byte[] PublicKey => Data.PublicKey;
+
+  private byte[]? PrivateKey;
+  private RSACryptoServiceProvider? CryptoServiceProvider;
+  private UserAuthenticationToken? TokenCache;
+
+  ~UserAuthenticationResource() => CryptoServiceProvider?.Dispose();
+
+  private byte[] GetPrivateKey(byte[] payloadHash)
   {
-    ;
-    try
+    lock (this)
     {
-      return Aes.Create().CreateDecryptor(GetHash(payload), IV).TransformFinalBlock(EncryptedBytes, 0, EncryptedBytes.Length).SequenceEqual(ChallengeBytes);
+      return PrivateKey ??= AesDecrypt(payloadHash, EncryptedPrivateKeyIv, EncryptedPrivateKey);
     }
-    catch
+  }
+
+  private byte[] GetPayloadHash(byte[] payload)
+  {
+    using Rfc2898DeriveBytes rfc2898DeriveBytes = new(payload, Salt, Iterations, HashAlgorithmName.SHA256);
+    byte[] payloadHash = rfc2898DeriveBytes.GetBytes(32);
+
+    if (!AesEncrypt(payloadHash, ChallengeIv, ChallengeBytes).SequenceEqual(ChallengeEncryptedBytes))
     {
-      return false;
+      throw new ArgumentException("Invalid payload.", nameof(payload));
+    }
+
+    return payloadHash;
+  }
+
+  private RSACryptoServiceProvider GetRSACryptoServiceProvider(byte[] cspBlob)
+  {
+    RSACryptoServiceProvider cryptoServiceProvider = Manager.Service.Server.KeyService.GetRsaCryptoServiceProvider(cspBlob);
+
+    return cryptoServiceProvider;
+  }
+
+  private byte[] Decrypt(byte[] bytes, byte[] payloadHash)
+  {
+    lock (this)
+    {
+      if (CryptoServiceProvider?.PublicOnly != false)
+      {
+        byte[] privateKey = GetPrivateKey(payloadHash);
+
+        CryptoServiceProvider?.Dispose();
+        CryptoServiceProvider = GetRSACryptoServiceProvider(privateKey);
+      }
+
+      return CryptoServiceProvider.Decrypt(bytes, false);
+    }
+  }
+
+  public byte[] Encrypt(byte[] bytes)
+  {
+    lock (this)
+    {
+      return (CryptoServiceProvider ??= GetRSACryptoServiceProvider(PublicKey)).Encrypt(bytes, false);
+    }
+  }
+
+  public UserAuthenticationToken GetTokenByPayload(UserResource user, byte[] payload)
+  {
+    lock (this)
+    {
+      user.ThrowIfInvalid();
+
+      if (user.Id != UserId)
+      {
+        throw new ArgumentException("Invalid user.", nameof(user));
+      }
+
+      byte[] payloadHash = GetPayloadHash(payload);
+
+      return TokenCache ??= new(user, this, payloadHash);
     }
   }
 }

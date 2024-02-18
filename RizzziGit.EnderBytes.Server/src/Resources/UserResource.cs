@@ -1,85 +1,117 @@
-using System.Text.RegularExpressions;
-using System.Text.Json.Serialization;
-using Microsoft.Data.Sqlite;
+using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-using Database;
+using Utilities;
+using DatabaseWrappers;
+using Services;
 
-public sealed class UserResource(UserResource.ResourceManager manager, UserResource.ResourceData data) : Resource<UserResource.ResourceManager, UserResource.ResourceData, UserResource>(manager, data)
+public sealed partial class UserResource(UserResource.ResourceManager manager, UserResource.ResourceData data) : Resource<UserResource.ResourceManager, UserResource.ResourceData, UserResource>(manager, data)
 {
-  public new sealed class ResourceManager(MainResourceManager main, Database database) : Resource<ResourceManager, ResourceData, UserResource>.ResourceManager(main, database, NAME, VERSION)
+  public sealed record Token(UserResource User, UserAuthenticationResource.UserAuthenticationToken AuthenticationToken);
+
+  private const string NAME = "User";
+  private const int VERSION = 1;
+
+  public new sealed partial class ResourceManager(ResourceService service) : Resource<ResourceManager, ResourceData, UserResource>.ResourceManager(service, NAME, VERSION)
   {
-    private static readonly Regex ValidUsernameRegex = new("^[A-Za-z0-9_\\-\\.]{6,16}$");
+    private const string COLUMN_USERNAME = "Username";
+    private const string COLUMN_DISPLAY_NAME = "DisplayName";
+    private const string COLUMN_PUBLIC_KEY = "PublicKey";
 
-    public const string NAME = "User";
-    public const int VERSION = 1;
+    private const string INDEX_USERNAME = $"Index_{NAME}_{COLUMN_USERNAME}";
 
-    private const string KEY_USERNAME = "Username";
-    private const string KEY_NAME = "Name";
-
-    private const string INDEX_UNIQUENESS = $"Index_{NAME}_{KEY_USERNAME}";
-
-    protected override ResourceData CreateData(SqliteDataReader reader, long id, long createTime, long updateTime) => new(
+    protected override UserResource NewResource(ResourceData data) => new(this, data);
+    protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
-      (string)reader[KEY_USERNAME]
+
+      reader.GetString(reader.GetOrdinal(COLUMN_USERNAME)),
+      reader.GetStringOptional(reader.GetOrdinal(COLUMN_DISPLAY_NAME)),
+      reader.GetBytes(reader.GetOrdinal(COLUMN_PUBLIC_KEY))
     );
 
-    protected override UserResource CreateResource(ResourceData data) => new(this, data);
-
-    protected override void OnInit(DatabaseTransaction transaction) => OnInit(0, transaction);
-    protected override void OnInit(int oldVersion, DatabaseTransaction transaction)
+    protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
     {
       if (oldVersion < 1)
       {
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_USERNAME} varchar(16) not null collate nocase;");
-        transaction.ExecuteNonQuery($"alter table {Name} add column {KEY_NAME} varchar(64) not null;");
+        SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_USERNAME} varchar(16) not null collate {DatabaseWrapper switch
+        {
+          MySQLDatabase => "utf8_general_ci",
+          _ => "nocase"
+        }};");
+        SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_DISPLAY_NAME} varchar(32) null;");
+        SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_PUBLIC_KEY} blob null;");
 
-        transaction.ExecuteNonQuery($"create unique index {INDEX_UNIQUENESS} on {NAME}({KEY_USERNAME});");
+        SqlNonQuery(transaction, $"create unique index {INDEX_USERNAME} on {Name}({COLUMN_USERNAME});");
       }
     }
 
-    public UserResource? GetByUsername(DatabaseTransaction transaction, string username)
+    public Token Create(ResourceService.Transaction transaction, string username, string? displayName, string password, CancellationToken cancellationToken = default)
     {
-      using var reader = DbSelect(transaction, new()
+      lock (this)
       {
-        { KEY_USERNAME, ("=", username, null) }
-      }, [], (1, null), null);
+        (byte[] privateKey, byte[] publicKey) = Service.Server.KeyService.GetNewRsaKeyPair();
 
-      while (reader.Read())
-      {
-        return Memory.ResolveFromData(CreateData(reader));
+        UserResource user = Insert(transaction, new(
+          (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
+          (COLUMN_DISPLAY_NAME, displayName),
+          (COLUMN_PUBLIC_KEY, publicKey)
+        ), cancellationToken);
+
+        return new(user, Service.UserAuthentications.CreatePassword(transaction, user, password, privateKey, publicKey));
       }
-
-      return null;
     }
 
-    public UserResource Create(DatabaseTransaction transaction, string username, string name)
+    public bool Update(ResourceService.Transaction transaction, UserResource user, string username, string? displayName)
     {
-      if (!ValidUsernameRegex.IsMatch(username))
+      lock (this)
       {
-        throw new ArgumentException("Invalid username.", nameof(username));
-      }
+        lock (user)
+        {
+          user.ThrowIfInvalid();
 
-      return DbInsert(transaction, new()
+          return Update(transaction, user, new(
+            (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
+            (COLUMN_DISPLAY_NAME, displayName)
+          ));
+        }
+      }
+    }
+
+    public bool TryGetByUsername(ResourceService.Transaction transaction, string username, [NotNullWhen(true)] out UserResource? user, CancellationToken cancellationToken = default)
+    {
+      lock (this)
       {
-        { KEY_USERNAME, username },
-        { KEY_NAME, name }
-      });
+        if (ValidateUsername(username) != UsernameValidationFlag.NoErrors)
+        {
+          user = null;
+          return false;
+        }
+
+        return (user = Select(transaction, new WhereClause.CompareColumn(COLUMN_USERNAME, "=", username), new(1), cancellationToken: cancellationToken).FirstOrDefault()) != null;
+      }
     }
   }
 
-  public new sealed record ResourceData(
-    long Id,
-    long CreateTime,
-    long UpdateTime,
-    string Username
-  ) : Resource<ResourceManager, ResourceData, UserResource>.ResourceData(Id, CreateTime, UpdateTime)
-  {
-    public const string KEY_USERNAME = "username";
-    [JsonPropertyName(KEY_USERNAME)]
-    public string Username = Username;
-  }
+  public new sealed record ResourceData(long Id, long CreateTime, long UpdateTime, string Username, string? DisplayName, byte[] PublicKey) : Resource<ResourceManager, ResourceData, UserResource>.ResourceData(Id, CreateTime, UpdateTime);
 
   public string Username => Data.Username;
+  public string? DisplayName => Data.DisplayName;
+  public byte[] PublicKey => Data.PublicKey;
+
+  private RSACryptoServiceProvider? RSACryptoServiceProvider;
+
+  ~UserResource() => RSACryptoServiceProvider?.Dispose();
+
+  public byte[] Encrypt(byte[] bytes)
+  {
+    lock (this)
+    {
+      RSACryptoServiceProvider ??= Manager.Service.Server.KeyService.GetRsaCryptoServiceProvider(PublicKey);
+
+      return RSACryptoServiceProvider.Encrypt(bytes, false);
+    }
+  }
 }

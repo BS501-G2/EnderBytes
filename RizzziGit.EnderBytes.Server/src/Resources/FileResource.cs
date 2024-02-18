@@ -108,7 +108,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
         bool result = Update(transaction, file, new(
           (COLUMN_PARENT_FILE_ID, newParent?.Id),
-          (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken), newParent, userAuthenticationToken, cancellationToken))
+          (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken).Key, newParent, userAuthenticationToken, cancellationToken))
         ), cancellationToken);
 
         return result;

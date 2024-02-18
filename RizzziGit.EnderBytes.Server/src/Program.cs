@@ -107,12 +107,18 @@ public static class Program
 
       FileResource file = service.Files.Create(transaction, storage, null, FileResource.FileType.File, "Test", originalToken, cancellationToken);
 
-      FileResource folder1 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder1", originalToken, cancellationToken);
-      FileResource folder2 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
+      FileResource? folder = null;
+      for (int index = 0; index < 100; index++)
+      {
+        folder = service.Files.Create(transaction, storage, folder, FileResource.FileType.Folder, "folder", originalToken, cancellationToken);
+      }
+
+      FileResource folder1 = service.Files.Create(transaction, storage, folder, FileResource.FileType.Folder, "Folder1", originalToken, cancellationToken);
+      FileResource folder2 = service.Files.Create(transaction, storage, folder, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
 
       service.Files.Move(transaction, storage, file, folder1, originalToken, cancellationToken);
 
-      FileAccessResource fileAccess1 = service.FileAccesses.Create(transaction, storage, folder1, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
+      FileAccessResource fileAccess1 = service.FileAccesses.Create(transaction, storage, folder1, otherUser, FileAccessResource.FileAccessType.Read, originalToken, cancellationToken);
       FileAccessResource fileAccess2 = service.FileAccesses.Create(transaction, storage, folder2, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
 
       service.Files.Move(transaction, storage, file, folder2, otherToken, cancellationToken);

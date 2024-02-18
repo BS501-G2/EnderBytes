@@ -64,7 +64,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
     {
       lock (this)
       {
-        KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptFileKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
+        KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptFileKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
 
         return Insert(transaction, new(
           (COLUMN_TARGET_FILE_ID, targetFile.Id),
@@ -93,7 +93,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
             {
               userAuthenticationToken.ThrowIfInvalid();
 
-              KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptFileKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
+              KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptFileKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
 
               return Insert(transaction, new(
                 (COLUMN_TARGET_FILE_ID, targetFile.Id),

@@ -2,15 +2,12 @@ using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-using Framework.Memory;
-
 using Utilities;
 using Services;
 
 public sealed class StorageResource(StorageResource.ResourceManager manager, StorageResource.ResourceData data) : Resource<StorageResource.ResourceManager, StorageResource.ResourceData, StorageResource>(manager, data)
 {
-  // [Flags]
-  // public enum StorageFlags : byte { }
+  public sealed record StorageDecryptedKeyInfo(KeyService.AesPair Key, FileAccessResource? FileAccess);
 
   private const string NAME = "Storage";
   private const int VERSION = 1;
@@ -121,13 +118,13 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
           }
 
           byte[] encryptFileKey(KeyService.AesPair? storageKey, FileResource? parent) => storageKey == null && parent != null
-            ? DecryptFileKey(transaction, storage, parent, userAuthenticationToken, cancellationToken: cancellationToken).Encrypt(key.Serialize())
+            ? DecryptFileKey(transaction, storage, parent, userAuthenticationToken, cancellationToken: cancellationToken).Key.Encrypt(key.Serialize())
             : storageKey!.Encrypt(key.Serialize());
         }
       }
     }
 
-    public KeyService.AesPair DecryptFileKey(ResourceService.Transaction transaction, StorageResource storage, FileResource file, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileAccessResource.FileAccessType? fileAccessType = null, CancellationToken cancellationToken = default)
+    public StorageDecryptedKeyInfo DecryptFileKey(ResourceService.Transaction transaction, StorageResource storage, FileResource file, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileAccessResource.FileAccessType? fileAccessType = null, CancellationToken cancellationToken = default)
     {
       lock (this)
       {
@@ -139,16 +136,18 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
           {
             file.ThrowIfInvalid();
 
+            FileAccessResource? fileAccessUsed = null;
+
             if (userAuthenticationToken == null)
             {
-              return decryptFileKey();
+              return new(decryptFileKey(), fileAccessUsed);
             }
 
             lock (userAuthenticationToken)
             {
               userAuthenticationToken.ThrowIfInvalid();
 
-              return decryptFileKey();
+              return new(decryptFileKey(), fileAccessUsed);
             }
 
             KeyService.AesPair decryptFileKey()
@@ -161,6 +160,11 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
                 {
                   foreach (FileAccessResource fileAccess in Service.FileAccesses.List(transaction, file, cancellationToken: cancellationToken))
                   {
+                    if (fileAccess.Type > fileAccessType)
+                    {
+                      continue;
+                    }
+
                     switch (fileAccess.TargetEntityType)
                     {
                       case FileAccessResource.FileAccessTargetEntityType.User:
@@ -168,9 +172,12 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
                         {
                           break;
                         }
+
+                        fileAccessUsed = fileAccess;
                         return KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(fileAccess.Key));
 
                       case FileAccessResource.FileAccessTargetEntityType.None:
+                        fileAccessUsed = fileAccess;
                         return KeyService.AesPair.Deserialize(fileAccess.Key);
                     }
                   }

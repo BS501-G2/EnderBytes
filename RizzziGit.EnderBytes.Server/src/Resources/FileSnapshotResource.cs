@@ -12,6 +12,7 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
   {
     private const string COLUMN_FILE_ID = "FileId";
     private const string COLUMN_BASE_SNAPSHOT_ID = "BaseSnapshotId";
+    private const string COLUMN_AUTHOR_FILE_ACCESS_ID = "TokenId";
     private const string COLUMN_AUTHOR_ID = "AuthorId";
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
@@ -30,7 +31,8 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
       {
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_FILE_ID} bigint not null;");
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_BASE_SNAPSHOT_ID} bigint null;");
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_AUTHOR_ID} bigint not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_AUTHOR_FILE_ACCESS_ID} bigint null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_AUTHOR_ID} bigint null;");
       }
     }
 
@@ -52,8 +54,13 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
 
         FileSnapshotResource create()
         {
-          return Insert(transaction, new(
+          (_, FileAccessResource? fileAccess) = Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
 
+          return Insert(transaction, new(
+            (COLUMN_FILE_ID, file.Id),
+            (COLUMN_BASE_SNAPSHOT_ID, baseSnapshot?.Id),
+            (COLUMN_AUTHOR_FILE_ACCESS_ID, fileAccess?.Id),
+            (COLUMN_AUTHOR_ID, userAuthenticationToken?.UserId)
           ), cancellationToken);
         }
       }

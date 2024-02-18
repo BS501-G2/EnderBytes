@@ -26,8 +26,7 @@ export function GET() {
       { 'name': 'Starred', 'url': '/starred' },
       { 'name': 'Feed', 'url': '/Feed' }
     ],
-    'scope': 'http://localhost:8081/app',
-    'start_url': '/',
+    'start_url': '/app',
     'theme_color': '#0000ff',
     'background-color': '#0000ff'
   }, {

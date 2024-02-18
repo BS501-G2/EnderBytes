@@ -3,14 +3,14 @@ export enum DisplayMode {
   Desktop = 0b10,
 
   Browser = 0b100,
-  PWA = 0b10000,
+  Standalone = 0b10000,
   Fullscreen = 0b100000,
 
   MobileBrowser = Mobile | Browser,
   DesktopBrowser = Desktop | Browser,
 
-  MobilePWA = Mobile | PWA,
-  DesktopPWA = Desktop | PWA,
+  MobileStandalone = Mobile | Standalone,
+  DesktopStandalone = Desktop | Standalone,
 
   MobileFullscreen = Mobile | Fullscreen,
   DesktopFullscreen = Desktop | Fullscreen
@@ -51,9 +51,15 @@ export function triggerUpdateCheck(window?: Window): void {
     current = window == null
       ? DisplayMode.DesktopBrowser
       : (
-        (window.matchMedia('(max-width: 720px)').matches ? DisplayMode.Mobile : DisplayMode.Desktop) |
-        (window.matchMedia('(display-mode: standalone)').matches ? DisplayMode.PWA :
-          window.matchMedia('(display-mode: fullscreen)').matches ? DisplayMode.Fullscreen : DisplayMode.Browser)
+        (
+          window.matchMedia('(max-width: 720px)').matches
+            ? DisplayMode.Mobile
+            : DisplayMode.Desktop
+        ) |
+        (
+          window.matchMedia('(display-mode: standalone)').matches ? DisplayMode.Standalone :
+            window.matchMedia('(display-mode: fullscreen)').matches ? DisplayMode.Fullscreen : DisplayMode.Browser
+        )
       )
   )) {
     for (const handler of onChangeListeners) {

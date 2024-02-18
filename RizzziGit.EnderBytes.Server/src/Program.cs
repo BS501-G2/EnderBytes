@@ -118,7 +118,7 @@ public static class Program
 
       service.Files.Move(transaction, storage, file, folder1, originalToken, cancellationToken);
 
-      FileAccessResource fileAccess1 = service.FileAccesses.Create(transaction, storage, folder1, otherUser, FileAccessResource.FileAccessType.Read, originalToken, cancellationToken);
+      FileAccessResource fileAccess1 = service.FileAccesses.Create(transaction, storage, folder1, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
       FileAccessResource fileAccess2 = service.FileAccesses.Create(transaction, storage, folder2, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
 
       service.Files.Move(transaction, storage, file, folder2, otherToken, cancellationToken);

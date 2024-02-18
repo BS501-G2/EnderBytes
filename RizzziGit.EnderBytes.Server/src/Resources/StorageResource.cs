@@ -90,7 +90,7 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
       }
     }
 
-    public byte[] EncryptFileKey(ResourceService.Transaction transaction, StorageResource storage, KeyService.AesPair key, FileResource? parent, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    public byte[] EncryptFileKey(ResourceService.Transaction transaction, StorageResource storage, KeyService.AesPair key, FileResource? parent, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileAccessResource.FileAccessType fileAccessType, CancellationToken cancellationToken = default)
     {
       lock (this)
       {
@@ -100,7 +100,7 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
 
           if (parent == null)
           {
-            if (storage.OwnerUserId != userAuthenticationToken.UserId)
+            if (storage.OwnerUserId != userAuthenticationToken?.UserId)
             {
               throw new ArgumentException("Other users cannot encrypt using the storage key.", nameof(userAuthenticationToken));
             }
@@ -118,7 +118,7 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
           }
 
           byte[] encryptFileKey(KeyService.AesPair? storageKey, FileResource? parent) => storageKey == null && parent != null
-            ? DecryptFileKey(transaction, storage, parent, userAuthenticationToken, cancellationToken: cancellationToken).Key.Encrypt(key.Serialize())
+            ? DecryptFileKey(transaction, storage, parent, userAuthenticationToken, fileAccessType, cancellationToken).Key.Encrypt(key.Serialize())
             : storageKey!.Encrypt(key.Serialize());
         }
       }

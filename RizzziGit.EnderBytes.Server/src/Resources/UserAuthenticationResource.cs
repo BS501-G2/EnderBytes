@@ -263,6 +263,11 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
   private byte[] PublicKey => Data.PublicKey;
 
   private byte[]? PrivateKey;
+  private RSACryptoServiceProvider? CryptoServiceProvider;
+  private UserAuthenticationToken? TokenCache;
+
+  ~UserAuthenticationResource()  => CryptoServiceProvider?.Dispose();
+
   private byte[] GetPrivateKey(byte[] payloadHash)
   {
     lock (this)
@@ -270,9 +275,6 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       return PrivateKey ??= AesDecrypt(payloadHash, EncryptedPrivateKeyIv, EncryptedPrivateKey);
     }
   }
-
-  private RSACryptoServiceProvider? CryptoServiceProvider;
-  private UserAuthenticationToken? TokenCache;
 
   private byte[] GetPayloadHash(byte[] payload)
   {
@@ -290,7 +292,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
   private RSACryptoServiceProvider GetRSACryptoServiceProvider(byte[] cspBlob)
   {
     RSACryptoServiceProvider cryptoServiceProvider = Manager.Service.Server.KeyService.GetRsaCryptoServiceProvider(cspBlob);
-    cryptoServiceProvider.ImportCspBlob(cspBlob);
+
     return cryptoServiceProvider;
   }
 

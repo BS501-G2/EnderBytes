@@ -103,6 +103,8 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
 
   private RSACryptoServiceProvider? RSACryptoServiceProvider;
 
+  ~UserResource() => RSACryptoServiceProvider?.Dispose();
+
   public byte[] Encrypt(byte[] bytes)
   {
     lock (this)

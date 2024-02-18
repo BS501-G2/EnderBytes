@@ -63,6 +63,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
         lock (storage)
         {
           storage.ThrowIfInvalid();
+          file.ThrowIfDoesNotBelongTo(storage);
 
           if (newParent == null)
           {
@@ -71,6 +72,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
           lock (newParent)
           {
+            newParent.ThrowIfDoesNotBelongTo(storage);
             newParent.ThrowIfInvalid();
 
             FileResource currentParent = newParent;
@@ -128,6 +130,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
           lock (parent)
           {
             parent.ThrowIfInvalid();
+            parent.ThrowIfDoesNotBelongTo(storage);
 
             return create();
           }
@@ -149,7 +152,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
         return Insert(transaction, new(
           (COLUMN_STORAGE_ID, storage.Id),
-          (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, Service.Server.KeyService.GetNewAesPair(), parent, userAuthenticationToken)),
+          (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, Service.Server.KeyService.GetNewAesPair(), parent, userAuthenticationToken, cancellationToken)),
           (COLUMN_PARENT_FILE_ID, parent?.Id),
           (COLUMN_NAME, name),
           (COLUMN_TYPE, (byte)type)
@@ -165,4 +168,23 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
   public long? ParentId => Data.ParentId;
   public FileType Type => Data.Type;
   public string Name => Data.Name;
+
+  public bool BelongsTo(StorageResource storage)
+  {
+    lock (this)
+    {
+      lock (storage)
+      {
+        return storage.Id == StorageId;
+      }
+    }
+  }
+
+  public void ThrowIfDoesNotBelongTo(StorageResource storage)
+  {
+    if (!BelongsTo(storage))
+    {
+      throw new ArgumentException("The specified file does not belong to storage.", nameof(storage));
+    }
+  }
 }

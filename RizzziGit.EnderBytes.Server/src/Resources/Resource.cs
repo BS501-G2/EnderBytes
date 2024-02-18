@@ -240,8 +240,10 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         foreach (D newData in SqlEnumeratedQuery(
           transaction,
           castToData,
-          $"select * from {Name} where {whereClause}; " +
-          $"update {Name} set {setClause} where {whereClause};",
+          $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
+          $"update {Name} set {setClause} where {whereClause}; " +
+          $"select {Name}.* from {temporaryTableName} left join (select * from {Name}) {Name} on {temporaryTableName}.{COLUMN_ID} = {Name}.{COLUMN_ID}; " +
+          $"drop table {temporaryTableName};",
           [.. parameterList]
         ))
         {
@@ -328,4 +330,6 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
   public bool IsValid => Manager.IsResourceValid((R)this);
   public void ThrowIfInvalid() => Manager.ThrowIfResourceInvalid((R)this);
+
+  public override string ToString() => Data.ToString();
 }

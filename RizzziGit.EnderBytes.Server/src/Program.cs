@@ -101,27 +101,21 @@ public static class Program
       (UserResource otherUser, UserAuthenticationResource.UserAuthenticationToken otherToken) = service.Users.Create(transaction, "testuser2", "Other User", "test", cancellationToken);
       Handler += (transaction, cancellationToken) => service.Users.Delete(transaction, otherUser, cancellationToken);
 
+      logger.Info($"Eq: {CompositeBuffer.From(originalToken.Decrypt(originalUser.Encrypt(CompositeBuffer.From("Test").ToByteArray())))}");
+
       StorageResource storage = service.Storages.Create(transaction, originalUser, originalToken, cancellationToken);
 
       FileResource file = service.Files.Create(transaction, storage, null, FileResource.FileType.File, "Test", originalToken, cancellationToken);
-      Console.WriteLine($"File Key: {CompositeBuffer.From(service.Storages.DecryptFileKey(transaction, storage, file, originalToken, cancellationToken).Serialize()).ToHexString()}");
 
-      FileResource? lastFolder = null;
-      for (int index = 0; index < 10; index++)
-      {
-        FileResource folder = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
+      FileResource folder1 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder1", originalToken, cancellationToken);
+      FileResource folder2 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
 
-        if (lastFolder != null)
-        {
-          service.Files.Move(transaction, storage, lastFolder, folder, originalToken, cancellationToken);
-        }
+      service.Files.Move(transaction, storage, file, folder1, originalToken, cancellationToken);
 
-        service.Files.Move(transaction, storage, file, folder, originalToken, cancellationToken);
+      FileAccessResource fileAccess1 = service.FileAccesses.Create(transaction, storage, folder1, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
+      FileAccessResource fileAccess2 = service.FileAccesses.Create(transaction, storage, folder2, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
 
-        lastFolder = folder;
-      }
-
-      Console.WriteLine($"File Key: {CompositeBuffer.From(service.Storages.DecryptFileKey(transaction, storage, file, originalToken, cancellationToken).Serialize()).ToHexString()}");
+      service.Files.Move(transaction, storage, file, folder2, otherToken, cancellationToken);
     });
   });
 }

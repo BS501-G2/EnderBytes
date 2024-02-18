@@ -2,6 +2,8 @@ using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Resources;
 
+using Framework.Memory;
+
 using Utilities;
 using Services;
 
@@ -53,29 +55,9 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
       }
     }
 
-    public IEnumerable<FileAccessResource> List(ResourceService.Transaction transaction, FileResource file, LimitClause? limit = null, OrderByClause? orderBy = null, CancellationToken cancellationToken = default) => Select(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), limit, orderBy, cancellationToken);
-
-    public bool TryGetAccessByUser(ResourceService.Transaction transaction, FileResource file, UserAuthenticationResource userAuthenticationToken, FileAccessType type, out FileAccessResource? fileAccess, CancellationToken cancellationToken = default)
+    public IEnumerable<FileAccessResource> List(ResourceService.Transaction transaction, FileResource file, LimitClause? limit = null, OrderByClause? orderBy = null, CancellationToken cancellationToken = default)
     {
-      lock (this)
-      {
-        lock (file)
-        {
-          file.ThrowIfInvalid();
-
-          lock (userAuthenticationToken)
-          {
-            userAuthenticationToken.ThrowIfInvalid();
-
-            return (fileAccess = SelectOne(transaction, new WhereClause.Nested("and",
-              new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id),
-              new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", userAuthenticationToken.UserId),
-              new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", (byte)FileAccessTargetEntityType.User),
-              new WhereClause.CompareColumn(COLUMN_TYPE, "<=", (byte)type)
-            ), cancellationToken: cancellationToken)) != null;
-          }
-        }
-      }
+      return Select(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), limit, orderBy, cancellationToken);
     }
 
     public FileAccessResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource targetFile, FileAccessType type, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
@@ -115,18 +97,15 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
           lock (targetFile)
           {
             targetFile.ThrowIfInvalid();
+            targetFile.ThrowIfDoesNotBelongTo(storage);
 
             lock (userAuthenticationToken)
             {
               userAuthenticationToken.ThrowIfInvalid();
 
-              if (targetFile.ParentId == null)
-              {
-                throw new ArgumentException("Top level files cannot be shared.", nameof(targetFile));
-              }
-
               KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptFileKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
 
+              Console.WriteLine($"File #{targetFile.Id} Key obtained from access creation: {CompositeBuffer.From(fileKey.Serialize()).ToHexString()}");
               return Insert(transaction, new(
                 (COLUMN_TARGET_FILE_ID, targetFile.Id),
                 (COLUMN_TARGET_ENTITY_ID, targetUser.Id),

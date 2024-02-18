@@ -2,6 +2,8 @@ using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Resources;
 
+using Framework.Memory;
+
 using Utilities;
 using Services;
 
@@ -154,18 +156,25 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
                 {
                   foreach (FileAccessResource fileAccess in Service.FileAccesses.List(transaction, file, cancellationToken: cancellationToken))
                   {
+                    // Console.WriteLine($"{fileAccess.Key.Length}");
                     if (fileAccessType != null && fileAccess.Type > fileAccessType)
                     {
                       continue;
                     }
 
-                    if ((userAuthenticationToken != null) && (fileAccess.TargetEntityType == FileAccessResource.FileAccessTargetEntityType.User) && (fileAccess.TargetEntityId == userAuthenticationToken?.UserId))
+                    switch (fileAccess.TargetEntityType)
                     {
-                      return KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(file.Key));
-                    }
-                    else if (fileAccess.TargetEntityType == FileAccessResource.FileAccessTargetEntityType.None)
-                    {
-                      return KeyService.AesPair.Deserialize(fileAccess.Key);
+                      case FileAccessResource.FileAccessTargetEntityType.User:
+                        if (userAuthenticationToken?.UserId == fileAccess.TargetEntityId)
+                        {
+                          Console.WriteLine($"File #{file.Id} Key from access decryption: {CompositeBuffer.From(file.Key).ToHexString()}");
+
+                          return KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(file.Key));
+                        }
+                        break;
+
+                      case FileAccessResource.FileAccessTargetEntityType.None:
+                        return KeyService.AesPair.Deserialize(fileAccess.Key);
                     }
                   }
 

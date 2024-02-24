@@ -68,7 +68,7 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
 
       FileSnapshotResource create()
       {
-        (_, FileAccessResource? fileAccess) = Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+        (_, FileAccessResource? fileAccess) = Service.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
 
         return Insert(transaction, new(
           (COLUMN_FILE_ID, file.Id),

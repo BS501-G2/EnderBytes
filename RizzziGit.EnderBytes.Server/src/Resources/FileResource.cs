@@ -151,7 +151,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
         bool result = Update(transaction, file, new(
           (COLUMN_PARENT_FILE_ID, newParent?.Id),
-          (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken).Key, newParent, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken))
+          (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, Service.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken).Key, newParent, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken))
         ), cancellationToken);
 
         return result;
@@ -236,7 +236,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
           bool delete()
           {
-            Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+            Service.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
 
             return base.Delete(transaction, file, cancellationToken);
           }
@@ -247,6 +247,26 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
     public override bool Delete(ResourceService.Transaction transaction, FileResource file, CancellationToken cancellationToken = default)
     {
       throw new NotSupportedException("Please specify user token.");
+    }
+
+    public FileResource? ResolvePath(ResourceService.Transaction transaction, StorageResource storage, string[] path, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    {
+      lock (storage)
+      {
+        storage.ThrowIfInvalid();
+
+        FileResource? file = null;
+        for (int index = 0; index < path.Length; index++)
+        {
+          file = SelectOne(transaction, new WhereClause.Nested("and",
+            new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storage.Id),
+            new WhereClause.Raw($"lower({COLUMN_NAME}) = {{0}}", path[index].ToLower())
+          ), null, null, cancellationToken);
+        }
+
+        _ = Service.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
+        return file;
+      }
     }
 
     public IEnumerable<FileResource> ScanFolder(ResourceService.Transaction transaction, StorageResource storage, FileResource? folder, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
@@ -279,7 +299,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
           {
             if (folder != null)
             {
-              Service.Storages.DecryptFileKey(transaction, storage, folder, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
+              Service.Storages.DecryptKey(transaction, storage, folder, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
             }
 
             foreach (FileResource file in Select(transaction, new WhereClause.Nested("and",
@@ -314,7 +334,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
 
           FileResource.FileHandle openFile()
           {
-            StorageResource.DecryptedFileKeyInfo decryptedFileKeyInfo = Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken, handleFlags.HasFlag(FileHandleFlags.Write)
+            StorageResource.DecryptedKeyInfo decryptedFileKeyInfo = Service.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, handleFlags.HasFlag(FileHandleFlags.Write)
               ? FileAccessResource.FileAccessType.ReadWrite
               : FileAccessResource.FileAccessType.Read, cancellationToken);
 

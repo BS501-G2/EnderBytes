@@ -86,6 +86,7 @@ public static class Program
     {
       await server.ResourceService.Transact(Handler);
     }
+
     await server.Stop();
   });
 
@@ -122,6 +123,11 @@ public static class Program
       FileAccessResource fileAccess2 = service.FileAccesses.Create(transaction, storage, folder2, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
 
       service.Files.Move(transaction, storage, file, folder2, otherToken, cancellationToken);
+
+      foreach (FileResource scannedFile in service.Files.ScanFolder(transaction, storage, folder2, otherToken, cancellationToken))
+      {
+        Console.WriteLine($"File: {scannedFile.Name}");
+      }
     });
   });
 }

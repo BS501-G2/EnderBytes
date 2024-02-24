@@ -7,7 +7,7 @@ using Services;
 
 public sealed class StorageResource(StorageResource.ResourceManager manager, StorageResource.ResourceData data) : Resource<StorageResource.ResourceManager, StorageResource.ResourceData, StorageResource>(manager, data)
 {
-  public sealed record DecryptedFileKeyInfo(KeyService.AesPair Key, FileAccessResource? FileAccess);
+  public sealed record DecryptedKeyInfo(KeyService.AesPair Key, FileAccessResource? FileAccess);
 
   private const string NAME = "Storage";
   private const int VERSION = 1;
@@ -110,16 +110,26 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
         }
 
         byte[] encryptFileKey(KeyService.AesPair? storageKey, FileResource? parent) => storageKey == null && parent != null
-          ? DecryptFileKey(transaction, storage, parent, userAuthenticationToken, fileAccessType, cancellationToken).Key.Encrypt(key.Serialize())
+          ? DecryptKey(transaction, storage, parent, userAuthenticationToken, fileAccessType, cancellationToken).Key.Encrypt(key.Serialize())
           : storageKey!.Encrypt(key.Serialize());
       }
     }
 
-    public DecryptedFileKeyInfo DecryptFileKey(ResourceService.Transaction transaction, StorageResource storage, FileResource file, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileAccessResource.FileAccessType? fileAccessType = null, CancellationToken cancellationToken = default)
+    public DecryptedKeyInfo DecryptKey(ResourceService.Transaction transaction, StorageResource storage, FileResource? file, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileAccessResource.FileAccessType? fileAccessType = null, CancellationToken cancellationToken = default)
     {
       lock (storage)
       {
         storage.ThrowIfInvalid();
+
+        if (file == null)
+        {
+          if (userAuthenticationToken?.UserId != storage.OwnerUserId)
+          {
+            throw new ArgumentException("The owner's authentication token is required to decrypt the storage key.", nameof(userAuthenticationToken));
+          }
+
+          return new(KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key)), null);
+        }
 
         lock (file)
         {

@@ -50,48 +50,39 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
 
     public Token Create(ResourceService.Transaction transaction, string username, string? displayName, string password, CancellationToken cancellationToken = default)
     {
-      lock (this)
-      {
-        (byte[] privateKey, byte[] publicKey) = Service.Server.KeyService.GetNewRsaKeyPair();
+      (byte[] privateKey, byte[] publicKey) = Service.Server.KeyService.GetNewRsaKeyPair();
 
-        UserResource user = Insert(transaction, new(
-          (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
-          (COLUMN_DISPLAY_NAME, displayName),
-          (COLUMN_PUBLIC_KEY, publicKey)
-        ), cancellationToken);
+      UserResource user = Insert(transaction, new(
+        (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
+        (COLUMN_DISPLAY_NAME, displayName),
+        (COLUMN_PUBLIC_KEY, publicKey)
+      ), cancellationToken);
 
-        return new(user, Service.UserAuthentications.CreatePassword(transaction, user, password, privateKey, publicKey));
-      }
+      return new(user, Service.UserAuthentications.CreatePassword(transaction, user, password, privateKey, publicKey));
     }
 
     public bool Update(ResourceService.Transaction transaction, UserResource user, string username, string? displayName)
     {
-      lock (this)
+      lock (user)
       {
-        lock (user)
-        {
-          user.ThrowIfInvalid();
+        user.ThrowIfInvalid();
 
-          return Update(transaction, user, new(
-            (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
-            (COLUMN_DISPLAY_NAME, displayName)
-          ));
-        }
+        return Update(transaction, user, new(
+          (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
+          (COLUMN_DISPLAY_NAME, displayName)
+        ));
       }
     }
 
     public bool TryGetByUsername(ResourceService.Transaction transaction, string username, [NotNullWhen(true)] out UserResource? user, CancellationToken cancellationToken = default)
     {
-      lock (this)
+      if (ValidateUsername(username) != UsernameValidationFlag.NoErrors)
       {
-        if (ValidateUsername(username) != UsernameValidationFlag.NoErrors)
-        {
-          user = null;
-          return false;
-        }
-
-        return (user = Select(transaction, new WhereClause.CompareColumn(COLUMN_USERNAME, "=", username), new(1), cancellationToken: cancellationToken).FirstOrDefault()) != null;
+        user = null;
+        return false;
       }
+
+      return (user = Select(transaction, new WhereClause.CompareColumn(COLUMN_USERNAME, "=", username), new(1), cancellationToken: cancellationToken).FirstOrDefault()) != null;
     }
   }
 

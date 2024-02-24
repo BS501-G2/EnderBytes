@@ -16,7 +16,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
   where D : Resource<M, D, R>.ResourceData
   where R : Resource<M, D, R>
 {
-  public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction,  CancellationToken cancellationToken);
+  public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, CancellationToken cancellationToken);
   public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, D oldData, CancellationToken cancellationToken);
 
   public abstract partial class ResourceManager(ResourceService service, string name, int version) : ResourceService.ResourceManager(service, name, version)

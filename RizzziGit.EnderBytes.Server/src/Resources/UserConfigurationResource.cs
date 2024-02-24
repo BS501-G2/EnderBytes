@@ -42,18 +42,15 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
 
     public UserConfigurationResource Get(ResourceService.Transaction transaction, UserResource user)
     {
-      lock (this)
+      lock (user)
       {
-        lock (user)
-        {
-          user.ThrowIfInvalid();
+        user.ThrowIfInvalid();
 
-          return SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id))
-            ?? Insert(transaction, new(
-              (COLUMN_USER_ID, user.Id),
-              (COLUMN_ENABLE_FTP_ACCESS, false)
-            ));
-        }
+        return SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id))
+          ?? Insert(transaction, new(
+            (COLUMN_USER_ID, user.Id),
+            (COLUMN_ENABLE_FTP_ACCESS, false)
+          ));
       }
     }
   }

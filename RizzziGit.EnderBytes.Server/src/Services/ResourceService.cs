@@ -18,6 +18,9 @@ public sealed partial class ResourceService : Server.SubService
     Storages = new(this);
     Files = new(this);
     FileAccesses = new(this);
+    FileSnapshots = new(this);
+    FileBuffers = new(this);
+    FileBufferMaps = new(this);
   }
 
   private Database? Database;
@@ -28,6 +31,9 @@ public sealed partial class ResourceService : Server.SubService
   public readonly StorageResource.ResourceManager Storages;
   public readonly FileResource.ResourceManager Files;
   public readonly FileAccessResource.ResourceManager FileAccesses;
+  public readonly FileSnapshotResource.ResourceManager FileSnapshots;
+  public readonly FileBufferResource.ResourceManager FileBuffers;
+  public readonly FileBufferMapResource.ResourceManager FileBufferMaps;
 
   private Task? TransactionQueueTask;
   private CancellationTokenSource? TransactionQueueTaskCancellationTokenSource = new();
@@ -58,6 +64,9 @@ public sealed partial class ResourceService : Server.SubService
     await Storages.Start(cancellationToken);
     await Files.Start(cancellationToken);
     await FileAccesses.Start(cancellationToken);
+    await FileSnapshots.Start(cancellationToken);
+    await FileBuffers.Start(cancellationToken);
+    await FileBufferMaps.Start(cancellationToken);
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
@@ -72,7 +81,10 @@ public sealed partial class ResourceService : Server.SubService
           UserConfiguration,
           Storages,
           Files,
-          FileAccesses
+          FileAccesses,
+          FileSnapshots,
+          FileBuffers,
+          FileBufferMaps
         ], cancellationToken)
       ]);
     }
@@ -84,6 +96,9 @@ public sealed partial class ResourceService : Server.SubService
 
   protected override async Task OnStop(Exception? exception = null)
   {
+    await FileBufferMaps.Stop();
+    await FileBuffers.Stop();
+    await FileSnapshots.Stop();
     await FileAccesses.Stop();
     await Files.Stop();
     await Storages.Stop();

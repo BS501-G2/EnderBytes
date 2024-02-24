@@ -1,7 +1,9 @@
 using System.Data.Common;
-using RizzziGit.EnderBytes.Services;
 
 namespace RizzziGit.EnderBytes.Resources;
+
+using Utilities;
+using Services;
 
 public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager manager, FileSnapshotResource.ResourceData data) : Resource<FileSnapshotResource.ResourceManager, FileSnapshotResource.ResourceData, FileSnapshotResource>(manager, data)
 {
@@ -22,7 +24,12 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
 
     protected override FileSnapshotResource NewResource(ResourceData data) => new(this, data);
     protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
-      id, createTime, updateTime
+      id, createTime, updateTime,
+
+      reader.GetInt64(reader.GetOrdinal(COLUMN_FILE_ID)),
+      reader.GetInt64Optional(reader.GetOrdinal(COLUMN_BASE_SNAPSHOT_ID)),
+      reader.GetInt64Optional(reader.GetOrdinal(COLUMN_AUTHOR_FILE_ACCESS_ID)),
+      reader.GetInt64Optional(reader.GetOrdinal(COLUMN_AUTHOR_ID))
     );
 
     protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
@@ -36,36 +43,55 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
       }
     }
 
-    public FileSnapshotResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileSnapshotResource? baseSnapshot, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken = null, CancellationToken cancellationToken = default)
+    public FileSnapshotResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileSnapshotResource? baseFileSnapshot, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken = null, CancellationToken cancellationToken = default)
     {
-      lock (this)
+      if (baseFileSnapshot == null)
       {
-        if (baseSnapshot == null)
+        return create();
+      }
+
+      lock (baseFileSnapshot)
+      {
+        baseFileSnapshot.ThrowIfInvalid();
+
+        FileSnapshotResource fileSnapshot = create();
+
+        foreach (FileBufferMapResource fileBufferMap in Service.FileBufferMaps.List(transaction, fileSnapshot, cancellationToken: cancellationToken))
         {
-          return create();
+          FileBufferResource fileBuffer = Service.FileBuffers.GetById(transaction, fileBufferMap.Id, cancellationToken);
+
+          Service.FileBufferMaps.Create(transaction, fileSnapshot, fileBuffer, fileBufferMap.Index, fileBufferMap.Length, cancellationToken);
         }
 
-        lock (baseSnapshot)
-        {
-          baseSnapshot.ThrowIfInvalid();
+        return fileSnapshot;
+      }
 
-          return create();
-        }
+      FileSnapshotResource create()
+      {
+        (_, FileAccessResource? fileAccess) = Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
 
-        FileSnapshotResource create()
-        {
-          (_, FileAccessResource? fileAccess) = Service.Storages.DecryptFileKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
-
-          return Insert(transaction, new(
-            (COLUMN_FILE_ID, file.Id),
-            (COLUMN_BASE_SNAPSHOT_ID, baseSnapshot?.Id),
-            (COLUMN_AUTHOR_FILE_ACCESS_ID, fileAccess?.Id),
-            (COLUMN_AUTHOR_ID, userAuthenticationToken?.UserId)
-          ), cancellationToken);
-        }
+        return Insert(transaction, new(
+          (COLUMN_FILE_ID, file.Id),
+          (COLUMN_BASE_SNAPSHOT_ID, baseFileSnapshot?.Id),
+          (COLUMN_AUTHOR_FILE_ACCESS_ID, fileAccess?.Id),
+          (COLUMN_AUTHOR_ID, userAuthenticationToken?.UserId)
+        ), cancellationToken);
       }
     }
   }
 
-  public new sealed record ResourceData(long Id, long CreateTime, long UpdateTime) : Resource<ResourceManager, ResourceData, FileSnapshotResource>.ResourceData(Id, CreateTime, UpdateTime);
+  public new sealed record ResourceData(
+    long Id,
+    long CreateTime,
+    long UpdateTime,
+    long FileId,
+    long? BaseSnapshotId,
+    long? AuthorFileAccessId,
+    long? AuthorId
+  ) : Resource<ResourceManager, ResourceData, FileSnapshotResource>.ResourceData(Id, CreateTime, UpdateTime);
+
+  public long FileId => Data.FileId;
+  public long? BaseSnapshotId => Data.BaseSnapshotId;
+  public long? AuthorFileAccessId => Data.AuthorFileAccessId;
+  public long? AuthorId => Data.AuthorId;
 }

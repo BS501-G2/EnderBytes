@@ -173,42 +173,36 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     public UserAuthenticationToken? GetByPayload(ResourceService.Transaction transaction, UserResource user, byte[] payload, UserAuthenticationType type)
     {
-      lock (this)
+      lock (user)
       {
-        lock (user)
+        user.ThrowIfInvalid();
+
+        foreach (UserAuthenticationResource userAuthentication in Select(transaction,
+          new WhereClause.Nested("and",
+            new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id),
+            new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)type)
+          )
+        ))
         {
-          user.ThrowIfInvalid();
-
-          foreach (UserAuthenticationResource userAuthentication in Select(transaction,
-            new WhereClause.Nested("and",
-              new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id),
-              new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)type)
-            )
-          ))
-          {
-            try { return new(user, userAuthentication, userAuthentication.GetPayloadHash(payload)); } catch { }
-          }
-
-          return null;
+          try { return new(user, userAuthentication, userAuthentication.GetPayloadHash(payload)); } catch { }
         }
+
+        return null;
       }
     }
 
     public override bool Delete(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication, CancellationToken cancellationToken = default)
     {
-      lock (this)
+      lock (userAuthentication)
       {
-        lock (userAuthentication)
+        userAuthentication.ThrowIfInvalid();
+
+        if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userAuthentication.UserId), cancellationToken) < 2)
         {
-          userAuthentication.ThrowIfInvalid();
-
-          if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userAuthentication.UserId), cancellationToken) < 2)
-          {
-            throw new InvalidOperationException("Must have at least two user authentications before deleting one.");
-          }
-
-          return base.Delete(transaction, userAuthentication, cancellationToken);
+          throw new InvalidOperationException("Must have at least two user authentications before deleting one.");
         }
+
+        return base.Delete(transaction, userAuthentication, cancellationToken);
       }
     }
   }

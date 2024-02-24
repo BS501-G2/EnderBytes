@@ -78,31 +78,28 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
 
     public FileAccessResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource targetFile, UserResource targetUser, FileAccessType type, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      lock (this)
+      lock (storage)
       {
-        lock (storage)
+        storage.ThrowIfInvalid();
+
+        lock (targetFile)
         {
-          storage.ThrowIfInvalid();
+          targetFile.ThrowIfInvalid();
+          targetFile.ThrowIfDoesNotBelongTo(storage);
 
-          lock (targetFile)
+          lock (userAuthenticationToken)
           {
-            targetFile.ThrowIfInvalid();
-            targetFile.ThrowIfDoesNotBelongTo(storage);
+            userAuthenticationToken.ThrowIfInvalid();
 
-            lock (userAuthenticationToken)
-            {
-              userAuthenticationToken.ThrowIfInvalid();
+            KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptFileKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
 
-              KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptFileKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
-
-              return Insert(transaction, new(
-                (COLUMN_TARGET_FILE_ID, targetFile.Id),
-                (COLUMN_TARGET_ENTITY_ID, targetUser.Id),
-                (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.User),
-                (COLUMN_KEY, targetUser.Encrypt(fileKey.Serialize())),
-                (COLUMN_TYPE, (byte)type)
-              ), cancellationToken);
-            }
+            return Insert(transaction, new(
+              (COLUMN_TARGET_FILE_ID, targetFile.Id),
+              (COLUMN_TARGET_ENTITY_ID, targetUser.Id),
+              (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.User),
+              (COLUMN_KEY, targetUser.Encrypt(fileKey.Serialize())),
+              (COLUMN_TYPE, (byte)type)
+            ), cancellationToken);
           }
         }
       }

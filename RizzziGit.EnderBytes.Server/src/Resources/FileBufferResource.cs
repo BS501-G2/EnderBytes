@@ -12,20 +12,16 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, FileBufferResource>.ResourceManager
   {
-    private const string COLUMN_STORAGE_ID = "StorageId";
-    private const string COLUMN_FILE_ID = "FileId";
     private const string COLUMN_BUFFER = "Buffer";
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.FileBufferMaps.ResourceDeleted += (transaction, fileBufferMap, cancellationToken) =>
-      {
-        if (fileBufferMap.FileBufferId == null)
-        {
-          return;
-        }
+      Service.FileBufferMaps.ResourceUpdated += (transaction, _, oldData, cancellationToken) => check(transaction, oldData.FileBufferId, cancellationToken);
+      Service.FileBufferMaps.ResourceDeleted += (transaction, fileBufferMap, cancellationToken) => check(transaction, fileBufferMap.FileBufferId, cancellationToken);
 
-        if (!TryGetById(transaction, (long)fileBufferMap.FileBufferId, out FileBufferResource? fileBuffer, cancellationToken))
+      void check(ResourceService.Transaction transaction, long? fileBufferId, CancellationToken cancellationToken)
+      {
+        if (fileBufferId == null || !TryGetById(transaction, (long)fileBufferId, out FileBufferResource? fileBuffer, cancellationToken))
         {
           return;
         }
@@ -34,15 +30,13 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
         {
           Delete(transaction, fileBuffer, cancellationToken);
         }
-      };
+      }
     }
 
     protected override FileBufferResource NewResource(ResourceData data) => new(this, data);
     protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
       id, createTime, updateTime,
 
-      reader.GetInt64(reader.GetOrdinal(COLUMN_STORAGE_ID)),
-      reader.GetInt64(reader.GetOrdinal(COLUMN_FILE_ID)),
       reader.GetBytes(reader.GetOrdinal(COLUMN_BUFFER))
     );
 
@@ -50,10 +44,22 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
     {
       if (oldVersion < 1)
       {
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_STORAGE_ID} bigint not null;");
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_FILE_ID} bigint not null;");
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_BUFFER} blob not null;");
       }
+    }
+
+    public bool Update(ResourceService.Transaction transaction, FileBufferResource fileBuffer, byte[] buffer, CancellationToken cancellationToken = default)
+    {
+      return Update(transaction, fileBuffer, new SetClause(
+        (COLUMN_BUFFER, buffer)
+      ), cancellationToken);
+    }
+
+    public FileBufferResource Create(ResourceService.Transaction transaction, byte[] buffer, CancellationToken cancellationToken = default)
+    {
+      return Insert(transaction, new(
+        (COLUMN_BUFFER, buffer)
+      ), cancellationToken);
     }
   }
 
@@ -62,12 +68,8 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
     long CreateTime,
     long UpdateTime,
 
-    long StorageId,
-    long FileId,
     byte[] Buffer
   ) : Resource<ResourceManager, ResourceData, FileBufferResource>.ResourceData(Id, CreateTime, UpdateTime);
 
-  public long StorageId => Data.StorageId;
-  public long FileId => Data.FileId;
   public byte[] Buffer => Data.Buffer;
 }

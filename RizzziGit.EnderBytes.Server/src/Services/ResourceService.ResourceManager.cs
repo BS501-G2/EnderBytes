@@ -20,16 +20,15 @@ public sealed partial class ResourceService
     public readonly int Version = version;
 
     protected Database DatabaseWrapper => Service.Database!;
-    protected DbConnection Database => Service.CurrentConnection!;
 
     protected abstract void Upgrade(Transaction transaction, int oldVersion = default, CancellationToken cancellationToken = default);
 
     protected Task<T> Transact<T>(TransactionHandler<T> handler, CancellationToken cancellationToken = default) => Service.Transact(handler, cancellationToken);
     protected Task Transact(TransactionHandler handler, CancellationToken cancellationToken = default) => Service.Transact(handler, cancellationToken);
 
-    private DbCommand CreateCommand(string sql, object?[] parameters)
+    private DbCommand CreateCommand(Transaction transaction, string sql, object?[] parameters)
     {
-      DbCommand command = Database.CreateCommand();
+      DbCommand command = transaction.Connection.CreateCommand();
       command.CommandText = string.Format(sql, createParameterArray());
 
       return command;
@@ -73,31 +72,40 @@ public sealed partial class ResourceService
 
     protected IEnumerable<T> SqlEnumeratedQuery<T>(Transaction transaction, SqlQueryDataEnumeratorHandler<T> dataHandler, string sqlQuery, params object?[] parameters)
     {
-      using DbCommand command = CreateCommand(sqlQuery, parameters);
-
-      LogSql(transaction, "Query", sqlQuery, parameters);
-      using DbDataReader reader = command.ExecuteReader(System.Data.CommandBehavior.SingleResult);
-
-      foreach (T item in dataHandler(reader))
+      lock (this)
       {
-        yield return item;
+        using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
+
+        LogSql(transaction, "Query", sqlQuery, parameters);
+        using DbDataReader reader = command.ExecuteReader(System.Data.CommandBehavior.SingleResult);
+
+        foreach (T item in dataHandler(reader))
+        {
+          yield return item;
+        }
       }
     }
 
     protected int SqlNonQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
-      using DbCommand command = CreateCommand(sqlQuery, parameters);
+      lock (this)
+      {
+        using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-      LogSql(transaction, "Non-query", sqlQuery, parameters);
-      return command.ExecuteNonQuery();
+        LogSql(transaction, "Non-query", sqlQuery, parameters);
+        return command.ExecuteNonQuery();
+      }
     }
 
     protected object? SqlScalar(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
-      using DbCommand command = CreateCommand(sqlQuery, parameters);
+      lock (this)
+      {
+        using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-      LogSql(transaction, "Scalar", sqlQuery, parameters);
-      return command.ExecuteScalar();
+        LogSql(transaction, "Scalar", sqlQuery, parameters);
+        return command.ExecuteScalar();
+      }
     }
 
     protected sealed override Task OnStop(Exception? exception) => base.OnStop(exception);
@@ -125,11 +133,7 @@ public sealed partial class ResourceService
         {
           if (version == null)
           {
-            SqlNonQuery(transaction, $"create table {Name}({COLUMN_ID} bigint primary key {DatabaseWrapper switch
-            {
-              MySQLDatabase => "auto_increment",
-              _ => "auto increment",
-            }}, {COLUMN_CREATE_TIME} bigint not null, {COLUMN_UPDATE_TIME} bigint not null);");
+            SqlNonQuery(transaction, $"create table {Name}({COLUMN_ID} bigint primary key auto_increment, {COLUMN_CREATE_TIME} bigint not null, {COLUMN_UPDATE_TIME} bigint not null);");
             Upgrade(transaction, cancellationToken: cancellationToken);
           }
           else

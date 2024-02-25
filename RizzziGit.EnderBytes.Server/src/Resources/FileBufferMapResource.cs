@@ -29,8 +29,8 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
       reader.GetInt64(reader.GetOrdinal(COLUMN_FILE_ID)),
       reader.GetInt64(reader.GetOrdinal(COLUMN_FILE_SNAPSHOT_ID)),
       reader.GetInt64(reader.GetOrdinal(COLUMN_FILE_BUFFER_ID)),
-      reader.GetInt64(reader.GetOrdinal(COLUMN_INDEX)),
-      reader.GetInt64(reader.GetOrdinal(COLUMN_LENGTH))
+      reader.GetInt32(reader.GetOrdinal(COLUMN_INDEX)),
+      reader.GetInt32(reader.GetOrdinal(COLUMN_LENGTH))
     );
 
     protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
@@ -40,8 +40,8 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_FILE_ID} bigint not null;");
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_FILE_SNAPSHOT_ID} bigint not null;");
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_FILE_BUFFER_ID} bigint null;");
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_INDEX} bigint not null;");
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_LENGTH} bigint not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_INDEX} int not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_LENGTH} int not null;");
       }
     }
 
@@ -63,7 +63,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
 
         return Select(transaction, new WhereClause.Nested("and",
           new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", snapshot.Id),
-          new WhereClause.CompareColumn(COLUMN_INDEX, ">", startAtIndex)
+          new WhereClause.CompareColumn(COLUMN_INDEX, ">=", startAtIndex)
         ), null, null, cancellationToken);
       }
     }
@@ -92,7 +92,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
       }
     }
 
-    public FileBufferMapResource Create(ResourceService.Transaction transaction, FileSnapshotResource snapshot, FileBufferResource? fileBuffer, long index, long size, CancellationToken cancellationToken = default)
+    public FileBufferMapResource Create(ResourceService.Transaction transaction, FileSnapshotResource snapshot, FileBufferResource? fileBuffer, int index, int size, CancellationToken cancellationToken = default)
     {
       lock (snapshot)
       {
@@ -122,6 +122,14 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
         }
       }
     }
+
+    public void Truncate(ResourceService.Transaction transaction, FileBufferMapResource fileBufferMap, long startIndex, CancellationToken cancellationToken = default)
+    {
+      lock (fileBufferMap)
+      {
+        fileBufferMap.ThrowIfInvalid();
+      }
+    }
   }
 
   public new sealed record ResourceData(
@@ -132,13 +140,13 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
     long FileId,
     long FileSnapshotId,
     long? FileBufferId,
-    long Index,
-    long Length
+    int Index,
+    int Length
   ) : Resource<ResourceManager, ResourceData, FileBufferMapResource>.ResourceData(Id, CreateTime, UpdateTime);
 
   public long FileId => Data.FileId;
   public long FileSnapshotId => Data.FileSnapshotId;
   public long? FileBufferId => Data.FileBufferId;
-  public long Index => Data.Index;
-  public long Length => Data.Length;
+  public int Index => Data.Index;
+  public int Length => Data.Length;
 }

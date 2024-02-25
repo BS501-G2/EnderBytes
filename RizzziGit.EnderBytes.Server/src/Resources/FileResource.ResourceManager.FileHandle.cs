@@ -62,7 +62,7 @@ public sealed partial class FileResource
             return (long)Size;
           }
 
-          (_, _, ResourceService service, _) = transaction;
+          (_, _, _, ResourceService service, _) = transaction;
 
           long size = service.FileBufferMaps.List(transaction, Snapshot, 0, cancellationToken).Sum((fileBufferMap) => fileBufferMap.Length);
 
@@ -82,7 +82,7 @@ public sealed partial class FileResource
         }
       }
 
-      public override CompositeBuffer Read(ResourceService.Transaction transaction, long size, CancellationToken cancellationToken = default)
+      public override CompositeBuffer Read(ResourceService.Transaction transaction, int size, CancellationToken cancellationToken = default)
       {
         lock (this)
         {
@@ -90,22 +90,18 @@ public sealed partial class FileResource
 
           CompositeBuffer buffer = [];
 
-          long beginIndex = Position / BUFFER_SIZE;
-          long beginOffset = Position - (BUFFER_SIZE * beginIndex);
+          int beginIndex = (int)(Position / BUFFER_SIZE);
 
-          long remaining() => size - buffer.Length;
+          int remaining() => (int)(size - buffer.Length);
+
+          StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResoruceService.Storages.DecryptKey(transaction, Storage, File, UserAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
 
           foreach (FileBufferMapResource fileBufferMap in transaction.ResoruceService.FileBufferMaps.List(transaction, Snapshot, Position / BUFFER_SIZE, cancellationToken))
           {
             FileBufferResource fileBuffer = transaction.ResoruceService.FileBuffers.GetById(transaction, fileBufferMap.Id, cancellationToken);
-            StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResoruceService.Storages.DecryptKey(transaction, Storage, File, UserAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
-
             byte[] decrypted = decryptedKeyInfo.Key.Decrypt(fileBuffer.Buffer);
 
-            if (beginOffset > 0)
-            {
-              beginOffset = 0;
-            }
+            buffer.Append(decrypted[(fileBufferMap.Index == beginIndex ? (int)(Position - (BUFFER_SIZE * beginIndex)) : 0)..int.Min(remaining(), fileBufferMap.Length)]);
 
             if (buffer.Length >= size)
             {
@@ -113,7 +109,38 @@ public sealed partial class FileResource
             }
           }
 
+          Position += buffer.Length;
           return buffer;
+        }
+      }
+
+      public override void Write(ResourceService.Transaction transaction, CompositeBuffer buffer, CancellationToken cancellationToken = default)
+      {
+        lock (this)
+        {
+          ThrowIfDisposed();
+
+          int beginIndex = (int)(Position / BUFFER_SIZE);
+          StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResoruceService.Storages.DecryptKey(transaction, Storage, File, UserAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+
+          CompositeBuffer decrypted = [];
+          int beginOffset = 0;
+
+          foreach (FileBufferMapResource fileBufferMap in transaction.ResoruceService.FileBufferMaps.List(transaction, Snapshot, Position / BUFFER_SIZE, cancellationToken))
+          {
+            FileBufferResource fileBuffer = transaction.ResoruceService.FileBuffers.GetById(transaction, fileBufferMap.Id, cancellationToken);
+            if (fileBufferMap.Index == beginIndex)
+            {
+              beginOffset = (int)(Position - (beginIndex * BUFFER_SIZE));
+            }
+
+            decrypted.Append(decryptedKeyInfo.Key.Decrypt(fileBuffer.Buffer));
+
+            if (decrypted.Length >= buffer.Length)
+            {
+              break;
+            }
+          }
         }
       }
     }

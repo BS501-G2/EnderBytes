@@ -22,7 +22,7 @@ public sealed partial class ResourceService
   public delegate void TransactionFailureHandler();
 
   private long NextTransactionId;
-  public sealed record Transaction(long Id, Action<TransactionFailureHandler> RegisterOnFailureHandler, ResourceService ResoruceService, CancellationToken CancellationToken);
+  public sealed record Transaction(DbConnection Connection, long Id, Action<TransactionFailureHandler> RegisterOnFailureHandler, ResourceService ResoruceService, CancellationToken CancellationToken);
 
   private WaitQueue? TransactionQueue;
 
@@ -97,7 +97,6 @@ public sealed partial class ResourceService
     await source.Task;
   }
 
-  public DbConnection? CurrentConnection { get; private set; }
   private async Task RunTransactionQueue(CancellationToken serviceCancellationToken)
   {
     Logger.Log(LogLevel.Info, $"Transaction queue is running for database.");
@@ -108,45 +107,39 @@ public sealed partial class ResourceService
         await foreach (var (source, handler, cancellationToken) in (TransactionQueue = new()).WithCancellation(serviceCancellationToken))
         {
           using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(serviceCancellationToken, cancellationToken);
-          try
+
+          await Database!.Run(async (connection, cancellationToken) =>
           {
-            await Database!.Run(async (connection, cancellationToken) =>
+            using DbTransaction dbTransaction = connection.BeginTransaction();
+
+            List<TransactionFailureHandler> failureHandlers = [];
+            Transaction transaction = new(connection, NextTransactionId++, failureHandlers.Add, this, linkedCancellationTokenSource.Token);
+            Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");
+
+            try
             {
-              using DbTransaction dbTransaction = (CurrentConnection = connection).BeginTransaction();
+              await handler(transaction, linkedCancellationTokenSource.Token);
+              linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
-              List<TransactionFailureHandler> failureHandlers = [];
-              Transaction transaction = new(NextTransactionId++, failureHandlers.Add, this, linkedCancellationTokenSource.Token);
-              Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");
+              Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");
+              dbTransaction.Commit();
+            }
+            catch (Exception exception)
+            {
+              Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
+              dbTransaction.Rollback();
 
-              try
+              foreach (TransactionFailureHandler failureHandler in failureHandlers.Reverse<TransactionFailureHandler>())
               {
-                await handler(transaction, linkedCancellationTokenSource.Token);
-                linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
-
-                Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");
-                dbTransaction.Commit();
-              }
-              catch (Exception exception)
-              {
-                Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
-                dbTransaction.Rollback();
-
-                foreach (TransactionFailureHandler failureHandler in failureHandlers.Reverse<TransactionFailureHandler>())
-                {
-                  failureHandler();
-                }
-
-                source.SetException(exception);
-                return;
+                failureHandler();
               }
 
-              source.SetResult();
-            }, cancellationToken);
-          }
-          finally
-          {
-            CurrentConnection = null;
-          }
+              source.SetException(exception);
+              return;
+            }
+
+            source.SetResult();
+          }, cancellationToken);
         }
       }
       catch (Exception exception)

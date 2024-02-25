@@ -97,7 +97,8 @@ public sealed partial class ResourceService
     await source.Task;
   }
 
-  private async Task RunTransactionQueue(DbConnection connection, CancellationToken serviceCancellationToken)
+  public DbConnection? CurrentConnection { get; private set; }
+  private async Task RunTransactionQueue(CancellationToken serviceCancellationToken)
   {
     Logger.Log(LogLevel.Info, $"Transaction queue is running for database.");
     try
@@ -107,35 +108,45 @@ public sealed partial class ResourceService
         await foreach (var (source, handler, cancellationToken) in (TransactionQueue = new()).WithCancellation(serviceCancellationToken))
         {
           using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(serviceCancellationToken, cancellationToken);
-          using DbTransaction dbTransaction = connection.BeginTransaction();
-
-          List<TransactionFailureHandler> failureHandlers = [];
-          Transaction transaction = new(NextTransactionId++, failureHandlers.Add, this, linkedCancellationTokenSource.Token);
-          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");
-
           try
           {
-            await handler(transaction, linkedCancellationTokenSource.Token);
-            linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
-
-            Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");
-            dbTransaction.Commit();
-          }
-          catch (Exception exception)
-          {
-            Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
-            dbTransaction.Rollback();
-
-            foreach (TransactionFailureHandler failureHandler in failureHandlers.Reverse<TransactionFailureHandler>())
+            await Database!.Run(async (connection, cancellationToken) =>
             {
-              failureHandler();
-            }
+              using DbTransaction dbTransaction = (CurrentConnection = connection).BeginTransaction();
 
-            source.SetException(exception);
-            continue;
+              List<TransactionFailureHandler> failureHandlers = [];
+              Transaction transaction = new(NextTransactionId++, failureHandlers.Add, this, linkedCancellationTokenSource.Token);
+              Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");
+
+              try
+              {
+                await handler(transaction, linkedCancellationTokenSource.Token);
+                linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
+
+                Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");
+                dbTransaction.Commit();
+              }
+              catch (Exception exception)
+              {
+                Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
+                dbTransaction.Rollback();
+
+                foreach (TransactionFailureHandler failureHandler in failureHandlers.Reverse<TransactionFailureHandler>())
+                {
+                  failureHandler();
+                }
+
+                source.SetException(exception);
+                return;
+              }
+
+              source.SetResult();
+            }, cancellationToken);
           }
-
-          source.SetResult();
+          finally
+          {
+            CurrentConnection = null;
+          }
         }
       }
       catch (Exception exception)

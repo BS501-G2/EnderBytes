@@ -1,5 +1,3 @@
-using System.Data.SQLite;
-using System.Data.Common;
 using MySql.Data.MySqlClient;
 
 namespace RizzziGit.EnderBytes.Services;
@@ -40,23 +38,10 @@ public sealed partial class ResourceService : Server.SubService
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
-    Database = Server.Configuration?.DatabaseConnectionStringBuilder switch
-    {
-      MySqlConnectionStringBuilder connectionStringBuilder => new MySQLDatabase(connectionStringBuilder),
-      SQLiteConnectionStringBuilder connectionStringBuilder => new SQLiteDatabase(connectionStringBuilder),
-
-      _ => new SQLiteDatabase(new SQLiteConnectionStringBuilder()
-      {
-        DataSource = Path.Join(Server.WorkingPath, $"Database.sqlite3"),
-        JournalMode = SQLiteJournalModeEnum.Memory
-      })
-    };
-
-    Logger.Info("Connecting to the database...");
-    await Database.Connection.OpenAsync(cancellationToken);
+    Database = new MySQLDatabase(Server.Configuration.DatabaseConnectionStringBuilder);
 
     TransactionQueueTaskCancellationTokenSource = new();
-    TransactionQueueTask = RunTransactionQueue(Database.Connection, TransactionQueueTaskCancellationTokenSource.Token);
+    TransactionQueueTask = RunTransactionQueue(TransactionQueueTaskCancellationTokenSource.Token);
 
     await Users.Start(cancellationToken);
     await UserAuthentications.Start(cancellationToken);

@@ -8,7 +8,7 @@ using Framework.Collections;
 using Services;
 using Utilities;
 
-public sealed class FileResource(FileResource.ResourceManager manager, FileResource.ResourceData data) : Resource<FileResource.ResourceManager, FileResource.ResourceData, FileResource>(manager, data)
+public sealed partial class FileResource(FileResource.ResourceManager manager, FileResource.ResourceData data) : Resource<FileResource.ResourceManager, FileResource.ResourceData, FileResource>(manager, data)
 {
   public enum FileType : byte { File, Folder, SymbolicLink }
 
@@ -22,39 +22,11 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
     ReadWrite = Read | Write
   }
 
-  public abstract record FileHandle(ResourceManager Manager, FileResource File, FileSnapshotResource Snapshot, UserAuthenticationResource.UserAuthenticationToken UserAuthenticationToken, FileHandleFlags Flags)
-  {
-    public long Position => InternalGetPosition();
-
-    protected abstract long InternalGetPosition();
-
-    public abstract bool InternalSeek(ResourceService.Transaction transaction, long newPosition);
-  }
-
   private const string NAME = "File";
   private const int VERSION = 1;
 
-  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, FileResource>.ResourceManager
+  public new sealed partial class ResourceManager : Resource<ResourceManager, ResourceData, FileResource>.ResourceManager
   {
-    private sealed record FileHandle : FileResource.FileHandle
-    {
-      public FileHandle(ResourceManager Manager, FileResource File, FileSnapshotResource Snapshot, UserAuthenticationResource.UserAuthenticationToken? UserAuthenticationToken, FileHandleFlags Flags) : base(Manager, File, Snapshot, UserAuthenticationToken, Flags)
-      {
-        Manager.Handles.Add(this);
-      }
-
-      ~FileHandle() => Manager.Handles.Remove(this);
-
-      private new long Position = 0;
-
-      protected override long InternalGetPosition() => Position;
-
-      public override bool InternalSeek(ResourceService.Transaction transaction, long newPosition)
-      {
-        throw new NotImplementedException();
-      }
-    }
-
     private const string COLUMN_STORAGE_ID = "StorageId";
     private const string COLUMN_KEY = "AesKey";
     private const string COLUMN_PARENT_FILE_ID = "ParentFileId";
@@ -351,7 +323,7 @@ public sealed class FileResource(FileResource.ResourceManager manager, FileResou
               }
             }
 
-            return new FileHandle(this, file, handleFlags.HasFlag(FileHandleFlags.Write) ? Service.FileSnapshots.Create(transaction, storage, file, fileSnapshot, userAuthenticationToken, cancellationToken) : fileSnapshot, userAuthenticationToken, handleFlags);
+            return new FileHandle(this, storage, file, handleFlags.HasFlag(FileHandleFlags.Write) ? Service.FileSnapshots.Create(transaction, storage, file, fileSnapshot, userAuthenticationToken, cancellationToken) : fileSnapshot, userAuthenticationToken, handleFlags);
           }
         }
       }

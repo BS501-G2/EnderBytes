@@ -55,13 +55,16 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
       }
     }
 
-    public IEnumerable<FileBufferMapResource> List(ResourceService.Transaction transaction, FileSnapshotResource snapshot, LimitClause? limit = null, CancellationToken cancellationToken = default)
+    public IEnumerable<FileBufferMapResource> List(ResourceService.Transaction transaction, FileSnapshotResource snapshot, long startAtIndex = 0, CancellationToken cancellationToken = default)
     {
       lock (snapshot)
       {
         snapshot.ThrowIfInvalid();
 
-        return Select(transaction, new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", snapshot.Id), limit, null, cancellationToken);
+        return Select(transaction, new WhereClause.Nested("and",
+          new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", snapshot.Id),
+          new WhereClause.CompareColumn(COLUMN_INDEX, ">", startAtIndex)
+        ), null, null, cancellationToken);
       }
     }
 

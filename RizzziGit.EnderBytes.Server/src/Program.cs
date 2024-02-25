@@ -16,8 +16,6 @@ public static class Program
   public static async Task Main()
   {
     Server server = new(new(
-      KeyGeneratorThreads: 8,
-
       DatabaseConnectionStringBuilder: new MySqlConnectionStringBuilder()
       {
         Server = "10.1.0.117",
@@ -27,7 +25,9 @@ public static class Program
         Password = "test",
 
         AllowBatch = true
-      }
+      },
+
+      KeyGeneratorThreads: 8
     ));
     {
       StringBuilder buffer = new();
@@ -123,6 +123,8 @@ public static class Program
       FileAccessResource fileAccess2 = service.FileAccesses.Create(transaction, storage, folder2, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
 
       service.Files.Move(transaction, storage, file, folder2, otherToken, cancellationToken);
+
+      FileResource file2 = service.Files.Create(transaction, storage, folder2, FileResource.FileType.File, "Test2", otherToken, cancellationToken);
 
       foreach (FileResource scannedFile in service.Files.ScanFolder(transaction, storage, folder2, otherToken, cancellationToken))
       {

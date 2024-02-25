@@ -1,4 +1,3 @@
-using System.Data.SQLite;
 using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Services;
@@ -21,7 +20,7 @@ public sealed partial class ResourceService
     public readonly int Version = version;
 
     protected Database DatabaseWrapper => Service.Database!;
-    protected DbConnection Database => DatabaseWrapper.Connection;
+    protected DbConnection Database => Service.CurrentConnection!;
 
     protected abstract void Upgrade(Transaction transaction, int oldVersion = default, CancellationToken cancellationToken = default);
 

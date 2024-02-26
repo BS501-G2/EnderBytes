@@ -87,7 +87,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
           targetFile.ThrowIfInvalid();
           targetFile.ThrowIfDoesNotBelongTo(storage);
 
-          lock (userAuthenticationToken)
+          return userAuthenticationToken.Enter(() =>
           {
             userAuthenticationToken.ThrowIfInvalid();
 
@@ -100,7 +100,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
               (COLUMN_KEY, targetUser.Encrypt(fileKey.Serialize())),
               (COLUMN_TYPE, (byte)type)
             ), cancellationToken);
-          }
+          });
         }
       }
     }

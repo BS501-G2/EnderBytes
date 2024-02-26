@@ -52,21 +52,21 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
       }
     }
 
-    public StorageResource Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationResource.UserAuthenticationToken token, CancellationToken cancellationToken = default)
+    public StorageResource Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       lock (user)
       {
         user.ThrowIfInvalid();
 
-        lock (token)
+        return userAuthenticationToken.Enter(() =>
         {
-          token.ThrowIfInvalid();
+          userAuthenticationToken.ThrowIfInvalid();
 
           return InsertAndGet(transaction, new(
             (COLUMN_OWNER_USER_ID, user.Id),
-            (COLUMN_KEY, token.Encrypt(Service.Server.KeyService.GetNewAesPair().Serialize()))
+            (COLUMN_KEY, userAuthenticationToken.Encrypt(Service.Server.KeyService.GetNewAesPair().Serialize()))
           ), cancellationToken);
-        }
+        });
       }
     }
 
@@ -142,12 +142,7 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
             return new(decryptFileKey(), fileAccessUsed);
           }
 
-          lock (userAuthenticationToken)
-          {
-            userAuthenticationToken.ThrowIfInvalid();
-
-            return new(decryptFileKey(), fileAccessUsed);
-          }
+          return userAuthenticationToken.Enter(() => new DecryptedKeyInfo(decryptFileKey(), fileAccessUsed));
 
           KeyService.AesPair decryptFileKey()
           {

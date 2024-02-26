@@ -18,6 +18,32 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     public byte[] Encrypt(byte[] bytes) => UserAuthentication.Encrypt(bytes);
     public byte[] Decrypt(byte[] bytes) => UserAuthentication.Decrypt(bytes, PayloadHash);
+
+    public T Enter<T>(Func<T> func)
+    {
+      lock (this)
+      {
+        lock (UserAuthentication)
+        {
+          ThrowIfInvalid();
+
+          return func();
+        }
+      }
+    }
+
+    public void Enter(Action action)
+    {
+      lock (this)
+      {
+        lock (UserAuthentication)
+        {
+          ThrowIfInvalid();
+
+          action();
+        }
+      }
+    }
   }
 
   public enum UserAuthenticationType { Password }

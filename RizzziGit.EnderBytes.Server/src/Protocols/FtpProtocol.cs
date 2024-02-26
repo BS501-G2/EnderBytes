@@ -33,7 +33,7 @@ public sealed partial class FtpProtocol(ProtocolService service) : Protocol<FtpP
 
         if (remoteEndPoint == null || localEndPoint == null)
         {
-          Console.WriteLine("Rejected a client with an unknown remote address.");
+          Logger.Info("Rejected a client with an unknown remote address.");
           client.Close();
 
           continue;

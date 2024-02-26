@@ -10,6 +10,7 @@ using Core;
 using Resources;
 using Utilities;
 using Services;
+using System.Security.Cryptography;
 
 public static class Program
 {
@@ -92,7 +93,7 @@ public static class Program
 
   public static async Task RunTest(Logger logger, Server server) => await Task.Run(async () =>
   {
-    await server.ResourceService.Transact((transaction, cancellationToken) =>
+    (StorageResource storage, FileResource folder, UserAuthenticationResource.UserAuthenticationToken token) = await server.ResourceService.Transact((transaction, cancellationToken) =>
     {
       ResourceService service = transaction.ResoruceService;
 
@@ -107,61 +108,66 @@ public static class Program
       StorageResource storage = service.Storages.Create(transaction, originalUser, originalToken, cancellationToken);
       FileResource folder = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
       FileAccessResource otherAccess = service.FileAccesses.Create(transaction, storage, folder, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
-      FileResource file = service.Files.Create(transaction, storage, folder, FileResource.FileType.File, "Test2", otherToken, cancellationToken);
-      FileSnapshotResource fileSnapshot = service.FileSnapshots.Create(transaction, storage, file, null, otherToken, cancellationToken);
 
-      string[] units = ["", "K", "M", "G", "T"];
-      string toReadable(decimal size)
-      {
-        int count = 0;
-        while (size >= 1000)
-        {
-          size /= 1024;
-          count++;
-        }
-
-        return $"{Math.Round(size, 2)}{units[count]}B";
-      }
-
-      return;
-
-      void read(FileSnapshotResource fileSnapshot, string path)
-      {
-        using FileStream fileStream = File.OpenRead(path);
-
-        long offset = 0;
-        while (fileStream.Position < fileStream.Length)
-        {
-          cancellationToken.ThrowIfCancellationRequested();
-          byte[] read = new byte[Random.Shared.Next(1024 * 1024 * 8)];
-          int readLength = fileStream.Read(read);
-
-          service.FileBufferMaps.Write(transaction, storage, file, fileSnapshot, offset, new(read, 0, readLength), otherToken, cancellationToken);
-
-          Console.WriteLine(toReadable(fileStream.Position));
-          offset += readLength;
-        }
-      }
-
-      void write(FileSnapshotResource fileSnapshot, string path)
-      {
-        using FileStream fileStream = File.OpenWrite(path);
-        fileStream.Position = 0;
-        fileStream.SetLength(0);
-
-        long size = service.FileBufferMaps.GetSize(transaction, storage, file, fileSnapshot, cancellationToken);
-
-        for (long offset = 0; offset < size;)
-        {
-          long chunkSize = long.Min(size - offset, Random.Shared.Next(1024 * 1024 * 8));
-
-          CompositeBuffer bytes = service.FileBufferMaps.Read(transaction, storage, file, fileSnapshot, offset, chunkSize, otherToken, cancellationToken);
-
-          fileStream.Write(bytes.ToByteArray());
-          Console.WriteLine(toReadable(fileStream.Position));
-          offset += chunkSize;
-        }
-      }
+      return (storage, folder, otherToken);
     });
+
+    async Task upload(string path, FileResource? folder)
+    {
+      FileAttributes fileAttributes = File.GetAttributes(path);
+
+      Console.WriteLine($"{path}");
+      if (fileAttributes.HasFlag(FileAttributes.Directory))
+      {
+        FileResource folderResource = await server.ResourceService.Transact((transaction, cancellationToken) =>
+        {
+          return transaction.ResoruceService.Files.Create(transaction, storage, folder, FileResource.FileType.Folder, Path.GetFileName(path), token, cancellationToken);
+        });
+
+        foreach (string pathEntry in Directory.GetFiles(path).Concat(Directory.GetDirectories(path)))
+        {
+          await upload(pathEntry, folderResource);
+        }
+      }
+      else if (fileAttributes.HasFlag(FileAttributes.Normal))
+      {
+        FileResource file = await server.ResourceService.Transact((transaction, cancellationToken) =>
+        {
+          return transaction.ResoruceService.Files.Create(transaction, storage, folder, FileResource.FileType.File, Path.GetFileName(path), token, cancellationToken);
+        });
+
+        using FileResource.CrossTransactionalFileHandle writer = await server.ResourceService.Transact((transaction, cancellationToken) =>
+        {
+          FileSnapshotResource fileSnapshot = transaction.ResoruceService.FileSnapshots.Create(transaction, storage, file, null, token, cancellationToken);
+
+          return transaction.ResoruceService.Files.OpenFile(transaction, storage, file, fileSnapshot, token, FileResource.FileHandleFlags.ReadModify | FileResource.FileHandleFlags.Exclusive, cancellationToken).CrossTransactional;
+        });
+
+        using FileStream reader = File.OpenRead(path);
+
+        while (reader.Position < reader.Length)
+        {
+          byte[] buffer = new byte[1024 * 1024];
+          int bufferLength = reader.Read(buffer);
+
+          await writer.Write(new(buffer, 0, bufferLength));
+        }
+      }
+    }
+
+    await upload("/run/media/cool/AC233/Testing", folder);
   });
+
+  public static readonly string[] Units = ["", "K", "M", "G", "T"];
+  public static string ToReadable(decimal size)
+  {
+    int count = 0;
+    while (size >= 1000)
+    {
+      size /= 1024;
+      count++;
+    }
+
+    return $"{Math.Round(size, 2)}{Units[count]}B";
+  }
 }

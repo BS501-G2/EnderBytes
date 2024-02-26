@@ -125,38 +125,38 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
       }
     }
 
-    public void Write(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileSnapshotResource fileSnapshot, long offset, CompositeBuffer buffer, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    public void Write(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileSnapshotResource fileSnapshot, long offset, CompositeBuffer buffer, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       lock (storage)
       {
-        storage.ThrowIfInvalid();
-
         lock (file)
         {
-          file.ThrowIfInvalid();
-
           lock (fileSnapshot)
           {
+            StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResoruceService.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+
             fileSnapshot.ThrowIfInvalid();
 
-            lock (userAuthenticationToken)
+            if (userAuthenticationToken == null)
             {
-              userAuthenticationToken.ThrowIfInvalid();
+              write();
+              return;
+            }
 
-              StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResoruceService.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+            userAuthenticationToken.Enter(write);
 
+            void write()
+            {
               CompositeBuffer bytes = [];
               long beginIndex = offset / BUFFER_SIZE;
               long bytesOffset = offset - (beginIndex * BUFFER_SIZE);
 
               ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, GetSize(transaction, storage, file, fileSnapshot, cancellationToken), nameof(offset));
 
-              foreach (FileBufferMapResource fileBufferMap in Select(transaction, new WhereClause.Nested("and",
-                new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
-                new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id),
-                new WhereClause.CompareColumn(COLUMN_INDEX, ">=", beginIndex)
-              ), null, null, cancellationToken).ToList())
+              foreach (FileBufferMapResource fileBufferMap in Select(transaction, file, fileSnapshot, beginIndex, null, cancellationToken).ToList())
               {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 if (fileBufferMap.FileBufferId == null)
                 {
                   bytes.Append(CompositeBuffer.Allocate(fileBufferMap.Length));
@@ -193,14 +193,12 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
 
               for (long index = beginIndex; bytes.Length > 0; index++)
               {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 CompositeBuffer fileBufferData = bytes.SpliceStart(long.Min(bytes.Length, BUFFER_SIZE));
                 long fileBufferId = Service.FileBuffers.Create(transaction, decryptedKeyInfo.Key.Encrypt(fileBufferData.ToByteArray()), cancellationToken);
 
-                FileBufferMapResource? fileBufferMap = SelectOne(transaction, new WhereClause.Nested("and",
-                  new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
-                  new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id),
-                  new WhereClause.CompareColumn(COLUMN_INDEX, "=", index)
-                ), null, null, cancellationToken);
+                FileBufferMapResource? fileBufferMap = Select(transaction, file, fileSnapshot, index, new(1), cancellationToken).FirstOrDefault();
 
                 if (fileBufferMap == null)
                 {
@@ -225,36 +223,36 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
       }
     }
 
-    public CompositeBuffer Read(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileSnapshotResource fileSnapshot, long offset, long length, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    public CompositeBuffer Read(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileSnapshotResource fileSnapshot, long offset, long length, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       lock (storage)
       {
-        storage.ThrowIfInvalid();
-
         lock (file)
         {
-          file.ThrowIfInvalid();
-
           lock (fileSnapshot)
           {
+            StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResoruceService.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
+
             fileSnapshot.ThrowIfInvalid();
 
-            lock (userAuthenticationToken)
+            if (userAuthenticationToken == null)
             {
-              userAuthenticationToken.ThrowIfInvalid();
+              return read();
+            }
 
-              StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResoruceService.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
+            return userAuthenticationToken.Enter(read);
+
+            CompositeBuffer read()
+            {
 
               CompositeBuffer bytes = [];
               long beginIndex = offset / BUFFER_SIZE;
               long bytesOffset = offset - (beginIndex * BUFFER_SIZE);
 
-              foreach (FileBufferMapResource fileBufferMap in Select(transaction, new WhereClause.Nested("and",
-                new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
-                new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id),
-                new WhereClause.CompareColumn(COLUMN_INDEX, ">=", beginIndex)
-              ), null, null, cancellationToken).ToList())
+              foreach (FileBufferMapResource fileBufferMap in Select(transaction, file, fileSnapshot, beginIndex, null, cancellationToken).ToList())
               {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 if (fileBufferMap.FileBufferId == null)
                 {
                   bytes.Append(CompositeBuffer.Allocate(fileBufferMap.Length));
@@ -280,6 +278,71 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
           }
         }
       }
+    }
+
+    public void Truncate(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileSnapshotResource fileSnapshot, long length, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+    {
+      lock (storage)
+      {
+        lock (file)
+        {
+          lock (fileSnapshot)
+          {
+            StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResoruceService.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
+
+            fileSnapshot.ThrowIfInvalid();
+
+            if (userAuthenticationToken == null)
+            {
+              truncate();
+              return;
+            }
+
+            userAuthenticationToken.Enter(truncate);
+            return;
+
+            void truncate()
+            {
+              long beginIndex = length / BUFFER_SIZE;
+              long bytesOffset = length - (BUFFER_SIZE * beginIndex);
+
+              ArgumentOutOfRangeException.ThrowIfGreaterThan(length, GetSize(transaction, storage, file, fileSnapshot, cancellationToken), nameof(length));
+
+              foreach (FileBufferMapResource fileBufferMap in Select(transaction, file, fileSnapshot, beginIndex, null, cancellationToken).ToList())
+              {
+                if (fileBufferMap.Index != beginIndex)
+                {
+                  Delete(transaction, fileBufferMap, cancellationToken);
+                  continue;
+                }
+
+                CompositeBuffer bytes;
+
+                if (fileBufferMap.FileBufferId == null)
+                {
+                  bytes = CompositeBuffer.Allocate(bytesOffset);
+                }
+                else
+                {
+                  FileBufferResource oldFileBuffer = Service.FileBuffers.GetById(transaction, (long)fileBufferMap.FileBufferId, cancellationToken);
+                  bytes = CompositeBuffer.From(decryptedKeyInfo.Key.Decrypt(oldFileBuffer.Buffer)).Slice(0, bytesOffset);
+                }
+
+                Update(transaction, fileBufferMap, Service.FileBuffers.Create(transaction, decryptedKeyInfo.Key.Encrypt(bytes.ToByteArray()), cancellationToken), fileBufferMap.Index, bytes.Length, cancellationToken);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    private IEnumerable<FileBufferMapResource> Select(ResourceService.Transaction transaction, FileResource file, FileSnapshotResource fileSnapshot, long startIndex, LimitClause? limit = null, CancellationToken cancellationToken = default)
+    {
+      return Select(transaction, new WhereClause.Nested("and",
+        new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
+        new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id),
+        new WhereClause.CompareColumn(COLUMN_INDEX, ">=", startIndex)
+      ), limit, null, cancellationToken);
     }
 
     private bool Update(ResourceService.Transaction transaction, FileBufferMapResource fileBufferMap, long? fileBufferId, long index, long length, CancellationToken cancellationToken = default)

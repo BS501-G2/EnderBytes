@@ -1,148 +1,126 @@
-// namespace RizzziGit.EnderBytes.Resources;
+namespace RizzziGit.EnderBytes.Resources;
 
-// using Framework.Memory;
+using Framework.Memory;
 
-// using Services;
+using Services;
 
-// public sealed partial class FileResource
-// {
-//   public sealed partial class ResourceManager
-//   {
-//     private sealed record FileHandle : FileResource.FileHandle, IDisposable
-//     {
-//       private const int BUFFER_SIZE = 4_096;
+public sealed partial class FileResource
+{
+  public sealed partial class ResourceManager
+  {
+    private sealed record FileHandle : FileResource.FileHandle, IDisposable
+    {
+      private sealed record CurrentMap(FileBufferMapResource FileBufferMap, long CurrentPosition);
 
-//       private sealed record CurrentMap(FileBufferMapResource FileBufferMap, long CurrentPosition);
+      public FileHandle(ResourceManager Manager, StorageResource Storage, FileResource File, FileSnapshotResource Snapshot, UserAuthenticationResource.UserAuthenticationToken? UserAuthenticationToken, FileHandleFlags Flags) : base(Manager, Storage, File, Snapshot, UserAuthenticationToken, Flags)
+      {
+        Manager.Handles.Add(this);
+      }
 
-//       public FileHandle(ResourceManager Manager, StorageResource Storage, FileResource File, FileSnapshotResource Snapshot, UserAuthenticationResource.UserAuthenticationToken? UserAuthenticationToken, FileHandleFlags Flags) : base(Manager, Storage, File, Snapshot, UserAuthenticationToken, Flags)
-//       {
-//         Manager.Handles.Add(this);
-//       }
+      private bool Disposed = false;
 
-//       ~FileHandle()
-//       {
-//         Manager.Handles.Remove(this);
-//       }
+      public override void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(Disposed, this);
 
-//       private bool Disposed = false;
+      public override void Dispose()
+      {
+        lock (this)
+        {
+          if (Disposed)
+          {
+            return;
+          }
 
-//       private FileBufferMapResource.ResourceManager BufferMaps => Manager.Service.FileBufferMaps;
-//       private FileBufferResource.ResourceManager Buffers => Manager.Service.FileBuffers;
+          Disposed = true;
+          Manager.Handles.Remove(this);
+          GC.SuppressFinalize(this);
+        }
+      }
 
-//       private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(Disposed, this);
+      private new long Position = 0;
+      private long? CurrentSize;
 
-//       public void Dispose()
-//       {
-//         lock (this)
-//         {
-//           if (Disposed)
-//           {
-//             return;
-//           }
+      protected override long InternalGetPosition() => Position;
 
-//           Disposed = true;
-//           Manager.Handles.Remove(this);
-//           GC.SuppressFinalize(this);
-//         }
-//       }
+      private long InternalGetSize(ResourceService.Transaction transaction, CancellationToken cancellationToken = default)
+      {
+        return transaction.ResoruceService.FileBufferMaps.GetSize(transaction, Storage, File, Snapshot, cancellationToken);
+      }
 
-//       private new long Position = 0;
-//       private long? Size;
+      public override long GetSize(ResourceService.Transaction transaction, CancellationToken cancellationToken = default)
+      {
+        lock (this)
+        {
+          ThrowIfDisposed();
 
-//       protected override long InternalGetPosition() => Position;
+          if (Flags.HasFlag(FileHandleFlags.Exclusive))
+          {
+            return CurrentSize ??= InternalGetSize(transaction, cancellationToken);
+          }
 
-//       public override long InternalGetSize(ResourceService.Transaction transaction, CancellationToken cancellationToken = default)
-//       {
-//         lock (this)
-//         {
-//           ThrowIfDisposed();
+          return InternalGetSize(transaction, cancellationToken);
+        }
+      }
 
-//           if (Size != null)
-//           {
-//             return (long)Size;
-//           }
+      public override void Seek(ResourceService.Transaction transaction, long position, CancellationToken cancellationToken = default)
+      {
+        lock (this)
+        {
+          ThrowIfDisposed();
 
-//           (_, _, _, ResourceService service, _) = transaction;
+          ArgumentOutOfRangeException.ThrowIfGreaterThan(position, GetSize(transaction, cancellationToken), nameof(position));
+          Position = position;
+        }
+      }
 
-//           long size = service.FileBufferMaps.List(transaction, Snapshot, 0, cancellationToken).Sum((fileBufferMap) => fileBufferMap.Length);
+      public override CompositeBuffer Read(ResourceService.Transaction transaction, int size, CancellationToken cancellationToken = default)
+      {
+        lock (this)
+        {
+          ThrowIfDisposed();
 
-//           Size = size;
-//           return size;
-//         }
-//       }
+          if (!Flags.HasFlag(FileHandleFlags.Read))
+          {
+            throw new InvalidOperationException($"File handle does not have {nameof(FileHandleFlags.Read)} flag.");
+          }
 
-//       public override bool InternalSeek(ResourceService.Transaction transaction, long newPosition, CancellationToken cancellationToken = default)
-//       {
-//         lock (this)
-//         {
-//           ThrowIfDisposed();
+          CompositeBuffer buffer = transaction.ResoruceService.FileBufferMaps.Read(transaction, Storage, File, Snapshot, Position, size, UserAuthenticationToken, cancellationToken);
+          Position += buffer.Length;
+          return buffer;
+        }
+      }
 
-//           Position = newPosition;
-//           return true;
-//         }
-//       }
+      public override void Write(ResourceService.Transaction transaction, CompositeBuffer buffer, CancellationToken cancellationToken = default)
+      {
+        lock (this)
+        {
+          ThrowIfDisposed();
 
-//       public override CompositeBuffer Read(ResourceService.Transaction transaction, int size, CancellationToken cancellationToken = default)
-//       {
-//         lock (this)
-//         {
-//           ThrowIfDisposed();
+          if (!Flags.HasFlag(FileHandleFlags.Modify))
+          {
+            throw new InvalidOperationException($"File handle does not have {nameof(FileHandleFlags.Modify)} flag.");
+          }
 
-//           CompositeBuffer buffer = [];
+          transaction.ResoruceService.FileBufferMaps.Write(transaction, Storage, File, Snapshot, Position, buffer, UserAuthenticationToken, cancellationToken);
+          Position += buffer.Length;
+          CurrentSize = InternalGetSize(transaction, cancellationToken);
+        }
+      }
 
-//           int beginIndex = (int)(Position / BUFFER_SIZE);
+      public override void Truncate(ResourceService.Transaction transaction, long size, CancellationToken cancellationToken = default)
+      {
+        lock (this)
+        {
+          ThrowIfDisposed();
 
-//           int remaining() => (int)(size - buffer.Length);
+          if (!Flags.HasFlag(FileHandleFlags.Modify))
+          {
+            throw new InvalidOperationException($"File handle does not have {nameof(FileHandleFlags.Modify)} flag.");
+          }
 
-//           StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResoruceService.Storages.DecryptKey(transaction, Storage, File, UserAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
-
-//           foreach (FileBufferMapResource fileBufferMap in transaction.ResoruceService.FileBufferMaps.List(transaction, Snapshot, Position / BUFFER_SIZE, cancellationToken))
-//           {
-//             FileBufferResource fileBuffer = transaction.ResoruceService.FileBuffers.GetById(transaction, fileBufferMap.Id, cancellationToken);
-//             byte[] decrypted = decryptedKeyInfo.Key.Decrypt(fileBuffer.Buffer);
-
-//             buffer.Append(decrypted[(fileBufferMap.Index == beginIndex ? (int)(Position - (BUFFER_SIZE * beginIndex)) : 0)..int.Min(remaining(), fileBufferMap.Length)]);
-
-//             if (buffer.Length >= size)
-//             {
-//               break;
-//             }
-//           }
-
-//           Position += buffer.Length;
-//           return buffer;
-//         }
-//       }
-
-//       public override void Write(ResourceService.Transaction transaction, CompositeBuffer buffer, CancellationToken cancellationToken = default)
-//       {
-//         lock (this)
-//         {
-//           ThrowIfDisposed();
-
-//           int beginIndex = (int)(Position / BUFFER_SIZE);
-//           StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResoruceService.Storages.DecryptKey(transaction, Storage, File, UserAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
-
-//           CompositeBuffer decrypted = [];
-//           int beginOffset = 0;
-
-//           foreach (FileBufferMapResource fileBufferMap in transaction.ResoruceService.FileBufferMaps.List(transaction, Snapshot, Position / BUFFER_SIZE, cancellationToken))
-//           {
-//             FileBufferResource fileBuffer = transaction.ResoruceService.FileBuffers.GetById(transaction, fileBufferMap.Id, cancellationToken);
-//             if (fileBufferMap.Index == beginIndex)
-//             {
-//               beginOffset = (int)(Position - (beginIndex * BUFFER_SIZE));
-//             }
-
-//             decrypted.Append(decryptedKeyInfo.Key.Decrypt(fileBuffer.Buffer));
-
-//             if (decrypted.Length >= buffer.Length)
-//             {
-//               break;
-//             }
-//           }
-//         }
-//       }
-//     }
-//   }
-// }
+          transaction.ResoruceService.FileBufferMaps.Truncate(transaction, Storage, File, Snapshot, size, UserAuthenticationToken, cancellationToken);
+          CurrentSize = InternalGetSize(transaction, cancellationToken);
+        }
+      }
+    }
+  }
+}

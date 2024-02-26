@@ -18,7 +18,7 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction, resource, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id), cancellationToken);
+      service.Users.ResourceDeleted += (transaction, userId, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userId), cancellationToken);
     }
 
     protected override UserConfigurationResource NewResource(ResourceData data) => new(this, data);
@@ -47,7 +47,7 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
         user.ThrowIfInvalid();
 
         return SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id))
-          ?? Insert(transaction, new(
+          ?? InsertAndGet(transaction, new(
             (COLUMN_USER_ID, user.Id),
             (COLUMN_ENABLE_FTP_ACCESS, false)
           ));

@@ -25,10 +25,10 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.Files.ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), cancellationToken);
-      Service.Users.ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.Nested("and",
+      Service.Files.ResourceDeleted += (transaction, fileId, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", fileId), cancellationToken);
+      Service.Users.ResourceDeleted += (transaction, userId, cancellationToken) => Delete(transaction, new WhereClause.Nested("and",
         new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", (byte)FileAccessTargetEntityType.User),
-        new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id)
+        new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", userId)
       ), cancellationToken);
     }
 
@@ -66,7 +66,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
       {
         KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
 
-        return Insert(transaction, new(
+        return InsertAndGet(transaction, new(
           (COLUMN_TARGET_FILE_ID, targetFile.Id),
           (COLUMN_TARGET_ENTITY_ID, null),
           (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.None),
@@ -93,7 +93,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
 
             KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
 
-            return Insert(transaction, new(
+            return InsertAndGet(transaction, new(
               (COLUMN_TARGET_FILE_ID, targetFile.Id),
               (COLUMN_TARGET_ENTITY_ID, targetUser.Id),
               (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.User),

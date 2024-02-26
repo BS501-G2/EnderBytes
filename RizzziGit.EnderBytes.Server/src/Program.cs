@@ -31,7 +31,7 @@ public static class Program
     ));
     {
       StringBuilder buffer = new();
-      server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{timestamp} / {level}] [{scope}] {message}");
+      // server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{timestamp} / {level}] [{scope}] {message}");
 
       ConsoleCancelEventHandler? onCancel = null;
       onCancel = (_, _) =>
@@ -105,30 +105,62 @@ public static class Program
       logger.Info($"Eq: {CompositeBuffer.From(originalToken.Decrypt(originalUser.Encrypt(CompositeBuffer.From("Test").ToByteArray())))}");
 
       StorageResource storage = service.Storages.Create(transaction, originalUser, originalToken, cancellationToken);
+      FileResource folder = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
+      FileAccessResource otherAccess = service.FileAccesses.Create(transaction, storage, folder, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
+      FileResource file = service.Files.Create(transaction, storage, folder, FileResource.FileType.File, "Test2", otherToken, cancellationToken);
+      FileSnapshotResource fileSnapshot = service.FileSnapshots.Create(transaction, storage, file, null, otherToken, cancellationToken);
 
-      FileResource file = service.Files.Create(transaction, storage, null, FileResource.FileType.File, "Test", originalToken, cancellationToken);
-
-      FileResource? folder = null;
-      for (int index = 0; index < 100; index++)
+      string[] units = ["", "K", "M", "G", "T"];
+      string toReadable(decimal size)
       {
-        folder = service.Files.Create(transaction, storage, folder, FileResource.FileType.Folder, "folder", originalToken, cancellationToken);
+        int count = 0;
+        while (size >= 1000)
+        {
+          size /= 1024;
+          count++;
+        }
+
+        return $"{Math.Round(size, 2)}{units[count]}B";
       }
 
-      FileResource folder1 = service.Files.Create(transaction, storage, folder, FileResource.FileType.Folder, "Folder1", originalToken, cancellationToken);
-      FileResource folder2 = service.Files.Create(transaction, storage, folder, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
+      return;
 
-      service.Files.Move(transaction, storage, file, folder1, originalToken, cancellationToken);
-
-      FileAccessResource fileAccess1 = service.FileAccesses.Create(transaction, storage, folder1, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
-      FileAccessResource fileAccess2 = service.FileAccesses.Create(transaction, storage, folder2, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
-
-      service.Files.Move(transaction, storage, file, folder2, otherToken, cancellationToken);
-
-      FileResource file2 = service.Files.Create(transaction, storage, folder2, FileResource.FileType.File, "Test2", otherToken, cancellationToken);
-
-      foreach (FileResource scannedFile in service.Files.ScanFolder(transaction, storage, folder2, otherToken, cancellationToken))
+      void read(FileSnapshotResource fileSnapshot, string path)
       {
-        Console.WriteLine($"File: {scannedFile.Name}");
+        using FileStream fileStream = File.OpenRead(path);
+
+        long offset = 0;
+        while (fileStream.Position < fileStream.Length)
+        {
+          cancellationToken.ThrowIfCancellationRequested();
+          byte[] read = new byte[Random.Shared.Next(1024 * 1024 * 8)];
+          int readLength = fileStream.Read(read);
+
+          service.FileBufferMaps.Write(transaction, storage, file, fileSnapshot, offset, new(read, 0, readLength), otherToken, cancellationToken);
+
+          Console.WriteLine(toReadable(fileStream.Position));
+          offset += readLength;
+        }
+      }
+
+      void write(FileSnapshotResource fileSnapshot, string path)
+      {
+        using FileStream fileStream = File.OpenWrite(path);
+        fileStream.Position = 0;
+        fileStream.SetLength(0);
+
+        long size = service.FileBufferMaps.GetSize(transaction, storage, file, fileSnapshot, cancellationToken);
+
+        for (long offset = 0; offset < size;)
+        {
+          long chunkSize = long.Min(size - offset, Random.Shared.Next(1024 * 1024 * 8));
+
+          CompositeBuffer bytes = service.FileBufferMaps.Read(transaction, storage, file, fileSnapshot, offset, chunkSize, otherToken, cancellationToken);
+
+          fileStream.Write(bytes.ToByteArray());
+          Console.WriteLine(toReadable(fileStream.Position));
+          offset += chunkSize;
+        }
       }
     });
   });

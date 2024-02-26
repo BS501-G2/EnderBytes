@@ -16,20 +16,17 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
   where D : Resource<M, D, R>.ResourceData
   where R : Resource<M, D, R>
 {
-  public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, CancellationToken cancellationToken);
-  public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, D oldData, CancellationToken cancellationToken);
+  public delegate void ResourceEventHandler(ResourceService.Transaction transaction, CancellationToken cancellationToken);
 
   public abstract partial class ResourceManager(ResourceService service, string name, int version) : ResourceService.ResourceManager(service, name, version)
   {
-    public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken);
-    public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, D oldData, CancellationToken cancellationToken);
-    public delegate void ResourceInsertHandler(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken);
+    public delegate void ResourceEventHandler(ResourceService.Transaction transaction, long resourceId, CancellationToken cancellationToken);
 
     private readonly WeakDictionary<long, R> Resources = [];
 
-    public event ResourceInsertHandler? ResourceInserted;
-    public event ResourceUpdateHandler? ResourceUpdated;
-    public event ResourceDeleteHandler? ResourceDeleted;
+    public event ResourceEventHandler? ResourceInserted = null;
+    public event ResourceEventHandler? ResourceUpdated;
+    public event ResourceEventHandler? ResourceDeleted;
 
     public bool IsResourceValid(R resource)
     {
@@ -72,7 +69,8 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       return resource;
     }
 
-    protected R Insert(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default)
+    protected R InsertAndGet(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default) => GetById(transaction, Insert(transaction, values, cancellationToken), cancellationToken);
+    protected long Insert(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default)
     {
       cancellationToken.ThrowIfCancellationRequested();
 
@@ -82,30 +80,16 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       values.Add(COLUMN_UPDATE_TIME, insertTimestamp);
 
       List<object?> parameterList = [];
-      return SqlQuery(
+
+      long id = (long)(ulong)(SqlScalar(
         transaction,
-        (reader) =>
-        {
-          cancellationToken.ThrowIfCancellationRequested();
-
-          reader.Read();
-          R resource = GetResource(CastToData(reader));
-
-          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] New {Name} resource: #{resource.Id}");
-
-          transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
-          ResourceInserted?.Invoke(transaction, resource, cancellationToken);
-          return resource;
-        },
         $"insert into {Name} ({string.Join(", ", values.Keys)}) values {values.Apply(parameterList)}; " +
-        $"select * from {Name} where {COLUMN_ID} = {DatabaseWrapper switch
-        {
-          MySQLDatabase => "last_insert_id",
-
-          _ => "last_insert_rowid"
-        }}() limit 1;",
+        $"select last_insert_id();",
         [.. parameterList]
-      );
+      ) ?? -1);
+
+      ResourceInserted?.Invoke(transaction, id, cancellationToken);
+      return id;
     }
 
     protected R? SelectFirst(ResourceService.Transaction transaction, WhereClause? where = null, OrderByClause? order = null, CancellationToken cancellationToken = default) => SelectOne(transaction, where, 0, order, cancellationToken);
@@ -163,10 +147,10 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
       Action? actions = null;
 
-      foreach (D data in SqlEnumeratedQuery(
+      foreach (long id in SqlEnumeratedQuery(
         transaction,
         castToData,
-        $"select * from {Name} where {whereClause}; " +
+        $"select {COLUMN_ID} from {Name} where {whereClause}; " +
         $"delete from {Name} where {whereClause};",
         [.. parameterList]
       ))
@@ -175,19 +159,18 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         {
           cancellationToken.ThrowIfCancellationRequested();
 
-          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{data.Id}");
-          if (Resources.TryGetValue(data.Id, out R? resource))
+          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{id}");
+          if (Resources.TryGetValue(id, out R? resource))
           {
-            transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
-            Resources.Remove(data.Id);
-            ResourceDeleted?.Invoke(transaction, resource, cancellationToken);
+            transaction.RegisterOnFailureHandler(() => Resources.Add(id, resource));
+            Resources.Remove(id);
+
+            ResourceDeleted?.Invoke(transaction, id, cancellationToken);
             resource.Deleted?.Invoke(transaction, cancellationToken);
             return;
           }
 
-          resource = NewResource(data);
-          transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
-          ResourceDeleted?.Invoke(transaction, resource, cancellationToken);
+          ResourceDeleted?.Invoke(transaction, id, cancellationToken);
         };
 
         count++;
@@ -196,11 +179,11 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       actions?.Invoke();
       return count;
 
-      IEnumerable<D> castToData(DbDataReader reader)
+      static IEnumerable<long> castToData(DbDataReader reader)
       {
         while (reader.Read())
         {
-          yield return CastToData(reader);
+          yield return reader.GetInt64(reader.GetOrdinal(COLUMN_ID));
         }
       }
     }
@@ -220,12 +203,12 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       long count = 0;
 
       Action? actions = null;
-      foreach (D newData in SqlEnumeratedQuery(
+      foreach (long id in SqlEnumeratedQuery(
         transaction,
         castToData,
         $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause}; " +
         $"update {Name} set {setClause} where {whereClause}; " +
-        $"select {Name}.* from {temporaryTableName} left join (select * from {Name}) {Name} on {temporaryTableName}.{COLUMN_ID} = {Name}.{COLUMN_ID}; " +
+        $"select * from {temporaryTableName}; " +
         $"drop table {temporaryTableName};",
         [.. parameterList]
       ))
@@ -233,23 +216,20 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         actions += () =>
         {
           cancellationToken.ThrowIfCancellationRequested();
-          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Updated {Name} resource: #{newData.Id}");
-          if (Resources.TryGetValue(newData.Id, out R? resource))
+          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Updated {Name} resource: #{id}");
+          if (Resources.TryGetValue(id, out R? resource))
           {
             D oldData = resource.Data;
 
             transaction.RegisterOnFailureHandler(() => resource.Data = oldData);
-            resource.Data = newData;
+            _ = GetById(transaction, id, cancellationToken);
 
-            ResourceUpdated?.Invoke(transaction, resource, oldData, cancellationToken);
-            resource.Updated?.Invoke(transaction, oldData, cancellationToken);
+            ResourceUpdated?.Invoke(transaction, id, cancellationToken);
+            resource.Updated?.Invoke(transaction, cancellationToken);
           }
           else if (ResourceUpdated != null)
           {
-            resource = GetResource(newData);
-
-            transaction.RegisterOnFailureHandler(() => Resources.Remove(resource.Id));
-            ResourceUpdated.Invoke(transaction, resource, newData, cancellationToken);
+            ResourceUpdated.Invoke(transaction, id, cancellationToken);
           }
         };
 
@@ -259,11 +239,11 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       actions?.Invoke();
       return count;
 
-      IEnumerable<D> castToData(DbDataReader reader)
+      static IEnumerable<long> castToData(DbDataReader reader)
       {
         while (reader.Read())
         {
-          yield return CastToData(reader);
+          yield return reader.GetInt64(reader.GetOrdinal(COLUMN_ID));
         }
       }
     }
@@ -297,8 +277,8 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
   public readonly M Manager = manager;
   protected D Data { get; private set; } = data;
 
-  public event ResourceUpdateHandler? Updated;
-  public event ResourceDeleteHandler? Deleted;
+  public event ResourceEventHandler? Updated;
+  public event ResourceEventHandler? Deleted;
 
   public long Id => Data.Id;
   public long CreateTime => Data.CreateTime;

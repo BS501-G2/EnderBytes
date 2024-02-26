@@ -37,13 +37,13 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.Storages.ResourceDeleted += (transaction, resource, cancellationToken) => base.Delete(transaction, new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", resource.Id), cancellationToken);
-      ResourceDeleted += (transaction, resource, cancellationToken) => base.Delete(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", resource.Id), cancellationToken);
+      Service.Storages.ResourceDeleted += (transaction, storageId, cancellationToken) => base.Delete(transaction, new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storageId), cancellationToken);
+      ResourceDeleted += (transaction, fileId, cancellationToken) => base.Delete(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", fileId), cancellationToken);
 
-      Handles = [];
+      // Handles = [];
     }
 
-    private readonly WeakList<FileHandle> Handles;
+    // private readonly WeakList<FileHandle> Handles;
 
     protected override FileResource NewResource(ResourceData data) => new(this, data);
 
@@ -169,7 +169,7 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
 
         KeyService.AesPair fileKey = Service.Server.KeyService.GetNewAesPair();
 
-        FileResource file = Insert(transaction, new(
+        FileResource file = InsertAndGet(transaction, new(
           (COLUMN_STORAGE_ID, storage.Id),
           (COLUMN_KEY, Service.Storages.EncryptFileKey(transaction, storage, fileKey, parent, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken)),
           (COLUMN_PARENT_FILE_ID, parent?.Id),
@@ -288,46 +288,46 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
       }
     }
 
-    public FileResource.FileHandle OpenFile(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileSnapshotResource fileSnapshot, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileHandleFlags handleFlags, CancellationToken cancellationToken = default)
-    {
-      lock (storage)
-      {
-        lock (file)
-        {
-          if (userAuthenticationToken == null)
-          {
-            return openFile();
-          }
+    // public FileResource.FileHandle OpenFile(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileSnapshotResource fileSnapshot, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileHandleFlags handleFlags, CancellationToken cancellationToken = default)
+    // {
+    //   lock (storage)
+    //   {
+    //     lock (file)
+    //     {
+    //       if (userAuthenticationToken == null)
+    //       {
+    //         return openFile();
+    //       }
 
-          lock (userAuthenticationToken)
-          {
-            return openFile();
-          }
+    //       lock (userAuthenticationToken)
+    //       {
+    //         return openFile();
+    //       }
 
-          FileResource.FileHandle openFile()
-          {
-            StorageResource.DecryptedKeyInfo decryptedFileKeyInfo = Service.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, handleFlags.HasFlag(FileHandleFlags.Write)
-              ? FileAccessResource.FileAccessType.ReadWrite
-              : FileAccessResource.FileAccessType.Read, cancellationToken);
+    //       FileResource.FileHandle openFile()
+    //       {
+    //         StorageResource.DecryptedKeyInfo decryptedFileKeyInfo = Service.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, handleFlags.HasFlag(FileHandleFlags.Write)
+    //           ? FileAccessResource.FileAccessType.ReadWrite
+    //           : FileAccessResource.FileAccessType.Read, cancellationToken);
 
-            if (file.Type != FileType.File)
-            {
-              throw new ArgumentException("Not a file.", nameof(file));
-            }
+    //         if (file.Type != FileType.File)
+    //         {
+    //           throw new ArgumentException("Not a file.", nameof(file));
+    //         }
 
-            foreach (FileHandle fileHandle in Handles)
-            {
-              if (fileHandle.Flags.HasFlag(FileHandleFlags.Exclusive))
-              {
-                throw new InvalidOperationException("File is currently locked for exclusive access.");
-              }
-            }
+    //         foreach (FileHandle fileHandle in Handles)
+    //         {
+    //           if (fileHandle.Flags.HasFlag(FileHandleFlags.Exclusive))
+    //           {
+    //             throw new InvalidOperationException("File is currently locked for exclusive access.");
+    //           }
+    //         }
 
-            return new FileHandle(this, storage, file, handleFlags.HasFlag(FileHandleFlags.Write) ? Service.FileSnapshots.Create(transaction, storage, file, fileSnapshot, userAuthenticationToken, cancellationToken) : fileSnapshot, userAuthenticationToken, handleFlags);
-          }
-        }
-      }
-    }
+    //         return new FileHandle(this, storage, file, handleFlags.HasFlag(FileHandleFlags.Write) ? Service.FileSnapshots.Create(transaction, storage, file, fileSnapshot, userAuthenticationToken, cancellationToken) : fileSnapshot, userAuthenticationToken, handleFlags);
+    //       }
+    //     }
+    //   }
+    // }
   }
 
   public new sealed record ResourceData(long Id, long CreateTime, long UpdateTime, long StorageId, byte[] Key, long? ParentId, FileType Type, string Name) : Resource<ResourceManager, ResourceData, FileResource>.ResourceData(Id, CreateTime, UpdateTime);

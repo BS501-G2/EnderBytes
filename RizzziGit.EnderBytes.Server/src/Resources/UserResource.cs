@@ -52,7 +52,7 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
     {
       (byte[] privateKey, byte[] publicKey) = Service.Server.KeyService.GetNewRsaKeyPair();
 
-      UserResource user = Insert(transaction, new(
+      UserResource user = InsertAndGet(transaction, new(
         (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
         (COLUMN_DISPLAY_NAME, displayName),
         (COLUMN_PUBLIC_KEY, publicKey)

@@ -16,21 +16,12 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.FileBufferMaps.ResourceUpdated += (transaction, _, oldData, cancellationToken) => check(transaction, oldData.FileBufferId, cancellationToken);
-      Service.FileBufferMaps.ResourceDeleted += (transaction, fileBufferMap, cancellationToken) => check(transaction, fileBufferMap.FileBufferId, cancellationToken);
+      // Service.FileBufferMaps.ResourceUpdated += (transaction, fileBufferMap, cancellationToken) => check(transaction, fileBufferMap, cancellationToken);
+      // Service.FileBufferMaps.ResourceDeleted += (transaction, fileBufferMap, cancellationToken) => check(transaction, fileBufferMap.FileBufferId, cancellationToken);
 
-      void check(ResourceService.Transaction transaction, long? fileBufferId, CancellationToken cancellationToken)
-      {
-        if (fileBufferId == null || !TryGetById(transaction, (long)fileBufferId, out FileBufferResource? fileBuffer, cancellationToken))
-        {
-          return;
-        }
-
-        if (Service.FileBufferMaps.GetReferenceCount(transaction, fileBuffer, cancellationToken) == 0)
-        {
-          Delete(transaction, fileBuffer, cancellationToken);
-        }
-      }
+      // void check(ResourceService.Transaction transaction, long? fileBufferId, CancellationToken cancellationToken)
+      // {
+      // }
     }
 
     protected override FileBufferResource NewResource(ResourceData data) => new(this, data);
@@ -44,7 +35,7 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
     {
       if (oldVersion < 1)
       {
-        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_BUFFER} blob not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_BUFFER} mediumblob not null;");
       }
     }
 
@@ -55,11 +46,16 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
       ), cancellationToken);
     }
 
-    public FileBufferResource Create(ResourceService.Transaction transaction, byte[] buffer, CancellationToken cancellationToken = default)
+    public long Create(ResourceService.Transaction transaction, byte[] buffer, CancellationToken cancellationToken = default)
     {
       return Insert(transaction, new(
         (COLUMN_BUFFER, buffer)
       ), cancellationToken);
+    }
+
+    public long Delete(ResourceService.Transaction transaction, long id, CancellationToken cancellationToken  = default)
+    {
+      return Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", id), cancellationToken);
     }
   }
 

@@ -45,7 +45,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction, resource, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id), cancellationToken);
+      service.Users.ResourceDeleted += (transaction, userId, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userId), cancellationToken);
     }
 
     protected override UserAuthenticationResource NewResource(ResourceData data) => new(this, data);
@@ -113,7 +113,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
       byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
 
-      return new(user, Insert(transaction, new(
+      return new(user, InsertAndGet(transaction, new(
         (COLUMN_USER_ID, user.Id),
         (COLUMN_TYPE, (byte)type),
 
@@ -152,7 +152,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
       byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
 
-      return new(user, Insert(transaction, new(
+      return new(user, InsertAndGet(transaction, new(
         (COLUMN_USER_ID, user.Id),
         (COLUMN_TYPE, (byte)type),
 

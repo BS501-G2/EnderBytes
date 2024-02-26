@@ -8,10 +8,10 @@ using Services;
 
 public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager manager, FileBufferMapResource.ResourceData data) : Resource<FileBufferMapResource.ResourceManager, FileBufferMapResource.ResourceData, FileBufferMapResource>(manager, data)
 {
-  private const string NAME = "FileData";
+  private const string NAME = "FileBufferMap";
   private const int VERSION = 1;
 
-  private const int BUFFER_SIZE = 4_096;
+  private const int BUFFER_SIZE = 1024 * 1024;
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, FileBufferMapResource>.ResourceManager
   {
@@ -23,7 +23,13 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.FileSnapshots.ResourceDeleted += (transaction, fileSnapshot, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id), cancellationToken);
+      Service.FileSnapshots.ResourceDeleted += (transaction, fileSnapshotId, cancellationToken) =>
+      {
+        foreach (FileBufferMapResource fileBufferMap in Select(transaction, new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshotId), null, null, cancellationToken).ToList())
+        {
+          Delete(transaction, fileBufferMap, cancellationToken);
+        }
+      };
     }
 
     protected override FileBufferMapResource NewResource(ResourceData data) => new(this, data);
@@ -49,14 +55,9 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
       }
     }
 
-    public long GetReferenceCount(ResourceService.Transaction transaction, FileBufferResource fileBuffer, CancellationToken cancellationToken = default)
+    public long GetReferenceCount(ResourceService.Transaction transaction, long fileBufferId, CancellationToken cancellationToken = default)
     {
-      lock (fileBuffer)
-      {
-        fileBuffer.ThrowIfInvalid();
-
-        return Count(transaction, new WhereClause.CompareColumn(COLUMN_FILE_BUFFER_ID, "=", fileBuffer.Id), cancellationToken);
-      }
+      return Count(transaction, new WhereClause.CompareColumn(COLUMN_FILE_BUFFER_ID, "=", fileBufferId), cancellationToken);
     }
 
     public long GetSize(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileSnapshotResource fileSnapshot, CancellationToken cancellationToken = default)
@@ -73,10 +74,13 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
           {
             fileSnapshot.ThrowIfInvalid();
 
-            return Select(transaction, new WhereClause.Nested("and",
+            List<object?> parameters = [];
+            WhereClause whereClause = new WhereClause.Nested("and",
               new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
               new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id)
-            ), null, null, cancellationToken).Sum((fileBufferMap) => fileBufferMap.Length);
+            );
+
+            return (long)(decimal)(SqlScalar(transaction, $"select coalesce(sum({COLUMN_LENGTH}), 0) as result from {NAME} where {whereClause.Apply(parameters)}", [.. parameters]) ?? 0);
           }
         }
       }
@@ -109,8 +113,8 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
             return Select(transaction, new WhereClause.Nested("and",
               new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
               new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.BaseSnapshotId)
-            ), null, null, cancellationToken).ToList().Select((fileBufferMap) => Insert(transaction, new(
-              (COLUMN_FILE_ID, fileBufferMap.FileId),
+            ), null, null, cancellationToken).ToList().Select((fileBufferMap) => InsertAndGet(transaction, new(
+              (COLUMN_FILE_ID, file.Id),
               (COLUMN_FILE_SNAPSHOT_ID, fileSnapshot.Id),
               (COLUMN_FILE_BUFFER_ID, fileBufferMap.FileBufferId),
               (COLUMN_INDEX, fileBufferMap.Index),
@@ -139,7 +143,82 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
             {
               userAuthenticationToken.ThrowIfInvalid();
 
-              
+              StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResoruceService.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+
+              CompositeBuffer bytes = [];
+              long beginIndex = offset / BUFFER_SIZE;
+              long bytesOffset = offset - (beginIndex * BUFFER_SIZE);
+
+              ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, GetSize(transaction, storage, file, fileSnapshot, cancellationToken), nameof(offset));
+
+              foreach (FileBufferMapResource fileBufferMap in Select(transaction, new WhereClause.Nested("and",
+                new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
+                new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id),
+                new WhereClause.CompareColumn(COLUMN_INDEX, ">=", beginIndex)
+              ), null, null, cancellationToken).ToList())
+              {
+                if (fileBufferMap.FileBufferId == null)
+                {
+                  bytes.Append(CompositeBuffer.Allocate(fileBufferMap.Length));
+                }
+                else if (fileBufferMap.CachedBuffer != null)
+                {
+                  bytes.Append(fileBufferMap.CachedBuffer);
+                }
+                else
+                {
+                  FileBufferResource fileBuffer = transaction.ResoruceService.FileBuffers.GetById(transaction, (long)fileBufferMap.FileBufferId, cancellationToken);
+                  bytes.Append(fileBufferMap.CachedBuffer = decryptedKeyInfo.Key.Decrypt(fileBuffer.Buffer));
+                }
+
+                if ((bytes.Length - bytesOffset) >= buffer.Length)
+                {
+                  break;
+                }
+              }
+
+              CompositeBuffer removedTemp = bytes.SpliceStart(bytesOffset);
+
+              if (bytes.Length < buffer.Length)
+              {
+                bytes.Write(0, buffer.Slice(0, bytes.Length));
+                bytes.Append(buffer.Slice(bytes.Length));
+              }
+              else
+              {
+                bytes.Write(0, buffer);
+              }
+
+              bytes.Prepend(removedTemp);
+
+              for (long index = beginIndex; bytes.Length > 0; index++)
+              {
+                CompositeBuffer fileBufferData = bytes.SpliceStart(long.Min(bytes.Length, BUFFER_SIZE));
+                long fileBufferId = Service.FileBuffers.Create(transaction, decryptedKeyInfo.Key.Encrypt(fileBufferData.ToByteArray()), cancellationToken);
+
+                FileBufferMapResource? fileBufferMap = SelectOne(transaction, new WhereClause.Nested("and",
+                  new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
+                  new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id),
+                  new WhereClause.CompareColumn(COLUMN_INDEX, "=", index)
+                ), null, null, cancellationToken);
+
+                if (fileBufferMap == null)
+                {
+                  fileBufferMap = InsertAndGet(transaction, new(
+                    (COLUMN_FILE_ID, file.Id),
+                    (COLUMN_FILE_SNAPSHOT_ID, fileSnapshot.Id),
+                    (COLUMN_FILE_BUFFER_ID, fileBufferId),
+                    (COLUMN_INDEX, index),
+                    (COLUMN_LENGTH, fileBufferData.Length)
+                  ), cancellationToken);
+                }
+                else
+                {
+                  Update(transaction, fileBufferMap, fileBufferId, index, fileBufferData.Length, cancellationToken);
+                }
+
+                fileBufferMap.CachedBuffer = fileBufferData.ToByteArray();
+              }
             }
           }
         }
@@ -164,46 +243,87 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
             {
               userAuthenticationToken.ThrowIfInvalid();
 
-              CompositeBuffer bytes = [];
-
               StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResoruceService.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
 
+              CompositeBuffer bytes = [];
               long beginIndex = offset / BUFFER_SIZE;
+              long bytesOffset = offset - (beginIndex * BUFFER_SIZE);
+
+              foreach (FileBufferMapResource fileBufferMap in Select(transaction, new WhereClause.Nested("and",
+                new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
+                new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id),
+                new WhereClause.CompareColumn(COLUMN_INDEX, ">=", beginIndex)
+              ), null, null, cancellationToken).ToList())
               {
-                long bytesOffset = offset - (beginIndex * BUFFER_SIZE);
-                foreach (FileBufferMapResource fileBufferMap in Select(transaction, new WhereClause.Nested("and",
-                  new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
-                  new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id),
-                  new WhereClause.CompareColumn(COLUMN_INDEX, ">=", beginIndex)
-                ), null, null, cancellationToken))
+                if (fileBufferMap.FileBufferId == null)
                 {
-                  if (fileBufferMap.FileBufferId == null)
-                  {
-                    bytes.Append(CompositeBuffer.Allocate(fileBufferMap.Length));
-                  }
-                  else
-                  {
-                    FileBufferResource fileBuffer = transaction.ResoruceService.FileBuffers.GetById(transaction, (long)fileBufferMap.FileBufferId, cancellationToken);
-                    bytes.Append(decryptedKeyInfo.Key.Decrypt(fileBuffer.Buffer));
-                  }
-
-                  if ((bytes.Length - bytesOffset) >= length)
-                  {
-                    break;
-                  }
+                  bytes.Append(CompositeBuffer.Allocate(fileBufferMap.Length));
                 }
-                bytes.TruncateStart(bytesOffset);
+                else if (fileBufferMap.CachedBuffer != null)
+                {
+                  bytes.Append(fileBufferMap.CachedBuffer);
+                }
+                else
+                {
+                  FileBufferResource fileBuffer = transaction.ResoruceService.FileBuffers.GetById(transaction, (long)fileBufferMap.FileBufferId, cancellationToken);
+                  bytes.Append(fileBufferMap.CachedBuffer = decryptedKeyInfo.Key.Decrypt(fileBuffer.Buffer));
+                }
+
+                if ((bytes.Length - bytesOffset) >= length)
+                {
+                  break;
+                }
               }
 
-              if (bytes.Length > length)
-              {
-                bytes.Truncate(bytes.Length - length);
-              }
-
-              return bytes;
+              return bytes.Slice(bytesOffset, long.Min(bytesOffset + length, bytes.Length));
             }
           }
         }
+      }
+    }
+
+    private bool Update(ResourceService.Transaction transaction, FileBufferMapResource fileBufferMap, long? fileBufferId, long index, long length, CancellationToken cancellationToken = default)
+    {
+      long? oldBufferId = fileBufferMap.FileBufferId;
+
+      try
+      {
+        return Update(transaction, fileBufferMap, new(
+          (COLUMN_FILE_BUFFER_ID, fileBufferId),
+          (COLUMN_INDEX, index),
+          (COLUMN_LENGTH, length)
+        ), cancellationToken);
+      }
+      finally
+      {
+        Check(transaction, oldBufferId, cancellationToken);
+      }
+    }
+
+    public override bool Delete(ResourceService.Transaction transaction, FileBufferMapResource fileBufferMap, CancellationToken cancellationToken = default)
+    {
+      long? oldBufferId = fileBufferMap.FileBufferId;
+
+      try
+      {
+        return base.Delete(transaction, fileBufferMap, cancellationToken);
+      }
+      finally
+      {
+        Check(transaction, oldBufferId, cancellationToken);
+      }
+    }
+
+    private void Check(ResourceService.Transaction transaction, long? fileBufferId, CancellationToken cancellationToken = default)
+    {
+      if (fileBufferId == null)
+      {
+        return;
+      }
+
+      if (Service.FileBufferMaps.GetReferenceCount(transaction, (long)fileBufferId, cancellationToken) == 0)
+      {
+        Service.FileBuffers.Delete(transaction, (long)fileBufferId, cancellationToken);
       }
     }
   }
@@ -225,4 +345,6 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
   public long? FileBufferId => Data.FileBufferId;
   public long Index => Data.Index;
   public long Length => Data.Length;
+
+  private byte[]? CachedBuffer;
 }

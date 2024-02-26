@@ -64,11 +64,12 @@ public sealed partial class ResourceService
 
     protected T SqlQuery<T>(Transaction transaction, SqlQueryDataHandler<T> dataHandler, string sqlQuery, params object?[] parameters) => SqlEnumeratedQuery<T>(transaction, (reader) => [dataHandler(reader)], sqlQuery, parameters).First();
 
-    protected void SqlQuery(Transaction transaction, SqlQueryDataHandler dataHandler, string sqlQuery, params object?[] parameters) => SqlEnumeratedQuery<byte>(transaction, (reader) =>
+    protected void SqlQuery(Transaction transaction, SqlQueryDataHandler dataHandler, string sqlQuery, params object?[] parameters) => _ = SqlEnumeratedQuery<byte>(transaction, (reader) =>
     {
       dataHandler(reader);
-      return [];
-    }, sqlQuery, parameters);
+
+      return [0];
+    }, sqlQuery, parameters).First();
 
     protected IEnumerable<T> SqlEnumeratedQuery<T>(Transaction transaction, SqlQueryDataEnumeratorHandler<T> dataHandler, string sqlQuery, params object?[] parameters)
     {

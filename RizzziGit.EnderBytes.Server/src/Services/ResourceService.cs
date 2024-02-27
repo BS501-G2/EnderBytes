@@ -1,6 +1,6 @@
-using MySql.Data.MySqlClient;
-
 namespace RizzziGit.EnderBytes.Services;
+
+using Framework.Collections;
 
 using Core;
 using Resources;
@@ -17,8 +17,8 @@ public sealed partial class ResourceService : Server.SubService
     Files = new(this);
     FileAccesses = new(this);
     FileSnapshots = new(this);
-    FileBufferMaps = new(this);
     FileBuffers = new(this);
+    FileBufferMaps = new(this);
   }
 
   private Database? Database;
@@ -30,9 +30,8 @@ public sealed partial class ResourceService : Server.SubService
   public readonly FileResource.ResourceManager Files;
   public readonly FileAccessResource.ResourceManager FileAccesses;
   public readonly FileSnapshotResource.ResourceManager FileSnapshots;
-  public readonly FileBufferMapResource.ResourceManager FileBufferMaps;
   public readonly FileBufferResource.ResourceManager FileBuffers;
-
+  public readonly FileBufferMapResource.ResourceManager FileBufferMaps;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
@@ -45,29 +44,32 @@ public sealed partial class ResourceService : Server.SubService
     await Files.Start(cancellationToken);
     await FileAccesses.Start(cancellationToken);
     await FileSnapshots.Start(cancellationToken);
-    await FileBufferMaps.Start(cancellationToken);
     await FileBuffers.Start(cancellationToken);
+    await FileBufferMaps.Start(cancellationToken);
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    await WatchDog([
-      Users,
-      UserAuthentications,
-      UserConfiguration,
-      Storages,
-      Files,
-      FileAccesses,
-      FileSnapshots,
-      FileBufferMaps,
-      FileBuffers
-    ], cancellationToken);
+    await await Task.WhenAny(
+      RunPeriodicCheck(cancellationToken),
+      WatchDog([
+        Users,
+        UserAuthentications,
+        UserConfiguration,
+        Storages,
+        Files,
+        FileAccesses,
+        FileSnapshots,
+        FileBuffers,
+        FileBufferMaps
+      ], cancellationToken)
+    );
   }
 
   protected override async Task OnStop(Exception? exception = null)
   {
-    await FileBuffers.Stop();
     await FileBufferMaps.Stop();
+    await FileBuffers.Stop();
     await FileSnapshots.Stop();
     await FileAccesses.Stop();
     await Files.Stop();

@@ -7,15 +7,15 @@ using Services;
 
 public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager manager, FileSnapshotResource.ResourceData data) : Resource<FileSnapshotResource.ResourceManager, FileSnapshotResource.ResourceData, FileSnapshotResource>(manager, data)
 {
-  private const string NAME = "FileSnapshot";
-  private const int VERSION = 1;
+  public const string NAME = "FileSnapshot";
+  public const int VERSION = 1;
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, FileSnapshotResource>.ResourceManager
   {
-    private const string COLUMN_FILE_ID = "FileId";
-    private const string COLUMN_BASE_SNAPSHOT_ID = "BaseSnapshotId";
-    private const string COLUMN_AUTHOR_FILE_ACCESS_ID = "TokenId";
-    private const string COLUMN_AUTHOR_ID = "AuthorId";
+    public const string COLUMN_FILE_ID = "FileId";
+    public const string COLUMN_BASE_SNAPSHOT_ID = "BaseSnapshotId";
+    public const string COLUMN_AUTHOR_FILE_ACCESS_ID = "TokenId";
+    public const string COLUMN_AUTHOR_ID = "AuthorId";
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {

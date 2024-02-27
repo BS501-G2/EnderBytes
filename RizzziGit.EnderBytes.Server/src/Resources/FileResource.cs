@@ -22,18 +22,18 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
     ReadModify = Read | Modify
   }
 
-  private const string NAME = "File";
-  private const int VERSION = 1;
+  public const string NAME = "File";
+  public const int VERSION = 1;
 
   public new sealed partial class ResourceManager : Resource<ResourceManager, ResourceData, FileResource>.ResourceManager
   {
-    private const string COLUMN_STORAGE_ID = "StorageId";
-    private const string COLUMN_KEY = "AesKey";
-    private const string COLUMN_PARENT_FILE_ID = "ParentFileId";
-    private const string COLUMN_TYPE = "Type";
-    private const string COLUMN_NAME = "Name";
+    public const string COLUMN_STORAGE_ID = "StorageId";
+    public const string COLUMN_KEY = "AesKey";
+    public const string COLUMN_PARENT_FILE_ID = "ParentFileId";
+    public const string COLUMN_TYPE = "Type";
+    public const string COLUMN_NAME = "Name";
 
-    private const string UNIQUE_INDEX_NAME = $"Index_{NAME}_{COLUMN_NAME}";
+    public const string UNIQUE_INDEX_NAME = $"Index_{NAME}_{COLUMN_NAME}";
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
@@ -127,7 +127,17 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
       }
     }
 
-    public FileResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, FileType type, string name, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    public FileResource CreateFile(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, string name, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    {
+      return Create(transaction, storage, parent, FileType.File, name, userAuthenticationToken, cancellationToken);
+    }
+
+    public FileResource CreateFolder(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, string name, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    {
+      return Create(transaction, storage, parent, FileType.Folder, name, userAuthenticationToken, cancellationToken);
+    }
+
+    private FileResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, FileType type, string name, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       cancellationToken.ThrowIfCancellationRequested();
       lock (storage)
@@ -327,10 +337,6 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
   }
 
   public new sealed record ResourceData(long Id, long CreateTime, long UpdateTime, long StorageId, byte[] Key, long? ParentId, FileType Type, string Name) : Resource<ResourceManager, ResourceData, FileResource>.ResourceData(Id, CreateTime, UpdateTime);
-
-  ~FileResource()
-  {
-  }
 
   public long StorageId => Data.StorageId;
   public byte[] Key => Data.Key;

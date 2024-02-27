@@ -73,40 +73,31 @@ public sealed partial class ResourceService
 
     protected IEnumerable<T> SqlEnumeratedQuery<T>(Transaction transaction, SqlQueryDataEnumeratorHandler<T> dataHandler, string sqlQuery, params object?[] parameters)
     {
-      lock (this)
+      using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
+
+      LogSql(transaction, "Query", sqlQuery, parameters);
+      using DbDataReader reader = command.ExecuteReader(System.Data.CommandBehavior.SingleResult);
+
+      foreach (T item in dataHandler(reader))
       {
-        using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
-
-        LogSql(transaction, "Query", sqlQuery, parameters);
-        using DbDataReader reader = command.ExecuteReader(System.Data.CommandBehavior.SingleResult);
-
-        foreach (T item in dataHandler(reader))
-        {
-          yield return item;
-        }
+        yield return item;
       }
     }
 
     protected int SqlNonQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
-      lock (this)
-      {
-        using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-        LogSql(transaction, "Non-query", sqlQuery, parameters);
-        return command.ExecuteNonQuery();
-      }
+      LogSql(transaction, "Non-query", sqlQuery, parameters);
+      return command.ExecuteNonQuery();
     }
 
     protected object? SqlScalar(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
-      lock (this)
-      {
-        using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-        LogSql(transaction, "Scalar", sqlQuery, parameters);
-        return command.ExecuteScalar();
-      }
+      LogSql(transaction, "Scalar", sqlQuery, parameters);
+      return command.ExecuteScalar();
     }
 
     protected sealed override Task OnStop(Exception? exception) => base.OnStop(exception);

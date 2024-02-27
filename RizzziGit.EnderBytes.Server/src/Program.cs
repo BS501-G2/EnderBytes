@@ -107,7 +107,7 @@ public static class Program
       logger.Info($"Eq: {CompositeBuffer.From(originalToken.Decrypt(originalUser.Encrypt(CompositeBuffer.From("Test").ToByteArray())))}");
 
       StorageResource storage = service.Storages.Create(transaction, originalUser, originalToken, cancellationToken);
-      FileResource folder = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
+      FileResource folder = service.Files.CreateFolder(transaction, storage, null, "Folder2", originalToken, cancellationToken);
       FileAccessResource otherAccess = service.FileAccesses.Create(transaction, storage, folder, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
 
       return (storage, folder, otherToken);
@@ -124,16 +124,16 @@ public static class Program
       {
         FileResource folderResource = await server.ResourceService.Transact((transaction, cancellationToken) =>
         {
-          return transaction.ResoruceService.Files.Create(transaction, storage, folder, FileResource.FileType.Folder, Path.GetFileName(path), token, cancellationToken);
+          return transaction.ResoruceService.Files.CreateFolder(transaction, storage, folder, Path.GetFileName(path), token, cancellationToken);
         });
 
-        await Task.WhenAll(Directory.GetDirectories(path).Concat(Directory.GetFiles(path)).Select((pathEntry) => Tasks.Enqueue(() => upload(pathEntry, folderResource))));
+        _ = Task.WhenAll(Directory.GetDirectories(path).Concat(Directory.GetFiles(path)).Select((pathEntry) => Tasks.Enqueue(() => upload(pathEntry, folderResource))));
       }
       else if (fileAttributes.HasFlag(FileAttributes.Normal))
       {
         FileResource file = await server.ResourceService.Transact((transaction, cancellationToken) =>
         {
-          return transaction.ResoruceService.Files.Create(transaction, storage, folder, FileResource.FileType.File, Path.GetFileName(path), token, cancellationToken);
+          return transaction.ResoruceService.Files.CreateFile(transaction, storage, folder, Path.GetFileName(path), token, cancellationToken);
         });
 
         using FileResource.CrossTransactionalFileHandle writer = await server.ResourceService.Transact((transaction, cancellationToken) =>
@@ -164,7 +164,6 @@ public static class Program
     }
 
     await Task.WhenAll(
-      upload("/run/media/cool/AC233/Testing", folder),
       Task.Run(run),
       Task.Run(run),
       Task.Run(run),

@@ -30,9 +30,12 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
     public bool IsResourceValid(R resource)
     {
-      lock (resource)
+      lock (Resources)
       {
-        return Resources.TryGetValue(resource.Id, out R? testResource) && testResource == resource;
+        lock (resource)
+        {
+          return Resources.TryGetValue(resource.Id, out R? testResource) && testResource == resource;
+        }
       }
     }
 
@@ -54,16 +57,19 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
     protected R GetResource(D data)
     {
-      if (!Resources.TryGetValue(data.Id, out R? resource))
+      lock (Resources)
       {
-        Resources.Add(data.Id, resource = NewResource(data));
-      }
-      else
-      {
-        resource.Data = data;
-      }
+        if (!Resources.TryGetValue(data.Id, out R? resource))
+        {
+          Resources.Add(data.Id, resource = NewResource(data));
+        }
+        else
+        {
+          resource.Data = data;
+        }
 
-      return resource;
+        return resource;
+      }
     }
 
     protected R InsertAndGet(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default) => GetById(transaction, Insert(transaction, values, cancellationToken), cancellationToken);
@@ -138,7 +144,6 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       List<object?> parameterList = [];
 
       string whereClause = where.Apply(parameterList);
-      string temporaryTableName = $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
 
       long count = 0;
 
@@ -264,7 +269,19 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       {
         resource.ThrowIfInvalid();
 
-        return Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), cancellationToken) != 0;
+        int result = SqlNonQuery(transaction, $"delete from {Name} where {{0}};", [resource.Id]);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{resource.Id}");
+
+        transaction.RegisterOnFailureHandler(() => Resources.Add(resource.Id, resource));
+        Resources.Remove(resource.Id);
+
+        ResourceDeleted?.Invoke(transaction, resource.Id, cancellationToken);
+        resource.Deleted?.Invoke(transaction, cancellationToken);
+
+        return result != 0;
       }
     }
   }

@@ -9,17 +9,17 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
 {
   public sealed record DecryptedKeyInfo(KeyService.AesPair Key, FileAccessResource? FileAccess);
 
-  private const string NAME = "Storage";
-  private const int VERSION = 1;
+  public const string NAME = "Storage";
+  public const int VERSION = 1;
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, StorageResource>.ResourceManager
   {
-    private const string COLUMN_OWNER_USER_ID = "OwnerUserId";
-    private const string COLUMN_KEY = "AesKey";
+    public const string COLUMN_OWNER_USER_ID = "OwnerUserId";
+    public const string COLUMN_KEY = "AesKey";
 
-    private const string COLUMN_ROOT_FOLDER_ID = "RootFolderId";
-    private const string COLUMN_TRASH_FOLDER_ID = "TrashFolderId";
-    private const string COLUMN_INTERNAL_FOLDER_ID = "InternalFolderId";
+    public const string COLUMN_ROOT_FOLDER_ID = "RootFolderId";
+    public const string COLUMN_TRASH_FOLDER_ID = "TrashFolderId";
+    public const string COLUMN_INTERNAL_FOLDER_ID = "InternalFolderId";
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {

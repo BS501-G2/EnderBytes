@@ -12,16 +12,16 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
   public enum FileAccessTargetEntityType : byte { None, User }
   public enum FileAccessType : byte { ManageShares, ReadWrite, Read, None }
 
-  private const string NAME = "FileAccess";
-  private const int VERSION = 1;
+  public const string NAME = "FileAccess";
+  public const int VERSION = 1;
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, FileAccessResource>.ResourceManager
   {
-    private const string COLUMN_TARGET_FILE_ID = "TargetFileId";
-    private const string COLUMN_TARGET_ENTITY_ID = "TargetEntityId";
-    private const string COLUMN_TARGET_ENTITY_TYPE = "TargetEntityType";
-    private const string COLUMN_KEY = "AesKey";
-    private const string COLUMN_TYPE = "Type";
+    public const string COLUMN_TARGET_FILE_ID = "TargetFileId";
+    public const string COLUMN_TARGET_ENTITY_ID = "TargetEntityId";
+    public const string COLUMN_TARGET_ENTITY_TYPE = "TargetEntityType";
+    public const string COLUMN_KEY = "AesKey";
+    public const string COLUMN_TYPE = "Type";
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {

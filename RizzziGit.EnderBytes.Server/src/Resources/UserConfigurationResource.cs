@@ -6,15 +6,15 @@ using Services;
 
 public sealed class UserConfigurationResource(UserConfigurationResource.ResourceManager manager, UserConfigurationResource.ResourceData data) : Resource<UserConfigurationResource.ResourceManager, UserConfigurationResource.ResourceData, UserConfigurationResource>(manager, data)
 {
-  private const string NAME = "UserConfiguration";
-  private const int VERSION = 1;
+  public const string NAME = "UserConfiguration";
+  public const int VERSION = 1;
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserConfigurationResource>.ResourceManager
   {
-    private const string COLUMN_USER_ID = "UserId";
-    private const string COLUMN_ENABLE_FTP_ACCESS = "EnableFTPAccess";
+    public const string COLUMN_USER_ID = "UserId";
+    public const string COLUMN_ENABLE_FTP_ACCESS = "EnableFTPAccess";
 
-    private const string INDEX_USER_ID = $"Index_{NAME}_{COLUMN_USER_ID}";
+    public const string INDEX_USER_ID = $"Index_{NAME}_{COLUMN_USER_ID}";
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {

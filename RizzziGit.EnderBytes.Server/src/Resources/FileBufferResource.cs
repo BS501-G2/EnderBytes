@@ -7,21 +7,19 @@ using Services;
 
 public sealed class FileBufferResource(FileBufferResource.ResourceManager manager, FileBufferResource.ResourceData data) : Resource<FileBufferResource.ResourceManager, FileBufferResource.ResourceData, FileBufferResource>(manager, data)
 {
-  private const string NAME = "FileBuffer";
-  private const int VERSION = 1;
+  public const string NAME = "FileBuffer";
+  public const int VERSION = 1;
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, FileBufferResource>.ResourceManager
   {
-    private const string COLUMN_BUFFER = "Buffer";
+    public const string COLUMN_BUFFER = "Buffer";
+    public const string COLUMN_FILE_ID = "FileId";
+
+    public const string INDEX_FILE_ID = $"Index_{NAME}_{COLUMN_FILE_ID}";
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      // Service.FileBufferMaps.ResourceUpdated += (transaction, fileBufferMap, cancellationToken) => check(transaction, fileBufferMap, cancellationToken);
-      // Service.FileBufferMaps.ResourceDeleted += (transaction, fileBufferMap, cancellationToken) => check(transaction, fileBufferMap.FileBufferId, cancellationToken);
-
-      // void check(ResourceService.Transaction transaction, long? fileBufferId, CancellationToken cancellationToken)
-      // {
-      // }
+      Service.Files.ResourceDeleted += (transaction, id, cancellationToken) => SqlNonQuery(transaction, $"delete from {NAME} where {COLUMN_FILE_ID} = {{0}}", [id]);
     }
 
     protected override FileBufferResource NewResource(ResourceData data) => new(this, data);
@@ -36,6 +34,8 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
       if (oldVersion < 1)
       {
         SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_BUFFER} mediumblob not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_FILE_ID} bigint not null;");
+        SqlNonQuery(transaction, $"create index {INDEX_FILE_ID} on {NAME}({COLUMN_FILE_ID});");
       }
     }
 
@@ -46,16 +46,33 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
       ), cancellationToken);
     }
 
-    public long Create(ResourceService.Transaction transaction, byte[] buffer, CancellationToken cancellationToken = default)
+    public long Create(ResourceService.Transaction transaction, FileResource file, byte[] buffer, CancellationToken cancellationToken = default)
     {
-      return Insert(transaction, new(
-        (COLUMN_BUFFER, buffer)
-      ), cancellationToken);
+      lock (file)
+      {
+        return Insert(transaction, new(
+          (COLUMN_BUFFER, buffer),
+          (COLUMN_FILE_ID, file.Id)
+        ), cancellationToken);
+      }
     }
 
-    public long Delete(ResourceService.Transaction transaction, long id, CancellationToken cancellationToken  = default)
+    public long Delete(ResourceService.Transaction transaction, long id, CancellationToken cancellationToken = default)
     {
       return Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", id), cancellationToken);
+    }
+
+    public void DeleteIfNotReferenced(ResourceService.Transaction transaction, long? fileBufferId, CancellationToken cancellationToken = default)
+    {
+      if (fileBufferId == null)
+      {
+        return;
+      }
+
+      string otherTable = FileBufferMapResource.NAME;
+      string otherColumn = FileBufferMapResource.ResourceManager.COLUMN_FILE_BUFFER_ID;
+
+      SqlNonQuery(transaction, $"delete from {NAME} where ({COLUMN_ID} = {{0}}) and ({COLUMN_ID} not in (select {otherColumn} from {otherTable} where {otherColumn} is not null));", fileBufferId);
     }
   }
 

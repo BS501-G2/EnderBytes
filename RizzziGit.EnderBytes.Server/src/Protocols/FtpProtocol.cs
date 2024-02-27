@@ -9,7 +9,7 @@ using Extras;
 
 public sealed partial class FtpProtocol(ProtocolService service) : Protocol<FtpProtocol, FtpProtocol.Connection>(service, "FTP")
 {
-  private const string RETURN = "\r\n";
+  public const string RETURN = "\r\n";
 
   protected override async IAsyncEnumerable<Connection> Listen([EnumeratorCancellation] CancellationToken cancellationToken)
   {

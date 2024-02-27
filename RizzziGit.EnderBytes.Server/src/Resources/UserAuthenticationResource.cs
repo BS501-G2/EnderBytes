@@ -48,26 +48,26 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
   public enum UserAuthenticationType { Password }
 
-  private const string NAME = "UserAuthentication";
-  private const int VERSION = 1;
+  public const string NAME = "UserAuthentication";
+  public const int VERSION = 1;
 
   public new sealed partial class ResourceManager : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager
   {
-    private const string COLUMN_USER_ID = "UserId";
-    private const string COLUMN_TYPE = "Type";
+    public const string COLUMN_USER_ID = "UserId";
+    public const string COLUMN_TYPE = "Type";
 
-    private const string COLUMN_SALT = "Salt";
-    private const string COLUMN_ITERATIONS = "Iterations";
+    public const string COLUMN_SALT = "Salt";
+    public const string COLUMN_ITERATIONS = "Iterations";
 
-    private const string COLUMN_CHALLENGE_IV = "ChallengeIv";
-    private const string COLUMN_CHALLENGE_BYTES = "ChallengeBytes";
-    private const string COLUMN_CHALLENGE_ENCRYPTED_BYTES = "ChallengeEncryptedBytes";
+    public const string COLUMN_CHALLENGE_IV = "ChallengeIv";
+    public const string COLUMN_CHALLENGE_BYTES = "ChallengeBytes";
+    public const string COLUMN_CHALLENGE_ENCRYPTED_BYTES = "ChallengeEncryptedBytes";
 
-    private const string COLUMN_ENCRYPTED_PRIVATE_KEY = "EncryptedPrivateKey";
-    private const string COLUMN_ENCRYPTED_PRIVATE_KEY_IV = "EncryptedPrivateKeyIv";
-    private const string COLUMN_PUBLIC_KEY = "PublicKey";
+    public const string COLUMN_ENCRYPTED_PRIVATE_KEY = "EncryptedPrivateKey";
+    public const string COLUMN_ENCRYPTED_PRIVATE_KEY_IV = "EncryptedPrivateKeyIv";
+    public const string COLUMN_PUBLIC_KEY = "PublicKey";
 
-    private const string INDEX_USER_ID = $"Index_{NAME}_{COLUMN_USER_ID}";
+    public const string INDEX_USER_ID = $"Index_{NAME}_{COLUMN_USER_ID}";
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {

@@ -12,16 +12,16 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
 {
   public sealed record Token(UserResource User, UserAuthenticationResource.UserAuthenticationToken AuthenticationToken);
 
-  private const string NAME = "User";
-  private const int VERSION = 1;
+  public const string NAME = "User";
+  public const int VERSION = 1;
 
   public new sealed partial class ResourceManager(ResourceService service) : Resource<ResourceManager, ResourceData, UserResource>.ResourceManager(service, NAME, VERSION)
   {
-    private const string COLUMN_USERNAME = "Username";
-    private const string COLUMN_DISPLAY_NAME = "DisplayName";
-    private const string COLUMN_PUBLIC_KEY = "PublicKey";
+    public const string COLUMN_USERNAME = "Username";
+    public const string COLUMN_DISPLAY_NAME = "DisplayName";
+    public const string COLUMN_PUBLIC_KEY = "PublicKey";
 
-    private const string INDEX_USERNAME = $"Index_{NAME}_{COLUMN_USERNAME}";
+    public const string INDEX_USERNAME = $"Index_{NAME}_{COLUMN_USERNAME}";
 
     protected override UserResource NewResource(ResourceData data) => new(this, data);
     protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(

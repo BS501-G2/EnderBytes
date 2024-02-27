@@ -8,18 +8,18 @@ using Services;
 
 public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager manager, FileBufferMapResource.ResourceData data) : Resource<FileBufferMapResource.ResourceManager, FileBufferMapResource.ResourceData, FileBufferMapResource>(manager, data)
 {
-  private const string NAME = "FileBufferMap";
-  private const int VERSION = 1;
+  public const string NAME = "FileBufferMap";
+  public const int VERSION = 1;
 
-  private const int BUFFER_SIZE = 1024 * 1024;
+  public const int BUFFER_SIZE = 1024 * 1024;
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, FileBufferMapResource>.ResourceManager
   {
-    private const string COLUMN_FILE_ID = "FileId";
-    private const string COLUMN_FILE_SNAPSHOT_ID = "FileSnapshotId";
-    private const string COLUMN_FILE_BUFFER_ID = "FileBufferId";
-    private const string COLUMN_INDEX = "BufferIndex";
-    private const string COLUMN_LENGTH = "BufferLength";
+    public const string COLUMN_FILE_ID = "FileId";
+    public const string COLUMN_FILE_SNAPSHOT_ID = "FileSnapshotId";
+    public const string COLUMN_FILE_BUFFER_ID = "FileBufferId";
+    public const string COLUMN_INDEX = "BufferIndex";
+    public const string COLUMN_LENGTH = "BufferLength";
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
@@ -196,7 +196,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
                 cancellationToken.ThrowIfCancellationRequested();
 
                 CompositeBuffer fileBufferData = bytes.SpliceStart(long.Min(bytes.Length, BUFFER_SIZE));
-                long fileBufferId = Service.FileBuffers.Create(transaction, decryptedKeyInfo.Key.Encrypt(fileBufferData.ToByteArray()), cancellationToken);
+                long fileBufferId = Service.FileBuffers.Create(transaction, file, decryptedKeyInfo.Key.Encrypt(fileBufferData.ToByteArray()), cancellationToken);
 
                 FileBufferMapResource? fileBufferMap = Select(transaction, file, fileSnapshot, index, new(1), cancellationToken).FirstOrDefault();
 
@@ -328,7 +328,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
                   bytes = CompositeBuffer.From(decryptedKeyInfo.Key.Decrypt(oldFileBuffer.Buffer)).Slice(0, bytesOffset);
                 }
 
-                Update(transaction, fileBufferMap, Service.FileBuffers.Create(transaction, decryptedKeyInfo.Key.Encrypt(bytes.ToByteArray()), cancellationToken), fileBufferMap.Index, bytes.Length, cancellationToken);
+                Update(transaction, fileBufferMap, Service.FileBuffers.Create(transaction, file, decryptedKeyInfo.Key.Encrypt(bytes.ToByteArray()), cancellationToken), fileBufferMap.Index, bytes.Length, cancellationToken);
               }
             }
           }
@@ -347,8 +347,6 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
 
     private bool Update(ResourceService.Transaction transaction, FileBufferMapResource fileBufferMap, long? fileBufferId, long index, long length, CancellationToken cancellationToken = default)
     {
-      long? oldBufferId = fileBufferMap.FileBufferId;
-
       try
       {
         return Update(transaction, fileBufferMap, new(
@@ -359,34 +357,19 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
       }
       finally
       {
-        Check(transaction, oldBufferId, cancellationToken);
+        Service.FileBuffers.DeleteIfNotReferenced(transaction, fileBufferMap.FileBufferId, cancellationToken);
       }
     }
 
     public override bool Delete(ResourceService.Transaction transaction, FileBufferMapResource fileBufferMap, CancellationToken cancellationToken = default)
     {
-      long? oldBufferId = fileBufferMap.FileBufferId;
-
       try
       {
         return base.Delete(transaction, fileBufferMap, cancellationToken);
       }
       finally
       {
-        Check(transaction, oldBufferId, cancellationToken);
-      }
-    }
-
-    private void Check(ResourceService.Transaction transaction, long? fileBufferId, CancellationToken cancellationToken = default)
-    {
-      if (fileBufferId == null)
-      {
-        return;
-      }
-
-      if (Service.FileBufferMaps.GetReferenceCount(transaction, (long)fileBufferId, cancellationToken) == 0)
-      {
-        Service.FileBuffers.Delete(transaction, (long)fileBufferId, cancellationToken);
+        Service.FileBuffers.DeleteIfNotReferenced(transaction, fileBufferMap.FileBufferId, cancellationToken);
       }
     }
   }

@@ -33,15 +33,10 @@ public sealed partial class ResourceService : Server.SubService
   public readonly FileBufferMapResource.ResourceManager FileBufferMaps;
   public readonly FileBufferResource.ResourceManager FileBuffers;
 
-  private Task? TransactionQueueTask;
-  private CancellationTokenSource? TransactionQueueTaskCancellationTokenSource = new();
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
     Database = new MySQLDatabase(Server.Configuration.DatabaseConnectionStringBuilder);
-
-    TransactionQueueTaskCancellationTokenSource = new();
-    TransactionQueueTask = RunTransactionQueue(TransactionQueueTaskCancellationTokenSource.Token);
 
     await Users.Start(cancellationToken);
     await UserAuthentications.Start(cancellationToken);
@@ -56,27 +51,17 @@ public sealed partial class ResourceService : Server.SubService
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    try
-    {
-      await await Task.WhenAny([
-        TransactionQueueTask!,
-        WatchDog([
-          Users,
-          UserAuthentications,
-          UserConfiguration,
-          Storages,
-          Files,
-          FileAccesses,
-          FileSnapshots,
-          FileBufferMaps,
-          FileBuffers
-        ], cancellationToken)
-      ]);
-    }
-    finally
-    {
-      TransactionQueueTask = null;
-    }
+    await WatchDog([
+      Users,
+      UserAuthentications,
+      UserConfiguration,
+      Storages,
+      Files,
+      FileAccesses,
+      FileSnapshots,
+      FileBufferMaps,
+      FileBuffers
+    ], cancellationToken);
   }
 
   protected override async Task OnStop(Exception? exception = null)
@@ -91,7 +76,6 @@ public sealed partial class ResourceService : Server.SubService
     await UserAuthentications.Stop();
     await Users.Stop();
 
-    TransactionQueueTaskCancellationTokenSource?.Cancel();
     Database?.Dispose();
     Database = null;
   }

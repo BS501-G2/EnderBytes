@@ -30,12 +30,9 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
     public bool IsResourceValid(R resource)
     {
-      lock (this)
+      lock (resource)
       {
-        lock (resource)
-        {
-          return Resources.TryGetValue(resource.Id, out R? testResource) && testResource == resource;
-        }
+        return Resources.TryGetValue(resource.Id, out R? testResource) && testResource == resource;
       }
     }
 

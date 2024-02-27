@@ -62,17 +62,23 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
 
     public FileAccessResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource targetFile, FileAccessType type, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      lock (this)
+      lock (storage)
       {
-        KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
+        lock (targetFile)
+        {
+          lock (userAuthenticationToken)
+          {
+            KeyService.AesPair fileKey = transaction.ResoruceService.Storages.DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
 
-        return InsertAndGet(transaction, new(
-          (COLUMN_TARGET_FILE_ID, targetFile.Id),
-          (COLUMN_TARGET_ENTITY_ID, null),
-          (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.None),
-          (COLUMN_KEY, fileKey.Serialize()),
-          (COLUMN_TYPE, (byte)type)
-        ), cancellationToken);
+            return InsertAndGet(transaction, new(
+              (COLUMN_TARGET_FILE_ID, targetFile.Id),
+              (COLUMN_TARGET_ENTITY_ID, null),
+              (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.None),
+              (COLUMN_KEY, fileKey.Serialize()),
+              (COLUMN_TYPE, (byte)type)
+            ), cancellationToken);
+          }
+        }
       }
     }
 

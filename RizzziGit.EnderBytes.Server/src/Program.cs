@@ -11,6 +11,7 @@ using Resources;
 using Utilities;
 using Services;
 using System.Security.Cryptography;
+using RizzziGit.Framework.Collections;
 
 public static class Program
 {
@@ -32,7 +33,7 @@ public static class Program
     ));
     {
       StringBuilder buffer = new();
-      // server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{timestamp} / {level}] [{scope}] {message}");
+      server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{timestamp} / {level}] [{scope}] {message}");
 
       ConsoleCancelEventHandler? onCancel = null;
       onCancel = (_, _) =>
@@ -112,11 +113,13 @@ public static class Program
       return (storage, folder, otherToken);
     });
 
+    WaitQueue<Func<Task>> Tasks = new();
+
     async Task upload(string path, FileResource? folder)
     {
+      Console.WriteLine($"{path}");
       FileAttributes fileAttributes = File.GetAttributes(path);
 
-      Console.WriteLine($"{path}");
       if (fileAttributes.HasFlag(FileAttributes.Directory))
       {
         FileResource folderResource = await server.ResourceService.Transact((transaction, cancellationToken) =>
@@ -124,10 +127,7 @@ public static class Program
           return transaction.ResoruceService.Files.Create(transaction, storage, folder, FileResource.FileType.Folder, Path.GetFileName(path), token, cancellationToken);
         });
 
-        foreach (string pathEntry in Directory.GetFiles(path).Concat(Directory.GetDirectories(path)))
-        {
-          await upload(pathEntry, folderResource);
-        }
+        await Task.WhenAll(Directory.GetDirectories(path).Concat(Directory.GetFiles(path)).Select((pathEntry) => Tasks.Enqueue(() => upload(pathEntry, folderResource))));
       }
       else if (fileAttributes.HasFlag(FileAttributes.Normal))
       {
@@ -155,7 +155,25 @@ public static class Program
       }
     }
 
-    await upload("/run/media/cool/AC233/Testing", folder);
+    async Task run()
+    {
+      await foreach (Func<Task> func in Tasks)
+      {
+        await func();
+      }
+    }
+
+    await Task.WhenAll(
+      upload("/run/media/cool/AC233/Testing", folder),
+      Task.Run(run),
+      Task.Run(run),
+      Task.Run(run),
+      Task.Run(run),
+      Task.Run(run),
+      Task.Run(run),
+      Task.Run(run),
+      Task.Run(run)
+    );
   });
 
   public static readonly string[] Units = ["", "K", "M", "G", "T"];

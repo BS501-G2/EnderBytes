@@ -75,40 +75,37 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
     {
       cancellationToken.ThrowIfCancellationRequested();
 
-      lock (this)
+      lock (storage)
       {
-        lock (storage)
+        storage.ThrowIfInvalid();
+        file.ThrowIfDoesNotBelongTo(storage);
+
+        if (newParent == null)
         {
-          storage.ThrowIfInvalid();
-          file.ThrowIfDoesNotBelongTo(storage);
+          return moveParent();
+        }
 
-          if (newParent == null)
+        lock (newParent)
+        {
+          newParent.ThrowIfDoesNotBelongTo(storage);
+          newParent.ThrowIfInvalid();
+
+          FileResource currentParent = newParent;
+          while (currentParent != null)
           {
-            return moveParent();
-          }
-
-          lock (newParent)
-          {
-            newParent.ThrowIfDoesNotBelongTo(storage);
-            newParent.ThrowIfInvalid();
-
-            FileResource currentParent = newParent;
-            while (currentParent != null)
+            if (currentParent.Id == file.Id)
             {
-              if (currentParent.Id == file.Id)
-              {
-                throw new ArgumentException("Moving the file inside the new parent folder closes the loop.", nameof(newParent));
-              }
-              else if (currentParent.ParentId == null)
-              {
-                break;
-              }
-
-              currentParent = GetById(transaction, (long)currentParent.ParentId, cancellationToken);
+              throw new ArgumentException("Moving the file inside the new parent folder closes the loop.", nameof(newParent));
+            }
+            else if (currentParent.ParentId == null)
+            {
+              break;
             }
 
-            return moveParent();
+            currentParent = GetById(transaction, (long)currentParent.ParentId, cancellationToken);
           }
+
+          return moveParent();
         }
       }
 
@@ -133,24 +130,21 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
     public FileResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, FileType type, string name, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       cancellationToken.ThrowIfCancellationRequested();
-      lock (this)
+      lock (storage)
       {
-        lock (storage)
+        storage.ThrowIfInvalid();
+
+        if (parent == null)
         {
-          storage.ThrowIfInvalid();
+          return create();
+        }
 
-          if (parent == null)
-          {
-            return create();
-          }
+        lock (parent)
+        {
+          parent.ThrowIfInvalid();
+          parent.ThrowIfDoesNotBelongTo(storage);
 
-          lock (parent)
-          {
-            parent.ThrowIfInvalid();
-            parent.ThrowIfDoesNotBelongTo(storage);
-
-            return create();
-          }
+          return create();
         }
       }
 
@@ -310,13 +304,22 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
 
             foreach (FileHandle fileHandle in Handles)
             {
+              if (fileHandle.File != file)
+              {
+                continue;
+              }
+
               if (fileHandle.Flags.HasFlag(FileHandleFlags.Exclusive))
               {
                 throw new InvalidOperationException("File is currently locked for exclusive access.");
               }
             }
 
-            return new FileHandle(this, storage, file, handleFlags.HasFlag(FileHandleFlags.Modify) ? Service.FileSnapshots.Create(transaction, storage, file, fileSnapshot, userAuthenticationToken, cancellationToken) : fileSnapshot, userAuthenticationToken, handleFlags);
+            FileSnapshotResource use = handleFlags.HasFlag(FileHandleFlags.Modify) && (Service.FileBufferMaps.GetSize(transaction, storage, file, fileSnapshot, cancellationToken) > 0)
+              ? Service.FileSnapshots.Create(transaction, storage, file, fileSnapshot, userAuthenticationToken, cancellationToken)
+              : fileSnapshot;
+
+            return new FileHandle(this, storage, file, use, userAuthenticationToken, handleFlags);
           }
         }
       }

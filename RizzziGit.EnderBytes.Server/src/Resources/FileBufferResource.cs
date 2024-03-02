@@ -19,7 +19,13 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.Files.ResourceDeleted += (transaction, id, cancellationToken) => SqlNonQuery(transaction, $"delete from {NAME} where {COLUMN_FILE_ID} = {{0}}", [id]);
+      Service.Files.ResourceDeleted += (transaction, resource, cancellationToken) =>
+      {
+        if (resource.Type == FileResource.FileType.File)
+        {
+          SqlNonQuery(transaction, $"delete from {NAME} where {COLUMN_FILE_ID} = {{0}}", [resource.Id]);
+        }
+      };
     }
 
     protected override FileBufferResource NewResource(ResourceData data) => new(this, data);

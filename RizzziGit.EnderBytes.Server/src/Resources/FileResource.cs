@@ -37,8 +37,8 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.Storages.ResourceDeleted += (transaction, storageId, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storageId), cancellationToken);
-      ResourceDeleted += (transaction, fileId, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", fileId), cancellationToken);
+      Service.Storages.ResourceDeleted += (transaction, storage, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storage.Id), cancellationToken);
+      ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", file.Id), cancellationToken);
 
       Handles = [];
     }

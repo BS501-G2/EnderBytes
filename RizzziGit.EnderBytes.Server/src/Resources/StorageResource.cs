@@ -23,7 +23,7 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction, userId, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", userId), cancellationToken);
+      service.Users.ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", user.Id), cancellationToken);
     }
 
     protected override StorageResource NewResource(ResourceData data) => new(this, data);

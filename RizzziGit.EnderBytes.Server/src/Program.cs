@@ -33,7 +33,7 @@ public static class Program
     ));
     {
       StringBuilder buffer = new();
-      server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{timestamp} / {level}] [{scope}] {message}");
+      // server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{timestamp} / {level}] [{scope}] {message}");
 
       ConsoleCancelEventHandler? onCancel = null;
       onCancel = (_, _) =>
@@ -164,6 +164,7 @@ public static class Program
     }
 
     await Task.WhenAll(
+      upload("/home/cool/AndroidStudioProjects", folder),
       Task.Run(run),
       Task.Run(run),
       Task.Run(run),

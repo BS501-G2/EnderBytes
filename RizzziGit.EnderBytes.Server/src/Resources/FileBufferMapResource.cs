@@ -23,9 +23,9 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.FileSnapshots.ResourceDeleted += (transaction, fileSnapshotId, cancellationToken) =>
+      Service.FileSnapshots.ResourceDeleted += (transaction, fileSnapshot, cancellationToken) =>
       {
-        foreach (FileBufferMapResource fileBufferMap in Select(transaction, new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshotId), null, null, cancellationToken).ToList())
+        foreach (FileBufferMapResource fileBufferMap in Select(transaction, new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id), null, null, cancellationToken).ToList())
         {
           Delete(transaction, fileBufferMap, cancellationToken);
         }

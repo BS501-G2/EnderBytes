@@ -19,7 +19,7 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.Files.ResourceDeleted += (transaction, fileId, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", fileId), cancellationToken);
+      Service.Files.ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id), cancellationToken);
     }
 
     protected override FileSnapshotResource NewResource(ResourceData data) => new(this, data);

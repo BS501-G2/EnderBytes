@@ -33,7 +33,7 @@ public static class Program
     ));
     {
       StringBuilder buffer = new();
-      // server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{timestamp} / {level}] [{scope}] {message}");
+      server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{timestamp} / {level}] [{scope}] {message}");
 
       ConsoleCancelEventHandler? onCancel = null;
       onCancel = (_, _) =>
@@ -147,7 +147,7 @@ public static class Program
 
         while (reader.Position < reader.Length)
         {
-          byte[] buffer = new byte[1024 * 1024];
+          byte[] buffer = new byte[1024 * 512];
           int bufferLength = reader.Read(buffer);
 
           await writer.Write(new(buffer, 0, bufferLength));
@@ -164,7 +164,7 @@ public static class Program
     }
 
     await Task.WhenAll(
-      upload("/home/cool/AndroidStudioProjects", folder),
+      upload("/run/media/cool/AC233/.minecraft", folder),
       Task.Run(run),
       Task.Run(run),
       Task.Run(run),

@@ -56,6 +56,13 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
     {
       lock (file)
       {
+        file.ThrowIfInvalid();
+
+        if (file.Type != FileResource.FileType.File)
+        {
+          throw new ArgumentException("Not a file.", nameof(file));
+        }
+
         return Insert(transaction, new(
           (COLUMN_BUFFER, buffer),
           (COLUMN_FILE_ID, file.Id)

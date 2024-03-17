@@ -1,11 +1,13 @@
 import { json } from '@sveltejs/kit';
 import * as Manifest from '$lib/manifest'
 
+export const prerender = true
+
 export function GET() {
   return json({
     'lang': 'en',
     'dir': 'ltr',
-    'id': 'enderbytes',
+    'id': 'enderdrive',
     'name': Manifest.APP_NAME,
     'short_name': Manifest.APP_NAME,
     'description': Manifest.APP_TAGLINE,

@@ -3,40 +3,47 @@ export enum Theme {
   Blue = 'blue'
 }
 
-export type OnThemeChangeListener = (theme: Theme) => void
+export type ThemeColorValues = Record<ThemeColorKey, string>
+export type ThemeColorKey = (
+  (typeof THEME_COLOR_PRIMARY) |
+  (typeof THEME_COLOR_PRIMARY_CONTAINER) |
+  (typeof THEME_COLOR_ON_PRIMARY) |
+  (typeof THEME_COLOR_ON_PRIMARY_CONTAINER)
+)
 
+export const THEME_COLOR_PRIMARY = 'primary'
+export const THEME_COLOR_PRIMARY_CONTAINER = 'primaryContainer'
+export const THEME_COLOR_ON_PRIMARY = 'onPrimary'
+export const THEME_COLOR_ON_PRIMARY_CONTAINER = 'onPrimaryContainer'
 
-const KEY_THEME: string = 'theme-name'
-const onChangeListeners: Array<OnThemeChangeListener> = []
+export const colors: Record<Theme, ThemeColorValues> = {
+  [Theme.Default]: {
+    [THEME_COLOR_PRIMARY]: '#000000',
+    [THEME_COLOR_PRIMARY_CONTAINER]: '#000000',
+    [THEME_COLOR_ON_PRIMARY]: '#000000',
+    [THEME_COLOR_ON_PRIMARY_CONTAINER]: '#000000'
+  },
 
-export function addOnThemeChangeListener(onChangeListener: OnThemeChangeListener): boolean {
-  if (onChangeListeners.indexOf(onChangeListener) >= 0) {
-    return false
+  [Theme.Blue]: {
+    [THEME_COLOR_PRIMARY]: '#000001',
+    [THEME_COLOR_PRIMARY_CONTAINER]: '#000001',
+    [THEME_COLOR_ON_PRIMARY]: '#000001',
+    [THEME_COLOR_ON_PRIMARY_CONTAINER]: '#000001'
   }
-
-  onChangeListeners.push(onChangeListener)
-  return true
 }
 
-export function removeOnThemeChangeListener(onChangeListener: OnThemeChangeListener): boolean {
-  let onChangeListenerIndex: number
+export function serializeThemeColorsIntoInlineStyle(theme: Theme) {
+  const color = colors[theme]
 
-  if ((onChangeListenerIndex = onChangeListeners.indexOf(onChangeListener)) == -1) {
-    return false
+  let style = ""
+
+  for (const key in color) {
+    if (style.length !== 0) {
+      style += '; '
+    }
+
+    style += `--${key}: ${color[<ThemeColorKey> key]}`
   }
 
-  onChangeListeners.splice(onChangeListenerIndex, 1)
-  return true
-}
-
-export function getTheme(window: Window): Theme {
-  return (<Theme | null>(window.localStorage.getItem(KEY_THEME))) ?? Theme.Default
-}
-
-export function setTheme(window: Window, theme: Theme): void {
-  window.localStorage.setItem(KEY_THEME, theme)
-
-  for (const onChangeListener of onChangeListeners) {
-    onChangeListener(theme)
-  }
+  return style
 }

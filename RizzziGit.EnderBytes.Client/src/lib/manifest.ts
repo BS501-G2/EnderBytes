@@ -1,2 +1,2 @@
-export const APP_NAME = "EnderBytes"
-export const APP_TAGLINE = "A secure place to place your files. Dedicated to the faculty members of Melchora Aquino Elementary School."
+export const APP_NAME = "EnderDrive"
+export const APP_TAGLINE = "Secure and Private File Storage and Sharing Website for Melchora Aquino Elementary School."

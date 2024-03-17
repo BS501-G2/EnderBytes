@@ -1,81 +1,42 @@
+<script lang="ts" context="module">
+  import { Theme } from '$lib/themes'
+
+  export interface RootState {
+    theme: Theme
+  }
+</script>
+
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { onMount, onDestroy } from "svelte";
+  import { APP_NAME, APP_TAGLINE } from '$lib/manifest'
+  import { setContext, onMount } from 'svelte'
+  import { writable } from 'svelte/store'
+  import { serializeThemeColorsIntoInlineStyle } from '$lib/themes'
 
-  import {
-    Theme,
-    type OnThemeChangeListener,
-    getTheme,
-    removeOnThemeChangeListener,
-    addOnThemeChangeListener,
-  } from "$lib/themes";
+  const rootState = writable<RootState>({
+    theme: Theme.Default
+  })
 
-  import NavigationBar from "./navigation-bar.svelte";
-  import { NavigationMenuItems } from "$lib/navigation-menu-items";
-  import { APP_NAME, APP_TAGLINE } from "$lib/manifest";
-  import {
-    DisplayMode,
-    type OnDisplayModeChangeListener,
-    triggerUpdateCheck,
-    removeOnDisplayModeChangeListener,
-    addOnDisplayModeChangeListener
-  } from "$lib/display-mode";
-
-  let theme: Theme = Theme.Default;
-  let displayMode: DisplayMode = DisplayMode.DesktopBrowser;
-  let loaded: boolean = false
-
-  const onThemeChangeListener: OnThemeChangeListener = (newTheme: Theme) => theme = newTheme;
-  const onDisplayModeChangeListener: OnDisplayModeChangeListener = (newDisplayMode: DisplayMode) => displayMode = newDisplayMode;
-
-  onDestroy(() => {
-    removeOnThemeChangeListener(onThemeChangeListener);
-    removeOnDisplayModeChangeListener(onDisplayModeChangeListener);
-  });
+  setContext('state', rootState)
 
   onMount(() => {
-    theme = getTheme(window);
+    rootState.subscribe((value) => document.body.setAttribute('style', serializeThemeColorsIntoInlineStyle(value.theme)))
 
-    addOnThemeChangeListener(onThemeChangeListener);
-    addOnDisplayModeChangeListener(onDisplayModeChangeListener);
+    $rootState.theme = (<Theme | null> localStorage.getItem('theme')) ?? Theme.Default
 
-    triggerUpdateCheck(window);
-
-    loaded = true
-  });
+    setInterval(() => {
+      $rootState.theme = $rootState.theme === Theme.Blue ? Theme.Default : Theme.Blue
+    }, 1000)
+  })
 </script>
 
 <svelte:head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <link rel="manifest" href="/site.webmanifest" />
+  <link rel="manifest" href="/api/manifest.json" />
   <link rel="shortcut icon" href="/favicon.png" />
-  <link rel="stylesheet" href="/themes/{theme}.css" />
 
-  {#if !$page.url.pathname.startsWith("/app")}
-    <title>{APP_NAME} — {APP_TAGLINE}</title>
-  {/if}
-
-  <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+  <title>{APP_NAME} - {APP_TAGLINE}</title>
 </svelte:head>
 
-<svelte:window on:resize={() => triggerUpdateCheck(window)} />
-
-{#if loaded}
-  <slot />
-
-  {#if !$page.url.pathname.startsWith("/app")}
-    <NavigationBar {displayMode} menuItems={NavigationMenuItems} />
-  {/if}
-
-  <style lang="scss">
-    body {
-      font-family: Arial, Helvetica, sans-serif;
-
-      min-width: 360px;
-
-      background-color: rgb(250, 250, 250);
-    }
-  </style>
-{/if}
+<slot />

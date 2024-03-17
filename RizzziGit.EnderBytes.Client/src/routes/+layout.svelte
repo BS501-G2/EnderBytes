@@ -70,10 +70,9 @@
   {/if}
 
   <style lang="scss">
-    :root {
+    body {
       font-family: Arial, Helvetica, sans-serif;
 
-      min-height: 1080px;
       min-width: 360px;
 
       background-color: rgb(250, 250, 250);

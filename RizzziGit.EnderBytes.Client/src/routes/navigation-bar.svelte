@@ -159,6 +159,13 @@
 
           user-select: none;
 
+          transition-property: background-position;
+          transition-duration: 300ms;
+
+          background-image: linear-gradient(180deg, rgba(255,255,255,0.5), transparent);
+          background-repeat: no-repeat;
+
+          background-position-y: -64px;
           height: 64px;
 
           margin: 0px 8px 0px 8px;
@@ -169,6 +176,10 @@
           align-content: center;
           justify-content: space-evenly;
           align-items: center;
+        }
+
+        div.navigation-entry:hover {
+          background-position-y: 0px;
         }
       }
     }

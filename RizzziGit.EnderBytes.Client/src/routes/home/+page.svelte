@@ -6,10 +6,6 @@
 
 <style lang="scss">
   video.stock {
-    position: absolute;
-    left: 0px;
-    top: 0px;
-
     object-fit: cover;
 
     width: 100%;

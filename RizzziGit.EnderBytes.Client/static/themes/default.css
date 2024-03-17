@@ -1,3 +1,7 @@
 :root {
-  --highlight-background-color-01: #5c9254
+  --sidebar-background-color-01: white;
+
+  --highlight-background-color-01: #5c9254;
+
+  --shadow-color-01: rgb(200,200,200)
 }

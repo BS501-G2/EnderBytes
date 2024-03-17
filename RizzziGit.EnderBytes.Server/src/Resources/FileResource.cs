@@ -2,15 +2,14 @@ using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-using Framework.Memory;
-using Framework.Collections;
+using Commons.Collections;
 
 using Services;
 using Utilities;
 
 public sealed partial class FileResource(FileResource.ResourceManager manager, FileResource.ResourceData data) : Resource<FileResource.ResourceManager, FileResource.ResourceData, FileResource>(manager, data)
 {
-  public enum FileType : byte { File, Folder, SymbolicLink }
+  public enum FileType : byte { File, Folder }
 
   [Flags]
   public enum FileHandleFlags : byte

@@ -4,11 +4,10 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-using Framework.Collections;
-using Framework.Memory;
-using Framework.Logging;
+using Commons.Collections;
+using Commons.Memory;
+using Commons.Logging;
 
-using DatabaseWrappers;
 using Services;
 
 public abstract partial class Resource<M, D, R>(M manager, D data)
@@ -76,10 +75,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       }
     }
 
-    protected R InsertAndGet(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default)
-    {
-      return GetById(transaction, Insert(transaction, values, cancellationToken), cancellationToken);
-    }
+    protected R InsertAndGet(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default) => GetById(transaction, Insert(transaction, values, cancellationToken), cancellationToken);
     protected long Insert(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default)
     {
       cancellationToken.ThrowIfCancellationRequested();

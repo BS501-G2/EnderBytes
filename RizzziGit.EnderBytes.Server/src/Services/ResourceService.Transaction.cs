@@ -3,8 +3,8 @@ using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Services;
 
-using Framework.Collections;
-using Framework.Logging;
+using Commons.Collections;
+using Commons.Logging;
 using RizzziGit.EnderBytes.Utilities;
 
 public sealed partial class ResourceService

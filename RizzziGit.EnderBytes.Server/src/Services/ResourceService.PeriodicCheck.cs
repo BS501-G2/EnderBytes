@@ -1,6 +1,6 @@
 namespace RizzziGit.EnderBytes.Services;
 
-using Framework.Collections;
+using Commons.Collections;
 
 public sealed partial class ResourceService
 {

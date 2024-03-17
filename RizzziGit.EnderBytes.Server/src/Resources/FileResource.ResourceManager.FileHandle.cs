@@ -1,6 +1,6 @@
 namespace RizzziGit.EnderBytes.Resources;
 
-using Framework.Memory;
+using Commons.Memory;
 
 using Services;
 

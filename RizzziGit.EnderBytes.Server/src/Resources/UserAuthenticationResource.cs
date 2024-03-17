@@ -6,6 +6,7 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Utilities;
 using Services;
+using System.Diagnostics.CodeAnalysis;
 
 public sealed partial class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
@@ -18,6 +19,47 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     public byte[] Encrypt(byte[] bytes) => UserAuthentication.Encrypt(bytes);
     public byte[] Decrypt(byte[] bytes) => UserAuthentication.Decrypt(bytes, PayloadHash);
+
+    public bool TryEnter<T>(Func<T> func, [NotNullWhen(true)] out T result)
+    {
+
+      lock (this)
+      {
+        lock (UserAuthentication)
+        {
+          if (IsValid)
+          {
+            result = func();
+#pragma warning disable CS8762 // Parameter must have a non-null value when exiting in some condition.
+            return true;
+#pragma warning restore CS8762 // Parameter must have a non-null value when exiting in some condition.
+          }
+        }
+      }
+
+#pragma warning disable CS8601 // Possible null reference assignment.
+      result = default;
+#pragma warning restore CS8601 // Possible null reference assignment.
+      return false;
+    }
+
+    public bool TryEnter(Action action)
+    {
+      lock (this)
+      {
+        lock (UserAuthentication)
+        {
+          if (IsValid)
+          {
+            action();
+
+            return true;
+          }
+        }
+      }
+
+      return false;
+    }
 
     public T Enter<T>(Func<T> func)
     {

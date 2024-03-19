@@ -1,0 +1,175 @@
+<script lang="ts" context="module">
+  import {
+    introNavigationEntries,
+    introNavigationButtons,
+  } from "$lib/intro-navigation";
+</script>
+
+<script lang="ts">
+  import { goto } from "$app/navigation";
+  import { page } from "$app/stores";
+
+  let scroll: number = 0;
+
+  function toAbsolutePath(path: string) {
+    return `/intro/${path}`;
+  }
+</script>
+
+<svelte:window bind:scrollY={scroll} />
+<svelte:body />
+
+<div class="navigation-bar" style={scroll == 0 ? "" : ""}>
+  <a href="/">
+    <img src="/favicon.png" alt="Site Logo" />
+  </a>
+  <div>
+    <nav>
+      <ul>
+        {#each introNavigationEntries as homeNavigationEntry}
+          <a
+            href={$page.url.pathname != toAbsolutePath(homeNavigationEntry.path)
+              ? toAbsolutePath(homeNavigationEntry.path)
+              : ""}><li><p>{homeNavigationEntry.name}</p></li></a
+          >
+        {/each}
+      </ul>
+
+      <div>
+        {#each introNavigationButtons as introNavigationButton}
+          {#if $page.url.pathname != toAbsolutePath(introNavigationButton.path)}
+            <button
+              on:click={() => goto(toAbsolutePath(introNavigationButton.path))}
+              >{introNavigationButton.name}</button
+            >
+          {/if}
+        {/each}
+      </div>
+    </nav>
+  </div>
+</div>
+
+<style lang="scss">
+  ::-webkit-scrollbar {
+    visibility: hidden;
+  }
+
+  div.navigation-bar {
+    background-color: var(--primaryContainer);
+    color: var(--onPrimaryContainer);
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    width: 100vw;
+
+    position: fixed;
+    left: 0px;
+    top: 0px;
+
+    overflow-x: auto;
+
+    box-shadow: #7f7f7f7f 0px 2px 8px;
+
+    padding: 0px 32px 0px 32px;
+    box-sizing: border-box;
+
+    @media only screen and (max-width: 1280px) {
+      padding: 0px;
+    }
+
+    > a {
+      padding: 8px;
+      width: 48px;
+      height: 48px;
+
+      > img {
+        width: 100%;
+        height: 100%;
+
+        image-rendering: pixelated;
+
+        filter: drop-shadow(#7f7f7f7f 2px 2px 2px);
+      }
+    }
+
+    > div {
+      display: flex;
+
+      flex-grow: 1;
+
+      max-width: 1280px;
+
+      > nav {
+        display: flex;
+
+        flex-grow: 1;
+
+        justify-content: center;
+        align-items: center;
+
+        > ul {
+          list-style: none;
+
+          flex-grow: 1;
+
+          display: flex;
+
+          margin: 0px 0px 0px 0px;
+          padding-left: 0px;
+
+          > a {
+            padding: 0px 16px 0px 16px;
+
+            margin: 0px 8px 0px 8px;
+            border-radius: 32px 32px 32px 32px;
+
+            color: inherit;
+            text-decoration: unset;
+
+            > li > p {
+              margin: 12px;
+            }
+          }
+
+          > a[href=""] {
+            background-color: var(--primary);
+          }
+        }
+
+        > div {
+          height: 100%;
+
+          > button {
+            background-color: var(--primary);
+            color: var(--onPrimary);
+
+            height: 100%;
+
+            border-style: solid;
+            border-color: #00000000;
+            border-radius: 8px;
+
+            font-size: 14px;
+            padding: 0px 16px 0px 16px;
+            transition: cubic-bezier(0.075, 0.82, 0.165, 1);
+            transition-duration: 300ms;
+
+            margin: 0px 8px 0px 8px;
+
+            cursor: pointer;
+          }
+
+          > button:nth-child(2) {
+            background-color: transparent;
+          }
+
+          > button:hover {
+            border-color: var(--onPrimary);
+          }
+        }
+      }
+    }
+  }
+</style>

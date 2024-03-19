@@ -1,42 +1,51 @@
 export enum Theme {
-  Default = 'default',
-  Blue = 'blue'
+  Ender = 'green'
 }
 
-export type OnThemeChangeListener = (theme: Theme) => void
+export type ThemeColorValues = Record<ThemeColorKey, string>
+export type ThemeColorKey = (
+  (typeof THEME_COLOR_PRIMARY) |
+  (typeof THEME_COLOR_PRIMARY_CONTAINER) |
+  (typeof THEME_COLOR_ON_PRIMARY) |
+  (typeof THEME_COLOR_ON_PRIMARY_CONTAINER) |
+  (typeof THEME_COLOR_BACKGROUND) |
+  (typeof THEME_COLOR_ON_BACKGROUND)
+)
 
+export const THEME_COLOR_PRIMARY = 'primary'
+export const THEME_COLOR_PRIMARY_CONTAINER = 'primaryContainer'
+export const THEME_COLOR_ON_PRIMARY = 'onPrimary'
+export const THEME_COLOR_ON_PRIMARY_CONTAINER = 'onPrimaryContainer'
+export const THEME_COLOR_BACKGROUND = 'background'
+export const THEME_COLOR_ON_BACKGROUND = 'onBackground'
 
-const KEY_THEME: string = 'theme-name'
-const onChangeListeners: Array<OnThemeChangeListener> = []
+export const intColorToHex = (color: number): string => `#${color.toString(16)}`
 
-export function addOnThemeChangeListener(onChangeListener: OnThemeChangeListener): boolean {
-  if (onChangeListeners.indexOf(onChangeListener) >= 0) {
-    return false
+// const a = /^#([0-9a-fA-F]{2}|[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
+
+export const colors: Record<Theme, ThemeColorValues> = {
+  [Theme.Ender]: {
+    [THEME_COLOR_PRIMARY]: '#37812e',
+    [THEME_COLOR_PRIMARY_CONTAINER]: '#86c058',
+    [THEME_COLOR_ON_PRIMARY]: '#ffffffff',
+    [THEME_COLOR_ON_PRIMARY_CONTAINER]: '#ffffffff',
+    [THEME_COLOR_BACKGROUND]: '#86c05852',
+    [THEME_COLOR_ON_BACKGROUND]: '#000000ff'
+  }
+}
+
+export function serializeThemeColorsIntoInlineStyle(theme: Theme) {
+  const color = colors[theme]
+
+  let style = ""
+
+  for (const key in color) {
+    if (style.length !== 0) {
+      style += '; '
+    }
+
+    style += `--${key}: ${color[<ThemeColorKey> key]}`
   }
 
-  onChangeListeners.push(onChangeListener)
-  return true
-}
-
-export function removeOnThemeChangeListener(onChangeListener: OnThemeChangeListener): boolean {
-  let onChangeListenerIndex: number
-
-  if ((onChangeListenerIndex = onChangeListeners.indexOf(onChangeListener)) == -1) {
-    return false
-  }
-
-  onChangeListeners.splice(onChangeListenerIndex, 1)
-  return true
-}
-
-export function getTheme(window: Window): Theme {
-  return (<Theme | null>(window.localStorage.getItem(KEY_THEME))) ?? Theme.Default
-}
-
-export function setTheme(window: Window, theme: Theme): void {
-  window.localStorage.setItem(KEY_THEME, theme)
-
-  for (const onChangeListener of onChangeListeners) {
-    onChangeListener(theme)
-  }
+  return style
 }

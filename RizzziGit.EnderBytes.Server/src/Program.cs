@@ -89,7 +89,8 @@ public static class Program
     await server.Stop();
   });
 
-  public static Task RunTest(Logger logger, Server server) => Task.Run(async () =>
+  public static Task RunTest(Logger logger, Server server) => Task.Run(() =>
   {
+    return Task.CompletedTask;
   });
 }

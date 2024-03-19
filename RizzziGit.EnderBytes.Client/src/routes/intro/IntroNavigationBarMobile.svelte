@@ -1,19 +1,10 @@
 <script lang="ts" context="module">
-  import {
-    introNavigationEntries,
-    introNavigationButtons,
-  } from "$lib/intro-navigation";
+  import { introNavigationButtons } from "$lib/intro-navigation";
 </script>
 
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { page } from "$app/stores";
-
   let scroll: number = 0;
-
-  function toAbsolutePath(path: string) {
-    return `/intro/${path}`;
-  }
 </script>
 
 <svelte:window bind:scrollY={scroll} />
@@ -21,14 +12,9 @@
 
 <div class="navigation-bar">
   <div>
-    {#each introNavigationButtons as introNavigationButton}
-      {#if $page.url.pathname != toAbsolutePath(introNavigationButton.path)}
-        <button
-          on:click={() => goto(toAbsolutePath(introNavigationButton.path))}
-          >{introNavigationButton.name}</button
-        >
-      {/if}
-    {/each}
+    <button on:click={() => goto(introNavigationButtons[0].path)}
+      >{introNavigationButtons[0].name}</button
+    >
   </div>
 </div>
 

@@ -7,17 +7,25 @@
 
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { page } from "$app/stores";
+  import { onMount } from "svelte";
 
   let scroll: number = 0;
+  let hash: string = "";
 
-  function toAbsolutePath(path: string) {
-    return `/intro/${path}`;
-  }
+  onMount(() => {
+    if (hash.length == 0) {
+      hash = "#home";
+      goto("#home", { replaceState: true });
+    }
+  });
 </script>
 
-<svelte:window bind:scrollY={scroll} />
-<svelte:body />
+<svelte:window
+  bind:scrollY={scroll}
+  on:hashchange={() => {
+    hash = location.hash;
+  }}
+/>
 
 <div class="navigation-bar" style={scroll == 0 ? "" : ""}>
   <a href="/">
@@ -28,19 +36,21 @@
       <ul>
         {#each introNavigationEntries as homeNavigationEntry}
           <a
-            href={$page.url.pathname != toAbsolutePath(homeNavigationEntry.path)
-              ? toAbsolutePath(homeNavigationEntry.path)
-              : ""}><li><p>{homeNavigationEntry.name}</p></li></a
+            class={homeNavigationEntry.path == hash ? "active" : ""}
+            href={homeNavigationEntry.path}
+            ><li><p>{homeNavigationEntry.name}</p></li></a
           >
         {/each}
       </ul>
 
       <div>
         {#each introNavigationButtons as introNavigationButton}
-          {#if $page.url.pathname != toAbsolutePath(introNavigationButton.path)}
+          {#if hash != introNavigationButton.path}
             <button
-              on:click={() => goto(toAbsolutePath(introNavigationButton.path))}
-              >{introNavigationButton.name}</button
+              on:click={() => {
+                hash = introNavigationButton.path;
+                goto(introNavigationButton.path);
+              }}>{introNavigationButton.name}</button
             >
           {/if}
         {/each}
@@ -133,7 +143,7 @@
             }
           }
 
-          > a[href=""] {
+          > a.active {
             background-color: var(--primary);
           }
         }

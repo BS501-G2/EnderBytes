@@ -1,23 +1,27 @@
 <script lang="ts" context="module">
-  import { STATE_ROOT, STATE_INTRO_TOP_PADDING_STATE, STATE_INTRO_BOTTOM_PADDING_STATE } from "$lib/values";
-  import { type RootState } from "../+layout.svelte";
+  import { getContext, setContext } from "svelte";
+  import { type Readable, writable } from "svelte/store";
+
+  import {
+    STATE_ROOT,
+    STATE_INTRO_TOP_PADDING_STATE,
+    STATE_INTRO_BOTTOM_PADDING_STATE,
+  } from "$lib/values";
   import { ViewMode } from "$lib/view-mode";
+
+  const topPaddingState = writable(0);
+  const bottomPaddingState = writable(0);
 </script>
 
 <script lang="ts">
-  import { getContext, setContext } from "svelte";
-  import { type Readable, readable, writable } from "svelte/store";
-
-  import NavigationBarDesktop from "./NavigationBarDesktop.svelte";
-  import NavigationBarMobile from "./NavigationBarMobile.svelte";
+  import { type RootState } from "../+layout.svelte";
+  import NavigationBarDesktop from "./IntroNavigationBarDesktop.svelte";
+  import NavigationBarMobile from "./IntroNavigationBarMobile.svelte";
 
   const rootState = getContext<Readable<RootState>>(STATE_ROOT);
 
-  const topPaddingState =  writable(0)
-  const bottomPaddingState = writable(0)
-
-  setContext(STATE_INTRO_TOP_PADDING_STATE, topPaddingState)
-  setContext(STATE_INTRO_BOTTOM_PADDING_STATE, bottomPaddingState)
+  setContext(STATE_INTRO_TOP_PADDING_STATE, topPaddingState);
+  setContext(STATE_INTRO_BOTTOM_PADDING_STATE, bottomPaddingState);
 </script>
 
 {#if $rootState.viewMode & ViewMode.Desktop}

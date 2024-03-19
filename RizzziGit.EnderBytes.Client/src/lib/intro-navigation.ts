@@ -9,12 +9,12 @@ export class IntroNavigationEntry {
 }
 
 export const introNavigationEntries: IntroNavigationEntry[] = [
-  new IntroNavigationEntry("Home", "home"),
-  new IntroNavigationEntry("Contact", "contact"),
-  new IntroNavigationEntry("About", "about")
+  new IntroNavigationEntry("Home", "#home"),
+  new IntroNavigationEntry("Contact", "#contact"),
+  new IntroNavigationEntry("About", "#about")
 ]
 
 export const introNavigationButtons: IntroNavigationEntry[] = [
   new IntroNavigationEntry("Go To Dashboard", "../app"),
-  new IntroNavigationEntry("Download", "download")
+  new IntroNavigationEntry("Download", "#download")
 ]

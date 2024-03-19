@@ -1,20 +1,21 @@
+let initializing: boolean = false
 export class Client {
-  #initializing: boolean = false
 
   public static async newInstance(url: URL): Promise<Client> {
-    const webSocket = new WebSocket("http://localhost:8080")
+    const webSocket = new WebSocket(url)
 
-    webSocket.onmessage = (eve) => {
-      console.log(eve.data)
+    webSocket.onmessage = (event) => {
+      console.log(event.data)
     }
 
-    const client = new Client()
-
+    initializing = true
+    const client = new this()
+    initializing = false
     return client
   }
 
   public constructor() {
-    if (!this.#initializing) {
+    if (!initializing) {
       throw new Error('Private constructor.')
     }
   }

@@ -7,10 +7,10 @@ using Utilities;
 
 public sealed partial class ClientService(Server server) : Server.SubService(server, "Clients")
 {
-  public async Task HandleWebSocket(WebSocket webSocket)
+  public async Task HandleWebSocket(WebSocket webSocket, CancellationToken cancellationToken = default)
   {
     UserClient client = new(webSocket);
 
-    await client.Handle(GetCancellationToken());
+    await client.Handle(cancellationToken);
   }
 }

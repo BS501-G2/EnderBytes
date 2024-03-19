@@ -14,7 +14,7 @@ public sealed class WebService(Server server) : Server.SubService(server, "WebSe
   {
     WebApplicationBuilder builder = WebApplication.CreateBuilder();
 
-    // builder.Logging.SetMinimumLevel(LogLevel.None);
+    builder.Logging.SetMinimumLevel(LogLevel.None);
     builder.WebHost.ConfigureKestrel((kestrelConfiguration) =>
     {
       kestrelConfiguration.AllowAlternateSchemes = true;
@@ -44,11 +44,13 @@ public sealed class WebService(Server server) : Server.SubService(server, "WebSe
       app.UseHttpsRedirection();
     }
 
+    app.UseWebSockets();
+
     app.Use(async (HttpContext context, RequestDelegate next) =>
     {
       if (context.Request.Path == "/ws" && context.WebSockets.IsWebSocketRequest)
       {
-        await Server.ClientService.HandleWebSocket(await context.WebSockets.AcceptWebSocketAsync());
+        await Server.ClientService.HandleWebSocket(await context.WebSockets.AcceptWebSocketAsync(), GetCancellationToken());
 
         context.Connection.RequestClose();
         return;

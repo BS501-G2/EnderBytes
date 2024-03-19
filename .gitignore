@@ -3,6 +3,10 @@
 /**/.EnderBytes
 /**/.ai
 /**/server.crt
+
+/**/node_modules
+/**/.svelte-kit
+
 /Build
 
 /old

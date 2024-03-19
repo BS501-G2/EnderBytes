@@ -6,6 +6,7 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Utilities;
 using Services;
+using System.Diagnostics.CodeAnalysis;
 
 public sealed partial class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
@@ -18,34 +19,101 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     public byte[] Encrypt(byte[] bytes) => UserAuthentication.Encrypt(bytes);
     public byte[] Decrypt(byte[] bytes) => UserAuthentication.Decrypt(bytes, PayloadHash);
+
+    public bool TryEnter<T>(Func<T> func, [NotNullWhen(true)] out T result)
+    {
+
+      lock (this)
+      {
+        lock (UserAuthentication)
+        {
+          if (IsValid)
+          {
+            result = func();
+#pragma warning disable CS8762 // Parameter must have a non-null value when exiting in some condition.
+            return true;
+#pragma warning restore CS8762 // Parameter must have a non-null value when exiting in some condition.
+          }
+        }
+      }
+
+#pragma warning disable CS8601 // Possible null reference assignment.
+      result = default;
+#pragma warning restore CS8601 // Possible null reference assignment.
+      return false;
+    }
+
+    public bool TryEnter(Action action)
+    {
+      lock (this)
+      {
+        lock (UserAuthentication)
+        {
+          if (IsValid)
+          {
+            action();
+
+            return true;
+          }
+        }
+      }
+
+      return false;
+    }
+
+    public T Enter<T>(Func<T> func)
+    {
+      lock (this)
+      {
+        lock (UserAuthentication)
+        {
+          ThrowIfInvalid();
+
+          return func();
+        }
+      }
+    }
+
+    public void Enter(Action action)
+    {
+      lock (this)
+      {
+        lock (UserAuthentication)
+        {
+          ThrowIfInvalid();
+
+          action();
+        }
+      }
+    }
   }
 
   public enum UserAuthenticationType { Password }
 
-  private const string NAME = "UserAuthentication";
-  private const int VERSION = 1;
+  public const string NAME = "UserAuthentication";
+  public const int VERSION = 1;
 
   public new sealed partial class ResourceManager : Resource<ResourceManager, ResourceData, UserAuthenticationResource>.ResourceManager
   {
-    private const string COLUMN_USER_ID = "UserId";
-    private const string COLUMN_TYPE = "Type";
+    public const string COLUMN_USER_ID = "UserId";
+    public const string COLUMN_TYPE = "Type";
 
-    private const string COLUMN_SALT = "Salt";
-    private const string COLUMN_ITERATIONS = "Iterations";
+    public const string COLUMN_SALT = "Salt";
+    public const string COLUMN_ITERATIONS = "Iterations";
 
-    private const string COLUMN_CHALLENGE_IV = "ChallengeIv";
-    private const string COLUMN_CHALLENGE_BYTES = "ChallengeBytes";
-    private const string COLUMN_CHALLENGE_ENCRYPTED_BYTES = "ChallengeEncryptedBytes";
+    public const string COLUMN_CHALLENGE_IV = "ChallengeIv";
+    public const string COLUMN_CHALLENGE_BYTES = "ChallengeBytes";
+    public const string COLUMN_CHALLENGE_ENCRYPTED_BYTES = "ChallengeEncryptedBytes";
 
-    private const string COLUMN_ENCRYPTED_PRIVATE_KEY = "EncryptedPrivateKey";
-    private const string COLUMN_ENCRYPTED_PRIVATE_KEY_IV = "EncryptedPrivateKeyIv";
-    private const string COLUMN_PUBLIC_KEY = "PublicKey";
+    public const string COLUMN_ENCRYPTED_PRIVATE_KEY = "EncryptedPrivateKey";
+    public const string COLUMN_ENCRYPTED_PRIVATE_KEY_IV = "EncryptedPrivateKeyIv";
+    public const string COLUMN_PUBLIC_KEY = "PublicKey";
 
-    private const string INDEX_USER_ID = $"Index_{NAME}_{COLUMN_USER_ID}";
+    public const string INDEX_USER_ID = $"Index_{NAME}_{COLUMN_USER_ID}";
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction, resource, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id), cancellationToken);
+      service.Users.ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), cancellationToken);
     }
 
     protected override UserAuthenticationResource NewResource(ResourceData data) => new(this, data);
@@ -113,7 +181,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
       byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
 
-      return new(user, Insert(transaction, new(
+      return new(user, InsertAndGet(transaction, new(
         (COLUMN_USER_ID, user.Id),
         (COLUMN_TYPE, (byte)type),
 
@@ -152,7 +220,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
       byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
 
-      return new(user, Insert(transaction, new(
+      return new(user, InsertAndGet(transaction, new(
         (COLUMN_USER_ID, user.Id),
         (COLUMN_TYPE, (byte)type),
 
@@ -173,42 +241,36 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     public UserAuthenticationToken? GetByPayload(ResourceService.Transaction transaction, UserResource user, byte[] payload, UserAuthenticationType type)
     {
-      lock (this)
+      lock (user)
       {
-        lock (user)
+        user.ThrowIfInvalid();
+
+        foreach (UserAuthenticationResource userAuthentication in Select(transaction,
+          new WhereClause.Nested("and",
+            new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id),
+            new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)type)
+          )
+        ))
         {
-          user.ThrowIfInvalid();
-
-          foreach (UserAuthenticationResource userAuthentication in Select(transaction,
-            new WhereClause.Nested("and",
-              new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id),
-              new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)type)
-            )
-          ))
-          {
-            try { return new(user, userAuthentication, userAuthentication.GetPayloadHash(payload)); } catch { }
-          }
-
-          return null;
+          try { return new(user, userAuthentication, userAuthentication.GetPayloadHash(payload)); } catch { }
         }
+
+        return null;
       }
     }
 
     public override bool Delete(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication, CancellationToken cancellationToken = default)
     {
-      lock (this)
+      lock (userAuthentication)
       {
-        lock (userAuthentication)
+        userAuthentication.ThrowIfInvalid();
+
+        if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userAuthentication.UserId), cancellationToken) < 2)
         {
-          userAuthentication.ThrowIfInvalid();
-
-          if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userAuthentication.UserId), cancellationToken) < 2)
-          {
-            throw new InvalidOperationException("Must have at least two user authentications before deleting one.");
-          }
-
-          return base.Delete(transaction, userAuthentication, cancellationToken);
+          throw new InvalidOperationException("Must have at least two user authentications before deleting one.");
         }
+
+        return base.Delete(transaction, userAuthentication, cancellationToken);
       }
     }
   }

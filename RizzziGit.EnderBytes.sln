@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RizzziGit.EnderBytes.Server", "RizzziGit.EnderBytes.Server\RizzziGit.EnderBytes.Server.csproj", "{B2D41BD1-7023-4A71-99D2-320B890785BA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RizzziGit.Commons", "..\RizzziGit.Commons\RizzziGit.Commons.csproj", "{6AF5D433-606A-4C62-855C-6C40F168A41F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B2D41BD1-7023-4A71-99D2-320B890785BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2D41BD1-7023-4A71-99D2-320B890785BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B2D41BD1-7023-4A71-99D2-320B890785BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2D41BD1-7023-4A71-99D2-320B890785BA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6AF5D433-606A-4C62-855C-6C40F168A41F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6AF5D433-606A-4C62-855C-6C40F168A41F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6AF5D433-606A-4C62-855C-6C40F168A41F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6AF5D433-606A-4C62-855C-6C40F168A41F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

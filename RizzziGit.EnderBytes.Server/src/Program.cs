@@ -3,21 +3,15 @@ using MySql.Data.MySqlClient;
 
 namespace RizzziGit.EnderBytes;
 
-using Framework.Logging;
-using Framework.Memory;
+using Commons.Logging;
 
 using Core;
-using Resources;
 using Utilities;
 using Services;
 
 public static class Program
 {
-  public static async Task Main()
-  {
-    Server server = new(new(
-      KeyGeneratorThreads: 8,
-
+  public static Server Server = new(new(
       DatabaseConnectionStringBuilder: new MySqlConnectionStringBuilder()
       {
         Server = "10.1.0.117",
@@ -27,11 +21,16 @@ public static class Program
         Password = "test",
 
         AllowBatch = true
-      }
+      },
+
+      KeyGeneratorThreads: 8
     ));
+
+  public static async Task Main()
+  {
     {
       StringBuilder buffer = new();
-      server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{timestamp} / {level}] [{scope}] {message}");
+      Server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{DateTimeOffset.FromUnixTimeMilliseconds((long)timestamp).ToLocalTime()} / {level.ToString().ToUpper()}] [{scope}] {message}");
 
       ConsoleCancelEventHandler? onCancel = null;
       onCancel = (_, _) =>
@@ -40,34 +39,34 @@ public static class Program
         Console.CancelKeyPress += (_, _) => Environment.Exit(0);
 
         Console.Error.WriteLine("\rSERVER IS SHUTTING DOWN. PLEASE DO NOT PRESS CANCEL KEY ONE MORE TIME.");
-        StopTest(server).WaitSync();
+        StopTest(Server).WaitSync();
       };
 
       Console.CancelKeyPress += onCancel!;
     }
 
     Logger testLogger = new("Test");
-    server.Logger.Subscribe(testLogger);
+    Server.Logger.Subscribe(testLogger);
 
-    await server.Start();
+    await Server.Start();
     try
     {
       try
       {
-        await RunTest(testLogger, server);
+        await RunTest(testLogger, Server);
       }
       catch
       {
         Handler = null;
         throw;
       }
-      await server.Join();
+      await Server.Join();
     }
     catch (Exception exception)
     {
       try
       {
-        await StopTest(server);
+        await StopTest(Server);
       }
       catch (Exception stopException)
       {
@@ -86,36 +85,12 @@ public static class Program
     {
       await server.ResourceService.Transact(Handler);
     }
+
     await server.Stop();
   });
 
-  public static async Task RunTest(Logger logger, Server server) => await Task.Run(async () =>
+  public static Task RunTest(Logger logger, Server server) => Task.Run(() =>
   {
-    await server.ResourceService.Transact((transaction, cancellationToken) =>
-    {
-      ResourceService service = transaction.ResoruceService;
-
-      (UserResource originalUser, UserAuthenticationResource.UserAuthenticationToken originalToken) = service.Users.Create(transaction, "testuser", "Test User", "test", cancellationToken);
-      Handler += (transaction, cancellationToken) => service.Users.Delete(transaction, originalUser, cancellationToken);
-
-      (UserResource otherUser, UserAuthenticationResource.UserAuthenticationToken otherToken) = service.Users.Create(transaction, "testuser2", "Other User", "test", cancellationToken);
-      Handler += (transaction, cancellationToken) => service.Users.Delete(transaction, otherUser, cancellationToken);
-
-      logger.Info($"Eq: {CompositeBuffer.From(originalToken.Decrypt(originalUser.Encrypt(CompositeBuffer.From("Test").ToByteArray())))}");
-
-      StorageResource storage = service.Storages.Create(transaction, originalUser, originalToken, cancellationToken);
-
-      FileResource file = service.Files.Create(transaction, storage, null, FileResource.FileType.File, "Test", originalToken, cancellationToken);
-
-      FileResource folder1 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder1", originalToken, cancellationToken);
-      FileResource folder2 = service.Files.Create(transaction, storage, null, FileResource.FileType.Folder, "Folder2", originalToken, cancellationToken);
-
-      service.Files.Move(transaction, storage, file, folder1, originalToken, cancellationToken);
-
-      FileAccessResource fileAccess1 = service.FileAccesses.Create(transaction, storage, folder1, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
-      FileAccessResource fileAccess2 = service.FileAccesses.Create(transaction, storage, folder2, otherUser, FileAccessResource.FileAccessType.ReadWrite, originalToken, cancellationToken);
-
-      service.Files.Move(transaction, storage, file, folder2, otherToken, cancellationToken);
-    });
+    return Task.CompletedTask;
   });
 }

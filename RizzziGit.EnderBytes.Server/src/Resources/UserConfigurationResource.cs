@@ -6,19 +6,19 @@ using Services;
 
 public sealed class UserConfigurationResource(UserConfigurationResource.ResourceManager manager, UserConfigurationResource.ResourceData data) : Resource<UserConfigurationResource.ResourceManager, UserConfigurationResource.ResourceData, UserConfigurationResource>(manager, data)
 {
-  private const string NAME = "UserConfiguration";
-  private const int VERSION = 1;
+  public const string NAME = "UserConfiguration";
+  public const int VERSION = 1;
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserConfigurationResource>.ResourceManager
   {
-    private const string COLUMN_USER_ID = "UserId";
-    private const string COLUMN_ENABLE_FTP_ACCESS = "EnableFTPAccess";
+    public const string COLUMN_USER_ID = "UserId";
+    public const string COLUMN_ENABLE_FTP_ACCESS = "EnableFTPAccess";
 
-    private const string INDEX_USER_ID = $"Index_{NAME}_{COLUMN_USER_ID}";
+    public const string INDEX_USER_ID = $"Index_{NAME}_{COLUMN_USER_ID}";
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction, resource, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", resource.Id), cancellationToken);
+      service.Users.ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), cancellationToken);
     }
 
     protected override UserConfigurationResource NewResource(ResourceData data) => new(this, data);
@@ -42,18 +42,15 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
 
     public UserConfigurationResource Get(ResourceService.Transaction transaction, UserResource user)
     {
-      lock (this)
+      lock (user)
       {
-        lock (user)
-        {
-          user.ThrowIfInvalid();
+        user.ThrowIfInvalid();
 
-          return SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id))
-            ?? Insert(transaction, new(
-              (COLUMN_USER_ID, user.Id),
-              (COLUMN_ENABLE_FTP_ACCESS, false)
-            ));
-        }
+        return SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id))
+          ?? InsertAndGet(transaction, new(
+            (COLUMN_USER_ID, user.Id),
+            (COLUMN_ENABLE_FTP_ACCESS, false)
+          ));
       }
     }
   }

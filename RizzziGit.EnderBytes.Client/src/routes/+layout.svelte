@@ -1,42 +1,65 @@
 <script lang="ts" context="module">
   import { Theme } from '$lib/themes'
+  import { ViewMode } from '$lib/view-mode'
+  import { STATE_ROOT } from '$lib/values'
 
   export interface RootState {
     theme: Theme
+
+    viewMode: ViewMode
   }
 </script>
 
 <script lang="ts">
-  import { APP_NAME, APP_TAGLINE } from '$lib/manifest'
+  import { APP_NAME, APP_TAGLINE } from '$lib/values'
   import { setContext, onMount } from 'svelte'
   import { writable } from 'svelte/store'
   import { serializeThemeColorsIntoInlineStyle } from '$lib/themes'
 
   const rootState = writable<RootState>({
-    theme: Theme.Default
+    theme: Theme.Ender,
+    viewMode: ViewMode.DesktopBrowser
   })
 
-  setContext('state', rootState)
+  setContext(STATE_ROOT, rootState)
+
+  function onResize() {
+    $rootState.viewMode = (
+      (window.matchMedia('(max-width: 720px)').matches ? ViewMode.Mobile : ViewMode.Desktop) |
+      (
+        window.matchMedia('(display-mode: standalone)').matches ? ViewMode.Standalone :
+        window.matchMedia('(display-mode: fullscreen)').matches ? ViewMode.Fullscreen :
+        ViewMode.Browser
+      )
+    )
+  }
 
   onMount(() => {
-    rootState.subscribe((value) => document.body.setAttribute('style', serializeThemeColorsIntoInlineStyle(value.theme)))
+    rootState.subscribe((value) => document.documentElement.setAttribute('style', serializeThemeColorsIntoInlineStyle(value.theme)))
 
-    $rootState.theme = (<Theme | null> localStorage.getItem('theme')) ?? Theme.Default
+    $rootState.theme = (<Theme | null> localStorage.getItem('theme')) ?? Theme.Ender
 
-    setInterval(() => {
-      $rootState.theme = $rootState.theme === Theme.Blue ? Theme.Default : Theme.Blue
-    }, 1000)
+    onResize()
   })
 </script>
 
 <svelte:head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <link rel="manifest" href="/api/manifest.json" />
-  <link rel="shortcut icon" href="/favicon.png" />
 
   <title>{APP_NAME} - {APP_TAGLINE}</title>
 </svelte:head>
 
+<svelte:window on:resize={onResize}/>
+
 <slot />
+
+<style lang="scss">
+  :root {
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+    background-color: var(--background);
+
+    color: var(--onBackground);
+
+    min-width: 320px;
+  }
+</style>

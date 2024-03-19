@@ -10,8 +10,6 @@ export class Client {
 
     const client = new Client()
 
-    
-
     return client
   }
 

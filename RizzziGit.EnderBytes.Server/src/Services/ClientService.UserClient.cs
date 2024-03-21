@@ -9,7 +9,7 @@ public sealed partial class ClientService
 {
   public sealed partial class UserClient : Client
   {
-    public UserClient(WebSocket webSocket) : base()
+    public UserClient(ClientService service, WebSocket webSocket) : base(service)
     {
       Func<CancellationToken, Task>? exportStartFunction = null;
       WebSocket = new(this, webSocket, (startFunc) => exportStartFunction = startFunc);

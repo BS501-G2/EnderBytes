@@ -1,5 +1,3 @@
-import { BSON } from 'bson'
-
 export class HybridWebSocket {
   public constructor(webSocket: WebSocket) {
     this.#webSocket = webSocket
@@ -9,6 +7,7 @@ export class HybridWebSocket {
 }
 
 export class Client {
+  static get #dotnet(): any { return (<any>window).__DOTNET__ }
   static #initializing: boolean = false
   static #client: Client | null = null
   static #clientPromise: Promise<Client> | null = null
@@ -49,4 +48,6 @@ export class Client {
   readonly #webSocket: WebSocket
 
   get isOpen(): boolean { return this.#webSocket.readyState === 1 }
+
+  async test(): Promise<string> { return await Client.#dotnet.Client.GetStatus() }
 }

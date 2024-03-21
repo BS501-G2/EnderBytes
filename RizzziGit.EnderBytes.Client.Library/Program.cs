@@ -1,9 +1,8 @@
 using System;
 using System.Runtime.InteropServices.JavaScript;
+using System.Threading.Tasks;
 
-Console.WriteLine("Hello, Browser!");
-
-public partial class MyClass
+public partial class Client
 {
     // [JSExport]
     // internal static string Greeting()
@@ -17,7 +16,15 @@ public partial class MyClass
     // internal static partial string GetHRef();
 
     [JSExport]
-    internal static string[] GetStatus() {
-        return ["asd"];
+    internal static async Task<string> GetStatus()
+    {
+        await Task.Delay(1000);
+
+        return "Aasds";
+    }
+
+    public static void Main()
+    {
+        Console.WriteLine("Hello world!");
     }
 }

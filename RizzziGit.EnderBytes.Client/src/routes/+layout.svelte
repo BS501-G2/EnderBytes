@@ -53,6 +53,8 @@
 
 <svelte:head>
   <title>{APP_NAME} - {APP_TAGLINE}</title>
+
+  <script type="module" src="/dotnet.js" />
 </svelte:head>
 
 <svelte:window on:resize={onResize} />

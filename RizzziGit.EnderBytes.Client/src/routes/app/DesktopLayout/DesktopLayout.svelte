@@ -40,7 +40,7 @@
     }
 
     > div.left-panel {
-      width: 256px;
+      min-width: 32px;
       height: 100%;
 
       background-color: var(--primaryContainer);

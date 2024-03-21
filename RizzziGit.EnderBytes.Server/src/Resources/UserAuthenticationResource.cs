@@ -382,20 +382,21 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
     }
   }
 
-  public UserAuthenticationToken GetTokenByPayload(UserResource user, byte[] payload)
+  public bool TryGetTokenByPayload(UserResource user, byte[] payload, [NotNullWhen(true)] out UserAuthenticationToken? userAuthenticationToken)
   {
+    userAuthenticationToken = null;
+
     lock (this)
     {
-      user.ThrowIfInvalid();
-
-      if (user.Id != UserId)
+      if (!user.IsValid || user.Id != UserId)
       {
-        throw new ArgumentException("Invalid user.", nameof(user));
+        return false;
       }
 
       byte[] payloadHash = GetPayloadHash(payload);
 
-      return TokenCache ??= new(user, this, payloadHash);
+      userAuthenticationToken = TokenCache ??= new(user, this, payloadHash);
+      return true;
     }
   }
 }

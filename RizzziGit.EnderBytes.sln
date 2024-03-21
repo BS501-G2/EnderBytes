@@ -7,6 +7,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RizzziGit.EnderBytes.Server
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RizzziGit.Commons", "..\RizzziGit.Commons\RizzziGit.Commons.csproj", "{6AF5D433-606A-4C62-855C-6C40F168A41F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RizzziGit.EnderBytes.Client.Library", "RizzziGit.EnderBytes.Client.Library\RizzziGit.EnderBytes.Client.Library.csproj", "{88C604CD-2516-4A10-94F2-A0A843F95A05}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RizzziGit.EnderBytes.Commons", "RizzziGit.EnderBytes.Commons\RizzziGit.EnderBytes.Commons.csproj", "{81A9F23C-B277-4ECE-959B-F3247DCE85E0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +28,13 @@ Global
 		{6AF5D433-606A-4C62-855C-6C40F168A41F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6AF5D433-606A-4C62-855C-6C40F168A41F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6AF5D433-606A-4C62-855C-6C40F168A41F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{88C604CD-2516-4A10-94F2-A0A843F95A05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{88C604CD-2516-4A10-94F2-A0A843F95A05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{88C604CD-2516-4A10-94F2-A0A843F95A05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{88C604CD-2516-4A10-94F2-A0A843F95A05}.Release|Any CPU.Build.0 = Release|Any CPU
+		{81A9F23C-B277-4ECE-959B-F3247DCE85E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{81A9F23C-B277-4ECE-959B-F3247DCE85E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{81A9F23C-B277-4ECE-959B-F3247DCE85E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{81A9F23C-B277-4ECE-959B-F3247DCE85E0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

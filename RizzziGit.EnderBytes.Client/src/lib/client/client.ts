@@ -1,22 +1,52 @@
-let initializing: boolean = false
-export class Client {
+import { BSON } from 'bson'
 
-  public static async newInstance(url: URL): Promise<Client> {
-    const webSocket = new WebSocket(url)
-
-    webSocket.onmessage = (event) => {
-      console.log(event.data)
-    }
-
-    initializing = true
-    const client = new this()
-    initializing = false
-    return client
+export class HybridWebSocket {
+  public constructor(webSocket: WebSocket) {
+    this.#webSocket = webSocket
   }
 
-  public constructor() {
-    if (!initializing) {
+  readonly #webSocket: WebSocket
+}
+
+export class Client {
+  static #initializing: boolean = false
+  static #client: Client | null = null
+  static #clientPromise: Promise<Client> | null = null
+
+  public static getInstance(url: URL): Promise<Client> {
+    if (Client.#client != null) {
+      return Promise.resolve(Client.#client)
+    }
+    else if (Client.#clientPromise != null) {
+      return Client.#clientPromise
+    }
+
+    return this.#clientPromise = (new Promise((resolve, reject) => {
+      const webSocket = new WebSocket(url)
+
+      webSocket.onerror = reject
+      webSocket.onopen = () => {
+        this.#initializing = true
+        const client = new Client(webSocket)
+        this.#initializing = false
+
+        resolve(this.#client = client)
+        this.#clientPromise = null
+      }
+    }))
+  }
+
+  public constructor(webSocket: WebSocket) {
+    if (!Client.#initializing) {
       throw new Error('Private constructor.')
     }
+
+    this.#webSocket = webSocket
+
+    this.#webSocket.readyState
   }
+
+  readonly #webSocket: WebSocket
+
+  get isOpen(): boolean { return this.#webSocket.readyState === 1 }
 }

@@ -18,7 +18,7 @@
         }
       }
 
-      const client: Client = await Client.newInstance(
+      const client: Client = await Client.getInstance(
         new URL("ws://localhost:8080/ws"),
       );
 

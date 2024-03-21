@@ -1,4 +1,6 @@
 export enum ViewMode {
+  Unset = 0,
+
   Mobile = 0b0001,
   Desktop = 0b10,
 

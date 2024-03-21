@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="RizzziGit.Commons" Version="0.0.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RizzziGit.EnderBytes.Commons\RizzziGit.EnderBytes.Commons.csproj" />
+  </ItemGroup>
+</Project>

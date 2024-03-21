@@ -7,10 +7,10 @@
   import { Theme, serializeThemeColorsIntoInlineStyle } from "$lib/themes";
 
   export class RootState {
-    public  constructor() {
-      this.theme = Theme.Ender
+    public constructor() {
+      this.theme = Theme.Ender;
 
-      this.viewMode = ViewMode.DesktopBrowser
+      this.viewMode = ViewMode.Unset;
     }
 
     theme: Theme;
@@ -57,7 +57,9 @@
 
 <svelte:window on:resize={onResize} />
 
-<slot />
+{#if $rootState.viewMode != ViewMode.Unset}
+  <slot />
+{/if}
 
 <style lang="scss">
   :root {

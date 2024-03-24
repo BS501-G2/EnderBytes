@@ -29,7 +29,7 @@
 
 <div class="navigation-bar" style={scroll == 0 ? "" : ""}>
   <a href="/">
-    <img src="/favicon.png" alt="Site Logo" />
+    <img src="/favicon.svg" alt="Site Logo" />
   </a>
   <div>
     <nav>

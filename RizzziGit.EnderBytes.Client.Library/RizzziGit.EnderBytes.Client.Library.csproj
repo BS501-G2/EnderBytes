@@ -2,9 +2,10 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="RizzziGit.Commons" Version="0.0.1" />
+    <PackageReference Include="RizzziGit.Commons" Version="0.0.2" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RizzziGit.EnderBytes.Commons\RizzziGit.EnderBytes.Commons.csproj" />

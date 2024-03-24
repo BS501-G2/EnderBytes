@@ -4,13 +4,15 @@
 // @ts-ignore
 import { dotnet } from './dotnet/wwwroot/_framework/dotnet.js'
 
-export async function init() {
+export async function init(url, onStatusUpdate) {
   const { setModuleImports, getAssemblyExports, getConfig, runMain } = await dotnet
     .withDiagnosticTracing(false)
     .withApplicationArgumentsFromQuery()
     .create();
 
   setModuleImports('main.js', {
+    updateState: onStatusUpdate,
+    getUrl: () => `${url}`
   });
 
   const config = getConfig();
@@ -19,11 +21,12 @@ export async function init() {
   // run the C# Main() method and keep the runtime process running and executing further API calls
   // await runMain();
 
-  Object.assign(window, {
-      "__DOTNET__": exports
-  })
+  void runMain()
 
   return exports
 }
 
-void init()
+
+Object.assign(window, {
+  "__DOTNET__INIT__": init
+})

@@ -12,9 +12,9 @@ export function GET() {
     short_name: Manifest.APP_NAME,
     description: Manifest.APP_TAGLINE,
     icons: [
-      { src: '/favicon.png', 'sizes': '16x16', 'type': 'image/png' },
-      { src: '/favicon.png', 'sizes': '64x64', 'type': 'image/png' },
-      { src: '/favicon.png', 'sizes': '128x128', 'type': 'image/png' }
+      { src: '/favicon.svg', 'sizes': '16x16', 'type': 'image/png' },
+      { src: '/favicon.svg', 'sizes': '64x64', 'type': 'image/png' },
+      { src: '/favicon.svg', 'sizes': '128x128', 'type': 'image/png' }
     ],
     categories: ['education', 'utilities'],
     display_override: ['fullscreen', 'minimal-ui'],

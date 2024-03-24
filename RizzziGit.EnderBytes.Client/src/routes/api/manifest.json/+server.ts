@@ -1,36 +1,42 @@
 import { json } from '@sveltejs/kit';
-import * as Manifest from '$lib/values'
+import { colors } from '$lib/color-schemes';
+import { Locale, strings } from '$lib/locale';
 
 export const prerender = true
 
-export function GET() {
+const icon = (size: number) => ({ src: `/favicon.svg?size=${size}`, 'sizes': `${size}x${size}`, 'type': 'image/svg+xml' })
+const icons = () => [icon(16), icon(32), icon(64), icon(72), icon(96), icon(128), icon(144)]
+
+const shortcut = (name: string, url: string) => ({ name, url, icons: icons() })
+
+export function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+
+  const locale = (<Locale>searchParams.get('locale')) ?? Locale.en_US
+  const localeStrings = strings[locale]
+
   return json({
-    lang: 'en',
+    lang: locale,
     dir: 'ltr',
-    id: 'enderdrive',
-    name: Manifest.APP_NAME,
-    short_name: Manifest.APP_NAME,
-    description: Manifest.APP_TAGLINE,
-    icons: [
-      { src: '/favicon.svg', 'sizes': '16x16', 'type': 'image/png' },
-      { src: '/favicon.svg', 'sizes': '64x64', 'type': 'image/png' },
-      { src: '/favicon.svg', 'sizes': '128x128', 'type': 'image/png' }
-    ],
+    name: localeStrings.AppName,
+    short_name: localeStrings.AppName,
+    description: localeStrings.AppTagline,
+    icons: icons(),
     categories: ['education', 'utilities'],
-    display_override: ['fullscreen', 'minimal-ui'],
+    display_override: ['window-controls-overlay', 'fullscreen', 'minimal-ui'],
     display: 'standalone',
     launch_handler: {
       client_mode: 'focus-existing'
     },
     orientation: 'any',
     shortcuts: [
-      { name: 'Upload', 'url': '/upload' },
-      { name: 'Starred', 'url': '/starred' },
-      { name: 'Feed', 'url': '/Feed' }
+      shortcut('Upload', '/upload'),
+      shortcut('Starred', '/starred'),
+      shortcut('Feed', '/feed')
     ],
     start_url: '/app',
-    theme_color: '#0000ff',
-    'background-color': '#0000ff'
+    theme_color: colors.green.primaryContainer,
+    background_color: colors.green.background
   }, {
     headers: {
       'content-type': 'application/manifest+json'

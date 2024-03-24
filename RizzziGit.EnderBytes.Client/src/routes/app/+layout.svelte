@@ -47,10 +47,16 @@
   onMount(async () => {
     appState.set(await AppState.init());
   });
+
+  let searchString: string = ''
 </script>
 
+<svelte:head>
+  <link rel="manifest" href="/api/manifest.json?locale={$rootState.locale}" />
+</svelte:head>
+
 {#if $rootState.viewMode & ViewMode.Desktop}
-  <DesktopLayout>
+  <DesktopLayout bind:searchString={searchString}>
     <slot slot="layout-slot" />
   </DesktopLayout>
 {:else}

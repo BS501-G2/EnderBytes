@@ -36,7 +36,6 @@
       min-height: 32px;
 
       background-color: var(--primaryContainer);
-      box-shadow: gray 0px -2px 8px;
     }
   }
 </style>

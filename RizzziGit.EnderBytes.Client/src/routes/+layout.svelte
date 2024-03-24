@@ -3,19 +3,34 @@
   import { writable } from "svelte/store";
 
   import { ViewMode } from "$lib/view-mode";
-  import { STATE_ROOT, APP_NAME, APP_TAGLINE } from "$lib/values";
-  import { Theme, serializeThemeColorsIntoInlineStyle } from "$lib/themes";
+  import { STATE_ROOT } from "$lib/values";
+  import {
+    ColorScheme,
+    serializeThemeColorsIntoInlineStyle,
+  } from "$lib/color-schemes";
+
+  import {
+    Locale,
+    bindLocalizedString,
+
+    LOCALE_APP_NAME,
+    LOCALE_APP_TAGLINE,
+  } from "$lib/locale";
 
   export class RootState {
     public constructor() {
-      this.theme = Theme.Ender;
+      this.theme = ColorScheme.Ender;
 
       this.viewMode = ViewMode.Unset;
+
+      this.locale = Locale.en_US;
     }
 
-    theme: Theme;
+    theme: ColorScheme;
 
     viewMode: ViewMode;
+
+    locale: Locale;
   }
 
   const rootState = writable<RootState>(new RootState());
@@ -37,24 +52,30 @@
   }
 
   onMount(() => {
-    rootState.subscribe((value) =>
+    rootState.subscribe((value) => {
       document.documentElement.setAttribute(
         "style",
         serializeThemeColorsIntoInlineStyle(value.theme),
-      ),
-    );
+      );
+
+      document.documentElement.setAttribute("lang", value.locale);
+    });
 
     $rootState.theme =
-      <Theme | null>localStorage.getItem("theme") ?? Theme.Ender;
+      <ColorScheme | null>localStorage.getItem("theme") ?? ColorScheme.Ender;
 
     onResize();
   });
+
+  const localizedString = bindLocalizedString(() => $rootState.locale);
 </script>
 
 <svelte:head>
-  <title>{APP_NAME} - {APP_TAGLINE}</title>
-
-  <script type="module" src="/dotnet.js" />
+  <title
+    >{localizedString(LOCALE_APP_NAME)} - {localizedString(
+      LOCALE_APP_TAGLINE,
+    )}</title
+  >
 </svelte:head>
 
 <svelte:window on:resize={onResize} />

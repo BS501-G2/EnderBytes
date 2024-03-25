@@ -5,19 +5,22 @@ export enum Locale {
 }
 
 export type LocaleValues = Record<LocaleKey, string>
-export type LocaleKey = (
-  (typeof LOCALE_APP_NAME) |
-  (typeof LOCALE_APP_TAGLINE)
-)
+export enum LocaleKey {
+  AppName,
+  AppTagline,
 
-export const LOCALE_APP_NAME = 'AppName'
-export const LOCALE_APP_TAGLINE = 'AppTagline'
+  AltIconSite,
+  AltIconSearch,
+
+  SearchBarPlaceholder,
+  SearchBannerPlaceholderText
+}
 
 export const strings: Record<Locale, LocaleValues> = {
   [Locale.en_US]: en_US()
 }
 
-export function localizedString(locale: Locale, key: LocaleKey, params?: Record<string, string>) {
+export function getString<L extends Locale, K extends LocaleKey>(locale: L, key: K, params?: Record<string, string>): (typeof strings)[L][K] {
   let string: string = strings[locale][key]
 
   if (params != null) {
@@ -30,5 +33,5 @@ export function localizedString(locale: Locale, key: LocaleKey, params?: Record<
 }
 
 export function bindLocalizedString(locale: () => Locale): (key: LocaleKey, params?: Record<string, string>) => string {
-  return (key, params) => localizedString(locale(), key, params)
+  return (key, params) => getString(locale(), key, params)
 }

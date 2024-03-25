@@ -1,5 +1,5 @@
 <script lang="ts" context="module">
-  import { setContext, onMount } from "svelte";
+  import { setContext, onMount, onDestroy } from "svelte";
   import { writable } from "svelte/store";
 
   import { ViewMode } from "$lib/view-mode";
@@ -9,28 +9,25 @@
     serializeThemeColorsIntoInlineStyle,
   } from "$lib/color-schemes";
 
-  import {
-    Locale,
-    bindLocalizedString,
-
-    LOCALE_APP_NAME,
-    LOCALE_APP_TAGLINE,
-  } from "$lib/locale";
+  import { Locale, getString, LocaleKey } from "$lib/locale";
 
   export class RootState {
     public constructor() {
       this.theme = ColorScheme.Ender;
-
       this.viewMode = ViewMode.Unset;
-
       this.locale = Locale.en_US;
     }
 
     theme: ColorScheme;
-
     viewMode: ViewMode;
-
     locale: Locale;
+
+    public getString<T extends LocaleKey>(
+      key: T,
+      params?: Record<string, string>,
+    ) {
+      return getString(this.locale, key, params);
+    }
   }
 
   const rootState = writable<RootState>(new RootState());
@@ -51,29 +48,35 @@
           : ViewMode.Browser);
   }
 
+  let unsubscriber: () => void = () => {};
+
   onMount(() => {
-    rootState.subscribe((value) => {
+    $rootState.theme =
+      <ColorScheme | null>localStorage.getItem("theme") ?? ColorScheme.Ender;
+    $rootState.locale =
+      <Locale | null>localStorage.getItem("locale") ?? Locale.en_US;
+
+    unsubscriber = rootState.subscribe((value) => {
+      document.documentElement.setAttribute("lang", value.locale);
       document.documentElement.setAttribute(
         "style",
         serializeThemeColorsIntoInlineStyle(value.theme),
       );
 
-      document.documentElement.setAttribute("lang", value.locale);
+      localStorage.setItem("locale", value.locale);
+      localStorage.setItem("theme", value.theme);
     });
-
-    $rootState.theme =
-      <ColorScheme | null>localStorage.getItem("theme") ?? ColorScheme.Ender;
 
     onResize();
   });
 
-  const localizedString = bindLocalizedString(() => $rootState.locale);
+  onDestroy(unsubscriber);
 </script>
 
 <svelte:head>
   <title
-    >{localizedString(LOCALE_APP_NAME)} - {localizedString(
-      LOCALE_APP_TAGLINE,
+    >{$rootState.getString(LocaleKey.AppName)} - {$rootState.getString(
+      LocaleKey.AppTagline,
     )}</title
   >
 </svelte:head>

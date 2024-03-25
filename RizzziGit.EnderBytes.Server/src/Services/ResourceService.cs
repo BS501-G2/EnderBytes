@@ -1,7 +1,5 @@
 namespace RizzziGit.EnderBytes.Services;
 
-using Commons.Collections;
-
 using Core;
 using Resources;
 using DatabaseWrappers;
@@ -10,73 +8,59 @@ public sealed partial class ResourceService : Server.SubService
 {
   public ResourceService(Server server) : base(server, "Resources")
   {
-    Users = new(this);
-    UserAuthentications = new(this);
-    UserConfiguration = new(this);
-    Storages = new(this);
-    Files = new(this);
-    FileAccesses = new(this);
-    FileSnapshots = new(this);
-    FileBuffers = new(this);
-    FileBufferMaps = new(this);
+    ResourceManagers = [];
+
+    ResourceManagers.Add(new UserResource.ResourceManager(this));
+    ResourceManagers.Add(new UserAuthenticationResource.ResourceManager(this));
+    ResourceManagers.Add(new UserConfigurationResource.ResourceManager(this));
+    ResourceManagers.Add(new StorageResource.ResourceManager(this));
+    ResourceManagers.Add(new FileResource.ResourceManager(this));
+    ResourceManagers.Add(new FileAccessResource.ResourceManager(this));
+    ResourceManagers.Add(new FileSnapshotResource.ResourceManager(this));
+    ResourceManagers.Add(new FileBufferResource.ResourceManager(this));
+    ResourceManagers.Add(new FileBufferMapResource.ResourceManager(this));
   }
 
   private Database? Database;
+  private readonly List<ResourceManager> ResourceManagers;
 
-  public readonly UserResource.ResourceManager Users;
-  public readonly UserAuthenticationResource.ResourceManager UserAuthentications;
-  public readonly UserConfigurationResource.ResourceManager UserConfiguration;
-  public readonly StorageResource.ResourceManager Storages;
-  public readonly FileResource.ResourceManager Files;
-  public readonly FileAccessResource.ResourceManager FileAccesses;
-  public readonly FileSnapshotResource.ResourceManager FileSnapshots;
-  public readonly FileBufferResource.ResourceManager FileBuffers;
-  public readonly FileBufferMapResource.ResourceManager FileBufferMaps;
+  public T GetResourceManager<T>() where T : ResourceManager
+  {
+    foreach (ResourceManager resourceManager in ResourceManagers)
+    {
+      if (resourceManager is T t)
+      {
+        return t;
+      }
+    }
+
+    throw new ArgumentException("Specified type is not available.");
+  }
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
     Database = new MySQLDatabase(Server.Configuration.DatabaseConnectionStringBuilder);
 
-    await Users.Start(cancellationToken);
-    await UserAuthentications.Start(cancellationToken);
-    await UserConfiguration.Start(cancellationToken);
-    await Storages.Start(cancellationToken);
-    await Files.Start(cancellationToken);
-    await FileAccesses.Start(cancellationToken);
-    await FileSnapshots.Start(cancellationToken);
-    await FileBuffers.Start(cancellationToken);
-    await FileBufferMaps.Start(cancellationToken);
+    foreach (ResourceManager resourceManager in ResourceManagers)
+    {
+      await resourceManager.Start(cancellationToken);
+    }
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
     await await Task.WhenAny(
       RunPeriodicCheck(cancellationToken),
-      WatchDog([
-        Users,
-        UserAuthentications,
-        UserConfiguration,
-        Storages,
-        Files,
-        FileAccesses,
-        FileSnapshots,
-        FileBuffers,
-        FileBufferMaps
-      ], cancellationToken)
+      WatchDog([.. ResourceManagers], cancellationToken)
     );
   }
 
   protected override async Task OnStop(Exception? exception = null)
   {
-    await FileBufferMaps.Stop();
-    await FileBuffers.Stop();
-    await FileSnapshots.Stop();
-    await FileAccesses.Stop();
-    await Files.Stop();
-    await Storages.Stop();
-    await UserConfiguration.Stop();
-    await UserAuthentications.Stop();
-    await Users.Stop();
+    foreach (ResourceManager resourceManager in ResourceManagers.Reverse<ResourceManager>())
+    {
+      await resourceManager.Stop();
+    }
 
     Database?.Dispose();
     Database = null;

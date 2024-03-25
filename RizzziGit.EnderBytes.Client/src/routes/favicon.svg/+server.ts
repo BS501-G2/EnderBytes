@@ -1,5 +1,7 @@
 import FS from 'fs'
 
+export const prerender = true
+
 export async function GET(request: Request) {
   const query = new URL(request.url).searchParams
 

@@ -5,7 +5,9 @@ namespace RizzziGit.EnderBytes.Services;
 
 using Commons.Collections;
 using Commons.Logging;
-using RizzziGit.EnderBytes.Utilities;
+
+using Utilities;
+using Core;
 
 public sealed partial class ResourceService
 {
@@ -15,7 +17,10 @@ public sealed partial class ResourceService
   public delegate void TransactionFailureHandler();
 
   private long NextTransactionId;
-  public sealed record Transaction(DbConnection Connection, long Id, Action<TransactionFailureHandler> RegisterOnFailureHandler, ResourceService ResoruceService, CancellationToken CancellationToken);
+  public sealed record Transaction(DbConnection Connection, long Id, Action<TransactionFailureHandler> RegisterOnFailureHandler, ResourceService ResourceService, CancellationToken CancellationToken)
+  {
+    public Server Server => ResourceService.Server;
+  }
 
   public async IAsyncEnumerable<T> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler, [EnumeratorCancellation] CancellationToken cancellationToken)
   {

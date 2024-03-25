@@ -1,12 +1,12 @@
 using System.Data.Common;
 using System.Security.Cryptography;
 using System.Text;
+using System.Diagnostics.CodeAnalysis;
 
 namespace RizzziGit.EnderBytes.Resources;
 
 using Utilities;
 using Services;
-using System.Diagnostics.CodeAnalysis;
 
 public sealed partial class UserAuthenticationResource(UserAuthenticationResource.ResourceManager manager, UserAuthenticationResource.ResourceData data) : Resource<UserAuthenticationResource.ResourceManager, UserAuthenticationResource.ResourceData, UserAuthenticationResource>(manager, data)
 {
@@ -88,7 +88,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
     }
   }
 
-  public enum UserAuthenticationType { Password }
+  public enum UserAuthenticationType { Password, SessionToken }
 
   public const string NAME = "UserAuthentication";
   public const int VERSION = 1;
@@ -113,7 +113,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      service.Users.ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), cancellationToken);
+      service.GetResourceManager<UserResource.ResourceManager>().ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), cancellationToken);
     }
 
     protected override UserAuthenticationResource NewResource(ResourceData data) => new(this, data);
@@ -161,83 +161,162 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
     public UserAuthenticationToken CreatePassword(ResourceService.Transaction transaction, UserResource user, UserAuthenticationToken existing, string password) => Create(transaction, user, existing, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
     public UserAuthenticationToken CreatePassword(ResourceService.Transaction transaction, UserResource user, string password, byte[] privateKey, byte[] publicKey) => Create(transaction, user, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password), privateKey, publicKey);
 
-    private UserAuthenticationToken Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationToken existing, UserAuthenticationType type, byte[] payload)
+    public string CreateSessionToken(ResourceService.Transaction transaction, UserResource user, UserAuthenticationToken baseToken)
     {
-      byte[] privateKey = existing.UserAuthentication.GetPrivateKey(existing.PayloadHash);
-      byte[] publicKey = existing.UserAuthentication.PublicKey;
-
-      byte[] salt = RandomNumberGenerator.GetBytes(16);
-      int iterations = RandomNumberGenerator.GetInt32(1000, 10000);
-      byte[] payloadHash;
+      return baseToken.Enter(() =>
       {
-        using Rfc2898DeriveBytes rfc2898DeriveBytes = new(payload, salt, iterations, HashAlgorithmName.SHA256);
-        payloadHash = rfc2898DeriveBytes.GetBytes(32);
+        baseToken.ThrowIfInvalid();
+
+        byte[] sessionToken = RandomNumberGenerator.GetBytes(100);
+
+        Create(transaction, user, baseToken, UserAuthenticationType.SessionToken, sessionToken);
+        return Convert.ToHexString(sessionToken);
+      });
+    }
+
+    public bool TryGetToken(ResourceService.Transaction transaction, UserResource user, string sessionToken, [NotNullWhen(true)] out UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+    {
+      userAuthenticationToken = null;
+
+      lock (user)
+      {
+        if (user.IsValid)
+        {
+          UserResource.ResourceManager users = Service.GetResourceManager<UserResource.ResourceManager>();
+
+          foreach (UserAuthenticationResource userAuthenticationResource in Select(transaction, new WhereClause.Nested("and",
+            new WhereClause.CompareColumn(COLUMN_TYPE, "=", UserAuthenticationType.SessionToken),
+            new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)
+          ), cancellationToken: cancellationToken))
+          {
+            if (userAuthenticationResource.TryGetTokenByPayload(user, Convert.FromHexString(sessionToken), out userAuthenticationToken))
+            {
+              break;
+            }
+          }
+        }
       }
 
-      byte[] challengeIv = RandomNumberGenerator.GetBytes(16);
-      byte[] challengeBytes = RandomNumberGenerator.GetBytes(16);
-      byte[] challengeEncryptedBytes = AesEncrypt(payloadHash, challengeIv, challengeBytes);
+      return userAuthenticationToken != null;
+    }
 
-      byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
-      byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
+    private UserAuthenticationToken Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationToken existing, UserAuthenticationType type, byte[] payload)
+    {
+      lock (user)
+      {
+        user.ThrowIfInvalid();
+        return existing.Enter<UserAuthenticationToken>(() =>
+        {
+          byte[] privateKey = existing.UserAuthentication.GetPrivateKey(existing.PayloadHash);
+          byte[] publicKey = existing.UserAuthentication.PublicKey;
 
-      return new(user, InsertAndGet(transaction, new(
-        (COLUMN_USER_ID, user.Id),
-        (COLUMN_TYPE, (byte)type),
+          byte[] salt = RandomNumberGenerator.GetBytes(16);
+          int iterations = RandomNumberGenerator.GetInt32(1000, 10000);
+          byte[] payloadHash;
+          {
+            using Rfc2898DeriveBytes rfc2898DeriveBytes = new(payload, salt, iterations, HashAlgorithmName.SHA256);
+            payloadHash = rfc2898DeriveBytes.GetBytes(32);
+          }
 
-        (COLUMN_SALT, salt),
-        (COLUMN_ITERATIONS, iterations),
+          byte[] challengeIv = RandomNumberGenerator.GetBytes(16);
+          byte[] challengeBytes = RandomNumberGenerator.GetBytes(16);
+          byte[] challengeEncryptedBytes = AesEncrypt(payloadHash, challengeIv, challengeBytes);
 
-        (COLUMN_CHALLENGE_IV, challengeIv),
-        (COLUMN_CHALLENGE_BYTES, challengeBytes),
-        (COLUMN_CHALLENGE_ENCRYPTED_BYTES, challengeEncryptedBytes),
+          byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
+          byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
 
-        (COLUMN_ENCRYPTED_PRIVATE_KEY, encryptedPrivateKey),
-        (COLUMN_ENCRYPTED_PRIVATE_KEY_IV, encryptedPrivateKeyIv),
-        (COLUMN_PUBLIC_KEY, publicKey)
-      )), payloadHash);
+          return new(user, InsertAndGet(transaction, new(
+            (COLUMN_USER_ID, user.Id),
+            (COLUMN_TYPE, (byte)type),
+
+            (COLUMN_SALT, salt),
+            (COLUMN_ITERATIONS, iterations),
+
+            (COLUMN_CHALLENGE_IV, challengeIv),
+            (COLUMN_CHALLENGE_BYTES, challengeBytes),
+            (COLUMN_CHALLENGE_ENCRYPTED_BYTES, challengeEncryptedBytes),
+
+            (COLUMN_ENCRYPTED_PRIVATE_KEY, encryptedPrivateKey),
+            (COLUMN_ENCRYPTED_PRIVATE_KEY_IV, encryptedPrivateKeyIv),
+            (COLUMN_PUBLIC_KEY, publicKey)
+          )), payloadHash);
+        });
+      }
     }
 
     private UserAuthenticationToken Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationType type, byte[] payload, byte[] privateKey, byte[] publicKey)
     {
-      if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)) != 0)
+      lock (user)
       {
-        throw new InvalidOperationException("Must use an existing rsa key.");
+        user.ThrowIfInvalid();
+
+        if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)) != 0)
+        {
+          throw new InvalidOperationException("Must use an existing rsa key.");
+        }
+
+        byte[] salt = RandomNumberGenerator.GetBytes(16);
+        int iterations = RandomNumberGenerator.GetInt32(1000, 10000);
+        byte[] payloadHash;
+        {
+          using Rfc2898DeriveBytes rfc2898DeriveBytes = new(payload, salt, iterations, HashAlgorithmName.SHA256);
+          payloadHash = rfc2898DeriveBytes.GetBytes(32);
+        }
+
+        byte[] challengeIv = RandomNumberGenerator.GetBytes(16);
+        byte[] challengeBytes = RandomNumberGenerator.GetBytes(64);
+        byte[] challengeEncryptedBytes = AesEncrypt(payloadHash, challengeIv, challengeBytes);
+
+        byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
+        byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
+
+        return new(user, InsertAndGet(transaction, new(
+          (COLUMN_USER_ID, user.Id),
+          (COLUMN_TYPE, (byte)type),
+
+          (COLUMN_SALT, salt),
+          (COLUMN_ITERATIONS, iterations),
+
+          (COLUMN_CHALLENGE_IV, challengeIv),
+          (COLUMN_CHALLENGE_BYTES, challengeBytes),
+          (COLUMN_CHALLENGE_ENCRYPTED_BYTES, challengeEncryptedBytes),
+
+          (COLUMN_ENCRYPTED_PRIVATE_KEY, encryptedPrivateKey),
+          (COLUMN_ENCRYPTED_PRIVATE_KEY_IV, encryptedPrivateKeyIv),
+          (COLUMN_PUBLIC_KEY, publicKey)
+        )), payloadHash);
       }
-
-      byte[] salt = RandomNumberGenerator.GetBytes(16);
-      int iterations = RandomNumberGenerator.GetInt32(1000, 10000);
-      byte[] payloadHash;
-      {
-        using Rfc2898DeriveBytes rfc2898DeriveBytes = new(payload, salt, iterations, HashAlgorithmName.SHA256);
-        payloadHash = rfc2898DeriveBytes.GetBytes(32);
-      }
-
-      byte[] challengeIv = RandomNumberGenerator.GetBytes(16);
-      byte[] challengeBytes = RandomNumberGenerator.GetBytes(64);
-      byte[] challengeEncryptedBytes = AesEncrypt(payloadHash, challengeIv, challengeBytes);
-
-      byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
-      byte[] encryptedPrivateKey = AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
-
-      return new(user, InsertAndGet(transaction, new(
-        (COLUMN_USER_ID, user.Id),
-        (COLUMN_TYPE, (byte)type),
-
-        (COLUMN_SALT, salt),
-        (COLUMN_ITERATIONS, iterations),
-
-        (COLUMN_CHALLENGE_IV, challengeIv),
-        (COLUMN_CHALLENGE_BYTES, challengeBytes),
-        (COLUMN_CHALLENGE_ENCRYPTED_BYTES, challengeEncryptedBytes),
-
-        (COLUMN_ENCRYPTED_PRIVATE_KEY, encryptedPrivateKey),
-        (COLUMN_ENCRYPTED_PRIVATE_KEY_IV, encryptedPrivateKeyIv),
-        (COLUMN_PUBLIC_KEY, publicKey)
-      )), payloadHash);
     }
 
     public IEnumerable<UserAuthenticationResource> List(ResourceService.Transaction transaction, UserResource user, LimitClause? limitClause = null, OrderByClause? orderByClause = null) => Select(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), limitClause, orderByClause);
+
+    public bool TryGetByPayload(ResourceService.Transaction transaction, UserResource user, byte[] payload, UserAuthenticationType type, [NotNullWhen(true)] out UserAuthenticationToken? userAuthenticationToken)
+    {
+      userAuthenticationToken = null;
+
+      lock (user)
+      {
+        if (user.IsValid)
+        {
+          foreach (UserAuthenticationResource userAuthentication in Select(transaction,
+            new WhereClause.Nested("and",
+              new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id),
+              new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)type)
+            )
+          ))
+          {
+            try
+            {
+              userAuthenticationToken = new(user, userAuthentication, userAuthentication.GetPayloadHash(payload));
+              break;
+            }
+            catch { }
+          }
+        }
+      }
+
+      return userAuthenticationToken != null;
+    }
 
     public UserAuthenticationToken? GetByPayload(ResourceService.Transaction transaction, UserResource user, byte[] payload, UserAuthenticationType type)
     {

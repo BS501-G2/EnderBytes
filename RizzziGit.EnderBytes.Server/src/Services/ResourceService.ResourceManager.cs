@@ -4,8 +4,9 @@ namespace RizzziGit.EnderBytes.Services;
 
 using Commons.Logging;
 using Commons.Services;
-using RizzziGit.EnderBytes.DatabaseWrappers;
+
 using Utilities;
+using DatabaseWrappers;
 
 public sealed partial class ResourceService
 {
@@ -25,6 +26,7 @@ public sealed partial class ResourceService
 
     protected Task<T> Transact<T>(TransactionHandler<T> handler, CancellationToken cancellationToken = default) => Service.Transact(handler, cancellationToken);
     protected Task Transact(TransactionHandler handler, CancellationToken cancellationToken = default) => Service.Transact(handler, cancellationToken);
+    protected IAsyncEnumerable<T> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler, CancellationToken cancellationToken = default) => Service.EnumeratedTransact(handler, cancellationToken);
 
     private DbCommand CreateCommand(Transaction transaction, string sql, object?[] parameters)
     {

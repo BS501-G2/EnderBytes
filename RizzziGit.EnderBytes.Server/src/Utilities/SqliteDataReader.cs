@@ -1,4 +1,6 @@
 using System.Data.Common;
+using System.Text;
+using Newtonsoft.Json.Linq;
 
 namespace RizzziGit.EnderBytes.Utilities;
 
@@ -21,6 +23,9 @@ public static class DbExtensions
   public static short? GetInt16Optional(this DbDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetInt16(ordinal);
   public static byte? GetByteOptional(this DbDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetByte(ordinal);
   public static object? GetValueOptional(this DbDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
+
+  public static JObject GetJsonObject(this DbDataReader reader, int ordinal) => new(Encoding.UTF8.GetString(reader.GetBytes(ordinal)));
+  public static JObject? GetJsonObjectOptional(this DbDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetJsonObject(ordinal);
 
   public static byte[] GetBytes(this DbDataReader reader, int ordinal) => (byte[])reader.GetValue(ordinal);
   public static byte[]? GetBytesOptional(this DbDataReader reader, int ordinal) => (byte[]?)reader.GetValueOptional(ordinal);

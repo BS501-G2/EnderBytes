@@ -43,7 +43,7 @@ public sealed partial class FileResource
 
       private long InternalGetSize(ResourceService.Transaction transaction, CancellationToken cancellationToken = default)
       {
-        return transaction.ResoruceService.FileBufferMaps.GetSize(transaction, Storage, File, Snapshot, cancellationToken);
+        return transaction.ResourceService.GetResourceManager<FileBufferMapResource.ResourceManager>().GetSize(transaction, Storage, File, Snapshot, cancellationToken);
       }
 
       public override long GetSize(ResourceService.Transaction transaction, CancellationToken cancellationToken = default)
@@ -83,7 +83,7 @@ public sealed partial class FileResource
             throw new InvalidOperationException($"File handle does not have {nameof(FileHandleFlags.Read)} flag.");
           }
 
-          CompositeBuffer buffer = transaction.ResoruceService.FileBufferMaps.Read(transaction, Storage, File, Snapshot, Position, size, UserAuthenticationToken, cancellationToken);
+          CompositeBuffer buffer = transaction.ResourceService.GetResourceManager<FileBufferMapResource.ResourceManager>().Read(transaction, Storage, File, Snapshot, Position, size, UserAuthenticationToken, cancellationToken);
           Position += buffer.Length;
           return buffer;
         }
@@ -100,7 +100,7 @@ public sealed partial class FileResource
             throw new InvalidOperationException($"File handle does not have {nameof(FileHandleFlags.Modify)} flag.");
           }
 
-          transaction.ResoruceService.FileBufferMaps.Write(transaction, Storage, File, Snapshot, Position, buffer, UserAuthenticationToken, cancellationToken);
+          transaction.ResourceService.GetResourceManager<FileBufferMapResource.ResourceManager>().Write(transaction, Storage, File, Snapshot, Position, buffer, UserAuthenticationToken, cancellationToken);
           Position += buffer.Length;
           CurrentSize = InternalGetSize(transaction, cancellationToken);
         }
@@ -117,7 +117,7 @@ public sealed partial class FileResource
             throw new InvalidOperationException($"File handle does not have {nameof(FileHandleFlags.Modify)} flag.");
           }
 
-          transaction.ResoruceService.FileBufferMaps.Truncate(transaction, Storage, File, Snapshot, size, UserAuthenticationToken, cancellationToken);
+          transaction.ResourceService.GetResourceManager<FileBufferMapResource.ResourceManager>().Truncate(transaction, Storage, File, Snapshot, size, UserAuthenticationToken, cancellationToken);
           CurrentSize = InternalGetSize(transaction, cancellationToken);
         }
       }

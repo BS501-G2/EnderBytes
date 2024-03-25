@@ -19,7 +19,7 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.Files.ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id), cancellationToken);
+      Service.GetResourceManager<FileResource.ResourceManager>().ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id), cancellationToken);
     }
 
     protected override FileSnapshotResource NewResource(ResourceData data) => new(this, data);
@@ -56,13 +56,13 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
 
         FileSnapshotResource fileSnapshot = create();
 
-        Service.FileBufferMaps.Initialize(transaction, storage, file, fileSnapshot, cancellationToken);
+        Service.GetResourceManager<FileBufferMapResource.ResourceManager>().Initialize(transaction, storage, file, fileSnapshot, cancellationToken);
         return fileSnapshot;
       }
 
       FileSnapshotResource create()
       {
-        (_, FileAccessResource? fileAccess) = Service.Storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+        (_, FileAccessResource? fileAccess) = Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
 
         return InsertAndGet(transaction, new(
           (COLUMN_FILE_ID, file.Id),

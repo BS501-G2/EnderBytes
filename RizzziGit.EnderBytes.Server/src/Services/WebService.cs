@@ -4,17 +4,30 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 namespace RizzziGit.EnderBytes.Services;
 
 using Core;
-using Web;
 using Utilities;
-using Microsoft.Extensions.FileProviders;
 
-public sealed class WebService(Server server) : Server.SubService(server, "WebService")
+public sealed partial class WebService(Server server) : Server.SubService(server, "WebService")
 {
-  private WebApplication CreateWebApplication()
+  private WebApplication CreateWebApplication(CancellationToken cancellationToken = default)
   {
     WebApplicationBuilder builder = WebApplication.CreateBuilder();
 
-    builder.Logging.SetMinimumLevel(LogLevel.None);
+    string corsPolicy = "EnderBytesCorsPolicy";
+
+    builder.Services
+    .AddCors((setup) =>
+      {
+        setup.AddPolicy(corsPolicy, (policy) =>
+        {
+          policy.WithOrigins("http://localhost:8081");
+          policy.WithHeaders("*");
+          policy.WithMethods("*");
+        });
+      })
+      .AddSingleton(Server)
+      .AddControllers(); ;
+
+    // builder.Logging.SetMinimumLevel(LogLevel.None);
     builder.WebHost.ConfigureKestrel((kestrelConfiguration) =>
     {
       kestrelConfiguration.AllowAlternateSchemes = true;
@@ -35,50 +48,38 @@ public sealed class WebService(Server server) : Server.SubService(server, "WebSe
       }
     });
 
-    builder.Services.AddRazorComponents().AddInteractiveServerComponents();
-
     WebApplication app = builder.Build();
+
+    app.UseCors(corsPolicy);
+    app.Use(async (context, next) =>
+    {
+      string token;
+
+      {
+        string[] split = $"{context.Request.Headers.Authorization}".Split(" ");
+
+        if (split.Length == 2)
+        {
+          token = split[1];
+        }
+      }
+
+      await next();
+    });
 
     if (Server.Configuration.HttpsClient != null)
     {
       app.UseHttpsRedirection();
     }
 
-    app.UseWebSockets();
-
-    app.Use(async (HttpContext context, RequestDelegate next) =>
-    {
-      if (context.Request.Path == "/ws" && context.WebSockets.IsWebSocketRequest)
-      {
-        await Server.ClientService.HandleWebSocket(await context.WebSockets.AcceptWebSocketAsync(), GetCancellationToken());
-
-        context.Connection.RequestClose();
-        return;
-      }
-
-      await next(context);
-    });
-
-    app.Environment.ContentRootPath = Path.Join(Environment.CurrentDirectory, "src", "Web");
-    app.Environment.WebRootPath = Path.Join("Static");
-
-    app.Environment.ContentRootPath = Path.Join(Environment.CurrentDirectory, "src", "Web");
-
-    app.UseStaticFiles(new StaticFileOptions
-    {
-      FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "Static"))
-    });
-    app.UseAntiforgery();
-
-    app.MapRazorComponents<App>()
-      .AddInteractiveServerRenderMode();
+    app.MapControllers();
 
     return app;
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    await using WebApplication webApplication = CreateWebApplication();
+    await using WebApplication webApplication = CreateWebApplication(cancellationToken);
 
     try
     {

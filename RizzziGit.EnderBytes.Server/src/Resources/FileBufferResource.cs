@@ -19,7 +19,7 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.Files.ResourceDeleted += (transaction, resource, cancellationToken) =>
+      Service.GetResourceManager<FileResource.ResourceManager>().ResourceDeleted += (transaction, resource, cancellationToken) =>
       {
         if (resource.Type == FileResource.FileType.File)
         {

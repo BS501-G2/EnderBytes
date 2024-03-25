@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { colors } from '$lib/color-schemes';
-import { Locale, strings } from '$lib/locale';
+import { LocaleKey, Locale, bindLocalizedString } from '$lib/locale';
 
 export const prerender = true
 
@@ -9,18 +9,18 @@ const icons = () => [icon(16), icon(32), icon(64), icon(72), icon(96), icon(128)
 
 const shortcut = (name: string, url: string) => ({ name, url, icons: icons() })
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
 
   const locale = (<Locale>searchParams.get('locale')) ?? Locale.en_US
-  const localeStrings = strings[locale]
+  const getString = bindLocalizedString(() => locale)
 
   return json({
     lang: locale,
     dir: 'ltr',
-    name: localeStrings.AppName,
-    short_name: localeStrings.AppName,
-    description: localeStrings.AppTagline,
+    name: getString(LocaleKey.AppName),
+    short_name: getString(LocaleKey.AppName),
+    description: getString(LocaleKey.AppTagline),
     icons: icons(),
     categories: ['education', 'utilities'],
     display_override: ['window-controls-overlay', 'fullscreen', 'minimal-ui'],

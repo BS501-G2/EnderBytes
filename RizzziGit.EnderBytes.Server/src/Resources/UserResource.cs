@@ -7,6 +7,8 @@ namespace RizzziGit.EnderBytes.Resources;
 using Utilities;
 using DatabaseWrappers;
 using Services;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Mvc;
 
 public sealed partial class UserResource(UserResource.ResourceManager manager, UserResource.ResourceData data) : Resource<UserResource.ResourceManager, UserResource.ResourceData, UserResource>(manager, data)
 {
@@ -58,7 +60,7 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
         (COLUMN_PUBLIC_KEY, publicKey)
       ), cancellationToken);
 
-      return new(user, Service.UserAuthentications.CreatePassword(transaction, user, password, privateKey, publicKey));
+      return new(user, Service.GetResourceManager<UserAuthenticationResource.ResourceManager>().CreatePassword(transaction, user, password, privateKey, publicKey));
     }
 
     public bool Update(ResourceService.Transaction transaction, UserResource user, string username, string? displayName)

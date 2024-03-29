@@ -14,7 +14,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
   {
     public long UserId => UserAuthentication.UserId;
 
-    public bool IsValid => UserAuthentication.IsValid;
+    public bool IsValid => User.IsValid && UserAuthentication.IsValid;
     public void ThrowIfInvalid() => UserAuthentication.ThrowIfInvalid();
 
     public byte[] Encrypt(byte[] bytes) => UserAuthentication.Encrypt(bytes);
@@ -22,10 +22,9 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     public bool TryEnter<T>(Func<T> func, [NotNullWhen(true)] out T result)
     {
-
       lock (this)
       {
-        lock (UserAuthentication)
+        lock (User)
         {
           if (IsValid)
           {
@@ -47,13 +46,16 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
     {
       lock (this)
       {
-        lock (UserAuthentication)
+        lock (User)
         {
-          if (IsValid)
+          lock (UserAuthentication)
           {
-            action();
+            if (IsValid)
+            {
+              action();
 
-            return true;
+              return true;
+            }
           }
         }
       }
@@ -472,10 +474,17 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
         return false;
       }
 
-      byte[] payloadHash = GetPayloadHash(payload);
+      try
+      {
+        byte[] payloadHash = GetPayloadHash(payload);
 
-      userAuthenticationToken = TokenCache ??= new(user, this, payloadHash);
-      return true;
+        userAuthenticationToken = TokenCache ??= new(user, this, payloadHash);
+        return true;
+      }
+      catch
+      {
+        return false;
+      }
     }
   }
 }

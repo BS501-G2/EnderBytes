@@ -55,9 +55,23 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
       }
     }
 
-    public IEnumerable<FileAccessResource> List(ResourceService.Transaction transaction, FileResource file, LimitClause? limit = null, OrderByClause? orderBy = null, CancellationToken cancellationToken = default)
+    public IEnumerable<FileAccessResource> List(ResourceService.Transaction transaction, StorageResource storage, FileResource file, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, LimitClause? limit = null, OrderByClause? orderBy = null, CancellationToken cancellationToken = default)
     {
-      return Select(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), limit, orderBy, cancellationToken);
+      lock (storage)
+      {
+        storage.ThrowIfInvalid();
+
+        lock (file)
+        {
+          file.ThrowIfInvalid();
+          file.ThrowIfDoesNotBelongTo(storage);
+
+          List<FileAccessResource> fileAccesses = Select(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), limit, orderBy, cancellationToken).ToList();
+          _ = Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ManageShares, cancellationToken);
+
+          return fileAccesses;
+        }
+      }
     }
 
     public FileAccessResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource targetFile, FileAccessType type, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
@@ -66,7 +80,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
       {
         lock (targetFile)
         {
-          lock (userAuthenticationToken)
+          return userAuthenticationToken.Enter(() =>
           {
             KeyService.AesPair fileKey = transaction.ResourceService.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
 
@@ -77,7 +91,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
               (COLUMN_KEY, fileKey.Serialize()),
               (COLUMN_TYPE, (byte)type)
             ), cancellationToken);
-          }
+          });
         }
       }
     }

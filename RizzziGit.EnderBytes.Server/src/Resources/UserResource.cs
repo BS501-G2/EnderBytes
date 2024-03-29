@@ -1,18 +1,17 @@
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
+using System.Text.Json.Serialization;
 
 namespace RizzziGit.EnderBytes.Resources;
 
 using Utilities;
 using DatabaseWrappers;
 using Services;
-using Microsoft.AspNetCore.Routing;
-using Microsoft.AspNetCore.Mvc;
 
 public sealed partial class UserResource(UserResource.ResourceManager manager, UserResource.ResourceData data) : Resource<UserResource.ResourceManager, UserResource.ResourceData, UserResource>(manager, data)
 {
-  public sealed record Token(UserResource User, UserAuthenticationResource.UserAuthenticationToken AuthenticationToken);
+  public sealed record UserPair(UserResource User, UserAuthenticationResource.UserAuthenticationToken AuthenticationToken);
 
   public const string NAME = "User";
   public const int VERSION = 1;
@@ -50,7 +49,7 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
       }
     }
 
-    public Token Create(ResourceService.Transaction transaction, string username, string? displayName, string password, CancellationToken cancellationToken = default)
+    public UserPair Create(ResourceService.Transaction transaction, string username, string? displayName, string password, CancellationToken cancellationToken = default)
     {
       (byte[] privateKey, byte[] publicKey) = Service.Server.KeyService.GetNewRsaKeyPair();
 
@@ -92,6 +91,7 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
 
   public string Username => Data.Username;
   public string? DisplayName => Data.DisplayName;
+  [JsonIgnore]
   public byte[] PublicKey => Data.PublicKey;
 
   private RSACryptoServiceProvider? RSACryptoServiceProvider;

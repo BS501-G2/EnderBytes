@@ -1,29 +1,19 @@
 import {
-  THEME_COLOR_BACKGROUND,
-  THEME_COLOR_ON_BACKGROUND,
-  THEME_COLOR_ON_PRIMARY,
-  THEME_COLOR_ON_PRIMARY_CONTAINER,
-  THEME_COLOR_PRIMARY,
-  THEME_COLOR_PRIMARY_CONTAINER,
-  THEME_COLOR_PRIMARY_VARIANT,
-  THEME_COLOR_ON_PRIMARY_VARIANT,
-  THEME_COLOR_ON_PRIMARY_VARIANT_CONTAINER,
-  THEME_COLOR_PRIMARY_VARIANT_CONTAINER,
-
+  ColorKey,
   type ColorValues
 } from "$lib/color-schemes";
 
 export const colors = (): ColorValues => ({
-  [THEME_COLOR_PRIMARY]: '#37812e',
-  [THEME_COLOR_ON_PRIMARY]: '#ffffffff',
-  [THEME_COLOR_PRIMARY_CONTAINER]: '#86c058',
-  [THEME_COLOR_ON_PRIMARY_CONTAINER]: '#ffffffff',
+  [ColorKey.Primary]: 0x0f3031ff,
+  [ColorKey.OnPrimary]: 0xffffffff,
+  [ColorKey.PrimaryContainer]: 0x86c24fff,
+  [ColorKey.OnPrimaryContainer]: 0x0f3031ff,
 
-  [THEME_COLOR_PRIMARY_VARIANT]: '#ffffff7f',
-  [THEME_COLOR_ON_PRIMARY_VARIANT]: '#37812eff',
-  [THEME_COLOR_PRIMARY_VARIANT_CONTAINER]: '#ffffff7f',
-  [THEME_COLOR_ON_PRIMARY_VARIANT_CONTAINER]: '#37812eff',
+  [ColorKey.PrimaryVariant]: 0x0f3031ff,
+  [ColorKey.OnPrimaryVariant]: 0xff37812e,
+  [ColorKey.PrimaryVariantContainer]: 0xffffff7f,
+  [ColorKey.OnPrimaryVariantContainer]: 0x37812eff,
 
-  [THEME_COLOR_BACKGROUND]: '#86c05852',
-  [THEME_COLOR_ON_BACKGROUND]: '#000000ff'
+  [ColorKey.Background]: 0xebf4e4ff,
+  [ColorKey.OnBackground]: 0x0f3031ff
 })

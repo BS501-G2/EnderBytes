@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Text.Json.Serialization;
 
 namespace RizzziGit.EnderBytes.Resources;
 
@@ -126,17 +127,17 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
       }
     }
 
-    public FileResource CreateFile(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, string name, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    public FileResource CreateFile(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, string name, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       return Create(transaction, storage, parent, FileType.File, name, userAuthenticationToken, cancellationToken);
     }
 
-    public FileResource CreateFolder(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, string name, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    public FileResource CreateFolder(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, string name, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       return Create(transaction, storage, parent, FileType.Folder, name, userAuthenticationToken, cancellationToken);
     }
 
-    private FileResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, FileType type, string name, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    private FileResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, FileType type, string name, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       cancellationToken.ThrowIfCancellationRequested();
       lock (storage)
@@ -338,6 +339,8 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
   public new sealed record ResourceData(long Id, long CreateTime, long UpdateTime, long StorageId, byte[] Key, long? ParentId, FileType Type, string Name) : Resource<ResourceManager, ResourceData, FileResource>.ResourceData(Id, CreateTime, UpdateTime);
 
   public long StorageId => Data.StorageId;
+
+  [JsonIgnore]
   public byte[] Key => Data.Key;
   public long? ParentId => Data.ParentId;
   public FileType Type => Data.Type;

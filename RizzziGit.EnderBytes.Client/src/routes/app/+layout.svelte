@@ -1,123 +1,66 @@
-<script lang="ts" context="module">
-  import { writable, type Readable } from "svelte/store";
-  import { getContext, setContext } from "svelte";
+<script lang="ts">
+  import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
 
-  import { STATE_APP, STATE_ROOT } from "$lib/values";
+  import { RootState } from "$lib/states/root-state";
   import { ViewMode } from "$lib/view-mode";
 
-  export class AppSearchState {
-    public constructor() {
-      this.#string = "";
-      this.focused = false;
-      this.dismissed = false;
-
-      this.filenameMatches = [];
-      this.contentMatches = [];
-
-      this.userMatches = [];
-    }
-
-    #string: string;
-    get string(): string {
-      return this.#string;
-    }
-    set string(searchString: string) {
-      this.#string = searchString;
-      this.#execute();
-    }
-
-    focused: boolean;
-    dismissed: boolean;
-
-    filenameMatches: number[];
-    contentMatches: number[];
-    userMatches: number[];
-
-    get active(): boolean {
-      return this.focused || (!this.dismissed && !!this.string);
-    }
-
-    #promise?: Promise<void>;
-
-    get inProgress(): boolean {
-      return !!this.#promise;
-    }
-
-    #execute() {
-      this.#promise ??= (async () => {
-        try {
-          while (true) {
-            let currentSearchString = this.string;
-
-            try {
-              await this.#getResults();
-            } finally {
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
-
-            if (this.string == currentSearchString) {
-              break;
-            }
-          }
-        } finally {
-          this.#promise = undefined;
-        }
-      })();
-    }
-
-    async #getResults(): Promise<void> {
-      await fetch("//localhost:8080/user/auth-password", {
-        method: "post",
-
-        headers: {
-          "content-type": "application/json",
-          authorization: "Bearer adasd",
-        },
-
-        body: JSON.stringify({
-          username: `${Math.random()}`,
-          password: `${Math.random()}`,
-        }),
-      });
-    }
-  }
-
-  export class AppState {
-    public constructor() {
-      this.search = new AppSearchState();
-
-      this.appInfoShown = false;
-    }
-
-    search: AppSearchState;
-
-    appInfoShown: boolean;
-  }
-
-  const appState = writable<AppState>(new AppState());
-</script>
-
-<script lang="ts">
-  import type { RootState } from "../+layout.svelte";
   import DesktopLayout from "./DesktopLayout/DesktopLayout.svelte";
   import MobileLayout from "./MobileLayout/MobileLayout.svelte";
+  import { onMount } from "svelte";
+  import { LocaleKey } from "$lib/locale";
 
-  const rootState = getContext<Readable<RootState>>(STATE_ROOT);
+  const rootState = RootState.state;
 
-  setContext(STATE_APP, appState);
+  onMount(async () => {
+    $rootState.client.on("sessionTokenChange", (sessionToken) => {
+      $rootState.sessionToken = sessionToken;
+    });
+
+    const sessionToken = localStorage.getItem("session-token");
+
+    rootState.subscribe(() => {
+      if ($rootState.sessionToken != null) {
+        localStorage.setItem("session-token", $rootState.sessionToken);
+      } else {
+        localStorage.removeItem("session-token");
+      }
+    });
+
+    try {
+      await $rootState.client.setSessionToken(sessionToken);
+    } catch {
+      if (sessionToken != null) {
+        localStorage.setItem("session-token", sessionToken);
+      }
+    }
+
+    if ($rootState.sessionToken == null) {
+      if (!$page.url.pathname.startsWith("/app/auth")) {
+        goto("/app/auth", { replaceState: true });
+      }
+    }
+  });
 </script>
 
 <svelte:head>
-  <link rel="manifest" href="/api/manifest.json?locale={$rootState.locale}" />
-  <title>EnderDrive</title>
+  <link
+    rel="manifest"
+    href="/api/manifest.json?locale={$rootState.locale}&theme={$rootState.theme}"
+  />
+  <title>{$rootState.getString(LocaleKey.AppName)}</title>
 </svelte:head>
 
-{#if $rootState.viewMode & ViewMode.Desktop}
-  <DesktopLayout>
-    <slot slot="layout-slot" />
-  </DesktopLayout>
-{:else}
-  <MobileLayout>
-    <slot slot="layout-slot" />
-  </MobileLayout>
+{#if $page.url.pathname.startsWith("/app/auth")}
+  <slot />
+{:else if $rootState.sessionToken != null}
+  {#if $rootState.viewMode & ViewMode.Desktop}
+    <DesktopLayout>
+      <slot slot="layout-slot" />
+    </DesktopLayout>
+  {:else}
+    <MobileLayout>
+      <slot slot="layout-slot" />
+    </MobileLayout>
+  {/if}
 {/if}

@@ -33,7 +33,6 @@
 
     left: 0px;
     top: 0px;
-
   }
 
   div.panel-container {

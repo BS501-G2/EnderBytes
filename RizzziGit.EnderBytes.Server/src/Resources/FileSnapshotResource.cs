@@ -45,31 +45,69 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
 
     public FileSnapshotResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileSnapshotResource? baseFileSnapshot, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken = null, CancellationToken cancellationToken = default)
     {
-      if (baseFileSnapshot == null)
+      lock (storage)
       {
-        return create();
+        storage.ThrowIfInvalid();
+
+        lock (file)
+        {
+          file.ThrowIfInvalid();
+        }
+
+        if (baseFileSnapshot == null)
+        {
+          return create();
+        }
+
+        lock (baseFileSnapshot)
+        {
+          baseFileSnapshot.ThrowIfInvalid();
+
+          FileSnapshotResource fileSnapshot = create();
+
+          Service.GetResourceManager<FileBufferMapResource.ResourceManager>().Initialize(transaction, storage, file, fileSnapshot, cancellationToken);
+          return fileSnapshot;
+        }
+
+        FileSnapshotResource create()
+        {
+          (_, FileAccessResource? fileAccess) = Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+
+          return InsertAndGet(transaction, new(
+            (COLUMN_FILE_ID, file.Id),
+            (COLUMN_BASE_SNAPSHOT_ID, baseFileSnapshot?.Id),
+            (COLUMN_AUTHOR_FILE_ACCESS_ID, fileAccess?.Id),
+            (COLUMN_AUTHOR_ID, userAuthenticationToken?.UserId)
+          ), cancellationToken);
+        }
       }
+    }
 
-      lock (baseFileSnapshot)
+    public IEnumerable<FileSnapshotResource> List(ResourceService.Transaction transaction, StorageResource storage, FileResource file, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken = null, LimitClause? limit = null, OrderByClause? orderBy = null, CancellationToken cancellationToken = default)
+    {
+      lock (storage)
       {
-        baseFileSnapshot.ThrowIfInvalid();
+        storage.ThrowIfInvalid();
 
-        FileSnapshotResource fileSnapshot = create();
+        lock (file)
+        {
+          file.ThrowIfInvalid();
+          file.ThrowIfDoesNotBelongTo(storage);
 
-        Service.GetResourceManager<FileBufferMapResource.ResourceManager>().Initialize(transaction, storage, file, fileSnapshot, cancellationToken);
-        return fileSnapshot;
-      }
+          if (userAuthenticationToken == null)
+          {
+            return list();
+          }
 
-      FileSnapshotResource create()
-      {
-        (_, FileAccessResource? fileAccess) = Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+          return userAuthenticationToken.Enter(list);
 
-        return InsertAndGet(transaction, new(
-          (COLUMN_FILE_ID, file.Id),
-          (COLUMN_BASE_SNAPSHOT_ID, baseFileSnapshot?.Id),
-          (COLUMN_AUTHOR_FILE_ACCESS_ID, fileAccess?.Id),
-          (COLUMN_AUTHOR_ID, userAuthenticationToken?.UserId)
-        ), cancellationToken);
+          IEnumerable<FileSnapshotResource> list()
+          {
+            _ = Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
+
+            return Select(transaction, new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id), limit, orderBy, cancellationToken);
+          }
+        }
       }
     }
   }

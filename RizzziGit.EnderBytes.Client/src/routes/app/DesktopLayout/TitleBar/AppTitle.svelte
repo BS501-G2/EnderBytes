@@ -1,23 +1,20 @@
 <script lang="ts" context="module">
   import { LocaleKey } from "$lib/locale";
-  import { getContext } from "svelte";
-  import type { RootState } from "../../../+layout.svelte";
-  import { STATE_APP, STATE_ROOT } from "$lib/values";
-  import type { Readable, Writable } from "svelte/store";
-  import type { AppState } from "../../+layout.svelte";
+  import { RootState } from "$lib/states/root-state";
+    import { _getUrl as faviconSrc } from "../../../dynamic-icons/[size]/favicon.svg/+server";
 </script>
 
 <script lang="ts">
   import Chip from "./TitleBarChip.svelte";
 
-  const rootState = getContext<Readable<RootState>>(STATE_ROOT);
-  const appState = getContext<Writable<AppState>>(STATE_APP);
+  const rootState = RootState.state;
+  const appState = $rootState.appState;
 </script>
 
 <Chip>
   <img
     class="title-image"
-    src="/favicon.svg?size=16"
+    src={faviconSrc(16)}
     alt={$rootState.getString(LocaleKey.AltIconSite)}
   />
 
@@ -34,5 +31,7 @@
 
     font-size: 14px;
     font-weight: 100;
+
+    color: var(--onPrimary);
   }
 </style>

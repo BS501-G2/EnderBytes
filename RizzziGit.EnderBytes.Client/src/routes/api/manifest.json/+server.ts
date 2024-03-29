@@ -1,18 +1,21 @@
 import { json } from '@sveltejs/kit';
-import { colors } from '$lib/color-schemes';
+import { ColorScheme, colors } from '$lib/color-schemes';
 import { LocaleKey, Locale, bindLocalizedString } from '$lib/locale';
+import { _sizes } from '../../dynamic-icons/[size]/favicon.svg/+server';
 
 export const prerender = true
 
-const icon = (size: number) => ({ src: `/favicon.svg?size=${size}`, 'sizes': `${size}x${size}`, 'type': 'image/svg+xml' })
-const icons = () => [icon(16), icon(32), icon(64), icon(72), icon(96), icon(128), icon(144)]
+const icon = (size: number) => ({ src: `/dynamic-icons/${size}x${size}/favicon.svg`, 'sizes': `${size}x${size}`, 'type': 'image/svg+xml' })
+const icons = () => _sizes.map((size) => icon(size))
 
 const shortcut = (name: string, url: string) => ({ name, url, icons: icons() })
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
 
-  const locale = (<Locale>searchParams.get('locale')) ?? Locale.en_US
+  const locale = (<Locale | null>searchParams.get('locale')) ?? Locale.en_US
+  const color = (<ColorScheme | null>searchParams.get('theme')) ?? ColorScheme.Ender
+
   const getString = bindLocalizedString(() => locale)
 
   return json({
@@ -35,8 +38,8 @@ export async function GET(request: Request) {
       shortcut('Feed', '/feed')
     ],
     start_url: '/app',
-    theme_color: colors.green.primaryContainer,
-    background_color: colors.green.background
+    theme_color: `#${colors[color].primaryContainer.toString(16)}`,
+    background_color: `#${colors[color].background.toString(16)}`
   }, {
     headers: {
       'content-type': 'application/manifest+json'

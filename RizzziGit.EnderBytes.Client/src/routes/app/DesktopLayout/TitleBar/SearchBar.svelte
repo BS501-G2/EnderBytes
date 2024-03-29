@@ -1,38 +1,33 @@
-<script lang="ts" context="module">
-  import { getContext } from "svelte";
-  import type { RootState } from "../../../+layout.svelte";
-  import { STATE_APP, STATE_ROOT } from "$lib/values";
-  import type { Readable, Writable } from "svelte/store";
-  import type { AppState } from "../../+layout.svelte";
-</script>
-
 <script lang="ts">
   import { SearchIcon } from "svelte-feather-icons";
+
+  import { RootState } from "$lib/states/root-state";
   import { LocaleKey } from "$lib/locale";
 
-  const rootState = getContext<Writable<RootState>>(STATE_ROOT);
-  const appState = getContext<Writable<AppState>>(STATE_APP);
+  const rootState = RootState.state;
+  const appState = $rootState.appState;
+  const searchState = $appState.searchState;
 
   let searchElement: HTMLDivElement | null = null;
 
   function updateFocus() {
     if (
-      ($appState.search.focused =
+      ($searchState.focused =
         document.activeElement == searchElement?.children[1])
     ) {
-      $appState.search.dismissed = false;
+      $searchState.dismissed = false;
     }
   }
 </script>
 
-{#if $appState.search.active}
+{#if $searchState.active}
   <div
     class="search-results-container"
     style="left: {(searchElement?.offsetLeft ?? 0) -
       4}px; top: {(searchElement?.offsetTop ?? 0) -
       4}px; width: {(searchElement?.offsetWidth ?? 0) + 8}px;"
   >
-    {#if $appState.search.string}
+    {#if $searchState.string}
       <div class="search-results">
         <div><b>Search Results</b></div>
       </div>
@@ -48,12 +43,12 @@
 <div class="search-container">
   <div
     class="search-background"
-    style={$appState.search.active ? "z-index: 0;" : ""}
+    style={$searchState.active ? "z-index: 0;" : ""}
   >
     <div class="search" bind:this={searchElement}>
       <SearchIcon size="16" strokeWidth={2} />
       <input
-        bind:value={$appState.search.string}
+        bind:value={$searchState.string}
         on:focusin={updateFocus}
         on:focusout={updateFocus}
         placeholder={$rootState.getString(LocaleKey.SearchBarPlaceholder)}
@@ -103,9 +98,9 @@
       height: 100%;
       box-sizing: border-box;
 
-      @media only screen and (max-width: 960px) {
-        max-width: 100%;
-      }
+      // @media only screen and (max-width: 960px) {
+      //   max-width: 100%;
+      // }
 
       margin: 0px auto 0px auto;
 

@@ -85,9 +85,9 @@
     padding: 0px 32px 0px 32px;
     box-sizing: border-box;
 
-    @media only screen and (max-width: 1280px) {
-      padding: 0px;
-    }
+    // @media only screen and (max-width: 1280px) {
+    //   padding: 0px;
+    // }
 
     > a {
       padding: 8px;
@@ -145,6 +145,7 @@
 
           > a.active {
             background-color: var(--primary);
+            color: var(--onPrimary);
           }
         }
 
@@ -173,6 +174,7 @@
 
           > button:nth-child(2) {
             background-color: transparent;
+            color: var(--primary);
           }
 
           > button:hover {

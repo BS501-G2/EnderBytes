@@ -1,6 +1,7 @@
 <script lang="ts">
+    import type { Writable } from "svelte/store";
     import NavigationBar from "./NavigationBar.svelte";
-
+    import type { AppState } from "$lib/states/app-state";
 </script>
 
 <div class="panel-container">

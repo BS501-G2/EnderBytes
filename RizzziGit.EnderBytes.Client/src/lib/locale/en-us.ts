@@ -12,5 +12,8 @@ export const locale: () => LocaleValues = () => ({
   [LocaleKey.AltIconSearch]: 'Search Icon',
 
   [LocaleKey.SearchBarPlaceholder]: 'Search...',
-  [LocaleKey.SearchBannerPlaceholderText]: 'Begin typing search keywords.'
+  [LocaleKey.SearchBannerPlaceholderText]: 'Begin typing search keywords.',
+  [LocaleKey.AuthLoginPageUsernamePlaceholder]: 'Username',
+  [LocaleKey.AuthLoginPagePasswordPlaceholder]: 'Password',
+  [LocaleKey.AuthLoginPageSubmit]: 'Login'
 })

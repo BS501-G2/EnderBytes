@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Text.Json.Serialization;
 
 namespace RizzziGit.EnderBytes.Resources;
 
@@ -52,22 +53,17 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
       }
     }
 
-    public StorageResource Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    public StorageResource Create(ResourceService.Transaction transaction, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      lock (user)
+      return userAuthenticationToken.Enter(() =>
       {
-        user.ThrowIfInvalid();
+        userAuthenticationToken.ThrowIfInvalid();
 
-        return userAuthenticationToken.Enter(() =>
-        {
-          userAuthenticationToken.ThrowIfInvalid();
-
-          return InsertAndGet(transaction, new(
-            (COLUMN_OWNER_USER_ID, user.Id),
-            (COLUMN_KEY, userAuthenticationToken.Encrypt(Service.Server.KeyService.GetNewAesPair().Serialize()))
-          ), cancellationToken);
-        });
-      }
+        return InsertAndGet(transaction, new(
+          (COLUMN_OWNER_USER_ID, userAuthenticationToken.UserId),
+          (COLUMN_KEY, userAuthenticationToken.Encrypt(Service.Server.KeyService.GetNewAesPair().Serialize()))
+        ), cancellationToken);
+      });
     }
 
     public bool Update(ResourceService.Transaction transaction, StorageResource storage, long? rootFolderId, long? trashFolderId, long? internalFolderId, CancellationToken cancellationToken = default)
@@ -152,7 +148,7 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
 
               KeyService.AesPair decryptFileKey2(FileResource file)
               {
-                foreach (FileAccessResource fileAccess in Service.GetResourceManager<FileAccessResource.ResourceManager>().List(transaction, file, cancellationToken: cancellationToken))
+                foreach (FileAccessResource fileAccess in Service.GetResourceManager<FileAccessResource.ResourceManager>().List(transaction, storage, file, userAuthenticationToken, cancellationToken: cancellationToken))
                 {
                   if (fileAccess.Type > fileAccessType)
                   {
@@ -198,6 +194,22 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
         }
       }
     }
+
+    public StorageResource GetByOwnerUser(ResourceService.Transaction transaction, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken)
+    {
+      return userAuthenticationToken.Enter(() =>
+      {
+        StorageResource? storage = SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", userAuthenticationToken.UserId));
+
+        if (storage == null)
+        {
+          storage = Create(transaction, userAuthenticationToken);
+        }
+
+        return storage;
+      });
+
+    }
   }
 
   public new sealed record ResourceData(
@@ -214,9 +226,13 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
   ) : Resource<ResourceManager, ResourceData, StorageResource>.ResourceData(Id, CreateTime, UpdateTime);
 
   public long OwnerUserId => Data.OwnerUserId;
+  [JsonIgnore]
   public byte[] Key => Data.Key;
 
+  [JsonIgnore]
   public long? RootFolderId => Data.RootFolderId;
+  [JsonIgnore]
   public long? TrashFolderId => Data.TrashFolderId;
+  [JsonIgnore]
   public long? InternalFolderId => Data.InternalFolderId;
 }

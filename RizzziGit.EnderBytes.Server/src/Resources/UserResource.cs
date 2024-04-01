@@ -59,7 +59,7 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
         (COLUMN_PUBLIC_KEY, publicKey)
       ), cancellationToken);
 
-      return new(user, Service.GetResourceManager<UserAuthenticationResource.ResourceManager>().CreatePassword(transaction, user, password, privateKey, publicKey));
+      return new(user, Service.GetManager<UserAuthenticationResource.ResourceManager>().CreatePassword(transaction, user, password, privateKey, publicKey));
     }
 
     public bool Update(ResourceService.Transaction transaction, UserResource user, string username, string? displayName)

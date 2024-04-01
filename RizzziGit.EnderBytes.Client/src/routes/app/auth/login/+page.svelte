@@ -26,22 +26,7 @@
   }
 
   async function onSubmit(username: string, password: string) {
-    const response = await $rootState.client.fetch(
-      "/auth/get-token-by-password",
-      "post",
-      {
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      },
-    );
-
-    if (response == null) {
-      return;
-    }
-
-    const { data: sessionToken } = await response.json();
-
-    await $rootState.client.setSessionToken(sessionToken);
+    const session = await (await $rootState.getClient()).authenticateByPassword(username, password);
   }
 </script>
 

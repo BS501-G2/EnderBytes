@@ -23,7 +23,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.GetResourceManager<FileSnapshotResource.ResourceManager>().ResourceDeleted += (transaction, fileSnapshot, cancellationToken) =>
+      Service.GetManager<FileSnapshotResource.ResourceManager>().ResourceDeleted += (transaction, fileSnapshot, cancellationToken) =>
       {
         foreach (FileBufferMapResource fileBufferMap in Select(transaction, new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id), null, null, cancellationToken).ToList())
         {
@@ -133,7 +133,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
         {
           lock (fileSnapshot)
           {
-            StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResourceService.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+            StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResourceService.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
 
             fileSnapshot.ThrowIfInvalid();
 
@@ -167,7 +167,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
                 }
                 else
                 {
-                  FileBufferResource fileBuffer = transaction.ResourceService.GetResourceManager<FileBufferResource.ResourceManager>().GetById(transaction, (long)fileBufferMap.FileBufferId, cancellationToken);
+                  FileBufferResource fileBuffer = transaction.ResourceService.GetManager<FileBufferResource.ResourceManager>().GetById(transaction, (long)fileBufferMap.FileBufferId, cancellationToken);
                   bytes.Append(fileBufferMap.CachedBuffer = decryptedKeyInfo.Key.Decrypt(fileBuffer.Buffer));
                 }
 
@@ -196,7 +196,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
                 cancellationToken.ThrowIfCancellationRequested();
 
                 CompositeBuffer fileBufferData = bytes.SpliceStart(long.Min(bytes.Length, BUFFER_SIZE));
-                long fileBufferId = Service.GetResourceManager<FileBufferResource.ResourceManager>().Create(transaction, file, decryptedKeyInfo.Key.Encrypt(fileBufferData.ToByteArray()), cancellationToken);
+                long fileBufferId = Service.GetManager<FileBufferResource.ResourceManager>().Create(transaction, file, decryptedKeyInfo.Key.Encrypt(fileBufferData.ToByteArray()), cancellationToken);
 
                 FileBufferMapResource? fileBufferMap = Select(transaction, file, fileSnapshot, index, new(1), cancellationToken).FirstOrDefault();
 
@@ -231,7 +231,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
         {
           lock (fileSnapshot)
           {
-            StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResourceService.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
+            StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResourceService.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
 
             fileSnapshot.ThrowIfInvalid();
 
@@ -263,7 +263,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
                 }
                 else
                 {
-                  FileBufferResource fileBuffer = transaction.ResourceService.GetResourceManager<FileBufferResource.ResourceManager>().GetById(transaction, (long)fileBufferMap.FileBufferId, cancellationToken);
+                  FileBufferResource fileBuffer = transaction.ResourceService.GetManager<FileBufferResource.ResourceManager>().GetById(transaction, (long)fileBufferMap.FileBufferId, cancellationToken);
                   bytes.Append(fileBufferMap.CachedBuffer = decryptedKeyInfo.Key.Decrypt(fileBuffer.Buffer));
                 }
 
@@ -288,7 +288,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
         {
           lock (fileSnapshot)
           {
-            StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResourceService.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
+            StorageResource.DecryptedKeyInfo decryptedKeyInfo = transaction.ResourceService.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
 
             fileSnapshot.ThrowIfInvalid();
 
@@ -324,11 +324,11 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
                 }
                 else
                 {
-                  FileBufferResource oldFileBuffer = Service.GetResourceManager<FileBufferResource.ResourceManager>().GetById(transaction, (long)fileBufferMap.FileBufferId, cancellationToken);
+                  FileBufferResource oldFileBuffer = Service.GetManager<FileBufferResource.ResourceManager>().GetById(transaction, (long)fileBufferMap.FileBufferId, cancellationToken);
                   bytes = CompositeBuffer.From(decryptedKeyInfo.Key.Decrypt(oldFileBuffer.Buffer)).Slice(0, bytesOffset);
                 }
 
-                Update(transaction, fileBufferMap, Service.GetResourceManager<FileBufferResource.ResourceManager>().Create(transaction, file, decryptedKeyInfo.Key.Encrypt(bytes.ToByteArray()), cancellationToken), fileBufferMap.Index, bytes.Length, cancellationToken);
+                Update(transaction, fileBufferMap, Service.GetManager<FileBufferResource.ResourceManager>().Create(transaction, file, decryptedKeyInfo.Key.Encrypt(bytes.ToByteArray()), cancellationToken), fileBufferMap.Index, bytes.Length, cancellationToken);
               }
             }
           }
@@ -357,7 +357,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
       }
       finally
       {
-        Service.GetResourceManager<FileBufferResource.ResourceManager>().DeleteIfNotReferenced(transaction, fileBufferMap.FileBufferId, cancellationToken);
+        Service.GetManager<FileBufferResource.ResourceManager>().DeleteIfNotReferenced(transaction, fileBufferMap.FileBufferId, cancellationToken);
       }
     }
 
@@ -369,7 +369,7 @@ public sealed class FileBufferMapResource(FileBufferMapResource.ResourceManager 
       }
       finally
       {
-        Service.GetResourceManager<FileBufferResource.ResourceManager>().DeleteIfNotReferenced(transaction, fileBufferMap.FileBufferId, cancellationToken);
+        Service.GetManager<FileBufferResource.ResourceManager>().DeleteIfNotReferenced(transaction, fileBufferMap.FileBufferId, cancellationToken);
       }
     }
   }

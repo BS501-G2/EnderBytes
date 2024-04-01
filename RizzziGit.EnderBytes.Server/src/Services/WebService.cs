@@ -3,15 +3,11 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 namespace RizzziGit.EnderBytes.Services;
 
-using System.Threading.RateLimiting;
 using Core;
-using Microsoft.AspNetCore.RateLimiting;
 using Utilities;
 
 public sealed partial class WebService(Server server) : Server.SubService(server, "WebService")
 {
-  public const string RATE_LIMIT_AUTH = "AuthRateLimit";
-
   private WebApplication CreateWebApplication(CancellationToken cancellationToken = default)
   {
     WebApplicationBuilder builder = WebApplication.CreateBuilder();
@@ -19,7 +15,7 @@ public sealed partial class WebService(Server server) : Server.SubService(server
     string corsPolicy = "EnderBytesCorsPolicy";
 
     builder.Services
-    .AddCors((setup) =>
+      .AddCors((setup) =>
       {
         setup.AddPolicy(corsPolicy, (policy) =>
         {
@@ -31,18 +27,6 @@ public sealed partial class WebService(Server server) : Server.SubService(server
       .AddSingleton(Server)
       .AddControllers();
 
-    builder.Services.AddRateLimiter((rateLimiter) =>
-    {
-      rateLimiter.AddFixedWindowLimiter(RATE_LIMIT_AUTH, (options) =>
-      {
-        options.Window = TimeSpan.FromSeconds(10);
-        options.PermitLimit = 1;
-        options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        options.QueueLimit = 2;
-      });
-    });
-
-    // builder.Logging.SetMinimumLevel(LogLevel.None);
     builder.WebHost.ConfigureKestrel((kestrelConfiguration) =>
     {
       kestrelConfiguration.AllowAlternateSchemes = true;
@@ -64,30 +48,24 @@ public sealed partial class WebService(Server server) : Server.SubService(server
     });
 
     WebApplication app = builder.Build();
+
     app.UseCors(corsPolicy);
-    app.UseRateLimiter();
-    app.Use(async (context, next) =>
-    {
-      string token;
-
-      {
-        string[] split = $"{context.Request.Headers.Authorization}".Split(" ");
-
-        if (split.Length == 2)
-        {
-          token = split[1];
-        }
-      }
-
-      await next();
-    });
-
+    app.UseWebSockets();
     if (Server.Configuration.HttpsClient != null)
     {
       app.UseHttpsRedirection();
     }
 
-    app.MapControllers();
+    app.Run(async (context) =>
+    {
+      if (!context.WebSockets.IsWebSocketRequest)
+      {
+        context.Response.StatusCode = 400;
+        return;
+      }
+
+      await Server.ClientService.HandleUserClient(await context.WebSockets.AcceptWebSocketAsync(), cancellationToken);
+    });
 
     return app;
   }

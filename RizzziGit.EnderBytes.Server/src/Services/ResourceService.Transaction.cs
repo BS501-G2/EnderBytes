@@ -20,6 +20,8 @@ public sealed partial class ResourceService
   public sealed record Transaction(DbConnection Connection, long Id, Action<TransactionFailureHandler> RegisterOnFailureHandler, ResourceService ResourceService, CancellationToken CancellationToken)
   {
     public Server Server => ResourceService.Server;
+
+    public T GetManager<T>() where T : ResourceManager => ResourceService.GetManager<T>();
   }
 
   public async IAsyncEnumerable<T> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler, [EnumeratorCancellation] CancellationToken cancellationToken)

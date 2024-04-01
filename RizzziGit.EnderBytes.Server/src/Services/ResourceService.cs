@@ -12,6 +12,7 @@ public sealed partial class ResourceService : Server.SubService
 
     ResourceManagers.Add(new UserResource.ResourceManager(this));
     ResourceManagers.Add(new UserAuthenticationResource.ResourceManager(this));
+    ResourceManagers.Add(new UserAuthenticationSessionTokenResource.ResourceManager(this));
     ResourceManagers.Add(new UserConfigurationResource.ResourceManager(this));
     ResourceManagers.Add(new StorageResource.ResourceManager(this));
     ResourceManagers.Add(new FileResource.ResourceManager(this));
@@ -24,7 +25,7 @@ public sealed partial class ResourceService : Server.SubService
   private Database? Database;
   private readonly List<ResourceManager> ResourceManagers;
 
-  public T GetResourceManager<T>() where T : ResourceManager
+  public T GetManager<T>() where T : ResourceManager
   {
     foreach (ResourceManager resourceManager in ResourceManagers)
     {

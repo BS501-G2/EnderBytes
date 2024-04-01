@@ -11,26 +11,78 @@ public sealed class UserAuthenticationSessionTokenResource(UserAuthenticationSes
 
   public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserAuthenticationSessionTokenResource>.ResourceManager
   {
-    public const string COLUMN_USER_AUTHENTICATION_ID = "";
+    public const string COLUMN_USER_AUTHENTICATION_ID = "UserAuthenticationId";
+    public const string COLUMN_EXPIRY_TIME = "ExpiryTime";
 
-    public ResourceManager(ResourceService service, string name, int version) : base(service, name, version)
+    public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-
+      service.GetManager<UserAuthenticationResource.ResourceManager>().ResourceDeleted += (transaction, resource, cancellationToken) =>
+      {
+        Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_AUTHENTICATION_ID, "=", resource.Id), cancellationToken);
+      };
     }
 
     protected override UserAuthenticationSessionTokenResource NewResource(ResourceData data) => new(this, data);
     protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
-      id, createTime, updateTime
+      id, createTime, updateTime,
+
+      reader.GetInt64(reader.GetOrdinal(COLUMN_USER_AUTHENTICATION_ID)),
+      reader.GetInt64(reader.GetOrdinal(COLUMN_EXPIRY_TIME))
     );
 
     protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
     {
       if (oldVersion < 1)
       {
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_USER_AUTHENTICATION_ID} bigint not null;");
+        SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_EXPIRY_TIME} bigint not null;");
+      }
+    }
 
+    public UserAuthenticationSessionTokenResource Create(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication, long expiryTime, CancellationToken cancellationToken = default)
+    {
+      lock (userAuthentication)
+      {
+        userAuthentication.ThrowIfInvalid();
+
+        if (userAuthentication.Type != UserAuthenticationResource.UserAuthenticationType.SessionToken)
+        {
+          throw new ArgumentException("Invalid user authentication type.", nameof(userAuthentication));
+        }
+
+        return InsertAndGet(transaction, new(
+          (COLUMN_USER_AUTHENTICATION_ID, userAuthentication.Id),
+          (COLUMN_EXPIRY_TIME, expiryTime)
+        ), cancellationToken);
+      }
+    }
+
+    public UserAuthenticationSessionTokenResource GetByUserAuthentication(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication, CancellationToken cancellationToken = default)
+    {
+      lock (userAuthentication)
+      {
+        userAuthentication.ThrowIfInvalid();
+
+        if (userAuthentication.Type != UserAuthenticationResource.UserAuthenticationType.SessionToken)
+        {
+          throw new ArgumentException("Invalid user authentication type.", nameof(userAuthentication));
+        }
+
+        return SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_USER_AUTHENTICATION_ID, "=", userAuthentication.Id), cancellationToken: cancellationToken)!;
       }
     }
   }
 
-  public new sealed record ResourceData(long Id, long CreateTime, long UpdateTime) : Resource<ResourceManager, ResourceData, UserAuthenticationSessionTokenResource>.ResourceData(Id, CreateTime, UpdateTime);
+  public new sealed record ResourceData(
+    long Id,
+    long CreateTime,
+    long UpdateTime,
+    long AuthenticationId,
+    long ExpiryTime
+  ) : Resource<ResourceManager, ResourceData, UserAuthenticationSessionTokenResource>.ResourceData(Id, CreateTime, UpdateTime);
+
+  public long AuthenticationId => Data.AuthenticationId;
+  public long ExpiryTime => Data.ExpiryTime;
+
+  public bool Expired => ExpiryTime <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 }

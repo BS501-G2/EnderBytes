@@ -115,7 +115,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      service.GetResourceManager<UserResource.ResourceManager>().ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), cancellationToken);
+      service.GetManager<UserResource.ResourceManager>().ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), cancellationToken);
     }
 
     protected override UserAuthenticationResource NewResource(ResourceData data) => new(this, data);
@@ -169,14 +169,16 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       {
         baseToken.ThrowIfInvalid();
 
-        byte[] sessionToken = RandomNumberGenerator.GetBytes(100);
+        byte[] sessionToken = RandomNumberGenerator.GetBytes(64);
 
-        Create(transaction, user, baseToken, UserAuthenticationType.SessionToken, sessionToken);
-        return Convert.ToHexString(sessionToken);
+        UserAuthenticationToken userAuthenticationToken = Create(transaction, user, baseToken, UserAuthenticationType.SessionToken, sessionToken);
+        transaction.GetManager<UserAuthenticationSessionTokenResource.ResourceManager>().Create(transaction, userAuthenticationToken.UserAuthentication, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + (36000 * 1000));
+
+        return Convert.ToHexStringLower(sessionToken);
       });
     }
 
-    public bool TryGetToken(ResourceService.Transaction transaction, UserResource user, string sessionToken, [NotNullWhen(true)] out UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+    public bool TryGetSessionToken(ResourceService.Transaction transaction, UserResource user, string sessionToken, [NotNullWhen(true)] out UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       userAuthenticationToken = null;
 
@@ -184,23 +186,36 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       {
         if (user.IsValid)
         {
-          UserResource.ResourceManager users = Service.GetResourceManager<UserResource.ResourceManager>();
+          UserResource.ResourceManager users = Service.GetManager<UserResource.ResourceManager>();
 
           foreach (UserAuthenticationResource userAuthenticationResource in Select(transaction, new WhereClause.Nested("and",
-            new WhereClause.CompareColumn(COLUMN_TYPE, "=", UserAuthenticationType.SessionToken),
+            new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)UserAuthenticationType.SessionToken),
             new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)
           ), cancellationToken: cancellationToken))
           {
             if (userAuthenticationResource.TryGetTokenByPayload(user, Convert.FromHexString(sessionToken), out userAuthenticationToken))
             {
+              Console.WriteLine("sessionToken");
               break;
             }
           }
         }
       }
 
+      if (userAuthenticationToken != null)
+      {
+        UserAuthenticationSessionTokenResource userAuthenticationSessionToken = Service.GetManager<UserAuthenticationSessionTokenResource.ResourceManager>().GetByUserAuthentication(transaction, userAuthenticationToken.UserAuthentication, cancellationToken);
+        Console.WriteLine($"Expired? {userAuthenticationSessionToken.Expired}");
+
+        if (userAuthenticationSessionToken.Expired)
+        {
+          userAuthenticationToken = null;
+        }
+      }
+
       return userAuthenticationToken != null;
     }
+
 
     private UserAuthenticationToken Create(ResourceService.Transaction transaction, UserResource user, UserAuthenticationToken existing, UserAuthenticationType type, byte[] payload)
     {

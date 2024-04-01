@@ -19,7 +19,7 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.GetResourceManager<FileResource.ResourceManager>().ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id), cancellationToken);
+      Service.GetManager<FileResource.ResourceManager>().ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id), cancellationToken);
     }
 
     protected override FileSnapshotResource NewResource(ResourceData data) => new(this, data);
@@ -65,13 +65,13 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
 
           FileSnapshotResource fileSnapshot = create();
 
-          Service.GetResourceManager<FileBufferMapResource.ResourceManager>().Initialize(transaction, storage, file, fileSnapshot, cancellationToken);
+          Service.GetManager<FileBufferMapResource.ResourceManager>().Initialize(transaction, storage, file, fileSnapshot, cancellationToken);
           return fileSnapshot;
         }
 
         FileSnapshotResource create()
         {
-          (_, FileAccessResource? fileAccess) = Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+          (_, FileAccessResource? fileAccess) = Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
 
           return InsertAndGet(transaction, new(
             (COLUMN_FILE_ID, file.Id),
@@ -103,7 +103,7 @@ public sealed class FileSnapshotResource(FileSnapshotResource.ResourceManager ma
 
           IEnumerable<FileSnapshotResource> list()
           {
-            _ = Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
+            _ = Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
 
             return Select(transaction, new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id), limit, orderBy, cancellationToken);
           }

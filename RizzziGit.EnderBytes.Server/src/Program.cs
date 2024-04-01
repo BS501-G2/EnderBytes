@@ -8,17 +8,18 @@ using Commons.Logging;
 using Core;
 using Utilities;
 using Services;
+using RizzziGit.EnderBytes.Resources;
 
 public static class Program
 {
   public static Server Server = new(new(
       DatabaseConnectionStringBuilder: new MySqlConnectionStringBuilder()
       {
-        Server = "10.0.0.3",
+        Server = "10.1.0.117",
         Database = "enderbytes",
 
-        UserID = "enderbytes",
-        Password = "enderbytes",
+        UserID = "test",
+        Password = "test",
 
         AllowBatch = true
       },
@@ -91,6 +92,13 @@ public static class Program
 
   public static Task RunTest(Logger logger, Server server) => Task.Run(() =>
   {
-    return Task.CompletedTask;
+    server.ResourceService.Transact((transaction, cancellationToken) =>
+    {
+      (UserResource user, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken) = server.ResourceService.GetManager<UserResource.ResourceManager>().Create(transaction, "Testuser", "Test User", "TestTest123;",  cancellationToken);
+      Handler += (transaction, cancellationToken) =>
+      {
+        server.ResourceService.GetManager<UserResource.ResourceManager>().Delete(transaction, user, cancellationToken);
+      };
+    });
   });
 }

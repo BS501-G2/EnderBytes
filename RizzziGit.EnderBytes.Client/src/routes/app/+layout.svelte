@@ -9,29 +9,63 @@
   import MobileLayout from "./MobileLayout/MobileLayout.svelte";
   import { onMount } from "svelte";
   import { LocaleKey } from "$lib/locale";
+  import type { Session } from "$lib/client/client";
 
   const rootState = RootState.state;
 
+  let size = 0;
+  let sizeStr = ''
+
   onMount(async () => {
-    $rootState.client.on("sessionTokenChange", (sessionToken) => {
-      $rootState.sessionToken = sessionToken;
+    (await $rootState.getClient()).on("sessionChange", (sessionToken) => {
+      $rootState.sessionToken = sessionToken ?? null;
     });
 
-    const sessionToken = localStorage.getItem("session-token");
+    const session: Session | null = JSON.parse(
+      localStorage.getItem("session") ?? "null",
+    );
 
     rootState.subscribe(() => {
       if ($rootState.sessionToken != null) {
-        localStorage.setItem("session-token", $rootState.sessionToken);
+        localStorage.setItem(
+          "session",
+          JSON.stringify($rootState.sessionToken),
+        );
       } else {
-        localStorage.removeItem("session-token");
+        localStorage.removeItem("session");
       }
     });
 
+    // void (async () => {
+    //   while (true) {
+    //     const bytes = await (
+    //       await $rootState.getClient()
+    //     ).randomBytes(128 * 1024);
+
+    //     console.log(
+    //       ((size) => {
+    //         let a = 0;
+
+    //         while (size > 1000) {
+    //           size /= 1024;
+    //           a++;
+    //         }
+
+    //         return sizeStr = `${size}${["B", "KB", "MB", "GB", "TB"][a]}`;
+    //       })((size += bytes.length)),
+    //     );
+    //   }
+    // })();
+
     try {
-      await $rootState.client.setSessionToken(sessionToken);
+      if (session != null) {
+        await (
+          await $rootState.getClient()
+        ).authenticateByToken(session.userId, session.token);
+      }
     } catch {
-      if (sessionToken != null) {
-        localStorage.setItem("session-token", sessionToken);
+      if (session != null) {
+        localStorage.setItem("session", JSON.stringify(session));
       }
     }
 

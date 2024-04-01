@@ -25,8 +25,8 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.GetResourceManager<FileResource.ResourceManager>().ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), cancellationToken);
-      Service.GetResourceManager<UserResource.ResourceManager>().ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.Nested("and",
+      Service.GetManager<FileResource.ResourceManager>().ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), cancellationToken);
+      Service.GetManager<UserResource.ResourceManager>().ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.Nested("and",
         new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", (byte)FileAccessTargetEntityType.User),
         new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id)
       ), cancellationToken);
@@ -67,7 +67,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
           file.ThrowIfDoesNotBelongTo(storage);
 
           List<FileAccessResource> fileAccesses = Select(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), limit, orderBy, cancellationToken).ToList();
-          _ = Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ManageShares, cancellationToken);
+          _ = Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ManageShares, cancellationToken);
 
           return fileAccesses;
         }
@@ -82,7 +82,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
         {
           return userAuthenticationToken.Enter(() =>
           {
-            KeyService.AesPair fileKey = transaction.ResourceService.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
+            KeyService.AesPair fileKey = transaction.ResourceService.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
 
             return InsertAndGet(transaction, new(
               (COLUMN_TARGET_FILE_ID, targetFile.Id),
@@ -111,7 +111,7 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
           {
             userAuthenticationToken.ThrowIfInvalid();
 
-            KeyService.AesPair fileKey = transaction.ResourceService.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
+            KeyService.AesPair fileKey = transaction.ResourceService.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
 
             return InsertAndGet(transaction, new(
               (COLUMN_TARGET_FILE_ID, targetFile.Id),

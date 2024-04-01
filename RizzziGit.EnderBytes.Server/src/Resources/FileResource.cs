@@ -37,7 +37,7 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
 
     public ResourceManager(ResourceService service) : base(service, NAME, VERSION)
     {
-      Service.GetResourceManager<StorageResource.ResourceManager>().ResourceDeleted += (transaction, storage, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storage.Id), cancellationToken);
+      Service.GetManager<StorageResource.ResourceManager>().ResourceDeleted += (transaction, storage, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storage.Id), cancellationToken);
       ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", file.Id), cancellationToken);
 
       Handles = [];
@@ -120,7 +120,7 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
 
         bool result = Update(transaction, file, new(
           (COLUMN_PARENT_FILE_ID, newParent?.Id),
-          (COLUMN_KEY, Service.GetResourceManager<StorageResource.ResourceManager>().EncryptFileKey(transaction, storage, Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken).Key, newParent, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken))
+          (COLUMN_KEY, Service.GetManager<StorageResource.ResourceManager>().EncryptFileKey(transaction, storage, Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken).Key, newParent, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken))
         ), cancellationToken);
 
         return result;
@@ -175,7 +175,7 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
 
         FileResource file = InsertAndGet(transaction, new(
           (COLUMN_STORAGE_ID, storage.Id),
-          (COLUMN_KEY, Service.GetResourceManager<StorageResource.ResourceManager>().EncryptFileKey(transaction, storage, fileKey, parent, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken)),
+          (COLUMN_KEY, Service.GetManager<StorageResource.ResourceManager>().EncryptFileKey(transaction, storage, fileKey, parent, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken)),
           (COLUMN_PARENT_FILE_ID, parent?.Id),
           (COLUMN_NAME, name),
           (COLUMN_TYPE, (byte)type)
@@ -205,7 +205,7 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
 
           bool delete()
           {
-            Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
+            Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
 
             return base.Delete(transaction, file, cancellationToken);
           }
@@ -233,7 +233,7 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
           ), null, null, cancellationToken);
         }
 
-        _ = Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
+        _ = Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
         return file;
       }
     }
@@ -268,7 +268,7 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
           {
             if (folder != null)
             {
-              Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, folder, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
+              Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, folder, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
             }
 
             foreach (FileResource file in Select(transaction, new WhereClause.Nested("and",
@@ -303,7 +303,7 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
 
           FileResource.FileHandle openFile()
           {
-            StorageResource.DecryptedKeyInfo decryptedFileKeyInfo = Service.GetResourceManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, handleFlags.HasFlag(FileHandleFlags.Modify)
+            StorageResource.DecryptedKeyInfo decryptedFileKeyInfo = Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, handleFlags.HasFlag(FileHandleFlags.Modify)
               ? FileAccessResource.FileAccessType.ReadWrite
               : FileAccessResource.FileAccessType.Read, cancellationToken);
 
@@ -325,8 +325,8 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
               }
             }
 
-            FileSnapshotResource use = handleFlags.HasFlag(FileHandleFlags.Modify) && (Service.GetResourceManager<FileBufferMapResource.ResourceManager>().GetSize(transaction, storage, file, fileSnapshot, cancellationToken) > 0)
-              ? Service.GetResourceManager<FileSnapshotResource.ResourceManager>().Create(transaction, storage, file, fileSnapshot, userAuthenticationToken, cancellationToken)
+            FileSnapshotResource use = handleFlags.HasFlag(FileHandleFlags.Modify) && (Service.GetManager<FileBufferMapResource.ResourceManager>().GetSize(transaction, storage, file, fileSnapshot, cancellationToken) > 0)
+              ? Service.GetManager<FileSnapshotResource.ResourceManager>().Create(transaction, storage, file, fileSnapshot, userAuthenticationToken, cancellationToken)
               : fileSnapshot;
 
             return new FileHandle(this, storage, file, use, userAuthenticationToken, handleFlags);

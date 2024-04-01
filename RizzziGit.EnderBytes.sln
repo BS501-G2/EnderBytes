@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RizzziGit.Commons", "..\Riz
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RizzziGit.EnderBytes.Commons", "RizzziGit.EnderBytes.Commons\RizzziGit.EnderBytes.Commons.csproj", "{81A9F23C-B277-4ECE-959B-F3247DCE85E0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RizzziGit.EnderBytes.Client.Library", "RizzziGit.EnderBytes.Client.Library\RizzziGit.EnderBytes.Client.Library.csproj", "{E3477874-8D46-4636-A3C5-6FBE78CE0810}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{81A9F23C-B277-4ECE-959B-F3247DCE85E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{81A9F23C-B277-4ECE-959B-F3247DCE85E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{81A9F23C-B277-4ECE-959B-F3247DCE85E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E3477874-8D46-4636-A3C5-6FBE78CE0810}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E3477874-8D46-4636-A3C5-6FBE78CE0810}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E3477874-8D46-4636-A3C5-6FBE78CE0810}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E3477874-8D46-4636-A3C5-6FBE78CE0810}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

@@ -1,23 +1,22 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
 
   import { RootState } from "$lib/states/root-state";
   import { ViewMode } from "$lib/view-mode";
-
-  import DesktopLayout from "./DesktopLayout/DesktopLayout.svelte";
-  import MobileLayout from "./MobileLayout/MobileLayout.svelte";
-  import { onMount } from "svelte";
   import { LocaleKey } from "$lib/locale";
   import type { Session } from "$lib/client/client";
 
-  const rootState = RootState.state;
+  import DesktopLayout from "./DesktopLayout/DesktopLayout.svelte";
+  import MobileLayout from "./MobileLayout/MobileLayout.svelte";
 
-  let size = 0;
-  let sizeStr = ''
+  const rootState = RootState.state;
+  const appState = $rootState.appState;
 
   onMount(async () => {
-    (await $rootState.getClient()).on("sessionChange", (sessionToken) => {
+    void (await $rootState.getClient()).on("sessionChange", (sessionToken) => {
       $rootState.sessionToken = sessionToken ?? null;
     });
 
@@ -36,27 +35,6 @@
       }
     });
 
-    // void (async () => {
-    //   while (true) {
-    //     const bytes = await (
-    //       await $rootState.getClient()
-    //     ).randomBytes(128 * 1024);
-
-    //     console.log(
-    //       ((size) => {
-    //         let a = 0;
-
-    //         while (size > 1000) {
-    //           size /= 1024;
-    //           a++;
-    //         }
-
-    //         return sizeStr = `${size}${["B", "KB", "MB", "GB", "TB"][a]}`;
-    //       })((size += bytes.length)),
-    //     );
-    //   }
-    // })();
-
     try {
       if (session != null) {
         await (
@@ -74,6 +52,8 @@
         goto("/app/auth", { replaceState: true });
       }
     }
+
+    $appState.appTitle = $rootState.getString(LocaleKey.AppName);
   });
 </script>
 
@@ -82,7 +62,7 @@
     rel="manifest"
     href="/api/manifest.json?locale={$rootState.locale}&theme={$rootState.theme}"
   />
-  <title>{$rootState.getString(LocaleKey.AppName)}</title>
+  <title>{$appState.appTitle}</title>
 </svelte:head>
 
 {#if $page.url.pathname.startsWith("/app/auth")}

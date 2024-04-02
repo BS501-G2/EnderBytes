@@ -11,11 +11,41 @@ public sealed partial class ClientService(Server server) : Server.SubService(ser
 {
   private readonly WeakList<Client> Clients = [];
 
-  public abstract partial class Client(ClientService service, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken = null)
+  public abstract partial class Client
   {
-    public readonly ClientService Service = service;
+    public readonly ClientService Service;
 
-    public UserAuthenticationResource.UserAuthenticationToken? UserAuthenticationToken { get; protected set; } = userAuthenticationToken;
+    public Client(ClientService service, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken = null)
+    {
+      Service = service;
+      UserAuthenticationToken = userAuthenticationToken;
+    }
+
+    public UserAuthenticationResource.UserAuthenticationToken? UserAuthenticationToken { get; protected set; }
+
+    public FileResource GetRootFolder(ResourceService.Transaction transaction, CancellationToken cancellationToken = default)
+    {
+      StorageResource storage = transaction.GetManager<StorageResource.ResourceManager>().GetByOwnerUser(transaction, UserAuthenticationToken!);
+      FileResource rootFolder = transaction.GetManager<StorageResource.ResourceManager>().GetRootFolder(transaction, storage, UserAuthenticationToken!, cancellationToken);
+
+      return rootFolder;
+    }
+
+    private FileResource GetTrashFolder(ResourceService.Transaction transaction, CancellationToken cancellationToken = default)
+    {
+      StorageResource storage = transaction.GetManager<StorageResource.ResourceManager>().GetByOwnerUser(transaction, UserAuthenticationToken!);
+      FileResource rootFolder = transaction.GetManager<StorageResource.ResourceManager>().GetTrashFolder(transaction, storage, UserAuthenticationToken!, cancellationToken);
+
+      return rootFolder;
+    }
+
+    private FileResource GetInternalFolder(ResourceService.Transaction transaction, CancellationToken cancellationToken = default)
+    {
+      StorageResource storage = transaction.GetManager<StorageResource.ResourceManager>().GetByOwnerUser(transaction, UserAuthenticationToken!);
+      FileResource rootFolder = transaction.GetManager<StorageResource.ResourceManager>().GetInternalFolder(transaction, storage, UserAuthenticationToken!, cancellationToken);
+
+      return rootFolder;
+    }
   }
 
   public async Task HandleUserClient(WebSocket webSocket, CancellationToken cancellationToken = default)

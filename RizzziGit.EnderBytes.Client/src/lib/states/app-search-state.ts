@@ -1,5 +1,8 @@
+import type { AppState } from "./app-state";
+
 export class AppSearchState {
-  public constructor() {
+  public constructor(appState: AppState) {
+    this.#appState = appState
     this.#string = "";
     this.focused = false;
     this.dismissed = false;
@@ -9,6 +12,8 @@ export class AppSearchState {
 
     this.userMatches = [];
   }
+
+  #appState: AppState
 
   #string: string;
   get string(): string {

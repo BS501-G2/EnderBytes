@@ -205,7 +205,6 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
       if (userAuthenticationToken != null)
       {
         UserAuthenticationSessionTokenResource userAuthenticationSessionToken = Service.GetManager<UserAuthenticationSessionTokenResource.ResourceManager>().GetByUserAuthentication(transaction, userAuthenticationToken.UserAuthentication, cancellationToken);
-        Console.WriteLine($"Expired? {userAuthenticationSessionToken.Expired}");
 
         if (userAuthenticationSessionToken.Expired)
         {

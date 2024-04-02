@@ -2,8 +2,14 @@
 </script>
 
 <script lang="ts">
-  import NavigationBar from "./NavigationBar.svelte";
+    import { RootState } from "$lib/states/root-state";
+
+  import NavigationBar from "./Navigation.svelte";
   import TitleBar from "./TitleBar.svelte";
+
+  const rootState = RootState.state
+  const appState = $rootState.appState
+  const fileState = $appState.fileState
 </script>
 
 <div class="viewport">
@@ -16,7 +22,6 @@
 
     <div class="panel right-panel">
       <slot name="layout-slot" />
-      <p>Sample Data</p>
     </div>
   </div>
 </div>
@@ -43,16 +48,19 @@
     display: flex;
 
     > div.panel {
-      padding: 16px 16px 16px 16px;
-
       box-sizing: border-box;
     }
 
     > div.left-panel {
+      padding: 16px;
+
       min-width: 256px;
       height: 100%;
 
       background-color: var(--primaryContainer);
+
+      display: flex;
+      flex-direction: column;
     }
 
     > div.right-panel {

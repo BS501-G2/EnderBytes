@@ -15,7 +15,7 @@ export class RootState {
 
     state.subscribe((value) => {
       if (capturedSessionToken != value.sessionToken) {
-        value.appState.set(new AppState())
+        value.appState.set(new AppState(value))
 
         capturedSessionToken = value.sessionToken
       }
@@ -31,7 +31,7 @@ export class RootState {
     this.sessionToken = null;
     this.connectionState = Client.STATE_NOT_CONNECTED;
 
-    this.appState = writable(new AppState())
+    this.appState = writable(new AppState(this))
   }
 
   theme: ColorScheme;

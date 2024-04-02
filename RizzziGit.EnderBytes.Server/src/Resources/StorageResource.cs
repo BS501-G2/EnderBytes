@@ -208,7 +208,78 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
 
         return storage;
       });
+    }
 
+    public FileResource GetRootFolder(ResourceService.Transaction transaction, StorageResource storage, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    {
+      lock (storage)
+      {
+        storage.ThrowIfInvalid();
+
+        return userAuthenticationToken.Enter(() =>
+        {
+          if (storage.RootFolderId != null && transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, (long)storage.RootFolderId, out FileResource? file, cancellationToken))
+          {
+            return file;
+          }
+
+          FileResource newFile = transaction.GetManager<FileResource.ResourceManager>().CreateFolder(transaction, storage, null, "_ROOT", userAuthenticationToken, cancellationToken);
+
+          Update(transaction, storage, new(
+            (COLUMN_ROOT_FOLDER_ID, newFile.Id)
+          ), cancellationToken);
+
+          return newFile;
+        });
+      }
+    }
+
+    public FileResource GetTrashFolder(ResourceService.Transaction transaction, StorageResource storage, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    {
+      lock (storage)
+      {
+        storage.ThrowIfInvalid();
+
+        return userAuthenticationToken.Enter(() =>
+        {
+          if (storage.TrashFolderId != null && transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, (long)storage.TrashFolderId, out FileResource? file, cancellationToken))
+          {
+            return file;
+          }
+
+          FileResource newFile = transaction.GetManager<FileResource.ResourceManager>().CreateFolder(transaction, storage, null, "_TRASH", userAuthenticationToken, cancellationToken);
+
+          Update(transaction, storage, new(
+            (COLUMN_TRASH_FOLDER_ID, newFile.Id)
+          ), cancellationToken);
+
+          return newFile;
+        });
+      }
+    }
+
+    public FileResource GetInternalFolder(ResourceService.Transaction transaction, StorageResource storage, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+    {
+      lock (storage)
+      {
+        storage.ThrowIfInvalid();
+
+        return userAuthenticationToken.Enter(() =>
+        {
+          if (storage.InternalFolderId != null && transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, (long)storage.InternalFolderId, out FileResource? file, cancellationToken))
+          {
+            return file;
+          }
+
+          FileResource newFile = transaction.GetManager<FileResource.ResourceManager>().CreateFolder(transaction, storage, null, "_INTERNAL", userAuthenticationToken, cancellationToken);
+
+          Update(transaction, storage, new(
+            (COLUMN_INTERNAL_FOLDER_ID, newFile.Id)
+          ), cancellationToken);
+
+          return newFile;
+        });
+      }
     }
   }
 

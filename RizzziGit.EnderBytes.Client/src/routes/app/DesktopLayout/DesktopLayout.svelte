@@ -67,6 +67,8 @@
       height: 100%;
 
       flex-grow: 1;
+
+      min-width: 0px;
     }
   }
 </style>

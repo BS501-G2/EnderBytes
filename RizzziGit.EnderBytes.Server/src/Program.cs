@@ -15,14 +15,16 @@ public static class Program
   public static Server Server = new(new(
       DatabaseConnectionStringBuilder: new MySqlConnectionStringBuilder()
       {
-        Server = "10.1.0.117",
+        Server = "localhost",
         Database = "enderbytes",
 
         UserID = "test",
         Password = "test",
 
-        AllowBatch = true
+        AllowBatch = true,
       },
+
+      HttpClientPort: 8083,
 
       KeyGeneratorThreads: 8
     ));

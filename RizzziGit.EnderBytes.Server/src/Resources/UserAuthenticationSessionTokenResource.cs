@@ -39,7 +39,7 @@ public sealed class UserAuthenticationSessionTokenResource(UserAuthenticationSes
       }
     }
 
-    public UserAuthenticationSessionTokenResource Create(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication, long expiryTime, CancellationToken cancellationToken = default)
+    public UserAuthenticationSessionTokenResource Create(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication, long expireTimer, CancellationToken cancellationToken = default)
     {
       lock (userAuthentication)
       {
@@ -52,7 +52,7 @@ public sealed class UserAuthenticationSessionTokenResource(UserAuthenticationSes
 
         return InsertAndGet(transaction, new(
           (COLUMN_USER_AUTHENTICATION_ID, userAuthentication.Id),
-          (COLUMN_EXPIRY_TIME, expiryTime)
+          (COLUMN_EXPIRY_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + expireTimer)
         ), cancellationToken);
       }
     }
@@ -69,6 +69,18 @@ public sealed class UserAuthenticationSessionTokenResource(UserAuthenticationSes
         }
 
         return SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_USER_AUTHENTICATION_ID, "=", userAuthentication.Id), cancellationToken: cancellationToken)!;
+      }
+    }
+
+    public bool ResetExpiryTime(ResourceService.Transaction transaction, UserAuthenticationSessionTokenResource userAuthenticationSessionToken, long expireTimer, CancellationToken cancellationToken = default)
+    {
+      lock (userAuthenticationSessionToken)
+      {
+        userAuthenticationSessionToken.ThrowIfInvalid();
+
+        return Update(transaction, userAuthenticationSessionToken, new(
+          (COLUMN_EXPIRY_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + expireTimer)
+        ), cancellationToken);
       }
     }
   }

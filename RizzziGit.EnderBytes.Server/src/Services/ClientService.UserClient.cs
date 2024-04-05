@@ -19,8 +19,13 @@ public sealed partial class ClientService
 
     public async Task Handle(WebSocket webSocket, CancellationToken cancellationToken = default)
     {
-      UserClientWebSocket clientWebSocket = new(webSocket, (payload, cancellationToken) => Service.Server.ResourceService.Transact<HybridWebSocket.Payload>((transaction, cancellationToken) =>
+      UserClientWebSocket clientWebSocket = new(webSocket, (payload, cancellationToken) => Service.Server.ResourceService.Transact((transaction, cancellationToken) =>
       {
+        if (UserAuthenticationToken != null)
+        {
+          // transaction.GetManager<UserAuthenticationSessionTokenResource.ResourceManager>()
+        }
+
         return payload.Code switch
         {
           UserClientWebSocket.REQ_PASSWORD_LOGIN => AuthenticateByPassword(transaction, payload.Buffer, cancellationToken),
@@ -106,7 +111,7 @@ public sealed partial class ClientService
       if (UserAuthenticationToken != null && UserAuthenticationToken.IsValid)
       {
         long userId = UserAuthenticationToken.UserId;
-        string token = Convert.ToHexStringLower(UserAuthenticationToken.PayloadHash);
+        string token = Convert.ToHexString(UserAuthenticationToken.PayloadHash);
 
         return new(UserClientWebSocket.RES_OK, new JObject
         {

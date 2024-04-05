@@ -43,7 +43,7 @@ export class RootState {
   appState: Writable<AppState>
 
   public async getClient(): Promise<Client> {
-    const client = await Client.getInstance(new URL('ws://10.1.0.1:8080'), {
+    const client = await Client.getInstance(new URL('ws://10.1.0.117:8083'), {
       stateChange: (state) => RootState.state.update((value) => {
         value.connectionState = state
 

@@ -11,7 +11,8 @@ export class IntroNavigationEntry {
 export const introNavigationEntries: IntroNavigationEntry[] = [
   new IntroNavigationEntry("Home", "#home"),
   new IntroNavigationEntry("Contact", "#contact"),
-  new IntroNavigationEntry("About", "#about")
+  new IntroNavigationEntry("About", "#about"),
+  new IntroNavigationEntry("Documentation", "/docs")
 ]
 
 export const introNavigationButtons: IntroNavigationEntry[] = [

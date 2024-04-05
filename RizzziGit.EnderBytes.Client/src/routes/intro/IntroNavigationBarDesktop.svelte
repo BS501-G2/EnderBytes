@@ -8,6 +8,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
+  import { ExternalLinkIcon } from "svelte-feather-icons";
 
   let scroll: number = 0;
   let hash: string = "";
@@ -38,7 +39,14 @@
           <a
             class={homeNavigationEntry.path == hash ? "active" : ""}
             href={homeNavigationEntry.path}
-            ><li><p>{homeNavigationEntry.name}</p></li></a
+            ><li>
+              {#if !homeNavigationEntry.path.startsWith("#")}
+                <div class="external-link-icon">
+                  <ExternalLinkIcon size="16px" />
+                </div>
+              {/if}
+              <p>{homeNavigationEntry.name}</p>
+            </li></a
           >
         {/each}
       </ul>
@@ -138,8 +146,19 @@
             color: inherit;
             text-decoration: unset;
 
-            > li > p {
-              margin: 12px;
+            > li {
+              display: flex;
+
+              align-items: center;
+
+              > div.external-link-icon {
+                height: 16px;
+                width: 16px;
+              }
+
+              > p {
+                margin: 12px;
+              }
             }
           }
 

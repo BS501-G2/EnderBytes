@@ -174,7 +174,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
         UserAuthenticationToken userAuthenticationToken = Create(transaction, user, baseToken, UserAuthenticationType.SessionToken, sessionToken);
         transaction.GetManager<UserAuthenticationSessionTokenResource.ResourceManager>().Create(transaction, userAuthenticationToken.UserAuthentication, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + (36000 * 1000));
 
-        return Convert.ToHexStringLower(sessionToken);
+        return Convert.ToHexString(sessionToken);
       });
     }
 

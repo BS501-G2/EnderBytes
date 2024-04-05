@@ -4,7 +4,14 @@
 </script>
 
 <script lang="ts">
-  import { GridIcon, FolderIcon, UserIcon } from "svelte-feather-icons";
+  import {
+    GridIcon,
+    FolderIcon,
+    UserIcon,
+    TrashIcon,
+    ShareIcon,
+    StarIcon,
+  } from "svelte-feather-icons";
 
   interface NavigationEntry {
     name: string;
@@ -15,6 +22,9 @@
   const navigationEntries: NavigationEntry[] = [
     { name: "Feed", icon: GridIcon, path: "feed" },
     { name: "My Files", icon: FolderIcon, path: "files" },
+    { name: "Starred", icon: StarIcon, path: "starred" },
+    { name: "Shared", icon: ShareIcon, path: "shared" },
+    { name: "Trash", icon: TrashIcon, path: "trash" },
     { name: "Profile", icon: UserIcon, path: "profile" },
   ];
 
@@ -23,16 +33,16 @@
 
 <div class="navigation-bar">
   {#each navigationEntries as entry}
-      <a href="/app/{entry.path}">
-        <div
-          class="nav-entry {entry.path == $page.url.pathname.split('/')[2]
-            ? 'active'
-            : ''}"
-        >
-          <svelte:component this={entry.icon}></svelte:component>
-          <p>{entry.name}</p>
-        </div>
-      </a>
+    <a href="/app/{entry.path}">
+      <div
+        class="nav-entry {entry.path == $page.url.pathname.split('/')[2]
+          ? 'active'
+          : ''}"
+      >
+        <svelte:component this={entry.icon}></svelte:component>
+        <p>{entry.name}</p>
+      </div>
+    </a>
   {/each}
 </div>
 
@@ -42,39 +52,41 @@
 
     flex-direction: column;
     align-items: last;
-  }
 
-  a {
-    text-decoration: none;
+    gap: 8px;
 
-    > div.nav-entry {
-      display: flex;
+    > a {
+      text-decoration: none;
 
-      flex-direction: row;
-      align-items: center;
-      align-content: end;
+      > div.nav-entry {
+        display: flex;
 
-      gap: 8px;
+        flex-direction: row;
+        align-items: center;
+        align-content: end;
 
-      background-color: var(--primaryContainer);
-      color: var(--onPrimaryContainer);
+        gap: 8px;
 
-      padding: 8px;
-      border-radius: 8px;
+        background-color: var(--primaryContainer);
+        color: var(--onPrimaryContainer);
 
-      user-select: none;
-      cursor: pointer;
+        padding: 8px;
+        border-radius: 8px;
 
-      > p {
-        flex-grow: 1;
+        user-select: none;
+        cursor: pointer;
 
-        margin: 0px;
+        > p {
+          flex-grow: 1;
+
+          margin: 0px;
+        }
       }
-    }
 
-    > div.nav-entry.active {
-      background-color: var(--primary);
-      color: var(--onPrimary);
+      > div.nav-entry.active {
+        background-color: var(--primary);
+        color: var(--onPrimary);
+      }
     }
   }
 </style>

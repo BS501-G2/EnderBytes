@@ -6,12 +6,14 @@ export class AppFileState {
 
     this.clipboard = null
     this.currentFileId = null
+    this.selectedIds = []
   }
 
   #appState: AppState
 
   clipboard: Clipboard | null
   currentFileId: number | null
+  selectedIds: number[]
 }
 
 export enum ClipboardIntent {

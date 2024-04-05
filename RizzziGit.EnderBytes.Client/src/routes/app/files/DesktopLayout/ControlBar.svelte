@@ -1,7 +1,15 @@
 <script lang="ts">
   import { RootState } from "$lib/states/root-state";
 
-  import { PlusCircleIcon, ScissorsIcon, CopyIcon, ClipboardIcon } from "svelte-feather-icons";
+  import {
+    PlusCircleIcon,
+    ScissorsIcon,
+    CopyIcon,
+    ClipboardIcon,
+    TrashIcon,
+    ShareIcon,
+    UsersIcon,
+  } from "svelte-feather-icons";
 
   const rootState = RootState.state;
   const appState = $rootState.appState;
@@ -17,13 +25,13 @@
   </div>
   <div class="divider"></div>
   <div class="button" title="Cut">
-    <button>
+    <button disabled={$fileState.selectedIds.length == 0}>
       <ScissorsIcon />
       <p>Cut</p>
     </button>
   </div>
   <div class="button" title="Copy">
-    <button>
+    <button disabled={$fileState.selectedIds.length == 0}>
       <CopyIcon />
       <p>Copy</p>
     </button>
@@ -32,6 +40,24 @@
     <button>
       <ClipboardIcon />
       <p>Paste</p>
+    </button>
+  </div>
+  <div class="button" title="Share">
+    <button>
+      <ShareIcon />
+      <p>Share</p>
+    </button>
+  </div>
+  <div class="button" title="Manage Accesss">
+    <button>
+      <UsersIcon />
+      <p>Manage Access</p>
+    </button>
+  </div>
+  <div class="button" title="Move to Trash">
+    <button>
+      <TrashIcon />
+      <p>Move to Trash</p>
     </button>
   </div>
 </div>
@@ -70,8 +96,6 @@
         border-color: transparent;
         border-radius: 8px;
 
-        outline: none;
-
         padding: 8px;
 
         transition: all linear 150ms;
@@ -85,14 +109,16 @@
         border-color: var(--primary);
       }
 
-      > button:disabled {
-        color: gray;
-        border-color: transparent;
-      }
-
       > button:active {
         background-color: var(--primary);
         color: var(--onPrimary);
+      }
+
+      > button:disabled {
+        color: gray;
+        border-color: transparent;
+        background-color: var(--background);
+        cursor: default;
       }
     }
   }

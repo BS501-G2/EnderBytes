@@ -36,7 +36,7 @@ public static partial class Client
   [JSExport]
   internal static int GetState() => State;
 
-  internal static Task Main() => Task.CompletedTask;
+  internal static void Main() { }
 
   [JSExport]
   internal static Task Run()

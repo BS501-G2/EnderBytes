@@ -1,15 +1,15 @@
 <script lang="ts">
-    import FileViewer from "../DesktopLayout/FileViewer.svelte";
-import AddressBar from "./DesktopLayout/AddressBar.svelte";
+  import AddressBar from "./DesktopLayout/AddressBar.svelte";
   import ControlBar from "./DesktopLayout/ControlBar.svelte";
+  import FileArea from "./DesktopLayout/FileArea.svelte";
 
   export let currentId: number | null;
 </script>
 
 <div class="container">
-  <AddressBar/>
+  <AddressBar />
   <ControlBar />
-  <FileViewer/>
+  <FileArea />
 </div>
 
 <style lang="scss">

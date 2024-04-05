@@ -18,7 +18,7 @@ export async function init(imports) {
   // run the C# Main() method and keep the runtime process running and executing further API calls
   // await runMain();
 
-  await runMain()
+  // await runMain()
 
   return exports
 }

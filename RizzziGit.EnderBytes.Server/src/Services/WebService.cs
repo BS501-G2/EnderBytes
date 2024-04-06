@@ -19,7 +19,7 @@ public sealed partial class WebService(Server server) : Server.SubService(server
       {
         setup.AddPolicy(corsPolicy, (policy) =>
         {
-          policy.WithOrigins("http://localhost:8081", "http://10.1.0.1:8081", "http://10.1.0.117:8081");
+          policy.WithOrigins("http://localhost:8083", "http://10.1.0.1:8081", "http://10.1.0.117:8081", "http://25.20.99.238:8081");
           policy.WithHeaders("*");
           policy.WithMethods("*");
         });

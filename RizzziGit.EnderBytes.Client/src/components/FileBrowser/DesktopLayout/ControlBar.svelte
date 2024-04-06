@@ -1,5 +1,9 @@
 <script lang="ts">
+  import { type Writable } from 'svelte/store'
+
   import { RootState } from "$lib/states/root-state";
+
+  import { FileBrowserState } from '../../FileBrowser.svelte'
 
   import {
     PlusCircleIcon,
@@ -10,6 +14,8 @@
     ShareIcon,
     UsersIcon,
   } from "svelte-feather-icons";
+
+  export let fileBrowserState: Writable<FileBrowserState>
 
   const rootState = RootState.state;
   const appState = $rootState.appState;

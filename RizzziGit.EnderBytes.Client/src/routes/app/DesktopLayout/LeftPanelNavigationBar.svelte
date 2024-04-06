@@ -55,6 +55,10 @@
 
     gap: 8px;
 
+    flex-grow: 1;
+
+    overflow-y: auto;
+
     > a {
       text-decoration: none;
 

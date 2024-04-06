@@ -1,22 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { writable } from 'svelte/store'
 
   import { RootState } from "$lib/states/root-state";
-  import { ViewMode } from "$lib/view-mode";
 
-  import DesktopLayout from "./DesktopLayout.svelte";
+  import FileBrowser, { NormalFileBrowserState } from '../../../components/FileBrowser.svelte'
 
   const rootState = RootState.state;
   const appState = $rootState.appState
   const fileState = $appState.fileState
 
-  export let currentId: number | null = null;
+  export let initialId: number | null = null;
+
+  const fileBrowserState = writable(new NormalFileBrowserState(initialId))
 
   onMount(() => {
-    $fileState.currentFileId = currentId
+    $fileState.currentFileId = initialId
   })
 </script>
 
-{#if $rootState.viewMode & ViewMode.Desktop}
-  <DesktopLayout {currentId} />
-{/if}
+<FileBrowser {fileBrowserState} />

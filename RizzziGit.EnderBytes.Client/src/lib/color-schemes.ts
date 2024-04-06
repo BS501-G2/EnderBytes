@@ -17,6 +17,7 @@ export enum ColorKey {
   OnPrimaryVariantContainer = 'onPrimaryVariantContainer',
 
   Background = 'background',
+  BackgroundVariant = 'backgroundVariant',
   OnBackground = 'onBackground',
 }
 export const intColorToHex = (color: number): string => `#${color.toString(16)}`

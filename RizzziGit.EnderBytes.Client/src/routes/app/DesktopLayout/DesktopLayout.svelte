@@ -2,14 +2,15 @@
 </script>
 
 <script lang="ts">
-    import { RootState } from "$lib/states/root-state";
+  import { RootState } from "$lib/states/root-state";
 
-  import NavigationBar from "./Navigation.svelte";
+  import LeftPanelNavigationBar from "./LeftPanelNavigationBar.svelte";
+  import LeftPanelAccountBar from "./LeftPanelAccountBar.svelte";
   import TitleBar from "./TitleBar.svelte";
 
-  const rootState = RootState.state
-  const appState = $rootState.appState
-  const fileState = $appState.fileState
+  const rootState = RootState.state;
+  const appState = $rootState.appState;
+  const fileState = $appState.fileState;
 </script>
 
 <div class="viewport">
@@ -17,7 +18,9 @@
 
   <div class="panel-container">
     <div class="panel left-panel">
-      <NavigationBar />
+      <LeftPanelNavigationBar />
+      <div class="divider"></div>
+      <LeftPanelAccountBar />
     </div>
 
     <div class="panel right-panel">
@@ -46,14 +49,13 @@
     width: 100%;
 
     display: flex;
+    min-height: 0px;
 
     > div.panel {
       box-sizing: border-box;
     }
 
     > div.left-panel {
-      padding: 16px;
-
       min-width: 256px;
       height: 100%;
 
@@ -61,6 +63,13 @@
 
       display: flex;
       flex-direction: column;
+
+      padding: 0px 16px 0px 16px;
+
+      > div.divider {
+        height: 1px;
+        background-color: var(--primary);
+      }
     }
 
     > div.right-panel {

@@ -52,8 +52,6 @@
         goto("/app/auth", { replaceState: true });
       }
     }
-
-    $appState.appTitle = $rootState.getString(LocaleKey.AppName);
   });
 </script>
 
@@ -62,7 +60,7 @@
     rel="manifest"
     href="/api/manifest.json?locale={$rootState.locale}&theme={$rootState.theme}"
   />
-  <title>{$appState.appTitle}</title>
+  <title>{$rootState.getString(LocaleKey.AppName)}</title>
 </svelte:head>
 
 {#if $page.url.pathname.startsWith("/app/auth")}

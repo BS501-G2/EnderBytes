@@ -15,7 +15,7 @@ export class RootState {
 
     state.subscribe((value) => {
       if (capturedSessionToken != value.sessionToken) {
-        value.appState.set(new AppState(value))
+        value.appState.set(new AppState())
 
         capturedSessionToken = value.sessionToken
       }
@@ -31,7 +31,7 @@ export class RootState {
     this.sessionToken = null;
     this.connectionState = Client.STATE_NOT_CONNECTED;
 
-    this.appState = writable(new AppState(this))
+    this.appState = writable(new AppState())
   }
 
   theme: ColorScheme;
@@ -43,7 +43,7 @@ export class RootState {
   appState: Writable<AppState>
 
   public async getClient(): Promise<Client> {
-    const client = await Client.getInstance(new URL('ws://10.1.0.117:8083'), {
+    const client = await Client.getInstance(new URL('ws://25.20.99.238:8083/'), {
       stateChange: (state) => RootState.state.update((value) => {
         value.connectionState = state
 

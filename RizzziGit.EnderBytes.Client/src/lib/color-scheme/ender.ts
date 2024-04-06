@@ -15,5 +15,6 @@ export const colors = (): ColorValues => ({
   [ColorKey.OnPrimaryVariantContainer]: 0x37812eff,
 
   [ColorKey.Background]: 0xebf4e4ff,
+  [ColorKey.BackgroundVariant]: 0xffffffff,
   [ColorKey.OnBackground]: 0x0f3031ff
 })

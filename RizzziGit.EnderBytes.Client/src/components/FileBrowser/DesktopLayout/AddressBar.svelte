@@ -1,15 +1,21 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { RootState } from "$lib/states/root-state";
+  import { type Writable } from 'svelte/store'
   import { FolderIcon } from "svelte-feather-icons";
-  import Overlay from "../../../../components/Overlay.svelte";
+
+  import { goto } from "$app/navigation";
+
+  import { RootState } from "$lib/states/root-state";
+
+  import Overlay from "../../Overlay.svelte";
+  import { FileBrowserState } from '../../FileBrowser.svelte'
+
+  export let fileBrowserState: Writable<FileBrowserState>
 
   const rootState = RootState.state;
   const appState = $rootState.appState;
   const fileState = $appState.fileState;
 
   $: currentPath = $fileState.currentFileId ? [$fileState.currentFileId] : [];
-  $: console.log(currentPath);
 
   const strings: string[] = [
     "Root",
@@ -87,6 +93,8 @@
     padding: 8px;
 
     > div.address-content {
+      background-color: var(--background);
+
       display: flex;
       align-items: center;
       padding: 0px 8px 0px 8px;
@@ -142,7 +150,7 @@
       display: flex;
       flex-direction: column;
 
-      background-color: var(--primaryContainer);
+      background-color: var(--background);
 
       padding: 4px;
       // border-radius: 8px;

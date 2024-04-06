@@ -1,15 +1,18 @@
 <script lang="ts">
+  import type { Writable } from "svelte/store";
+  import type { FileBrowserState } from "../FileBrowser.svelte";
+
   import AddressBar from "./DesktopLayout/AddressBar.svelte";
   import ControlBar from "./DesktopLayout/ControlBar.svelte";
   import FileArea from "./DesktopLayout/FileArea.svelte";
 
-  export let currentId: number | null;
+  export let fileBrowserState: Writable<FileBrowserState>;
 </script>
 
 <div class="container">
-  <AddressBar />
-  <ControlBar />
-  <FileArea />
+  <AddressBar {fileBrowserState} />
+  <ControlBar {fileBrowserState} />
+  <FileArea {fileBrowserState} />
 </div>
 
 <style lang="scss">

@@ -11,9 +11,15 @@ using Commons.Net;
 using Commons.Memory;
 
 using Services;
+using Newtonsoft.Json;
 
 public static partial class Client
 {
+  public class ClientError(uint responseCode, Exception? innerException = null) : Exception($"Client received server error: {responseCode}", innerException)
+  {
+    public readonly uint ResponseCode = responseCode;
+  }
+
   [JSImport("STATE_NOT_CONNECTED", "main.js")]
   internal static partial int STATE_NOT_CONNECTED();
   [JSImport("STATE_CONNECTING", "main.js")]
@@ -28,8 +34,6 @@ public static partial class Client
 
   [JSImport("OnStateChange", "main.js")]
   internal static partial void OnStateChange(int state);
-  [JSImport("OnSessionTokenChange", "main.js")]
-  internal static partial void OnSessionChange(string sessionToken);
 
   internal static int State = STATE_NOT_CONNECTED();
   internal static void SetState(int state) => OnStateChange(State = state);
@@ -55,7 +59,7 @@ public static partial class Client
         ClientWebSocket clientWebSocket = new();
         await clientWebSocket.ConnectAsync(new(WS_URL()), CancellationToken.None);
 
-        UserClientWebSocket client = UserClientWebSocket = new(clientWebSocket, (payload, cancellationToken) => Task.FromResult<HybridWebSocket.Payload>(new(0, [])));
+        UserClient client = UserClientWebSocket = new(clientWebSocket, (buffer) => Task.CompletedTask, (payload, cancellationToken) => Task.FromResult<HybridWebSocket.Payload>(new(0, [])));
         SetState(STATE_READY());
 
         source.SetResult();
@@ -68,87 +72,106 @@ public static partial class Client
     }
   }
 
+  internal static UserClient? UserClientWebSocket = null;
+
   [JSExport]
-  internal static async Task<bool> AuthenticateByPassword(string username, string password)
+  internal static int? GetRequestInt(string requestString)
   {
-    JObject request = new()
+    foreach (UserRequest request in Enum.GetValues<UserRequest>())
     {
-      { "username", username },
-      { "password", password }
-    };
-
-    (uint responseCode, CompositeBuffer responseBuffer) = await UserClientWebSocket!.Request(new(UserClientWebSocket.REQ_PASSWORD_LOGIN, request.ToString()), CancellationToken.None);
-
-    if (responseCode == UserClientWebSocket.RES_OK)
-    {
-      JObject response = JObject.Parse(responseBuffer.ToString());
-
-      OnSessionChange(response.ToString());
-
-      return true;
+      if (requestString == request.ToString())
+      {
+        return (byte)request;
+      }
     }
 
-    return false;
+    return null;
   }
 
   [JSExport]
-  internal static async Task<bool> AuthenticateByToken(string userId, string token)
+  internal static string? GetRequestString(int requestInt)
   {
-    JObject request = new()
+    foreach (UserRequest request in Enum.GetValues<UserRequest>())
     {
-      { "userId", Convert.ToInt64(userId) },
-      { "token", token }
-    };
-
-    (uint responseCode, CompositeBuffer responseBuffer) = await UserClientWebSocket!.Request(new(UserClientWebSocket.REQ_TOKEN_LOGIN, request.ToString()), CancellationToken.None);
-
-    if (responseCode == UserClientWebSocket.RES_OK)
-    {
-      JObject response = JObject.Parse(responseBuffer.ToString());
-
-      OnSessionChange(response.ToString());
-
-      return true;
+      if (requestInt == ((byte)request))
+      {
+        return request.ToString();
+      }
     }
 
-    return false;
+    return null;
   }
 
   [JSExport]
-  internal static async Task<bool> DestroyToken()
+  internal static int? GetResponseInt(string responseString)
   {
-    (uint responseCode, _) = await UserClientWebSocket!.Request(new(UserClientWebSocket.REQ_DESTROY_TOKEN, []), CancellationToken.None);
-
-    if (responseCode == UserClientWebSocket.RES_OK)
+    foreach (UserResponse response in Enum.GetValues<UserResponse>())
     {
-      OnSessionChange("null");
-
-      return true;
+      if (responseString == response.ToString())
+      {
+        return (byte)response;
+      }
     }
 
-    return false;
+    return null;
   }
 
   [JSExport]
-  internal static async Task<string> GetToken()
+  internal static string? GetResponseString(int responseInt)
   {
-    (_, CompositeBuffer responseBuffer) = await UserClientWebSocket!.Request(new(UserClientWebSocket.REQ_GET_TOKEN, []), CancellationToken.None);
-
-    return responseBuffer.ToString();
-  }
-
-  [JSExport]
-  internal static async Task<string> RandomBytes(int length)
-  {
-    JObject request = new()
+    foreach (UserResponse response in Enum.GetValues<UserResponse>())
     {
-      { "length", length }
-    };
+      if (responseInt == ((byte)response))
+      {
+        return response.ToString();
+      }
+    }
 
-    (_, CompositeBuffer responseBuffer) = await UserClientWebSocket!.Request(new(UserClientWebSocket.REQ_RANDOM_BYTES, request.ToString()), CancellationToken.None);
-
-    return responseBuffer.ToBase64String();
+    return null;
   }
 
-  internal static UserClientWebSocket? UserClientWebSocket = null;
+  private static ClientPayload? LastResponsePayload = null;
+
+  [JSExport]
+  internal static int? GetResponseType() => (int?)LastResponsePayload?.Type;
+
+  [JSExport]
+  internal static byte[] ReceiveRawResponse()
+  {
+    if (LastResponsePayload == null || LastResponsePayload is not ClientPayload.Raw rawPayload)
+    {
+      throw new Exception($"Invalid payload type {LastResponsePayload?.Type}.");
+    }
+
+    return rawPayload.Bytes.ToByteArray();
+  }
+
+  [JSExport]
+  internal static string ReceiveJsonResponse()
+  {
+    if (LastResponsePayload == null || LastResponsePayload is not ClientPayload.JSON jsonPayload)
+    {
+      throw new Exception($"Invalid payload type {LastResponsePayload?.Type}.");
+    }
+
+    return jsonPayload.Json.ToString(Formatting.None);
+  }
+
+  [JSExport] internal static Task<int> SendJsonRequest(int requestCode, string requestPayload) => SendRequest(requestCode, new ClientPayload.JSON(JToken.Parse(requestPayload)));
+  [JSExport] internal static Task<int> SendRawRequest(int requestCode, byte[] requestPayload) => SendRequest(requestCode, new ClientPayload.Raw(requestPayload));
+
+  internal static async Task<int> SendRequest(int requestCode, ClientPayload requestPayload)
+  {
+    LastResponsePayload = null;
+
+    if (GetRequestString(requestCode) == null)
+    {
+      throw new Exception($"Invalid request: {requestCode}.");
+    }
+
+    (uint responseCode, CompositeBuffer responseBuffer) = await UserClientWebSocket!.Request(new((uint)requestCode, requestPayload.Serialize()), CancellationToken.None);
+
+    LastResponsePayload = ClientPayload.Deserialize(responseBuffer);
+    return (int)responseCode;
+  }
 }

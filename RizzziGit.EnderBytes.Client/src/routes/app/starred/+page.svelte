@@ -10,8 +10,7 @@
     <title>Starred</title>
     <style>
         body{
-          background-color: --onPrimary;
-          margin:0px;23
+          margin:0px;
         }
         .starred-browser{
           border-radius: 30px;
@@ -21,6 +20,7 @@
           grid-template-columns: auto auto;
           margin: 5%;
           margin-left: 50px;
+          width: 85vw;
 
         }
         .title{
@@ -30,8 +30,8 @@
           margin-left: 50px;
         }
         .starred-column{
-          width: 60vw;
-          height: 630px;
+          width: 100%;
+          height: 70vh;
           overflow: auto;
           display: flex;
           justify-content: space-evenly;
@@ -65,12 +65,16 @@
           margin: 2px;
           overflow: hidden;
           text-overflow: ellipsis;
+          font-weight:bold;
+          max-width: 90%;
         }
         .fileType{
           margin: 2px;
+          max-width: 90%;
         }
         .fileSize{
           margin: 2px;
+          max-width: 90%;
         }
         .moreIcon{
           margin: 2px;
@@ -82,13 +86,15 @@
             border-color: black;
             grid-column: 2;
             max-height: fit-content;
-            width: clamp(100px, 400px, 500px);
+            width: 70%;
             display: flex;
             justify-content: flex-start;
             border-radius: 30px;
             flex-direction: column;
             opacity: 0;
             transition: opacity .5s;
+            justify-self: center;
+
         }
         .starred-preview-info{
             display: flex;
@@ -101,92 +107,105 @@
         }
         .previewFileName{
           margin-top: 7px;
-          font-size: clamp(1rem, 2rem, 2.5rem);
+          font-size: 2rem;
           font-weight: bold;
-          max-width: 200px;
+          max-width: 100%;
           overflow: hidden;
           text-overflow: ellipsis;
         }
         .previewfileType{
           margin-top: 7px;
-          font-size: clamp(.5rem, 1rem, 1.5rem);
+          font-size: 1rem;
         }
         .previewFileSize{
           margin-top: 7px;
-          font-size: clamp(.5rem, 1rem, 1.5rem);
+          font-size:1rem;
         }
         .previewFileDate{
           margin-top: 7px;
-          font-size: clamp(.5rem, 1rem, 1.5rem);
+          font-size: 1rem;
         }
         .starred-column:hover + .starred-preview{
             opacity: 1;
         }
-        .searchBarTitle{
-          width: clamp(500px, 1000px, 1500px);
-        }
+
         .fileIconImg,.moreIconImg{
           width: 30px;
         }
-        @media only screen and (max-width: 1024){
-          body,html{
-            width: 100%;
-            overflow-x: hidden;
-          }
+
+        @media only screen and (max-width: 1440px){
           .starred-section{
-            height: 100vh;
-            width: 100vw;
             margin: 0px;
-            padding: 0px;
-            justify-content: center;
+          }
+          .files{
+            width:175px;
+            height: 225px;
+            font-size: .8rem;
+          }
+          .fileName{
+            font-size: .9rem;
+          }
+
+        }
+
+        @media only screen and (max-width: 1024px){
+          .starred-section{
+            width: 75vw;
+            display: flex;
+            height: 70vh
           }
           .starred-column{
             height: 100%;
-            width: 90vw;
-            overflow: unset;
+            width: 70%;
+
           }
+          .files{
+            width: 150px;
+            height: 200px;
+          }
+          .starred-preview{
+            width: 20%;
+            height: 70%;
+            font-size: .8rem;
+          }
+          .previewFileName{
+            font-size: .9rem;
+          }
+          .previewfileType,.previewFileSize,.previewFileDate{
+          font-size: .8rem;
+        }
+
         }
         @media only screen and (max-width: 768px){
-          body,html{
-            width: 100%;
-            overflow-x: hidden;
+          .starred-browser{
+            height: auto;
           }
           .starred-section{
-            height: 100vh;
+            height: 50vh;
             width: 100vw;
             margin: 0px;
             padding: 0px;
             justify-content: center;
           }
           .starred-column{
-            height: 100%;
             width: 90vw;
             overflow: unset;
+          }
+          .title{
+            margin: 0px;
+          }
+          .searchBarTitle{
+            padding: 25px;
+            padding-left: 40px;
+            background-color: var(--background);
+            position: sticky;
+            top: 0;
           }
           .starred-preview{
             display: none;
           }
-          .starred-browser{
-            width: 100vw;
-          }
-          .searchBarTitle{
-            width: 100vw;
-          }
-          .title{
-            margin: 25px;
-            margin-left: 40px;
-          }
-          .files{
-            font-size: larger;
-            width: 100%;
-          }
 
-          .searchBarTitle{
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            padding-top: 10px;
-          }
+
 
         }
         @media only screen and (max-width: 425px) {
@@ -205,13 +224,10 @@
             justify-content: center;
             width: 100%;
             padding: 10px;
+            background-color: rgba(0,0,0,0);
+            position: relative;
           }
 
-
-
-          body{
-            background-color: rgb(32, 32, 32);
-          }
           .starred-preview{
             display: none;
           }
@@ -232,70 +248,32 @@
             height: 100%;
           }
           .files{
-            background-color: rgb(39, 39, 39);
-            border-left: 0px;
-            border-right: 0px;
-            border-top: 0px;
-            color:white;
-            border-color: lightgray;
-            border-radius: 0px;
-            font-size: .5rem;
-            width: 100%;
-            grid-template-columns: 75px 250px 75px;
-            grid-template-rows: 25px 25px 25px;
-            height: 75px;
-            justify-items: center;
-            margin-bottom:5px;
-            resize: none;
-          }
-          .fileIcon{
-            grid-row-start: 1;
-            grid-row-end: 4;
-          }
-          .moreIcon{
-            grid-column: 3;
-            grid-row-start: 1;
-            grid-row-end: 4;
+            font-size: .75rem;
           }
           .fileName{
             font-weight: bold;
-            font-size: .75rem;
-          }
-          .fileName,.fileSize,.fileType{
-            grid-column: 2;
-            justify-self: start;
-          }
-          .fileIcon, .moreIcon{
-            filter: invert(100%);
+            font-size: .8rem;
           }
 
-          .fileIcon,.fileName,.fileType,.fileSize,.moreIcon{
-            margin:0px;
+          .fileIcon, .moreIcon{
           }
-          .fileIconImg{
-            width: 75px;
-          }
-          .moreIconImg{
-            width: 25px;
-          }
+
+
         }
       </style>
 </svelte:head>
 <body>
     <div class="starred-browser">
-
         <div class="searchBarTitle">
-
           <div class="titleContainer">
             <p class="title">Starred Files</p>
           </div>
         </div>
           <div class="starred-section">
             <div class="starred-column">
-
               <div class="files">
                 <div class="fileIcon"><ImageIcon size="90%"/></div>
-                <div class="fileName">fileNamePlaceholder</div>
+                <div class="fileName">fileNamePlaasfdfdfsdafsdaasdfceholder</div>
                 <div class="fileType">fileTypePlaceholder</div>
                 <div class="fileSize">fileSizePlaceholder</div>
                 <div class="moreIcon"><MoreHorizontalIcon/></div>

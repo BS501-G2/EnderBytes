@@ -26,7 +26,7 @@
   }
 
   async function onSubmit(username: string, password: string) {
-    const session = await (await $rootState.getClient()).authenticateByPassword(username, password);
+    const session = await (await $rootState.getClient()).loginPassword(username, password);
   }
 </script>
 

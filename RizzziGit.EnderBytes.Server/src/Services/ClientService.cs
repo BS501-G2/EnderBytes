@@ -31,7 +31,7 @@ public sealed partial class ClientService(Server server) : Server.SubService(ser
       return rootFolder;
     }
 
-    private FileResource GetTrashFolder(ResourceService.Transaction transaction, CancellationToken cancellationToken = default)
+    protected FileResource GetTrashFolder(ResourceService.Transaction transaction, CancellationToken cancellationToken = default)
     {
       StorageResource storage = transaction.GetManager<StorageResource.ResourceManager>().GetByOwnerUser(transaction, UserAuthenticationToken!);
       FileResource rootFolder = transaction.GetManager<StorageResource.ResourceManager>().GetTrashFolder(transaction, storage, UserAuthenticationToken!, cancellationToken);
@@ -39,7 +39,7 @@ public sealed partial class ClientService(Server server) : Server.SubService(ser
       return rootFolder;
     }
 
-    private FileResource GetInternalFolder(ResourceService.Transaction transaction, CancellationToken cancellationToken = default)
+    protected FileResource GetInternalFolder(ResourceService.Transaction transaction, CancellationToken cancellationToken = default)
     {
       StorageResource storage = transaction.GetManager<StorageResource.ResourceManager>().GetByOwnerUser(transaction, UserAuthenticationToken!);
       FileResource rootFolder = transaction.GetManager<StorageResource.ResourceManager>().GetInternalFolder(transaction, storage, UserAuthenticationToken!, cancellationToken);
@@ -50,7 +50,7 @@ public sealed partial class ClientService(Server server) : Server.SubService(ser
 
   public async Task HandleUserClient(WebSocket webSocket, CancellationToken cancellationToken = default)
   {
-    UserClient client = new(this);
+    RemoteUserClient client = new(this);
 
     try
     {

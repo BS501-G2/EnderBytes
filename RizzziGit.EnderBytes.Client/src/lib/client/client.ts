@@ -7,7 +7,7 @@ export interface Session {
 
 export interface ClientEvent extends EventInterface {
   stateChange: [state: number]
-  sessionChange: [session?: Session]
+  sessionChange: [session: Session | null]
 }
 
 export interface PromiseObject {
@@ -40,38 +40,46 @@ export class Client {
 
   static #initializing: boolean = false
   static #client: Client | null = null
+  static #clientPromise: Promise<Client> | null = null
 
   public static async getInstance(url: URL, events: ClientEventMap): Promise<Client> {
-    return Client.#client ??= await (async () => {
-      try {
-        const { STATE_NOT_CONNECTED, STATE_CONNECTING, STATE_READY, STATE_BORKED } = this
+    try {
+      return Client.#client ??= await (this.#clientPromise ??= (async () => {
+        try {
+          const { STATE_NOT_CONNECTED, STATE_CONNECTING, STATE_READY, STATE_BORKED } = this
 
-        Client.#initializing = true
+          Client.#initializing = true
 
-        const client = new Client(await (<any>window).__DOTNET__INIT__({
-          STATE_NOT_CONNECTED: () => STATE_NOT_CONNECTED,
-          STATE_READY: () => STATE_READY,
-          STATE_CONNECTING: () => STATE_CONNECTING,
-          STATE_BORKED: () => STATE_BORKED,
+          const client = new Client(await (<any>window).__DOTNET__INIT__({
+            STATE_NOT_CONNECTED: () => STATE_NOT_CONNECTED,
+            STATE_READY: () => STATE_READY,
+            STATE_CONNECTING: () => STATE_CONNECTING,
+            STATE_BORKED: () => STATE_BORKED,
 
-          WS_URL: () => url.toString(),
+            WS_URL: () => url.toString(),
 
-          OnStateChange: (state: number) => client!.#emit('stateChange', state),
-          OnSessionTokenChange: (session: string) => client!.#emit('sessionChange', client!.#sessionCache = JSON.parse(session))
-        }))
+            OnStateChange: (state: number) => client!.#emit('stateChange', state),
+            OnSessionTokenChange: (session: string) => client!.#emit('sessionChange', client!.#sessionCache = JSON.parse(session))
+          }))
 
-        for (const eventName in events) {
-          client!.on(eventName, events[eventName])
+          for (const eventName in events) {
+            client!.on(eventName, events[eventName])
+          }
+
+          await client.#run()
+
+          Object.assign(window, { client })
+
+          return client
         }
-
-        await client.#run()
-
-        return client
-      }
-      finally {
-        Client.#initializing = false
-      }
-    })()
+        finally {
+          Client.#initializing = false
+        }
+      })())
+    }
+    finally {
+      Client.#clientPromise = null
+    }
   }
 
   public constructor(dotnet: any) {
@@ -132,9 +140,9 @@ export class Client {
     void this.#runQueue()
 
     if (this.#sessionCache != null) {
-      const { userId, token } = this.#sessionCache
+      // const { userId, token } = this.#sessionCache
 
-      await this.authenticateByToken(userId, token)
+      // await this.authenticateByToken(userId, token)
     }
   }
 
@@ -148,46 +156,98 @@ export class Client {
     return promise
   }
 
-  authenticateByPassword(username: string, password: string): Promise<boolean> {
-    return this.#queue(() => this.#dotnet.AuthenticateByPassword(username, password))
+  #getRequestInt(request: string): number | null {
+    return this.#dotnet.GetRequestInt(request)
   }
 
-  authenticateByToken(userId: number, token: string): Promise<boolean> {
-    return this.#queue(() => this.#dotnet.AuthenticateByToken(`${userId}`, token))
+  #getRequestString(request: number): string | null {
+    return this.#dotnet.GetRequestString(request)
   }
 
-  destroyToken(): Promise<boolean> {
-    return this.#queue(() => this.#dotnet.DestroyToken())
+  #getResponseInt(response: string): number | null {
+    return this.#dotnet.GetResponseInt(response)
   }
 
-  getToken(): Promise<Session | null> {
-    return this.#queue(async () => JSON.parse(this.#dotnet.GetToken()))
+  #getResponseString(response: number): string | null {
+    return this.#dotnet.GetResponseString(response)
   }
 
-  randomBytes(length: number): Promise<Uint8Array> {
-    return this.#queue(async () => Uint8Array.from(atob(await this.#dotnet.RandomBytes(length)), (e) => e.charCodeAt(0)))
+  #request(request: string | number, requestData: ArrayBuffer | any = null): Promise<ArrayBuffer | any> {
+    if (typeof (request) === 'string') {
+      request = this.#getRequestInt(request)!
+
+      if (request == null) {
+        throw new Error('Invalid request string.')
+      }
+    }
+
+    return this.#queue(async () => {
+      let responseCode: number | null = null
+
+      if (requestData instanceof ArrayBuffer) {
+        responseCode = await this.#dotnet.SendRawRequest(request, new Uint8Array(requestData))
+      } else {
+        responseCode = await this.#dotnet.SendJsonRequest(request, JSON.stringify(requestData))
+      }
+
+      const responseType = this.#dotnet.GetResponseType()
+
+      if (responseCode == null) {
+        throw new Error("Unknown request/response data.")
+      } else if (responseCode != this.#dotnet.GetResponseInt("Okay")) {
+        throw new Error(`Response Error: ${this.#dotnet.GetResponseString(responseCode)}`)
+      }
+
+      let responseData: ArrayBuffer | any
+
+      if (responseType == 0) {
+        responseData = JSON.parse(this.#dotnet.ReceiveJsonResponse())
+      } else if (responseType == 1) {
+        responseData = (this.#dotnet.ReceiveRawResponse()).buffer
+      }
+
+      return responseData
+    })
   }
 
-  // authenticateWithPassword(username: string, password: string): Promise<Session | null> {
-  //   return this.#queue(async () => JSON.parse(await this.#dotnet.AuthenticateWithPassword(username, password)))
-  // }
+  public echo<T>(message: T): Promise<T> {
+    return this.#request('Echo', message)
+  }
 
-  // validate(session: Session): Promise<boolean> {
-  //   return this.#queue(async () => await this.#dotnet.Validate(`${session.userId}`, session.token))
-  // }
+  #session?: Session | null = null
 
-  // setSession(session: Session | null): Promise<void> {
-  //   return this.#queue(async () => {
-  //     if (session == null) {
-  //       this.#dotnet.SetSession("null")
-  //       return;
-  //     }
+  public async loginPassword(username: string, password: string): Promise<void> {
+    const session = await this.#request('LoginPassword', { username, password })
 
-  //     if (await this.#dotnet.Validate(`${session.userId}`, session.token)) {
-  //       this.#dotnet.SetSession(JSON.stringify(session ?? null))
-  //     }
-  //   })
-  // }
+    this.#emit('sessionChange', this.#session = session)
+  }
+
+  public async loginToken(userId: number, sessionToken: string): Promise<void> {
+    const session = await this.#request('LoginToken', { userId, token: sessionToken })
+
+    this.#emit('sessionChange', this.#session = session)
+  }
+
+  public async register(username: string, password: string, lastName: string, firstName: string, middleName: string | null): Promise<number> {
+    return await this.#request('Register', { username, password, lastName, firstName, middleName })
+  }
+
+  public async logout(): Promise<void> {
+    const session = this.#session
+
+    if (session == null) {
+      return
+    }
+
+    await this.#request('Logout', session)
+    this.#emit('sessionChange', this.#session = null)
+  }
+
+  public async getOwnStorageId(): Promise<number> {
+    const storageId = await this.#request('GetOwnStorageId')
+
+    return storageId
+  }
 
   get #emit() { return this.#events.bind().emit }
   get on() { return this.#events.bind().on }

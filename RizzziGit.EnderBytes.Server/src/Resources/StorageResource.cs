@@ -195,7 +195,7 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
       }
     }
 
-    public StorageResource GetByOwnerUser(ResourceService.Transaction transaction, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken)
+    public StorageResource GetByOwnerUser(ResourceService.Transaction transaction, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       return userAuthenticationToken.Enter(() =>
       {

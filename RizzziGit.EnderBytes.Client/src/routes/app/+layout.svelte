@@ -39,7 +39,7 @@
       if (session != null) {
         await (
           await $rootState.getClient()
-        ).authenticateByToken(session.userId, session.token);
+        ).loginToken(session.userId, session.token);
       }
     } catch {
       if (session != null) {

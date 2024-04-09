@@ -19,6 +19,15 @@ export enum LocaleKey {
   AuthLoginPageUsernamePlaceholder,
   AuthLoginPagePasswordPlaceholder,
   AuthLoginPageSubmit,
+
+  ClientResponse_Okay,
+  ClientResponse_LoginRequired,
+  ClientResponse_AlreadyLoggedIn,
+  ClientResponse_InvalidCredentials,
+  ClientResponse_ResourceNotFound,
+  ClientResponse_InvalidCommand,
+  ClientResponse_InvalidFormat,
+  ClientResponse_UnknownError
 }
 
 export const strings: Record<Locale, LocaleValues> = {
@@ -36,6 +45,10 @@ export function getString<L extends Locale, K extends LocaleKey>(locale: L, key:
   }
 
   return string
+}
+
+export function getClientResponseString<L extends Locale>(locale: L, responseCodeString: string) {
+  return getString(locale, (<any>LocaleKey)[(`ClientResponse_${responseCodeString}`)])
 }
 
 export function bindLocalizedString(locale: () => Locale): (key: LocaleKey, params?: Record<string, string>) => string {

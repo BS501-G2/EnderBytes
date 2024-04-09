@@ -405,6 +405,7 @@ public sealed partial class UserAuthenticationResource(UserAuthenticationResourc
 
     return cryptoTransform.TransformFinalBlock(bytes);
   }
+
   public long UserId => Data.UserId;
   public UserAuthenticationType Type => Data.Type;
 

@@ -17,15 +17,15 @@ export interface PromiseObject {
 }
 
 export class ClientError extends Error {
-  public constructor(response: Response) {
-    super(`HTTP ${response.status}: ${response.statusText}`)
+  public constructor(responseCode: number, responseCodeString: string) {
+    super(`Server response: ${responseCodeString}(${responseCode})`)
 
-    this.response = response
+    this.responseCode = responseCode
+    this.responseCodeString = responseCodeString
   }
 
-  readonly response: Response
-
-  public get error(): Response { return this.response }
+  readonly responseCode: number
+  readonly responseCodeString: string
 }
 
 type ClientEventMap = {
@@ -97,13 +97,20 @@ export class Client {
 
   readonly #dotnet: any
   readonly #events: EventEmitter<ClientEvent>
-  get state(): number { return this.#dotnet.GetState() }
-  get session(): Session | null { return JSON.parse(this.#dotnet.GetSession()); }
+  get state(): number {
+    try {
+      return this.#dotnet.GetState()
+    } catch {
+      return Client.STATE_BORKED
+    }
+  }
+  public get session(): Session | null { return this.#session }
 
   #tasks: PromiseObject[] = []
   #currentTask?: PromiseObject
   #queueRunning: boolean = false
   #sessionCache: Session | null = null
+  #session: Session | null = null
 
   async #runQueue(): Promise<void> {
     if (this.#queueRunning) {
@@ -183,21 +190,19 @@ export class Client {
 
     return this.#queue(async () => {
       let responseCode: number | null = null
-
       if (requestData instanceof ArrayBuffer) {
         responseCode = await this.#dotnet.SendRawRequest(request, new Uint8Array(requestData))
       } else {
         responseCode = await this.#dotnet.SendJsonRequest(request, JSON.stringify(requestData))
       }
 
-      const responseType = this.#dotnet.GetResponseType()
-
       if (responseCode == null) {
         throw new Error("Unknown request/response data.")
       } else if (responseCode != this.#dotnet.GetResponseInt("Okay")) {
-        throw new Error(`Response Error: ${this.#dotnet.GetResponseString(responseCode)}`)
+        throw new ClientError(responseCode, this.#getResponseString(responseCode)!)
       }
 
+      const responseType = this.#dotnet.GetResponseType()
       let responseData: ArrayBuffer | any
 
       if (responseType == 0) {
@@ -213,8 +218,6 @@ export class Client {
   public echo<T>(message: T): Promise<T> {
     return this.#request('Echo', message)
   }
-
-  #session?: Session | null = null
 
   public async loginPassword(username: string, password: string): Promise<void> {
     const session = await this.#request('LoginPassword', { username, password })
@@ -243,10 +246,20 @@ export class Client {
     this.#emit('sessionChange', this.#session = null)
   }
 
-  public async getOwnStorageId(): Promise<number> {
-    const storageId = await this.#request('GetOwnStorageId')
+  public async getOwnStorage(): Promise<any> {
+    return await this.#request('GetOwnStorage')
+  }
 
-    return storageId
+  public async resolveUserId(username: string): Promise<number | null> {
+    return await this.#request('ResolveUserId', { username })
+  }
+
+  public async getUser(userId: number): Promise<any> {
+    return await this.#request('GetUser', { userId })
+  }
+
+  public async getLoginUser(): Promise<any> {
+    return await this.getUser(this.session!.userId)
   }
 
   get #emit() { return this.#events.bind().emit }

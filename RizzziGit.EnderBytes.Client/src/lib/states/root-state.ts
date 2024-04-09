@@ -1,5 +1,5 @@
 import { ColorScheme, type ColorKey, type ColorValues, colors } from "$lib/color-schemes";
-import { Locale, LocaleKey, getString } from "$lib/locale";
+import { Locale, LocaleKey, getClientResponseString, getString } from "$lib/locale";
 import { ViewMode } from "$lib/view-mode";
 import { writable, type Writable } from "svelte/store";
 import { AppState } from "./app-state";
@@ -43,7 +43,7 @@ export class RootState {
   appState: Writable<AppState>
 
   public async getClient(): Promise<Client> {
-    const client = await Client.getInstance(new URL('ws://25.20.99.238:8083/'), {
+    const client = await Client.getInstance(new URL('ws://10.1.0.117:8083/'), {
       stateChange: (state) => RootState.state.update((value) => {
         value.connectionState = state
 
@@ -72,5 +72,9 @@ export class RootState {
     params?: Record<string, string>,
   ) {
     return getString(this.locale, key, params);
+  }
+
+  public getClientResponseString(responseCodeString: string): string {
+    return getClientResponseString(this.locale, responseCodeString)
   }
 }

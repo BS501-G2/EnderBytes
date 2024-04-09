@@ -166,12 +166,16 @@ public static partial class Client
 
     if (GetRequestString(requestCode) == null)
     {
-      throw new Exception($"Invalid request: {requestCode}.");
+      return (int)UserResponse.InvalidCommand;
     }
 
     (uint responseCode, CompositeBuffer responseBuffer) = await UserClientWebSocket!.Request(new((uint)requestCode, requestPayload.Serialize()), CancellationToken.None);
 
-    LastResponsePayload = ClientPayload.Deserialize(responseBuffer);
+    if (responseCode == (uint)UserResponse.Okay)
+    {
+      LastResponsePayload = ClientPayload.Deserialize(responseBuffer);
+    }
+
     return (int)responseCode;
   }
 }

@@ -5,6 +5,7 @@
 
   import SiteBanner from "./SiteBanner.svelte";
   import Banner from "./Banner.svelte";
+  import { ClientError } from "$lib/client/client";
 </script>
 
 <script lang="ts">
@@ -25,8 +26,22 @@
     }
   }
 
+  let errorMessage: string | null = null;
+
   async function onSubmit(username: string, password: string) {
-    const session = await (await $rootState.getClient()).loginPassword(username, password);
+    try {
+      errorMessage = null;
+
+      await (await $rootState.getClient()).loginPassword(username, password);
+    } catch (error: any) {
+      if (error instanceof ClientError) {
+        errorMessage = $rootState.getClientResponseString(error.responseCodeString)
+      } else {
+        errorMessage = error.message;
+      }
+
+      throw error;
+    }
   }
 </script>
 
@@ -53,8 +68,16 @@
           await onActivity(() => onSubmit(username, password));
         }}
       >
+        {#if errorMessage != null}
+          <p class="error-message">{errorMessage}</p>
+        {/if}
+
         <div class="field">
-          <label for="-username">{$rootState.getString(LocaleKey.AuthLoginPageUsernamePlaceholder)}</label>
+          <label for="-username"
+            >{$rootState.getString(
+              LocaleKey.AuthLoginPageUsernamePlaceholder,
+            )}</label
+          >
           <input
             type="text"
             id="-username"
@@ -67,7 +90,11 @@
           />
         </div>
         <div class="field">
-          <label for="-password">{$rootState.getString(LocaleKey.AuthLoginPagePasswordPlaceholder)}</label>
+          <label for="-password"
+            >{$rootState.getString(
+              LocaleKey.AuthLoginPagePasswordPlaceholder,
+            )}</label
+          >
           <input
             type="password"
             id="-password"
@@ -152,6 +179,19 @@
           box-sizing: border-box;
 
           gap: 16px;
+
+          > p.error-message {
+            padding: 8px;
+            margin: 0px;
+
+            min-width: 100%;
+            max-width: 100%;
+
+            box-sizing: border-box;
+
+            background-color: var(--error);
+            color: var(--onError);
+          }
 
           > div.field {
             width: 100%;

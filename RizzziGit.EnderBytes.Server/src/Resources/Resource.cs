@@ -9,6 +9,7 @@ using Commons.Memory;
 using Commons.Logging;
 
 using Services;
+using Newtonsoft.Json;
 
 public abstract partial class Resource<M, D, R>(M manager, D data)
   where M : Resource<M, D, R>.ResourceManager
@@ -331,7 +332,9 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
   public abstract partial record ResourceData(long Id, long CreateTime, long UpdateTime);
 
+  [JsonIgnore]
   public readonly M Manager = manager;
+  [JsonIgnore]
   protected D Data { get; private set; } = data;
 
   public event ResourceUpdateHandler? Updated;
@@ -341,6 +344,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
   public long CreateTime => Data.CreateTime;
   public long UpdateTime => Data.UpdateTime;
 
+  [JsonIgnore]
   public bool IsValid => Manager.IsResourceValid((R)this);
   public void ThrowIfInvalid() => Manager.ThrowIfResourceInvalid((R)this);
 

@@ -1,13 +1,13 @@
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
-using System.Text.Json.Serialization;
 
 namespace RizzziGit.EnderBytes.Resources;
 
 using Utilities;
 using DatabaseWrappers;
 using Services;
+using Newtonsoft.Json;
 
 public sealed partial class UserResource(UserResource.ResourceManager manager, UserResource.ResourceData data) : Resource<UserResource.ResourceManager, UserResource.ResourceData, UserResource>(manager, data)
 {

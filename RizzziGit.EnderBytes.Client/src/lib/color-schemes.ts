@@ -13,12 +13,21 @@ export enum ColorKey {
 
   PrimaryVariant = 'primaryVariant',
   OnPrimaryVariant = 'onPrimaryVariant',
-  PrimaryVariantContainer = 'primaryVariantContainer',
-  OnPrimaryVariantContainer = 'onPrimaryVariantContainer',
+  PrimaryContainerVariant = 'primaryContainerVariant',
+  OnPrimaryContainierVariant = 'onPrimaryContainerVariant',
 
   Background = 'background',
   BackgroundVariant = 'backgroundVariant',
   OnBackground = 'onBackground',
+
+  Error = 'error',
+  OnError = 'onError',
+
+  Warning = 'warning',
+  OnWarning = 'onWarning',
+
+  Info = 'info',
+  OnInfo = 'onInfo'
 }
 export const intColorToHex = (color: number): string => `#${color.toString(16)}`
 

@@ -12,7 +12,7 @@
   const rootState = RootState.state;
 
   function onResize() {
-    $rootState.viewMode =
+    const newViewMode =
       (window.matchMedia("(max-width: 768px)").matches
         ? ViewMode.Mobile
         : ViewMode.Desktop) |
@@ -23,6 +23,10 @@
         : window.matchMedia("(display-mode: fullscreen)").matches
           ? ViewMode.Fullscreen
           : ViewMode.Browser);
+
+    if (newViewMode != $rootState.viewMode) {
+      $rootState.viewMode = newViewMode
+    }
   }
 
   function loadSettings() {

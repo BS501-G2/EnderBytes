@@ -6,5 +6,5 @@ import {
 
 import { locale as en_US } from './en-us'
 
-export const locale: () => LocaleValues = () => (Object.assign(en_US(), {
+export const locale: () => LocaleValues = () => (Object.assign(structuredClone(en_US()), {
 }))

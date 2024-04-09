@@ -1,7 +1,7 @@
 <script lang="ts" context="module">
   import { LocaleKey } from "$lib/locale";
   import { RootState } from "$lib/states/root-state";
-    import { _getUrl as faviconSrc } from "../../../dynamic-icons/[size]/favicon.svg/+server";
+  import { _getUrl as faviconSrc } from "../../../../routes/dynamic-icons/[size]/favicon.svg/+server";
 </script>
 
 <script lang="ts">

@@ -10,6 +10,7 @@
     onDismiss();
   };
 
+  export let dim: boolean = false
   export let offsetX: number;
   export let offsetY: number;
   export let onDismiss: () => void;
@@ -19,7 +20,7 @@
   let element: HTMLElement;
 </script>
 
-<button on:click={onClick}>
+<button on:click={onClick} style="{dim ? "background-color: #0000003f" : ""}">
   <div
     class="container"
     style="margin-left: {offsetX}px; margin-top: {offsetY}px;"

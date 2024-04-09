@@ -55,10 +55,16 @@ public enum UserRequest : uint
 
   LoginToken, LoginPassword, Register, Logout,
 
-  GetOwnStorageId
+  ResolveUserId,
+
+  GetOwnStorage, GetUser
 }
 
 public enum UserResponse : uint
 {
-  Okay, LoginRequired, AlreadyLoggedIn, InvalidCredentials, InvalidCommand, InvalidFormat, UnknownError
+  Okay, LoginRequired, AlreadyLoggedIn, InvalidCredentials,
+
+  ResourceNotFound,
+
+  InvalidCommand, InvalidFormat, UnknownError
 }

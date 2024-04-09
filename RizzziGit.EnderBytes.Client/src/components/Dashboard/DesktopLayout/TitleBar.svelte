@@ -1,6 +1,6 @@
 <script lang="ts">
   import ActionChip from "./TitleBar/ActionChip.svelte";
-import AppTitle from "./TitleBar/AppTitle.svelte";
+  import AppTitle from "./TitleBar/AppTitle.svelte";
   import SearchBar from "./TitleBar/SearchBar.svelte";
 </script>
 

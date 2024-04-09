@@ -4,9 +4,9 @@
 <script lang="ts">
   import { RootState } from "$lib/states/root-state";
 
-  import LeftPanelNavigationBar from "./LeftPanelNavigationBar.svelte";
-  import LeftPanelAccountBar from "./LeftPanelAccountBar.svelte";
-  import TitleBar from "./TitleBar.svelte";
+  import LeftPanelNavigationBar from "./DesktopLayout/LeftPanelNavigationBar.svelte";
+  import LeftPanelAccountBar from "./DesktopLayout/LeftPanelAccountBar.svelte";
+  import TitleBar from "./DesktopLayout/TitleBar.svelte";
 
   const rootState = RootState.state;
   const appState = $rootState.appState;
@@ -57,6 +57,7 @@
 
     > div.left-panel {
       min-width: 256px;
+      max-width: 256px;
       height: 100%;
 
       background-color: var(--primaryContainer);

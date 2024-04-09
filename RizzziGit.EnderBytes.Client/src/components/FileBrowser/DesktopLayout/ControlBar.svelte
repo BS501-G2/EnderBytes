@@ -78,6 +78,8 @@
     flex-direction: row;
     gap: 8px;
 
+    border-bottom: solid 1px var(--primaryContainer);
+
     > div.divider {
       width: 1px;
       background-color: var(--onBackground);

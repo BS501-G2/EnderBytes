@@ -1,6 +1,6 @@
 <script>
 
-    import { ImageIcon, MoreHorizontalIcon } from "svelte-feather-icons";
+    import { ImageIcon, MoreHorizontalIcon, Trash2Icon, EditIcon, Share2Icon } from "svelte-feather-icons";
 
 </script>
 
@@ -11,9 +11,6 @@
     <style>
         body{
           margin:0px;
-        }
-        .starred-browser{
-          border-radius: 30px;
         }
         .starred-section{
           display: grid;
@@ -50,8 +47,7 @@
           width: 250px;
           align-items: center;
           overflow: auto;
-          margin-top: 20px;
-          flex-shrink: 10;
+          margin-bottom: 20px;
         }
         .fileIcon{
           display: flex;
@@ -79,6 +75,18 @@
         .moreIcon{
           margin: 2px;
           align-self: flex-end;
+        }
+        .my-icon1{
+          font-size: 40px;
+          margin: auto;
+          width: 50%;
+          padding-right; 50px;
+        }
+        .my-icon2{
+
+        }
+        .my-icon3{
+
         }
         .starred-preview{
             background-color: whitesmoke;
@@ -793,6 +801,9 @@
                 <div class="previewfileType">fileTypePlaceholder</div>
                 <div class="previewFileSize">fileSizePlaceholder</div>
                 <div class="previewFileDate">00/00/0000</div>
+                <div class="my-icon1"><Trash2Icon/></div>
+                <div class="my-icon2"><Share2Icon/></div>
+                <div class="my-icon3"><EditIcon/></div>
               </div>
 
             </div>

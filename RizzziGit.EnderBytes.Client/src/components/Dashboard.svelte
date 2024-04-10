@@ -13,7 +13,6 @@
   import MobileLayout from "./Dashboard/MobileLayout.svelte";
 
   const rootState = RootState.state;
-  const appState = $rootState.appState;
 
   export let client: Client;
 

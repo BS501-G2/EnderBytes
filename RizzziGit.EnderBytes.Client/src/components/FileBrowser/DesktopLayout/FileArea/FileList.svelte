@@ -12,7 +12,8 @@
 
   export let client: Client;
   export let file: any;
-  export let selectedFileIds: number[] = [];
+  export let selectedFileIds: number[];
+  export let onRefresh: () => void
 
   let loadPromise: Promise<number[]> | null;
   async function load(): Promise<number[]> {
@@ -20,6 +21,15 @@
   }
 
   onMount(() => (loadPromise = load()));
+
+  $: {
+    file
+    loadPromise = load()
+  }
+
+  onRefresh = () => {
+    loadPromise = load()
+  }
 </script>
 
 {#if loadPromise == null}

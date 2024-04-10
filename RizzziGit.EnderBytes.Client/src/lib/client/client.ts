@@ -250,6 +250,10 @@ export class Client {
     return await this.#request('GetOwnStorage')
   }
 
+  public async getOwnStorageId(): Promise<number> {
+    return (await this.getOwnStorage()).Id
+  }
+
   public async resolveUserId(username: string): Promise<number | null> {
     return await this.#request('ResolveUserId', { username })
   }

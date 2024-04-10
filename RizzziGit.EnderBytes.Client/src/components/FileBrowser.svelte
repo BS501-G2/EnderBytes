@@ -18,9 +18,12 @@
 </script>
 
 {#if $rootState.viewMode & ViewMode.Desktop}
-  <DesktopLayout {client} {currentFileId} bind:fileCreationDialog />
+  <DesktopLayout {client} bind:currentFileId bind:fileCreationDialog />
 {/if}
 
 {#if fileCreationDialog}
-  <FileCreationDialog {client} onDismiss={() => (fileCreationDialog = false)} />
+  <FileCreationDialog
+    {client}
+    onDismiss={() => (fileCreationDialog = false)}
+  />
 {/if}

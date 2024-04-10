@@ -4,21 +4,30 @@
 
   import FileBrowser from "../../../components/FileBrowser.svelte";
   import { RootState } from "$lib/states/root-state";
+  import { onNavigate } from "$app/navigation";
 
   const rootState = RootState.state;
 
   let currentFileId: number | null | undefined = undefined;
 
-  onMount(() => {
-    const currentId = $page.url.pathname.split("/")[3] ?? null;
+  function update(url: URL) {
+    const currentId = url.pathname.split("/")[3] ?? null;
 
     currentFileId =
       (currentId != null ? Number.parseInt(currentId) : null) ?? null;
+  }
+
+  onMount(() => {
+    update($page.url);
+  });
+
+  onNavigate((navigation) => {
+    update(navigation.to?.url ?? navigation.from?.url ?? $page.url);
   });
 </script>
 
 {#if currentFileId !== undefined}
   {#await $rootState.getClient() then client}
-    <FileBrowser {client} {currentFileId} />
+    <FileBrowser {client} bind:currentFileId />
   {/await}
 {/if}

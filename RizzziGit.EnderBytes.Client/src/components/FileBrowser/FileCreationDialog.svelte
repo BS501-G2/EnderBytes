@@ -12,6 +12,7 @@
 
 <Dialog
   dialogClass={DialogClass.Normal}
+  title="Create New File"
   onDismiss={() => {
     if (busy) {
       return;
@@ -36,7 +37,6 @@
     },
   ]}
 >
-  <b slot="head">Create new File</b>
   <div slot="body" class="file-creation-dialog"></div>
 </Dialog>
 

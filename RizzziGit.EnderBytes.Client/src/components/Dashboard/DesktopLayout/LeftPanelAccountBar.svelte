@@ -31,10 +31,10 @@
         },
       },
     ]}
+    title="Account Logout"
     onDismiss={() => (logoutConfirm = false)}
   >
-    <b slot="head">Account Logout</b>
-    <p slot="body">This will log you out from the dashboard.</p>
+    <span slot="body">This will log you out from the dashboard.</span>
   </Dialog>
 {/if}
 

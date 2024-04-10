@@ -20,12 +20,13 @@
   export let onDismiss: () => void;
   export let dialogClass: DialogClass;
   export let buttons: DialogButton[];
+  export let title: string = "";
 </script>
 
 <Modal {onDismiss}>
   <div class="dialog {dialogClass}">
     <div class="head">
-      <slot name="head" />
+      <h2>{title}</h2>
     </div>
     <div class="body">
       <slot name="body" />
@@ -54,8 +55,14 @@
     display: flex;
     flex-direction: column;
 
+    gap: 8px;
+
     > div.head {
       text-align: left;
+
+      > h2 {
+        margin: 0px;
+      }
     }
 
     > div.body {

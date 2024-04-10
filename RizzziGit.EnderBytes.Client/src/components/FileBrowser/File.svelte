@@ -5,19 +5,27 @@
   import { onMount } from "svelte";
   import Loading from "../Loading.svelte";
 
+  import { AlertTriangleIcon } from "svelte-feather-icons";
+
   export let client: Client;
   export let fileId: number;
   export let selected: boolean = false;
 
   export let onClick: () => void;
 
-  const rootState = RootState.state;
   let hovered: boolean = false;
+  let errored: boolean = false;
 
   let loadPromise: Promise<any> | null = null;
   async function load(): Promise<any> {
-    await new Promise<void>((resolve) => setTimeout(resolve, 1000))
-    return await client.getFile(fileId);
+    errored = false;
+    try {
+      return await client.getFile(fileId);
+    } catch (error) {
+      errored = true;
+
+      throw error;
+    }
   }
 
   onMount(() => (loadPromise = load()));
@@ -27,7 +35,14 @@
   class="file-entry {selected ? 'selected' : ''}"
   on:pointerenter={() => (hovered = true)}
   on:pointerleave={() => (hovered = false)}
-  on:click={onClick}
+  on:click={() => {
+    if (!errored) {
+      onClick();
+      return;
+    }
+
+    loadPromise = load();
+  }}
   on:dblclick={() => goto("/app/files/" + fileId)}
 >
   <div class="overlay">
@@ -49,6 +64,10 @@
         <div class="file-preview">
           <img class="file-preview" src="/favicon.svg" alt="asd" />
         </div>
+      {:catch}
+        <div class="file-preview" style="padding: 16px; color: red">
+          <AlertTriangleIcon size="100%" />
+        </div>
       {/await}
     {/if}
     <div class="file-info">
@@ -60,6 +79,8 @@
             Loading...
           {:then file}
             {file.Name}
+          {:catch}
+            [error]
           {/await}
         {/if}</span
       >

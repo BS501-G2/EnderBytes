@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onNavigate } from "$app/navigation";
   import type { Client } from "$lib/client/client";
   import AddressBar from "./DesktopLayout/AddressBar.svelte";
   import ControlBar from "./DesktopLayout/ControlBar.svelte";
@@ -6,17 +7,27 @@
 
   export let currentFileId: number | null;
   export let client: Client;
-  export let fileCreationDialog: boolean
+  export let fileCreationDialog: boolean;
 
   let selectedFileIds: number[] = [];
+  let onRefresh: () => void
 
-  $: console.log(fileCreationDialog)
+  $: {
+    currentFileId;
+    selectedFileIds = [];
+  }
 </script>
 
 <div class="container">
-  <AddressBar {client} {currentFileId} />
-  <ControlBar {client} {currentFileId} bind:fileCreationDialog bind:selectedFileIds />
-  <FileArea {client} {currentFileId} bind:selectedFileIds />
+  <AddressBar {client} bind:currentFileId />
+  <ControlBar
+    {client}
+    bind:currentFileId
+    bind:fileCreationDialog
+    bind:selectedFileIds
+    bind:onRefresh
+  />
+  <FileArea {client} bind:onRefresh bind:currentFileId bind:selectedFileIds />
 </div>
 
 <style lang="scss">

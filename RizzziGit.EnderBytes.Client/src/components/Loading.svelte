@@ -1,16 +1,61 @@
 <!-- https://www.benmvp.com/blog/how-to-create-circle-svg-gradient-loading-spinner -->
 
-<script lang="ts">
-  import { ColorKey } from "$lib/color-schemes";
-  import { RootState } from "$lib/states/root-state";
+<script lang="ts" context="module">
+  import { writable, type Writable } from "svelte/store";
+  let spinner: Writable<number> = writable(0);
+  let activeCount: number = 0;
 
-  const rootState = RootState.state;
+  spinner.subscribe(console.log);
+
+  function connect() {
+    if (activeCount == 0) {
+      const update = () => {
+        if (activeCount <= 0) {
+          activeCount = 0;
+
+          return;
+        }
+
+        spinner.update((v) => {
+          v += 6;
+
+          if (v >= 360) {
+            v = 0;
+          }
+
+          return v;
+        });
+
+        requestAnimationFrame(update);
+      };
+
+      activeCount++;
+      requestAnimationFrame(update);
+      return;
+    } else {
+      activeCount++;
+    }
+  }
+
+  function disconnect() {
+    activeCount--;
+  }
+</script>
+
+<script lang="ts">
+  import { onDestroy, onMount } from "svelte";
+
+  onMount(() => {
+    connect();
+  });
+
+  onDestroy(() => disconnect());
 </script>
 
 <svg
   viewBox="0 0 200 200"
-  color={$rootState.getColorHex(ColorKey.Primary)}
   fill="none"
+  style="transform: rotate({$spinner}deg);"
   xmlns="http://www.w3.org/2000/svg"
 >
   <defs>
@@ -35,14 +80,14 @@
     />
   </g>
 
-  <animateTransform
+  <!-- <animateTransform
     from="0 0 0"
     to="360 0 0"
     attributeName="transform"
     type="rotate"
     repeatCount="indefinite"
     dur="1300ms"
-  />
+  /> -->
 </svg>
 
 <style lang="scss">

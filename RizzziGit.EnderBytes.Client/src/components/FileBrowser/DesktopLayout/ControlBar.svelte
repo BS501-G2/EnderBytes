@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Client } from "$lib/client/client";
   import { RootState } from "$lib/states/root-state";
+  import { onMount } from "svelte";
 
   import {
     PlusCircleIcon,
@@ -9,12 +10,26 @@
     TrashIcon,
     ShareIcon,
     UsersIcon,
+    RefreshCwIcon,
   } from "svelte-feather-icons";
 
   export let client: Client;
   export let currentFileId: number | null;
-  export let selectedFileIds: number[] = [];
-  export let fileCreationDialog: boolean
+  export let selectedFileIds: number[];
+  export let fileCreationDialog: boolean;
+  export let onRefresh: () => void;
+
+  let file: any | null;
+
+  async function update() {
+    if (currentFileId != null) {
+      file = await client.getFile(currentFileId);
+    }
+  }
+
+  onMount(() => {
+    update();
+  });
 </script>
 
 <div class="controls">
@@ -25,6 +40,14 @@
     </button>
   </div>
   <div class="divider"></div>
+  {#if file?.Type === 1}
+    <div class="button" title="Refresh">
+      <button on:click={onRefresh}>
+        <RefreshCwIcon />
+        <p>Refresh</p>
+      </button>
+    </div>
+  {/if}
   <div class="button" title="Move To">
     <button disabled={selectedFileIds.length == 0}>
       <ScissorsIcon />

@@ -1,33 +1,68 @@
 <script lang="ts">
-  export let name: string;
-  export let selected: boolean | null = null;
+  import { goto } from "$app/navigation";
+  import type { Client } from "$lib/client/client";
+  import { RootState } from "$lib/states/root-state";
+  import { onMount } from "svelte";
+  import Loading from "../Loading.svelte";
 
+  export let client: Client;
+  export let fileId: number;
+  export let selected: boolean = false;
+
+  export let onClick: () => void;
+
+  const rootState = RootState.state;
   let hovered: boolean = false;
 
-  function onClick() {
-    if (selected == null) {
-      return;
-    }
-
-    selected = !selected;
+  let loadPromise: Promise<any> | null = null;
+  async function load(): Promise<any> {
+    await new Promise<void>((resolve) => setTimeout(resolve, 1000))
+    return await client.getFile(fileId);
   }
+
+  onMount(() => (loadPromise = load()));
 </script>
 
 <button
-  class="file-entry"
+  class="file-entry {selected ? 'selected' : ''}"
   on:pointerenter={() => (hovered = true)}
   on:pointerleave={() => (hovered = false)}
   on:click={onClick}
+  on:dblclick={() => goto("/app/files/" + fileId)}
 >
   <div class="overlay">
     {#if selected || hovered}
-      <input type="checkbox" disabled checked={selected ?? false} />
+      <input type="checkbox" disabled checked={selected} />
     {/if}
   </div>
   <div class="base">
-    <img class="file-preview" src="/favicon.svg" alt="asd" />
+    {#if loadPromise == null}
+      <div class="file-preview" style="padding: 16px">
+        <Loading></Loading>
+      </div>
+    {:else}
+      {#await loadPromise}
+        <div class="file-preview" style="padding: 16px">
+          <Loading></Loading>
+        </div>
+      {:then}
+        <div class="file-preview">
+          <img class="file-preview" src="/favicon.svg" alt="asd" />
+        </div>
+      {/await}
+    {/if}
     <div class="file-info">
-      <span class="file-name" bind:textContent={name} contenteditable="false" />
+      <span class="file-name">
+        {#if loadPromise == null}
+          Loading...
+        {:else}
+          {#await loadPromise}
+            Loading...
+          {:then file}
+            {file.Name}
+          {/await}
+        {/if}</span
+      >
     </div>
   </div>
 </button>
@@ -64,11 +99,17 @@
     }
 
     > div.base {
-      > img.file-preview {
+      > div.file-preview {
         width: 128px;
         height: 128px;
 
+        padding: 8px;
         box-sizing: border-box;
+
+        > img {
+          width: 100%;
+          height: 100%;
+        }
       }
 
       > div.file-info {
@@ -89,6 +130,12 @@
         }
       }
     }
+  }
+
+  button.file-entry.selected {
+    border-color: var(--primaryContainer);
+    background-color: var(--primary);
+    color: var(--onPrimary);
   }
 
   button.file-entry:hover {

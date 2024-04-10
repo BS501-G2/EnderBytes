@@ -1,21 +1,15 @@
 <script lang="ts">
-  import { type Writable } from 'svelte/store'
   import { FolderIcon } from "svelte-feather-icons";
-
-  import { goto } from "$app/navigation";
 
   import { RootState } from "$lib/states/root-state";
 
   import Overlay from "../../Overlay.svelte";
-  import { FileBrowserState } from '../../FileBrowser.svelte'
+    import type { Client } from "$lib/client/client";
 
-  export let fileBrowserState: Writable<FileBrowserState>
+  export let client: Client
+  export let currentFileId: number | null
 
   const rootState = RootState.state;
-  const appState = $rootState.appState;
-  const fileState = $appState.fileState;
-
-  $: currentPath = $fileState.currentFileId ? [$fileState.currentFileId] : [];
 
   const strings: string[] = [
     "Root",
@@ -36,8 +30,6 @@
   let menuOffsetX: number = 0;
   let menuOffsetY: number = 0;
   let menuOpen: boolean = false;
-
-  fileState.subscribe(console.log);
 </script>
 
 <div class="address">

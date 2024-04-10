@@ -1,30 +1,39 @@
 <script lang="ts">
-  import { type Writable } from "svelte/store";
+  import { RootState } from "$lib/states/root-state";
 
-  import File from "../File.svelte";
+  import { onMount } from "svelte";
+  import LoadingPage from "../../LoadingPage.svelte";
+  import FileList from "./FileArea/FileList.svelte";
+  import type { Client } from "$lib/client/client";
 
-  import { FileBrowserState } from "../../FileBrowser.svelte";
+  export let client: Client;
+  export let currentFileId: number | null;
+  export let selectedFileIds: number[] = [];
 
-  export let fileBrowserState: Writable<FileBrowserState>;
+  let loadPromise: Promise<any> | null = null;
+  async function load(): Promise<any> {
+    return await client.getFile(currentFileId ?? await client.getRootFolderId());
+  }
 
-  let files: string[] = ["test", "test2", "kasl alsd alskjcalsca sdk asd"];
-
-  files = files.concat(files);
-  files = files.concat(files);
-  files = files.concat(files);
-  files = files.concat(files);
+  onMount(() => (loadPromise = load()));
 </script>
 
 <div class="file-area">
-  <div class="file-list">
-    {#each files as file}
-      <File name={file} selected={false} />
-    {/each}
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="file-details"></div>
+  {#if loadPromise == null}
+    <LoadingPage />
+  {:else}
+    {#await loadPromise}
+      <LoadingPage />
+    {:then file}
+      {#if file == null}
+        <p>error</p>
+      {:else if file.Type == 0}
+        <p>a</p>
+      {:else if file.Type == 1}
+        <FileList {client} {file} bind:selectedFileIds />
+      {/if}
+    {/await}
+  {/if}
 </div>
 
 <style lang="scss">
@@ -34,31 +43,6 @@
     flex-grow: 1;
     min-height: 0px;
 
-    > div.file-list {
-      flex-grow: 1;
-
-      padding: 16px;
-
-      display: flex;
-      flex-wrap: wrap;
-      align-content: flex-start;
-      justify-content: start;
-      gap: 8px;
-
-      overflow: auto;
-      min-height: 0px;
-    }
-
-    > div.divider {
-      min-width: 1px;
-      background-color: var(--primaryContainer);
-    }
-
-    > div.file-details {
-      min-width: 320px;
-      flex-grow: 1;
-
-      padding: 16px;
-    }
+    user-select: none;
   }
 </style>

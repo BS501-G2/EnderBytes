@@ -1,51 +1,40 @@
 <script lang="ts">
-  import { type Writable } from 'svelte/store'
-
+  import type { Client } from "$lib/client/client";
   import { RootState } from "$lib/states/root-state";
-
-  import { FileBrowserState } from '../../FileBrowser.svelte'
 
   import {
     PlusCircleIcon,
     ScissorsIcon,
     CopyIcon,
-    ClipboardIcon,
     TrashIcon,
     ShareIcon,
     UsersIcon,
   } from "svelte-feather-icons";
 
-  export let fileBrowserState: Writable<FileBrowserState>
-
-  const rootState = RootState.state;
-  const appState = $rootState.appState;
-  const fileState = $appState.fileState;
+  export let client: Client;
+  export let currentFileId: number | null;
+  export let selectedFileIds: number[] = [];
+  export let fileCreationDialog: boolean
 </script>
 
 <div class="controls">
   <div class="button" title="New Item">
-    <button>
+    <button on:click={() => (fileCreationDialog = true)}>
       <PlusCircleIcon />
       <p>New Item</p>
     </button>
   </div>
   <div class="divider"></div>
-  <div class="button" title="Cut">
-    <button disabled={$fileState.selectedIds.length == 0}>
+  <div class="button" title="Move To">
+    <button disabled={selectedFileIds.length == 0}>
       <ScissorsIcon />
-      <p>Cut</p>
+      <p>Move To</p>
     </button>
   </div>
-  <div class="button" title="Copy">
-    <button disabled={$fileState.selectedIds.length == 0}>
+  <div class="button" title="Copy To">
+    <button disabled={selectedFileIds.length == 0}>
       <CopyIcon />
-      <p>Copy</p>
-    </button>
-  </div>
-  <div class="button" title="Paste">
-    <button>
-      <ClipboardIcon />
-      <p>Paste</p>
+      <p>Copy To</p>
     </button>
   </div>
   <div class="button" title="Share">

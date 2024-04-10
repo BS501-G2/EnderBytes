@@ -7,13 +7,15 @@
   import { RootState } from "$lib/states/root-state";
   import { ViewMode } from "$lib/view-mode";
   import { LocaleKey } from "$lib/locale";
-  import type { Session } from "$lib/client/client";
+  import type { Client, Session } from "$lib/client/client";
 
   import DesktopLayout from "./Dashboard/DesktopLayout.svelte";
   import MobileLayout from "./Dashboard/MobileLayout.svelte";
 
   const rootState = RootState.state;
   const appState = $rootState.appState;
+
+  export let client: Client;
 
   onMount(async () => {
     void (await $rootState.getClient()).on("sessionChange", (sessionToken) => {
@@ -75,7 +77,7 @@
   <slot />
 {:else if $rootState.sessionToken != null}
   {#if $rootState.viewMode & ViewMode.Desktop}
-    <DesktopLayout>
+    <DesktopLayout {client}>
       <slot slot="layout-slot" />
     </DesktopLayout>
   {:else}

@@ -4,6 +4,7 @@ import { ViewMode } from "$lib/view-mode";
 import { writable, type Writable } from "svelte/store";
 import { AppState } from "./app-state";
 import { Client, type Session } from "$lib/client/client";
+import { KeyboardState } from "../../components/Keyboard.svelte";
 
 export class RootState {
   static #state?: Writable<RootState>
@@ -32,6 +33,7 @@ export class RootState {
     this.connectionState = Client.STATE_NOT_CONNECTED;
 
     this.appState = writable(new AppState())
+    this.keyboardState = writable(new KeyboardState())
   }
 
   theme: ColorScheme;
@@ -41,6 +43,7 @@ export class RootState {
 
   sessionToken: Session | null
   appState: Writable<AppState>
+  keyboardState: Writable<KeyboardState>
 
   public async getClient(): Promise<Client> {
     const client = await Client.getInstance(new URL('ws://10.1.0.117:8083/'), {
@@ -64,7 +67,7 @@ export class RootState {
   }
 
   public getColorHex<T extends ColorKey>(key: T): string {
-    return `${this.getColor(key).toString(16) ?? 'transparent'}`
+    return `#${this.getColor(key).toString(16).padStart(8, '0') ?? 'transparent'}`
   }
 
   public getString<T extends LocaleKey>(

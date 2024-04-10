@@ -7,11 +7,15 @@
   import LeftPanelNavigationBar from "./DesktopLayout/LeftPanelNavigationBar.svelte";
   import LeftPanelAccountBar from "./DesktopLayout/LeftPanelAccountBar.svelte";
   import TitleBar from "./DesktopLayout/TitleBar.svelte";
+  import Keyboard from "../Keyboard.svelte";
+  import type { Client } from "$lib/client/client";
+
+  export let client: Client;
 
   const rootState = RootState.state;
-  const appState = $rootState.appState;
-  const fileState = $appState.fileState;
 </script>
+
+<Keyboard />
 
 <div class="viewport">
   <TitleBar></TitleBar>
@@ -20,7 +24,7 @@
     <div class="panel left-panel">
       <LeftPanelNavigationBar />
       <div class="divider"></div>
-      <LeftPanelAccountBar />
+      <LeftPanelAccountBar {client} />
     </div>
 
     <div class="panel right-panel">

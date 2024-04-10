@@ -5,44 +5,47 @@
   import { UserIcon, LogOutIcon, SettingsIcon } from "svelte-feather-icons";
   import Dialog, { DialogClass } from "../../../components/Dialog.svelte";
   import { ButtonClass } from "../../../components/Button.svelte";
+  import type { Client } from "$lib/client/client";
+
+  export let client: Client;
 
   const rootState = RootState.state;
 
   let logoutConfirm: boolean = false;
 </script>
 
-{#await $rootState.getClient() then client}
-  {#if logoutConfirm}
-    <Dialog
-      dialogClass={DialogClass.Normal}
-      buttons={[
-        {
-          label: "OK",
-          buttonClass: ButtonClass.PrimaryContainer,
-          onClick: () => client.logout(),
+{#if logoutConfirm}
+  <Dialog
+    dialogClass={DialogClass.Normal}
+    buttons={[
+      {
+        label: "OK",
+        buttonClass: ButtonClass.Primary,
+        onClick: () => client.logout(),
+      },
+      {
+        label: "Cancel",
+        buttonClass: ButtonClass.Background,
+        onClick: () => {
+          logoutConfirm = false;
         },
-        {
-          label: "Cancel",
-          buttonClass: ButtonClass.PrimaryContainer,
-          onClick: () => {
-            logoutConfirm = false;
-          },
-        },
-      ]}
-      onDismiss={() => (logoutConfirm = false)}
-    >
-      <h2 slot="header" style="margin: 0px;">Account Logout</h2>
-      <p slot="body">This will log you out from the dashboard.</p>
-    </Dialog>
-  {/if}
+      },
+    ]}
+    onDismiss={() => (logoutConfirm = false)}
+  >
+    <b slot="head">Account Logout</b>
+    <p slot="body">This will log you out from the dashboard.</p>
+  </Dialog>
+{/if}
 
-  <div class="account">
-    <button
-      class="account-info"
-      on:click={() => goto(`/app/profile/:${client.session?.userId ?? "null"}`)}
-    >
-      <UserIcon />
-      <p>
+<div class="account">
+  <button
+    class="account-info"
+    on:click={() => goto(`/app/profile/:${client.session?.userId ?? "null"}`)}
+  >
+    <UserIcon />
+    <p>
+      {#if client.session != null}
         {#await client.getLoginUser()}
           ...
         {:then user}
@@ -50,14 +53,14 @@
             ? `${user.MiddleName[0]}.`
             : ""}
         {/await}
-      </p>
-    </button>
-    <div class="account-actions">
-      <button on:click={() => (logoutConfirm = true)}><LogOutIcon /></button>
-      <button on:click={() => goto("/app/settings")}><SettingsIcon /></button>
-    </div>
+      {/if}
+    </p>
+  </button>
+  <div class="account-actions">
+    <button on:click={() => (logoutConfirm = true)}><LogOutIcon /></button>
+    <button on:click={() => goto("/app/settings")}><SettingsIcon /></button>
   </div>
-{/await}
+</div>
 
 <style lang="scss">
   div.account {

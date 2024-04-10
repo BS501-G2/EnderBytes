@@ -8,6 +8,7 @@
   export interface DialogButton {
     label: string;
     buttonClass?: ButtonClass;
+    enabled?: boolean;
     onClick: () => void | Promise<void>;
   }
 </script>
@@ -23,8 +24,8 @@
 
 <Modal {onDismiss}>
   <div class="dialog {dialogClass}">
-    <div class="header">
-      <slot name="header" />
+    <div class="head">
+      <slot name="head" />
     </div>
     <div class="body">
       <slot name="body" />
@@ -36,6 +37,7 @@
             onClick={button.onClick}
             buttonClass={button.buttonClass ?? ButtonClass.Primary}
             label={button.label}
+            enabled={button.enabled ?? true}
           />
         </div>
       {/each}
@@ -49,7 +51,10 @@
     border-radius: 8px;
     box-shadow: gray 2px 2px 8px;
 
-    > div.header {
+    display: flex;
+    flex-direction: column;
+
+    > div.head {
       text-align: left;
     }
 
@@ -57,6 +62,7 @@
       text-align: left;
 
       margin: 16px 0px 16px 0px;
+      box-sizing: border-box;
     }
 
     > div.actions {

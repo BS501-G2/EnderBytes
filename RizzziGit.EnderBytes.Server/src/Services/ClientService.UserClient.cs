@@ -215,6 +215,89 @@ public sealed partial class ClientService
 
         return new ClientPayload.JSON(JToken.FromObject(user));
       });
+      Handlers.Add(UserRequest.ScanFolder, (userAuthenticationToken, request, transaction, cancellationToken) =>
+      {
+        JObject requestData = AsJson<JObject>(request);
+
+        List<long> ids = [];
+
+        long? folderId = (long?)requestData["folderId"];
+
+        if (folderId == null)
+        {
+          StorageResource storage = transaction.GetManager<StorageResource.ResourceManager>().GetByOwnerUser(transaction, userAuthenticationToken, cancellationToken);
+          FileResource folder = transaction.GetManager<StorageResource.ResourceManager>().GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+
+          foreach (FileResource file in transaction.GetManager<FileResource.ResourceManager>().ScanFolder(transaction, storage, folder, userAuthenticationToken, cancellationToken))
+          {
+            ids.Add(file.Id);
+          }
+        }
+        else
+        {
+          if (
+            !transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, (long)folderId, out FileResource? folder, cancellationToken) ||
+            !transaction.GetManager<StorageResource.ResourceManager>().TryGetById(transaction, folder.StorageId, out StorageResource? remoteStorage, cancellationToken)
+          )
+          {
+            throw new RequestError(UserResponse.ResourceNotFound);
+          }
+
+          foreach (FileResource file in transaction.GetManager<FileResource.ResourceManager>().ScanFolder(transaction, remoteStorage, folder, userAuthenticationToken, cancellationToken))
+          {
+            ids.Add(file.Id);
+          }
+        }
+
+
+        return new ClientPayload.JSON(JToken.FromObject(ids));
+      });
+      Handlers.Add(UserRequest.GetFile, (userAuthentication, request, transaction, cancellationToken) =>
+      {
+        JObject requestData = AsJson<JObject>(request);
+
+        long fileId = (long)requestData["fileId"]!;
+
+        if (!transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, fileId, out FileResource? file, cancellationToken))
+        {
+          throw new RequestError(UserResponse.ResourceNotFound);
+        }
+
+        return new ClientPayload.JSON(JToken.FromObject(file));
+      });
+      Handlers.Add(UserRequest.CreateFolder, (userAuthenticationToken, request, transaction, cancellationToken) =>
+      {
+        JObject requestData = AsJson<JObject>(request);
+
+        string name = (string)requestData["name"]!;
+        long? folderId = (long?)requestData["folderId"];
+
+        if (folderId == null)
+        {
+          StorageResource storage = transaction.GetManager<StorageResource.ResourceManager>().GetByOwnerUser(transaction, userAuthenticationToken, cancellationToken);
+          FileResource folder = transaction.GetManager<StorageResource.ResourceManager>().GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+
+          folderId = folder.Id;
+        }
+
+        if (
+          !transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, (long)folderId, out FileResource? parentFolder, cancellationToken) ||
+          !transaction.GetManager<StorageResource.ResourceManager>().TryGetById(transaction, parentFolder.StorageId, out StorageResource? remoteStorage, cancellationToken)
+        )
+        {
+          throw new RequestError(UserResponse.ResourceNotFound);
+        }
+
+        FileResource newFolder = transaction.GetManager<FileResource.ResourceManager>().CreateFolder(transaction, remoteStorage, parentFolder, name, userAuthenticationToken, cancellationToken);
+        return new ClientPayload.JSON(JToken.FromObject(newFolder.Id));
+      });
+
+      Handlers.Add(UserRequest.GetRootFolderId, (userAuthenticationToken, request, transaction, cancellationToken) => {
+        StorageResource storage = transaction.GetManager<StorageResource.ResourceManager>().GetByOwnerUser(transaction, userAuthenticationToken, cancellationToken);
+        FileResource rootFolder = transaction.GetManager<StorageResource.ResourceManager>().GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+
+        return new ClientPayload.JSON(JToken.FromObject(rootFolder.Id));
+      });
     }
   }
 }

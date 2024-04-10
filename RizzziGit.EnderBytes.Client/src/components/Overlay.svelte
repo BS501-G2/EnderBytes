@@ -47,6 +47,7 @@
     padding: 0px;
 
     display: flex;
+    z-index: 1;
 
     > div.container {
       display: inline-block;

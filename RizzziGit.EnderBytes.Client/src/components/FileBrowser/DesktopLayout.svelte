@@ -1,18 +1,22 @@
 <script lang="ts">
-  import type { Writable } from "svelte/store";
-  import type { FileBrowserState } from "../FileBrowser.svelte";
-
+  import type { Client } from "$lib/client/client";
   import AddressBar from "./DesktopLayout/AddressBar.svelte";
   import ControlBar from "./DesktopLayout/ControlBar.svelte";
   import FileArea from "./DesktopLayout/FileArea.svelte";
 
-  export let fileBrowserState: Writable<FileBrowserState>;
+  export let currentFileId: number | null;
+  export let client: Client;
+  export let fileCreationDialog: boolean
+
+  let selectedFileIds: number[] = [];
+
+  $: console.log(fileCreationDialog)
 </script>
 
 <div class="container">
-  <AddressBar {fileBrowserState} />
-  <ControlBar {fileBrowserState} />
-  <FileArea {fileBrowserState} />
+  <AddressBar {client} {currentFileId} />
+  <ControlBar {client} {currentFileId} bind:fileCreationDialog bind:selectedFileIds />
+  <FileArea {client} {currentFileId} bind:selectedFileIds />
 </div>
 
 <style lang="scss">

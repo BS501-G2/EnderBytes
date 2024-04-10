@@ -31,7 +31,7 @@
     border: solid 1px transparent;
     border-radius: 8px;
 
-    transition: all linear 150ms;
+    // transition: all linear 150ms;
 
     cursor: pointer;
 

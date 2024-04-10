@@ -259,7 +259,26 @@ export class Client {
   }
 
   public async getLoginUser(): Promise<any> {
+    if (this.session == null) {
+      return
+    }
     return await this.getUser(this.session!.userId)
+  }
+
+  public async scanFolder(folderId: number | null): Promise<number[]> {
+    return await this.#request('ScanFolder', { folderId })
+  }
+
+  public async getRootFolderId(): Promise<number> {
+    return await this.#request('GetRootFolderId')
+  }
+
+  public async getFile(fileId: number): Promise<any> {
+    return await this.#request('GetFile', { fileId })
+  }
+
+  public async createFolder(name: string, folderId: number | null): Promise<number> {
+    return await this.#request('CreateFolder', { name, folderId })
   }
 
   get #emit() { return this.#events.bind().emit }

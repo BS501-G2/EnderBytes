@@ -19,11 +19,14 @@ export const colors = (): ColorValues => ({
   [ColorKey.OnBackground]: 0x0f3031ff,
 
   [ColorKey.Error]: 0xcc3300ff,
+  [ColorKey.ErrorBackground]: 0xcc33007f,
   [ColorKey.OnError]: 0xffffffff,
 
   [ColorKey.Warning]: 0xffcc00ff,
+  [ColorKey.WarningBackground]: 0xffcc007f,
   [ColorKey.OnWarning]: 0xffffffff,
 
   [ColorKey.Info]: 0x40a6ceff,
+  [ColorKey.InfoBackground]: 0x40a6ce7f,
   [ColorKey.OnInfo]: 0xffffffff,
 })

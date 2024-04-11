@@ -265,12 +265,14 @@ public sealed partial class ClientService
 
         return new ClientPayload.JSON(JToken.FromObject(file));
       });
-      Handlers.Add(UserRequest.CreateFolder, (userAuthenticationToken, request, transaction, cancellationToken) =>
+
+      Handlers.Add(UserRequest.Create, (userAuthenticationToken, request, transaction, cancellationToken) =>
       {
         JObject requestData = AsJson<JObject>(request);
 
         string name = (string)requestData["name"]!;
         long? folderId = (long?)requestData["folderId"];
+        bool isFolder = (bool)requestData["isFolder"]!;
 
         if (folderId == null)
         {
@@ -288,8 +290,34 @@ public sealed partial class ClientService
           throw new RequestError(UserResponse.ResourceNotFound);
         }
 
-        FileResource newFolder = transaction.GetManager<FileResource.ResourceManager>().CreateFolder(transaction, remoteStorage, parentFolder, name, userAuthenticationToken, cancellationToken);
-        return new ClientPayload.JSON(JToken.FromObject(newFolder.Id));
+        FileResource newFile = isFolder
+          ? transaction.GetManager<FileResource.ResourceManager>().CreateFolder(transaction, remoteStorage, parentFolder, name, userAuthenticationToken, cancellationToken)
+          : transaction.GetManager<FileResource.ResourceManager>().CreateFile(transaction, remoteStorage, parentFolder, name, userAuthenticationToken, cancellationToken);
+
+        return new ClientPayload.JSON(JToken.FromObject(newFile.Id));
+      });
+
+      Handlers.Add(UserRequest.OpenFile, (userAuthenticationToken, request, transaction, cancellationToken) =>
+      {
+        JObject requestData = AsJson<JObject>(request);
+
+        long fileId = (long)requestData["fileId"]!;
+        long baseSnapshotId = (long)requestData["baseSnapshotId"]!;
+        bool enableWrite = (bool)requestData["enableWrite"]!;
+
+        if (
+          (!transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, fileId, out FileResource? file, cancellationToken)) ||
+
+          (!transaction.GetManager<StorageResource.ResourceManager>().TryGetById(transaction, file.StorageId, out StorageResource? storage, cancellationToken))||
+          (!transaction.GetManager<FileSnapshotResource.ResourceManager>().TryGetById(transaction, baseSnapshotId, out FileSnapshotResource? baseSnapshot, cancellationToken))
+        )
+        {
+          throw new RequestError(UserResponse.ResourceNotFound);
+        }
+
+        FileResource.FileHandle fileHandle = transaction.GetManager<FileResource.ResourceManager>().OpenFile(transaction, storage, file, baseSnapshot, userAuthenticationToken, enableWrite ? FileResource.FileHandleFlags.ReadModify : FileResource.FileHandleFlags.Read, cancellationToken);
+
+        return new ClientPayload.JSON(JToken.FromObject(fileHandle));
       });
 
       Handlers.Add(UserRequest.GetRootFolderId, (userAuthenticationToken, request, transaction, cancellationToken) => {

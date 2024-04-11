@@ -333,6 +333,34 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
         }
       }
     }
+
+    public bool IsInsideOf(ResourceService.Transaction transaction, StorageResource storage, FileResource haystack, FileResource needle, CancellationToken cancellationToken = default)
+    {
+      lock (haystack)
+      {
+        haystack.ThrowIfInvalid();
+        haystack.ThrowIfDoesNotBelongTo(storage);
+
+        lock (needle)
+        {
+          needle.ThrowIfInvalid();
+          needle.ThrowIfDoesNotBelongTo(storage);
+
+          FileResource? current = needle;
+          while (true) {
+            if (current.ParentId == haystack.ParentId || current.ParentId == haystack.Id) {
+              return true;
+            }
+
+            if (current.ParentId == null || !TryGetById(transaction, (long)current.ParentId, out current, cancellationToken)) {
+              break;
+            }
+          }
+
+          return false;
+        }
+      }
+    }
   }
 
   public new sealed record ResourceData(long Id, long CreateTime, long UpdateTime, long StorageId, byte[] Key, long? ParentId, FileType Type, string Name) : Resource<ResourceManager, ResourceData, FileResource>.ResourceData(Id, CreateTime, UpdateTime);

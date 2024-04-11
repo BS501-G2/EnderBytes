@@ -4,7 +4,7 @@
 
   import { UserIcon, LogOutIcon, SettingsIcon } from "svelte-feather-icons";
   import Dialog, { DialogClass } from "../../../components/Dialog.svelte";
-  import { ButtonClass } from "../../../components/Button.svelte";
+  import Button, { ButtonClass } from "../../../components/Button.svelte";
   import type { Client } from "$lib/client/client";
 
   export let client: Client;
@@ -17,23 +17,19 @@
 {#if logoutConfirm}
   <Dialog
     dialogClass={DialogClass.Normal}
-    buttons={[
-      {
-        label: "OK",
-        buttonClass: ButtonClass.Primary,
-        onClick: () => client.logout(),
-      },
-      {
-        label: "Cancel",
-        buttonClass: ButtonClass.Background,
-        onClick: () => {
-          logoutConfirm = false;
-        },
-      },
-    ]}
-    title="Account Logout"
     onDismiss={() => (logoutConfirm = false)}
   >
+    <svelte:fragment slot="actions">
+      <Button
+        onClick={() => client.logout()}
+        buttonClass={ButtonClass.Primary}
+      >OK</Button>
+      <Button
+        onClick={() => {logoutConfirm = false}}
+        buttonClass={ButtonClass.Background}
+      >Cancel</Button>
+    </svelte:fragment>
+    <h2 slot="head" style="margin: 0px;">Account Logout</h2>
     <span slot="body">This will log you out from the dashboard.</span>
   </Dialog>
 {/if}

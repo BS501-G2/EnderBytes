@@ -55,9 +55,21 @@ public static partial class Client
     {
       try
       {
-        SetState(STATE_CONNECTING());
         ClientWebSocket clientWebSocket = new();
-        await clientWebSocket.ConnectAsync(new(WS_URL()), CancellationToken.None);
+
+        SetState(STATE_CONNECTING());
+
+        try
+        {
+          await clientWebSocket.ConnectAsync(new(WS_URL()), CancellationToken.None);
+        }
+        catch(Exception exception)
+        {
+          SetState(STATE_NOT_CONNECTED());
+          source.SetException(exception);
+
+          throw;
+        }
 
         UserClient client = UserClientWebSocket = new(clientWebSocket, (buffer) => Task.CompletedTask, (payload, cancellationToken) => Task.FromResult<HybridWebSocket.Payload>(new(0, [])));
         SetState(STATE_READY());

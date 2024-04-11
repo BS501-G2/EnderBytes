@@ -19,35 +19,30 @@
 
   export let onDismiss: () => void;
   export let dialogClass: DialogClass;
-  export let buttons: DialogButton[];
-  export let title: string = "";
 </script>
 
 <Modal {onDismiss}>
   <div class="dialog {dialogClass}">
     <div class="head">
-      <h2>{title}</h2>
+      <slot name="head" />
     </div>
     <div class="body">
       <slot name="body" />
     </div>
     <div class="actions">
-      {#each buttons as button}
-        <div class="button-entry">
-          <Button
-            onClick={button.onClick}
-            buttonClass={button.buttonClass ?? ButtonClass.Primary}
-            label={button.label}
-            enabled={button.enabled ?? true}
-          />
-        </div>
-      {/each}
+      <slot name="actions" />
     </div>
   </div>
 </Modal>
 
 <style lang="scss">
   div.dialog {
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+    min-height: 128px;
+
+    box-sizing: border-box;
+
     padding: 16px;
     border-radius: 8px;
     box-shadow: gray 2px 2px 8px;
@@ -70,6 +65,9 @@
 
       margin: 16px 0px 16px 0px;
       box-sizing: border-box;
+
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     > div.actions {

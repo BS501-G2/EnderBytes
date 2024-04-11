@@ -24,6 +24,8 @@
   async function update() {
     if (currentFileId != null) {
       file = await client.getFile(currentFileId);
+
+      console.log(file)
     }
   }
 
@@ -33,14 +35,14 @@
 </script>
 
 <div class="controls">
-  <div class="button" title="New Item">
+  <div class="button" title="Create">
     <button on:click={() => (fileCreationDialog = true)}>
       <PlusCircleIcon />
-      <p>New Item</p>
+      <p>Create</p>
     </button>
   </div>
   <div class="divider"></div>
-  {#if file?.Type === 1}
+  {#if currentFileId == null ||  file?.Type === 1}
     <div class="button" title="Refresh">
       <button on:click={onRefresh}>
         <RefreshCwIcon />

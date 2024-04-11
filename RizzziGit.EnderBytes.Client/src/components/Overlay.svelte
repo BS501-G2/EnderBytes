@@ -23,7 +23,7 @@
 <button on:click={onClick} style="{dim ? "background-color: #0000003f" : ""}">
   <div
     class="container"
-    style="margin-left: {offsetX}px; margin-top: {offsetY}px;"
+    style="position: fixed; left: {offsetX}px; top: {offsetY}px;"
     bind:clientWidth={width}
     bind:clientHeight={height}
     bind:this={element}

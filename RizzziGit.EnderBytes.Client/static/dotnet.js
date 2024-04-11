@@ -5,7 +5,7 @@
 import { dotnet } from './dotnet/wwwroot/_framework/dotnet.js'
 
 export async function init(imports) {
-  const { setModuleImports, getAssemblyExports, getConfig, runMain } = await dotnet
+  const { setModuleImports, getAssemblyExports, getConfig, /* runMain */ } = await dotnet
     .withDiagnosticTracing(false)
     .withApplicationArgumentsFromQuery()
     .create();
@@ -17,8 +17,6 @@ export async function init(imports) {
 
   // run the C# Main() method and keep the runtime process running and executing further API calls
   // await runMain();
-
-  // await runMain()
 
   return exports
 }

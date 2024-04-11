@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { onNavigate } from "$app/navigation";
   import type { Client } from "$lib/client/client";
+
   import AddressBar from "./DesktopLayout/AddressBar.svelte";
   import ControlBar from "./DesktopLayout/ControlBar.svelte";
   import FileArea from "./DesktopLayout/FileArea.svelte";

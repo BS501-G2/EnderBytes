@@ -28,7 +28,7 @@
     </div>
 
     <div class="panel right-panel">
-      <slot name="layout-slot" />
+      <slot />
     </div>
   </div>
 </div>

@@ -7,23 +7,21 @@
 </script>
 
 <script lang="ts">
-  export let buttonClass: ButtonClass;
+  export let buttonClass: ButtonClass = ButtonClass.Primary;
   export let enabled: boolean = true;
   export let onClick: () => Promise<void> | void;
-  export let label: string;
 
-  let busy: boolean = false;
+    let busy: boolean = false;
 </script>
 
 <button
   disabled={!enabled || busy}
   class="button {buttonClass}"
-  on:click={onClick}><p>{label}</p></button
+  on:click={onClick}><slot/></button
 >
 
 <style lang="scss">
   button.button {
-    width: 100%;
     padding: 8px 16px 8px 16px;
 
     box-sizing: border-box;
@@ -31,13 +29,7 @@
     border: solid 1px transparent;
     border-radius: 8px;
 
-    // transition: all linear 150ms;
-
     cursor: pointer;
-
-    > p {
-      margin: 0px;
-    }
   }
 
   button.primary {
@@ -83,5 +75,24 @@
   button.background:active {
     background-color: var(--onBackground);
     color: var(--background);
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  button:disabled.primary {
+    background-color: var(--primary);
+    color: var(--onPrimary);
+  }
+
+  button:disabled.primary-container {
+    background-color: var(--primaryContainer);
+    color: var(--onPrimaryContainer);
+  }
+
+  button:disabled.background {
+    background-color: var(--background);
+    color: var(--onBackground);
   }
 </style>

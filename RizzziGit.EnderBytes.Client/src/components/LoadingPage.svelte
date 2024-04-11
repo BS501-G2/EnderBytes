@@ -1,11 +1,18 @@
-<script>
+<script lang="ts">
   import Loading from "./Loading.svelte";
 </script>
 
 <div class="loading-page">
-  <div class="loading-icon">
-    <Loading />
-  </div>
+  {#if $$slots["without-spinner"]}
+    <slot name="without-spinner" />
+  {:else}
+    <div class="loading-icon">
+      <Loading />
+    </div>
+    {#if $$slots["with-spinner"]}
+      <slot name="with-spinner" />
+    {/if}
+  {/if}
 </div>
 
 <style lang="scss">
@@ -14,6 +21,7 @@
     height: 100%;
 
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
 

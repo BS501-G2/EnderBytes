@@ -21,12 +21,15 @@ export enum ColorKey {
   OnBackground = 'onBackground',
 
   Error = 'error',
+  ErrorBackground = 'errorBackground',
   OnError = 'onError',
 
   Warning = 'warning',
+  WarningBackground = 'warningBackground',
   OnWarning = 'onWarning',
 
   Info = 'info',
+  InfoBackground = 'infoBackground',
   OnInfo = 'onInfo'
 }
 export const intColorToHex = (color: number): string => `#${color.toString(16)}`

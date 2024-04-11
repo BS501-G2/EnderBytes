@@ -41,6 +41,7 @@ export class Client {
   static #initializing: boolean = false
   static #client: Client | null = null
   static #clientPromise: Promise<Client> | null = null
+  static #assembly: any
 
   public static async getInstance(url: URL, events: ClientEventMap): Promise<Client> {
     try {
@@ -50,7 +51,11 @@ export class Client {
 
           Client.#initializing = true
 
-          const client = new Client(await (<any>window).__DOTNET__INIT__({
+          while (!('__DOTNET__INIT__' in window)) {
+            await new Promise<void>((resolve) => setTimeout(resolve, 100))
+          }
+
+          const client = new Client(this.#assembly ??= await (<any>window).__DOTNET__INIT__({
             STATE_NOT_CONNECTED: () => STATE_NOT_CONNECTED,
             STATE_READY: () => STATE_READY,
             STATE_CONNECTING: () => STATE_CONNECTING,
@@ -147,9 +152,9 @@ export class Client {
     void this.#runQueue()
 
     if (this.#sessionCache != null) {
-      // const { userId, token } = this.#sessionCache
+      const { userId, token } = this.#sessionCache
 
-      // await this.authenticateByToken(userId, token)
+      await this.loginToken(userId, token)
     }
   }
 
@@ -282,7 +287,11 @@ export class Client {
   }
 
   public async createFolder(name: string, folderId: number | null): Promise<number> {
-    return await this.#request('CreateFolder', { name, folderId })
+    return await this.#request('CreateFolder', { name, folderId, isFolder: true })
+  }
+
+  public async createFile(name: string, folderId: number | null): Promise<number> {
+    return await this.#request('CreateFolder', { name, folderId, isFolder: false })
   }
 
   get #emit() { return this.#events.bind().emit }

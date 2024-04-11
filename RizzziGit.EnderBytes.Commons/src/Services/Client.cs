@@ -57,7 +57,7 @@ public enum UserRequest : uint
 
   ResolveUserId,
 
-  GetOwnStorage, GetUser, GetFile, GetRootFolderId, ScanFolder, CreateFolder
+  GetOwnStorage, GetUser, GetFile, GetRootFolderId, ScanFolder, Create, OpenFile, WriteFileBuffer, ReadFileBuffer
 }
 
 public enum UserResponse : uint

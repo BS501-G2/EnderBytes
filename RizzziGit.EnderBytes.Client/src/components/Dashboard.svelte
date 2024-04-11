@@ -5,12 +5,12 @@
   import { goto } from "$app/navigation";
 
   import { RootState } from "$lib/states/root-state";
-  import { ViewMode } from "$lib/view-mode";
   import { LocaleKey } from "$lib/locale";
   import type { Client, Session } from "$lib/client/client";
 
   import DesktopLayout from "./Dashboard/DesktopLayout.svelte";
   import MobileLayout from "./Dashboard/MobileLayout.svelte";
+  import ResponsiveLayout from "./ResponsiveLayout.svelte";
 
   const rootState = RootState.state;
 
@@ -75,13 +75,16 @@
 {#if $page.url.pathname.startsWith("/app/auth")}
   <slot />
 {:else if $rootState.sessionToken != null}
-  {#if $rootState.viewMode & ViewMode.Desktop}
-    <DesktopLayout {client}>
-      <slot slot="layout-slot" />
-    </DesktopLayout>
-  {:else}
-    <MobileLayout>
-      <slot slot="layout-slot" />
-    </MobileLayout>
-  {/if}
+  <ResponsiveLayout>
+    <svelte:fragment slot="desktop">
+      <DesktopLayout {client}>
+        <slot />
+      </DesktopLayout>
+    </svelte:fragment>
+    <svelte:fragment slot="mobile">
+      <MobileLayout>
+        <slot />
+      </MobileLayout>
+    </svelte:fragment>
+  </ResponsiveLayout>
 {/if}

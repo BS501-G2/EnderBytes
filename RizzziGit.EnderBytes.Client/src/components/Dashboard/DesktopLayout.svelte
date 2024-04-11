@@ -2,17 +2,14 @@
 </script>
 
 <script lang="ts">
-  import { RootState } from "$lib/states/root-state";
+  import type { Client } from "$lib/client/client";
 
   import LeftPanelNavigationBar from "./DesktopLayout/LeftPanelNavigationBar.svelte";
   import LeftPanelAccountBar from "./DesktopLayout/LeftPanelAccountBar.svelte";
   import TitleBar from "./DesktopLayout/TitleBar.svelte";
   import Keyboard from "../Keyboard.svelte";
-  import type { Client } from "$lib/client/client";
 
   export let client: Client;
-
-  const rootState = RootState.state;
 </script>
 
 <Keyboard />

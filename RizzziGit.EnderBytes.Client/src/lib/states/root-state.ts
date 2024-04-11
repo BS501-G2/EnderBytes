@@ -5,6 +5,7 @@ import { writable, type Writable } from "svelte/store";
 import { AppState } from "./app-state";
 import { Client, type Session } from "$lib/client/client";
 import { KeyboardState } from "../../components/Keyboard.svelte";
+import { AwaiterState } from "../../components/Awaiter.svelte";
 
 export class RootState {
   static #state?: Writable<RootState>
@@ -34,6 +35,7 @@ export class RootState {
 
     this.appState = writable(new AppState())
     this.keyboardState = writable(new KeyboardState())
+    this.awaiterState = writable(new AwaiterState())
   }
 
   theme: ColorScheme;
@@ -44,6 +46,7 @@ export class RootState {
   sessionToken: Session | null
   appState: Writable<AppState>
   keyboardState: Writable<KeyboardState>
+  awaiterState: Writable<AwaiterState>
 
   public async getClient(): Promise<Client> {
     const client = await Client.getInstance(new URL('ws://10.1.0.117:8083/'), {

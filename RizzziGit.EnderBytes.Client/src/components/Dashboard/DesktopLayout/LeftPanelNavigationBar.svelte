@@ -1,6 +1,7 @@
 <script lang="ts" context="module">
   import { page } from "$app/stores";
   import { RootState } from "$lib/states/root-state";
+  import { navigating } from "$app/stores";
 </script>
 
 <script lang="ts">
@@ -27,13 +28,11 @@
     { name: "Trash", icon: TrashIcon, path: "trash" },
     { name: "Profile", icon: UserIcon, path: "profile" },
   ];
-
-  const rootState = RootState.state;
 </script>
 
 <div class="navigation-bar">
   {#each navigationEntries as entry}
-    <a href="/app/{entry.path}">
+    <a href={$navigating ? null : `${"/app/" + entry.path}`}>
       <div
         class="nav-entry {entry.path == $page.url.pathname.split('/')[2]
           ? 'active'

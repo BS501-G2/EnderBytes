@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import type { Client } from "$lib/client/client";
 
-  import LoadingPage from "../../LoadingPage.svelte";
+  import LoadingPage from "../../LoadingSpinnerPage.svelte";
   import FileList from "./FileArea/FileList.svelte";
   import FileView from "./FileArea/FileView.svelte";
 

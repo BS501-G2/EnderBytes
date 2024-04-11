@@ -33,7 +33,9 @@
 
     padding: 16px;
 
-    display: flex;
+    overflow-y: auto;
+
+    align-items: center;
 
     > div.file-preview {
       display: flex;

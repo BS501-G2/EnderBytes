@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Loading from "./Loading.svelte";
+  import Loading from "./LoadingSpinner.svelte";
 </script>
 
 <div class="loading-page">

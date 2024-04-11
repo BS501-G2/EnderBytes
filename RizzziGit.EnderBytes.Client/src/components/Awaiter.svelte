@@ -1,12 +1,22 @@
 <script lang="ts" context="module">
+  export type AwaiterSetStatusFunction = (
+    message?: string | null,
+    progressPercentage?: number | null,
+  ) => void;
   export type AwaiterCallback<T> = (
-    setMessage: (message: string | null) => void,
+    setStatus: AwaiterSetStatusFunction,
   ) => T | Promise<T>;
+
+  export interface AwaiterTask {}
+
+  export class AwaiterState {
+    public constructor() {}
+  }
 </script>
 
 <script lang="ts" generics="T extends any">
   import { onMount } from "svelte";
-  import LoadingPage from "./LoadingPage.svelte";
+  import LoadingPage from "./LoadingSpinnerPage.svelte";
   import Banner, { BannerClass } from "./Banner.svelte";
   import Button, { ButtonClass } from "./Button.svelte";
 
@@ -16,13 +26,18 @@
 
   let promise: Promise<T>;
   let message: string | null = null;
+  let progress: number | null = null;
 
-  async function setMessage(newMessage: string | null) {
+  const setStatus: AwaiterSetStatusFunction = (
+    newMessage = message,
+    newProgress = progress,
+  ) => {
     message = newMessage;
-  }
+    progress = newProgress;
+  };
 
   async function load() {
-    return await callback(setMessage);
+    return await callback(setStatus);
   }
 
   async function exec() {
@@ -74,7 +89,19 @@
       </LoadingPage>
     {:else}
       <LoadingPage>
-        <p slot="with-spinner">{message}</p>
+        <svelte:fragment slot="with-spinner">
+          {#if message == null || progress == null}
+            <p>
+              {#if message != null}
+                {message}
+              {/if}
+
+              {#if progress != null}
+                {Math.floor(progress * 100)}%
+              {/if}
+            </p>
+          {/if}
+        </svelte:fragment>
       </LoadingPage>
     {/if}
   {:then result}

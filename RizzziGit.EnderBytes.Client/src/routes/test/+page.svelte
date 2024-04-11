@@ -1,8 +1,10 @@
 <script lang="ts">
   import Awaiter from "../../components/Awaiter.svelte";
+  import LoadingBar from "../../components/LoadingBar.svelte";
 </script>
 
 <div class="content">
+  <LoadingBar />
   <Awaiter
     callback={async () => {
       await new Promise((resolve) => setTimeout(resolve, 1000));

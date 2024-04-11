@@ -1,19 +1,21 @@
 <script lang="ts">
   import { RootState } from "$lib/states/root-state";
   import type { Client } from "$lib/client/client";
+  import { navigating } from "$app/stores";
 
   import Dashboard from "../../components/Dashboard.svelte";
   import Awaiter, {
     type AwaiterCallback,
   } from "../../components/Awaiter.svelte";
-  import LoadingPage from "../../components/LoadingPage.svelte";
+  import LoadingPage from "../../components/LoadingSpinnerPage.svelte";
+  import LoadingBar from "../../components/LoadingBar.svelte";
 
   const rootState = RootState.state;
 
   const callback: AwaiterCallback<Client> = async (
-    setText: (message: string) => void,
+    setStatus,
   ): Promise<Client> => {
-    setText("Loading .NET Libraries...");
+    setStatus("Loading .NET Libraries...");
 
     return $rootState.getClient();
   };
@@ -22,6 +24,11 @@
 <Awaiter {callback}>
   <svelte:fragment slot="success" let:result={client}>
     <Dashboard {client}>
+      {#if $navigating}
+        <div class="top-loading">
+          <LoadingBar />
+        </div>
+      {/if}
       <slot />
     </Dashboard>
   </svelte:fragment>
@@ -42,5 +49,9 @@
     display: flex;
     justify-content: center;
     align-items: center;
+  }
+
+  div.top-loading {
+    height: 0px;
   }
 </style>

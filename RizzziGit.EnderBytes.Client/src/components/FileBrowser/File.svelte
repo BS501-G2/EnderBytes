@@ -3,7 +3,7 @@
   import type { Client } from "$lib/client/client";
   import { RootState } from "$lib/states/root-state";
   import { onMount } from "svelte";
-  import Loading from "../Loading.svelte";
+  import Loading from "../LoadingSpinner.svelte";
 
   import { AlertTriangleIcon } from "svelte-feather-icons";
 

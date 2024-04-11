@@ -88,7 +88,7 @@
     onDismiss={() => (dismissConfirmationDialog = false)}
   >
   <h2 slot="head" style="margin: 0px;">Unsaved Progress</h2>
-  <p slot="body" style="margin: 0px;">All unsaved progress will be lost.</p>
+  <p slot="body" style="margin: 0px;">All unsaved progress will be lost. Are you sure to close the file creation dialog?</p>
     <svelte:fragment slot="actions">
       <Button onClick={() => onDismiss()}>Yes</Button>
       <Button onClick={() => {dismissConfirmationDialog = false}}>No</Button>

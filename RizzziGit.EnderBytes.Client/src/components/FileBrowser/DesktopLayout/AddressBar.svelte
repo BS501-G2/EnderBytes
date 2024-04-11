@@ -6,7 +6,7 @@
   import Overlay from "../../Overlay.svelte";
   import type { Client } from "$lib/client/client";
   import { goto } from "$app/navigation";
-  import Loading from "../../Loading.svelte";
+  import Loading from "../../LoadingSpinner.svelte";
 
   export let client: Client;
   export let currentFileId: number | null;

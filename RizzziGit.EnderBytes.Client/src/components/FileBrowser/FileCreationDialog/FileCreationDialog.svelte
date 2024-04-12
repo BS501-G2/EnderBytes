@@ -12,21 +12,25 @@
 
 <script lang="ts">
   import type { Client } from "$lib/client/client";
-  import Button, { ButtonClass } from "../Button.svelte";
-  import Dialog, { DialogClass } from "../Dialog.svelte";
-  import FileCreationTab from "./FileCreationDialog/FileCreationTab.svelte";
+  import Button, { ButtonClass } from "../../Widgets/Button.svelte";
+  import Dialog, { DialogClass } from "../../Widgets/Dialog.svelte";
+  import FileCreationTab from "./FileCreationTab.svelte";
+  import FolderCreationTab from "./FolderCreationTab.svelte";
 
+  export let folderId: number | null;
   export let client: Client;
 
   let hasUnsavedProgress = true;
   let current: CreateNewFileType = CreateNewFileType.File;
+  let onSubmit: () => Promise<number> | number;
+  let submitPromise: Promise<number> | null = null;
 
   let dismissConfirmationDialog = false;
 
   export let onDismiss: () => void;
 
-  function cancel() {
-    if (hasUnsavedProgress) {
+  function cancel(ignoreUnsaved: boolean = false) {
+    if (!ignoreUnsaved && hasUnsavedProgress) {
       dismissConfirmationDialog = true;
       return;
     }
@@ -66,20 +70,35 @@
     <div class="divider"></div>
     <div class="creation-panel">
       {#if current == CreateNewFileType.File}
-        <FileCreationTab />
+        <FileCreationTab {client} {folderId} bind:onSubmit />
       {:else if current == CreateNewFileType.Folder}
-        <p>Folder Page</p>
+        <FolderCreationTab {client} {folderId} bind:onSubmit />
       {/if}
     </div>
   </div>
   <svelte:fragment slot="actions">
-    <Button buttonClass={ButtonClass.Primary} onClick={() => {}}>Create</Button>
     <Button
-      buttonClass={ButtonClass.Background}
+      enabled={submitPromise == null}
+      buttonClass={ButtonClass.Primary}
       onClick={async () => {
-        cancel();
-      }}>Cancel</Button
+        try {
+          await (submitPromise = (async () => await onSubmit())());
+
+          onDismiss();
+        } finally {
+          submitPromise = null;
+        }
+      }}
     >
+      Create
+    </Button>
+    <Button
+      enabled={submitPromise == null}
+      buttonClass={ButtonClass.Background}
+      onClick={cancel}
+    >
+      Cancel
+    </Button>
   </svelte:fragment>
 </Dialog>
 
@@ -94,12 +113,14 @@
       dialog?
     </p>
     <svelte:fragment slot="actions">
-      <Button onClick={() => onDismiss()}>Yes</Button>
+      <Button onClick={onDismiss}>Yes</Button>
       <Button
         onClick={() => {
           dismissConfirmationDialog = false;
-        }}>No</Button
+        }}
       >
+        No
+      </Button>
     </svelte:fragment>
   </Dialog>
 {/if}
@@ -116,8 +137,8 @@
     overflow-x: auto;
 
     > div.creation-tab {
-      width: 256px;
-      padding: 8px;
+      width: 172px;
+      padding: 0px 8px 0px 8px;
       box-sizing: border-box;
 
       display: flex;
@@ -136,6 +157,12 @@
 
     > div.creation-panel {
       flex-grow: 1;
+
+      display: flex;
+
+      flex-direction: column;
+
+      padding: 0px 16px 0px 16px;
     }
   }
 </style>

@@ -2,8 +2,8 @@
   import { page } from "$app/stores";
   import { RootState } from "$lib/states/root-state";
 
-  import FileBrowser from "../../../components/FileBrowser.svelte";
-  import Loader from "../../../components/Awaiter.svelte";
+  import FileBrowser from "../../../components/FileBrowser/FileBrowser.svelte";
+  import Loader from "../../../components/Bindings/Awaiter.svelte";
 
   const rootState = RootState.state;
 

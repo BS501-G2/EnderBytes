@@ -8,9 +8,9 @@
   import { LocaleKey } from "$lib/locale";
   import type { Client, Session } from "$lib/client/client";
 
-  import DesktopLayout from "./Dashboard/DesktopLayout.svelte";
-  import MobileLayout from "./Dashboard/MobileLayout.svelte";
-  import ResponsiveLayout from "./ResponsiveLayout.svelte";
+  import DesktopLayout from "./DesktopLayout/DesktopLayout.svelte";
+  import MobileLayout from "./MobileLayout/MobileLayout.svelte";
+  import ResponsiveLayout from "../Bindings/ResponsiveLayout.svelte";
 
   const rootState = RootState.state;
 

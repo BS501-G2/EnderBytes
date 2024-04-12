@@ -1,20 +1,12 @@
 <script lang="ts">
-    import type { Writable } from "svelte/store";
-    import NavigationBar from "./MobileLayout/NavigationBar.svelte";
-    import type { AppState } from "$lib/states/app-state";
 </script>
 
 <div class="panel-container">
   <div class="panel top-panel"></div>
-  <div class="panel middle-panel"></div>
-  <div class="panel bottom-panel"></div>
-  <!-- <div class="panel top-panel">
-    <slot name="layout-slot" />
+  <div class="panel middle-panel">
+    <slot />
   </div>
-
-  <div class="panel bottom-panel">
-    <NavigationBar></NavigationBar>
-  </div> -->
+  <div class="panel bottom-panel"></div>
 </div>
 
 <style lang="scss">

@@ -3,10 +3,10 @@
 
   import { RootState } from "$lib/states/root-state";
 
-  import Overlay from "../../Overlay.svelte";
+  import Overlay from "../../Widgets/Overlay.svelte";
   import type { Client } from "$lib/client/client";
   import { goto } from "$app/navigation";
-  import Loading from "../../LoadingSpinner.svelte";
+  import Loading from "../../Widgets/LoadingSpinner.svelte";
 
   export let client: Client;
   export let currentFileId: number | null;

@@ -3,8 +3,8 @@
     BackgroundTaskStatus,
     dismissAll,
     executeBackgroundTask,
-  } from "../../BackgroundTaskList.svelte";
-  import Button from "../../Button.svelte";
+  } from "../../BackgroundTaskList/BackgroundTaskList.svelte";
+  import Button from "../../Widgets/Button.svelte";
   import NavigationTab from "./NavigationTab.svelte";
 
   export let onDismiss: () => void;

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import BackgroundTasks from "../../BackgroundTaskList.svelte";
+  import BackgroundTasks from "../../BackgroundTaskList/BackgroundTaskList.svelte";
   import NavigationTab from "./NavigationTab.svelte";
 
   export let onDismiss: () => void;

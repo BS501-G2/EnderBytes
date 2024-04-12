@@ -10,18 +10,15 @@
 
   import { BellIcon, CheckSquareIcon } from "svelte-feather-icons";
 
-  import LeftPanelNavigationBar from "./DesktopLayout/LeftPanelNavigationBar.svelte";
-  import LeftPanelAccountBar from "./DesktopLayout/LeftPanelAccountBar.svelte";
-  import TitleBar from "./DesktopLayout/TitleBar.svelte";
-  import Keyboard from "../Keyboard.svelte";
-  import OperationsTab from "./DesktopLayout/OperationsTab.svelte";
-  import NotificationsTab from "./DesktopLayout/NotificationsTab.svelte";
+  import LeftPanelNavigationBar from "./LeftPanelNavigationBar.svelte";
+  import LeftPanelAccountBar from "./LeftPanelAccountBar.svelte";
+  import TitleBar from "./TitleBar.svelte";
+  import Keyboard from "../../Bindings/Keyboard.svelte";
+  import OperationsTab from "./OperationsTab.svelte";
+  import NotificationsTab from "./NotificationsTab.svelte";
   import BackgroundTaskList, {
-    BackgroundTaskStatus,
-    backgroundTasks,
     pendingTasks,
-  } from "../BackgroundTaskList.svelte";
-  import { get } from "svelte/store";
+  } from "../../BackgroundTaskList/BackgroundTaskList.svelte";
 
   export let client: Client;
 

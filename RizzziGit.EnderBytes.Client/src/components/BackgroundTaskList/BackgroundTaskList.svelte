@@ -8,8 +8,8 @@
   } from "svelte/store";
 
   export type BackgroundTaskSetStatusFunction = (
-    message: string | null,
-    progressPercentage: number | null,
+    message?: string | null,
+    progressPercentage?: number | null,
   ) => void;
 
   export type BackgroundTaskCallback<T> = (
@@ -101,11 +101,11 @@
       get run() {
         const refresh = () => backgroundTasks.update((e) => e);
         const setStatus: BackgroundTaskSetStatusFunction = (
-          message,
-          processPercentage,
+          message = backgroundTask.message,
+          progress = backgroundTask.progress
         ) => {
           backgroundTask.message = message;
-          backgroundTask.progress = processPercentage;
+          backgroundTask.progress = progress;
           refresh();
         };
         const run = async (client: BackgroundTaskClient<T>): Promise<T> => {
@@ -203,7 +203,7 @@
 </script>
 
 <script lang="ts">
-  import LoadingBar from "./LoadingBar.svelte";
+  import LoadingBar from "../Widgets/LoadingBar.svelte";
   import { RefreshCwIcon, XIcon, PlayIcon } from "svelte-feather-icons";
   import { onDestroy, onMount } from "svelte";
 

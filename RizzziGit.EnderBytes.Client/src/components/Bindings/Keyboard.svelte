@@ -51,7 +51,7 @@
 
 <script lang="ts">
   function onKey(type: "up" | "down", event: KeyboardEvent) {
-    const key = event.key.toLowerCase();
+    const key = event.key?.toLowerCase() ?? '';
 
     if (type == "down" && !keys.includes(key)) {
       keys.push(key);

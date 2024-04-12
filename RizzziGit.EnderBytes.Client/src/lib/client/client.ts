@@ -287,11 +287,11 @@ export class Client {
   }
 
   public async createFolder(name: string, folderId: number | null): Promise<number> {
-    return await this.#request('CreateFolder', { name, folderId, isFolder: true })
+    return await this.#request('Create', { name, folderId, isFolder: true })
   }
 
   public async createFile(name: string, folderId: number | null): Promise<number> {
-    return await this.#request('CreateFolder', { name, folderId, isFolder: false })
+    return await this.#request('Create', { name, folderId, isFolder: false })
   }
 
   get #emit() { return this.#events.bind().emit }

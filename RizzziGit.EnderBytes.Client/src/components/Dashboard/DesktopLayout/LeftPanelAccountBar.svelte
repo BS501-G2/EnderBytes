@@ -3,8 +3,8 @@
   import { RootState } from "$lib/states/root-state";
 
   import { UserIcon, LogOutIcon, SettingsIcon } from "svelte-feather-icons";
-  import Dialog, { DialogClass } from "../../../components/Dialog.svelte";
-  import Button, { ButtonClass } from "../../../components/Button.svelte";
+  import Dialog, { DialogClass } from "../../Widgets/Dialog.svelte";
+  import Button, { ButtonClass } from "../../Widgets/Button.svelte";
   import type { Client } from "$lib/client/client";
 
   export let client: Client;
@@ -20,14 +20,17 @@
     onDismiss={() => (logoutConfirm = false)}
   >
     <svelte:fragment slot="actions">
+      <Button onClick={() => client.logout()} buttonClass={ButtonClass.Primary}>
+        OK
+      </Button>
       <Button
-        onClick={() => client.logout()}
-        buttonClass={ButtonClass.Primary}
-      >OK</Button>
-      <Button
-        onClick={() => {logoutConfirm = false}}
+        onClick={() => {
+          logoutConfirm = false;
+        }}
         buttonClass={ButtonClass.Background}
-      >Cancel</Button>
+      >
+        Cancel
+      </Button>
     </svelte:fragment>
     <h2 slot="head" style="margin: 0px;">Account Logout</h2>
     <span slot="body">This will log you out from the dashboard.</span>

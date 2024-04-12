@@ -4,7 +4,7 @@
 
   import File from "../../File.svelte";
   import FileDetails from "./FileDetails.svelte";
-  import Awaiter from "../../../Awaiter.svelte";
+  import Awaiter from "../../../Bindings/Awaiter.svelte";
 
   const rootState = RootState.state;
   const keyboardState = $rootState.keyboardState;
@@ -60,7 +60,7 @@
 
     <div class="divider"></div>
 
-    <FileDetails bind:selectedFileIds />
+    <FileDetails {client} bind:selectedFileIds />
   </svelte:fragment>
 </Awaiter>
 

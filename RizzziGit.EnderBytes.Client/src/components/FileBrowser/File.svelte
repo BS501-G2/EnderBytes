@@ -3,7 +3,7 @@
   import type { Client } from "$lib/client/client";
   import { RootState } from "$lib/states/root-state";
   import { onMount } from "svelte";
-  import Loading from "../LoadingSpinner.svelte";
+  import Loading from "../Widgets/LoadingSpinner.svelte";
 
   import { AlertTriangleIcon } from "svelte-feather-icons";
 
@@ -108,6 +108,8 @@
 
     display: flex;
     flex-direction: column;
+
+    border-radius: 8px;
 
     > div.overlay {
       width: 100%;

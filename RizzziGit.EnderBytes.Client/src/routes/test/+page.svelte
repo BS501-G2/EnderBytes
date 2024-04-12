@@ -1,11 +1,12 @@
 <script lang="ts">
-    import { onDestroy, onMount } from "svelte";
-  import Awaiter from "../../components/Awaiter.svelte";
-  import LoadingBar from "../../components/LoadingBar.svelte";
+  import { onDestroy, onMount } from "svelte";
+  import Awaiter from "../../components/Bindings/Awaiter.svelte";
+  import LoadingBar from "../../components/Widgets/LoadingBar.svelte";
+  import Input from "../../components/Widgets/Input.svelte";
 
   export let progress: number | null = 0;
 
-  let a: boolean = false
+  let a: boolean = false;
 
   async function exec() {
     while (a) {
@@ -18,23 +19,29 @@
         await new Promise((resolve) => setTimeout(resolve, 30 / 1000));
       } else {
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        progress = 0
+        progress = 0;
       }
     }
   }
 
   onMount(() => {
-    a = true
-    exec()
-  })
+    a = true;
+    exec();
+  });
 
   onDestroy(() => {
-    a = false
-  })
+    a = false;
+  });
+
+  let text: string;
+  let valid: boolean
 </script>
 
 <div class="content">
-  <LoadingBar {progress} />
+  <!-- <LoadingBar {progress} /> -->
+  <Input name="test" type="email" bind:valid bind:text />
+  <p>{text}</p>
+  <p>Valid? {valid}</p>
   <Awaiter
     callback={async () => {
       await new Promise((resolve) => setTimeout(resolve, 1000));

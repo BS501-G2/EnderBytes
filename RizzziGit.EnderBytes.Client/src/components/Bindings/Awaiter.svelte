@@ -16,9 +16,9 @@
 
 <script lang="ts" generics="T extends any">
   import { onMount } from "svelte";
-  import LoadingPage from "./LoadingSpinnerPage.svelte";
-  import Banner, { BannerClass } from "./Banner.svelte";
-  import Button, { ButtonClass } from "./Button.svelte";
+  import LoadingPage from "../Widgets/LoadingSpinnerPage.svelte";
+  import Banner, { BannerClass } from "../Widgets/Banner.svelte";
+  import Button, { ButtonClass } from "../Widgets/Button.svelte";
 
   export let callback: AwaiterCallback<T>;
   export let reload: (() => void) | null = null;
@@ -61,7 +61,7 @@
   {#if $$slots["not-loaded"]}
     <slot name="not-loaded" />
   {:else if $$slots.loading}
-    <slot name="loading" />
+    <slot name="loading" {message} />
   {:else}
     <Banner bannerClass={BannerClass.Info}>
       <div class="banner">

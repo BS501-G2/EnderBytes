@@ -3,9 +3,9 @@
   import {
     BackgroundTaskStatus,
     type BackgroundTask,
-  } from "../BackgroundTaskList.svelte";
+  } from "./BackgroundTaskList.svelte";
   import { PlayIcon, RefreshCwIcon, XIcon } from "svelte-feather-icons";
-  import LoadingBar from "../LoadingBar.svelte";
+  import LoadingBar from "../Widgets/LoadingBar.svelte";
 
   export let backgroundTask: Writable<BackgroundTask<any>>;
   export let filter: BackgroundTaskStatus[];

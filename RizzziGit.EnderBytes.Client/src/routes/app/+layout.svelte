@@ -1,25 +1,11 @@
 <script lang="ts">
-  import { RootState } from "$lib/states/root-state";
-  import type { Client } from "$lib/client/client";
   import { navigating } from "$app/stores";
 
-  import Dashboard from "../../components/Dashboard.svelte";
-  import Awaiter, {
-    type AwaiterCallback,
-  } from "../../components/Awaiter.svelte";
-  import LoadingPage from "../../components/LoadingSpinnerPage.svelte";
-  import LoadingBar from "../../components/LoadingBar.svelte";
-  import { pendingTasks } from "../../components/BackgroundTaskList.svelte";
-
-  const rootState = RootState.state;
-
-  const callback: AwaiterCallback<Client> = async (
-    setStatus,
-  ): Promise<Client> => {
-    setStatus("Loading .NET Libraries...");
-
-    return $rootState.getClient();
-  };
+  import Dashboard from "../../components/Dashboard/Dashboard.svelte";
+  import LoadingPage from "../../components/Widgets/LoadingSpinnerPage.svelte";
+  import LoadingBar from "../../components/Widgets/LoadingBar.svelte";
+  import { pendingTasks } from "../../components/BackgroundTaskList/BackgroundTaskList.svelte";
+  import ClientAwaiter from "../../components/Bindings/ClientAwaiter.svelte";
 </script>
 
 <svelte:window
@@ -33,8 +19,8 @@
   }}
 />
 
-<Awaiter {callback}>
-  <svelte:fragment slot="success" let:result={client}>
+<ClientAwaiter>
+  <svelte:fragment let:client>
     <Dashboard {client}>
       {#if $navigating}
         <div class="top-loading">
@@ -44,7 +30,6 @@
       <slot />
     </Dashboard>
   </svelte:fragment>
-
   <svelte:fragment slot="loading" let:message>
     <div class="loading-page">
       <LoadingPage>
@@ -52,7 +37,7 @@
       </LoadingPage>
     </div>
   </svelte:fragment>
-</Awaiter>
+</ClientAwaiter>
 
 <style lang="scss">
   div.loading-page {

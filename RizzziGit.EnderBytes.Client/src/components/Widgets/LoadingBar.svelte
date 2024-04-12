@@ -1,5 +1,5 @@
 <script lang="ts">
-  import AnimationFrame from "./AnimationFrame.svelte";
+  import AnimationFrame from "../Bindings/AnimationFrame.svelte";
 
   export let progress: number | null = null;
 

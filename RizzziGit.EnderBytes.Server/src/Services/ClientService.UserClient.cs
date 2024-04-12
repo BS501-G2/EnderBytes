@@ -302,14 +302,16 @@ public sealed partial class ClientService
         JObject requestData = AsJson<JObject>(request);
 
         long fileId = (long)requestData["fileId"]!;
-        long baseSnapshotId = (long)requestData["baseSnapshotId"]!;
+        long? baseSnapshotId = (long?)requestData["baseSnapshotId"];
         bool enableWrite = (bool)requestData["enableWrite"]!;
+
+        FileSnapshotResource? baseSnapshot = null;
 
         if (
           (!transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, fileId, out FileResource? file, cancellationToken)) ||
 
           (!transaction.GetManager<StorageResource.ResourceManager>().TryGetById(transaction, file.StorageId, out StorageResource? storage, cancellationToken))||
-          (!transaction.GetManager<FileSnapshotResource.ResourceManager>().TryGetById(transaction, baseSnapshotId, out FileSnapshotResource? baseSnapshot, cancellationToken))
+          (baseSnapshotId != null && (!transaction.GetManager<FileSnapshotResource.ResourceManager>().TryGetById(transaction, (long)baseSnapshotId, out baseSnapshot, cancellationToken)))
         )
         {
           throw new RequestError(UserResponse.ResourceNotFound);

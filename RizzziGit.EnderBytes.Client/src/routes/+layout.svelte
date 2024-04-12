@@ -25,7 +25,7 @@
           : ViewMode.Browser);
 
     if (newViewMode != $rootState.viewMode) {
-      $rootState.viewMode = newViewMode
+      $rootState.viewMode = newViewMode;
     }
   }
 
@@ -55,11 +55,11 @@
 </script>
 
 <svelte:head>
-  <title
-    >{$rootState.getString(LocaleKey.AppName)} - {$rootState.getString(
+  <title>
+    {$rootState.getString(LocaleKey.AppName)} - {$rootState.getString(
       LocaleKey.AppTagline,
-    )}</title
-  >
+    )}
+  </title>
 
   {@html `<style>:root { ${serializeThemeColorsIntoInlineStyle($rootState.theme)} } body { margin: unset; min-height: 100vh; }</style>`}
 </svelte:head>

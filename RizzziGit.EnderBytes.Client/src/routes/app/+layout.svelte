@@ -9,6 +9,7 @@
   } from "../../components/Awaiter.svelte";
   import LoadingPage from "../../components/LoadingSpinnerPage.svelte";
   import LoadingBar from "../../components/LoadingBar.svelte";
+  import { pendingTasks } from "../../components/BackgroundTaskList.svelte";
 
   const rootState = RootState.state;
 
@@ -20,6 +21,17 @@
     return $rootState.getClient();
   };
 </script>
+
+<svelte:window
+  on:beforeunload={(event) => {
+    if ($pendingTasks.length == 0) {
+      return;
+    }
+
+    event.preventDefault();
+    return "There are pending tasks in the queue. Are you sure you want to leave?";
+  }}
+/>
 
 <Awaiter {callback}>
   <svelte:fragment slot="success" let:result={client}>

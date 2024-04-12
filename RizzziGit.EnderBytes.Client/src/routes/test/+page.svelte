@@ -1,10 +1,40 @@
 <script lang="ts">
+    import { onDestroy, onMount } from "svelte";
   import Awaiter from "../../components/Awaiter.svelte";
   import LoadingBar from "../../components/LoadingBar.svelte";
+
+  export let progress: number | null = 0;
+
+  let a: boolean = false
+
+  async function exec() {
+    while (a) {
+      if (progress != null) {
+        progress += 0.001;
+
+        if (progress >= 1) {
+          progress = null;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 30 / 1000));
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        progress = 0
+      }
+    }
+  }
+
+  onMount(() => {
+    a = true
+    exec()
+  })
+
+  onDestroy(() => {
+    a = false
+  })
 </script>
 
 <div class="content">
-  <LoadingBar />
+  <LoadingBar {progress} />
   <Awaiter
     callback={async () => {
       await new Promise((resolve) => setTimeout(resolve, 1000));

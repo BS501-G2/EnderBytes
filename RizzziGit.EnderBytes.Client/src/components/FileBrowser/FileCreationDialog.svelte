@@ -14,6 +14,7 @@
   import type { Client } from "$lib/client/client";
   import Button, { ButtonClass } from "../Button.svelte";
   import Dialog, { DialogClass } from "../Dialog.svelte";
+  import FileCreationTab from "./FileCreationDialog/FileCreationTab.svelte";
 
   export let client: Client;
 
@@ -40,16 +41,7 @@
     cancel();
   }}
 >
-  <svelte:fragment slot="actions">
-    <Button buttonClass={ButtonClass.Primary} onClick={() => {}}>Create</Button>
-    <Button
-      buttonClass={ButtonClass.Background}
-      onClick={async () => {
-        cancel();
-      }}>Cancel</Button
-    >
-  </svelte:fragment>
-  <h2 style="margin: 0px" slot="head">Create New File</h2>
+  <h2 slot="head" style="margin: 0px">Create New File</h2>
   <div slot="body" class="file-creation-dialog">
     <div class="creation-tab">
       {#each types as type}
@@ -74,12 +66,21 @@
     <div class="divider"></div>
     <div class="creation-panel">
       {#if current == CreateNewFileType.File}
-        <p>File Page</p>
+        <FileCreationTab />
       {:else if current == CreateNewFileType.Folder}
         <p>Folder Page</p>
       {/if}
     </div>
   </div>
+  <svelte:fragment slot="actions">
+    <Button buttonClass={ButtonClass.Primary} onClick={() => {}}>Create</Button>
+    <Button
+      buttonClass={ButtonClass.Background}
+      onClick={async () => {
+        cancel();
+      }}>Cancel</Button
+    >
+  </svelte:fragment>
 </Dialog>
 
 {#if dismissConfirmationDialog}
@@ -87,11 +88,18 @@
     dialogClass={DialogClass.Normal}
     onDismiss={() => (dismissConfirmationDialog = false)}
   >
-  <h2 slot="head" style="margin: 0px;">Unsaved Progress</h2>
-  <p slot="body" style="margin: 0px;">All unsaved progress will be lost. Are you sure to close the file creation dialog?</p>
+    <h2 slot="head" style="margin: 0px;">Unsaved Progress</h2>
+    <p slot="body" style="margin: 0px;">
+      All unsaved progress will be lost. Are you sure to close the file creation
+      dialog?
+    </p>
     <svelte:fragment slot="actions">
       <Button onClick={() => onDismiss()}>Yes</Button>
-      <Button onClick={() => {dismissConfirmationDialog = false}}>No</Button>
+      <Button
+        onClick={() => {
+          dismissConfirmationDialog = false;
+        }}>No</Button
+      >
     </svelte:fragment>
   </Dialog>
 {/if}

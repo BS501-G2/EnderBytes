@@ -5,13 +5,16 @@
 </script>
 
 <div class="panel-container">
-  <div class="panel top-panel">
+  <div class="panel top-panel"></div>
+  <div class="panel middle-panel"></div>
+  <div class="panel bottom-panel"></div>
+  <!-- <div class="panel top-panel">
     <slot name="layout-slot" />
   </div>
 
   <div class="panel bottom-panel">
     <NavigationBar></NavigationBar>
-  </div>
+  </div> -->
 </div>
 
 <style lang="scss">
@@ -28,6 +31,12 @@
     flex-direction: column;
 
     > div.top-panel {
+      min-height: 32px;
+
+      background-color: var(--primaryContainer);
+    }
+
+    > div.middle-panel {
       flex-grow: 1;
 
       overflow-y: auto;

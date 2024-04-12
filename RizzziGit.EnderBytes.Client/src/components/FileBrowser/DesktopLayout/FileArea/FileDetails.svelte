@@ -28,12 +28,13 @@
     flex-direction: column;
     flex-grow: 1;
 
-    min-width: 320px;
-    max-width: 320px;
+    min-width: 256px;
+    max-width: 256px;
 
     padding: 16px;
 
     overflow-y: auto;
+    overflow-x: hidden;
 
     align-items: center;
 
@@ -43,10 +44,11 @@
 
       width: 256px;
       height: 256px;
+      box-sizing: border-box;
 
       align-items: center;
 
-      margin: 16px;
+      padding: 16px;
 
       > img {
         width: 100%;

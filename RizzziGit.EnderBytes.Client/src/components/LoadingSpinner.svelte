@@ -6,7 +6,7 @@
   let spinner: Writable<[degrees: number, time: number | null]> = writable([0, null]);
   let activeCount: number = 0;
 
-  let degreesIncrement = 1000 / (6 * 60)
+  let degreesIncrement = 1000 / 360
 
   function connect() {
     if (activeCount == 0) {
@@ -28,7 +28,7 @@
             v[0] = 0
           }
 
-          return [Math.floor(v[0] + ((Date.now() - (v[1] ?? Date.now())) / degreesIncrement)), Date.now()]
+          return [v[0] + ((Date.now() - (v[1] ?? Date.now())) / degreesIncrement), Date.now()]
         });
 
         requestAnimationFrame(update);

@@ -1,0 +1,400 @@
+<script lang="ts" context="module">
+  import {
+    writable,
+    get,
+    type Writable,
+    type Readable,
+    derived,
+  } from "svelte/store";
+
+  export type BackgroundTaskSetStatusFunction = (
+    message: string | null,
+    progressPercentage: number | null,
+  ) => void;
+
+  export type BackgroundTaskCallback<T> = (
+    client: BackgroundTaskClient<T>,
+    setStatus: BackgroundTaskSetStatusFunction,
+  ) => Promise<T> | T;
+
+  export interface BackgroundTask<T> {
+    name: string;
+    message: string | null;
+    progress: number | null;
+    retryable: boolean;
+    status: BackgroundTaskStatus;
+    cancelled: boolean;
+
+    isDismissed: boolean;
+
+    client: BackgroundTaskClient<any>;
+    run: () => Promise<T>;
+    dismiss: () => void;
+    cancel: () => void;
+  }
+
+  export interface BackgroundTaskClient<T> {
+    name: string;
+    status: BackgroundTaskStatus;
+    retryable: boolean;
+    cancelled: boolean;
+    run: () => Promise<T>;
+    dismiss: () => void;
+    task: Promise<T> | null;
+    cancel: () => void;
+  }
+
+  export enum BackgroundTaskStatus {
+    Ready,
+    Running,
+    Done,
+    Failed,
+  }
+
+  export const backgroundTasks: Writable<BackgroundTask<any>[]> = writable([]);
+  export const pendingTasks: Readable<BackgroundTask<any>[]> = derived(
+    backgroundTasks,
+    (value, set, update) => {
+      set(
+        value.filter(
+          (value) =>
+            value.status == BackgroundTaskStatus.Running ||
+            value.status == BackgroundTaskStatus.Failed ||
+            value.status == BackgroundTaskStatus.Ready,
+        ),
+      );
+    },
+  );
+
+  export function dismissAll() {
+    backgroundTasks.update((value) => {
+      return value.filter(
+        (value) => value.status === BackgroundTaskStatus.Running,
+      );
+    });
+  }
+
+  export function executeBackgroundTask<T>(
+    name: string,
+    retryable: boolean,
+    callback: BackgroundTaskCallback<T>,
+    autoDismiss: boolean = false,
+  ): BackgroundTaskClient<T> {
+    let firstRun: boolean = false;
+    let task: Promise<T> | null = null;
+    let client: BackgroundTaskClient<T>;
+
+    const backgroundTask: BackgroundTask<T> = {
+      name,
+      message: null,
+      progress: null,
+      retryable,
+      status: BackgroundTaskStatus.Ready,
+
+      get isDismissed() {
+        return get(backgroundTasks).indexOf(backgroundTask) === -1;
+      },
+
+      get client() {
+        return client;
+      },
+      get run() {
+        const refresh = () => backgroundTasks.update((e) => e);
+        const setStatus: BackgroundTaskSetStatusFunction = (
+          message,
+          processPercentage,
+        ) => {
+          backgroundTask.message = message;
+          backgroundTask.progress = processPercentage;
+          refresh();
+        };
+        const run = async (client: BackgroundTaskClient<T>): Promise<T> => {
+          if (backgroundTask.status === BackgroundTaskStatus.Running) {
+            throw new Error("Operation is already running.");
+          }
+
+          if (firstRun && !backgroundTask.retryable) {
+            throw new Error("Operation cannot be retried.");
+          }
+
+          try {
+            backgroundTask.status = BackgroundTaskStatus.Running;
+            refresh();
+            const result = await callback(client, setStatus);
+            backgroundTask.status = BackgroundTaskStatus.Done;
+            setStatus("Completed", null);
+
+            if (autoDismiss) {
+              backgroundTask.dismiss();
+            }
+
+            return result;
+          } catch (error: any) {
+            backgroundTask.status = BackgroundTaskStatus.Failed;
+            setStatus(error?.message ?? "An error occured.", null);
+            throw error;
+          }
+        };
+
+        return async () => {
+          try {
+            return await (task = run(client));
+          } finally {
+            task = null;
+          }
+        };
+      },
+
+      cancel: () => (backgroundTask.cancelled = true),
+      dismiss: () => {
+        if (backgroundTask.status == BackgroundTaskStatus.Running) {
+          return;
+        }
+
+        backgroundTasks.update((value) => {
+          const index = value.indexOf(backgroundTask);
+
+          if (index >= 0) {
+            value.splice(index, 1);
+          }
+
+          return value;
+        });
+      },
+
+      cancelled: false,
+    };
+
+    backgroundTasks.update((value) => {
+      value.unshift(backgroundTask);
+
+      return value;
+    });
+
+    client = {
+      get cancelled() {
+        return backgroundTask.cancelled;
+      },
+      get run() {
+        return backgroundTask.run;
+      },
+      get cancel() {
+        return backgroundTask.cancel;
+      },
+      get name() {
+        return backgroundTask.name;
+      },
+      get retryable() {
+        return backgroundTask.retryable;
+      },
+      get status() {
+        return backgroundTask.status;
+      },
+      get task() {
+        return task;
+      },
+      get dismiss() {
+        return backgroundTask.dismiss;
+      },
+    };
+
+    return client;
+  }
+</script>
+
+<script lang="ts">
+  import LoadingBar from "./LoadingBar.svelte";
+  import { RefreshCwIcon, XIcon, PlayIcon } from "svelte-feather-icons";
+  import { onDestroy, onMount } from "svelte";
+
+  export let filter: BackgroundTaskStatus[] | null = [
+    BackgroundTaskStatus.Running,
+    BackgroundTaskStatus.Failed,
+    BackgroundTaskStatus.Ready,
+  ];
+
+  let cached: BackgroundTask<any>[] = [];
+
+  let unsubscriber: () => void;
+
+  onMount(() => {
+    let preCached: BackgroundTask<any>[] | null = [];
+    let running: boolean = false;
+
+    let lastTime: number = 0;
+
+    unsubscriber = backgroundTasks.subscribe((value) => {
+      preCached = value;
+
+      if (!running) {
+        running = true;
+
+        const update = () => {
+          if (preCached == null) {
+            running = false;
+            return;
+          }
+
+          cached = preCached;
+          preCached = null;
+          lastTime = Date.now();
+
+          requestAnimationFrame(update);
+        };
+
+        requestAnimationFrame(update);
+      }
+    });
+  });
+
+  onDestroy(() => {
+    unsubscriber();
+  });
+</script>
+
+<div class="background-tasks">
+  {#if cached.length == 0}
+    <p>No pending operations.</p>
+  {:else}
+    {#each cached as { name, progress, run, retryable, cancelled, cancel, message, status, dismiss }, index}
+      {#if filter == null || filter.includes(status)}
+        {#if index != 0}
+          <div class="divider" />
+        {/if}
+
+        <div class="background-task">
+          <div class="name">
+            <p><b>{name}</b></p>
+
+            {#if status == BackgroundTaskStatus.Running}
+              {#if !cancelled}
+                <button on:click={() => cancel()} title="Cancel"
+                  ><XIcon size="16px" /></button
+                >
+              {/if}
+            {:else if status == BackgroundTaskStatus.Done}
+              <button on:click={() => dismiss()} title="Dismiss"
+                ><XIcon size="16px" /></button
+              >
+            {:else if status == BackgroundTaskStatus.Failed}
+              {#if retryable}
+                <button on:click={() => run()} title="Run"
+                  ><RefreshCwIcon size="16px" /></button
+                >
+              {/if}
+              <button on:click={() => dismiss()} title="Dismiss"
+                ><XIcon size="16px" /></button
+              >
+            {:else if status == BackgroundTaskStatus.Ready}
+              <button on:click={() => run()} title="Run"
+                ><PlayIcon size="16px" /></button
+              >
+              <button on:click={() => dismiss()} title="Dismiss"
+                ><XIcon size="16px" /></button
+              >
+            {/if}
+          </div>
+          {#if status == BackgroundTaskStatus.Running}
+            <div class="progress">
+              <LoadingBar bind:progress />
+            </div>
+          {/if}
+          <div class="message">
+            {#if status == BackgroundTaskStatus.Failed}
+              <p>Failed: {message}</p>
+            {:else}
+              {#if message != null}
+                <p>{message}</p>
+              {/if}
+              {#if progress != null}
+                <p>{Math.round(progress * 1000) / 10}%</p>
+              {/if}
+            {/if}
+          </div>
+        </div>
+      {/if}
+    {/each}
+  {/if}
+</div>
+
+<style lang="scss">
+  div.background-tasks {
+    display: flex;
+    flex-direction: column;
+
+    min-height: 64px;
+    overflow-y: auto;
+
+    padding: 8px 0px 8px 0px;
+
+    gap: 8px;
+
+    > p {
+      text-align: center;
+    }
+
+    > div.divider {
+      min-height: 1px;
+      max-height: 1px;
+
+      background-color: var(--primary);
+    }
+
+    > div.background-task {
+      font-size: 10px;
+      display: flex;
+      flex-direction: column;
+
+      gap: 8px;
+
+      > div.name {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+
+        gap: 9px;
+
+        > p {
+          margin: 0px;
+        }
+
+        > p:nth-child(1) {
+          flex-grow: 1;
+          min-width: 0px;
+        }
+
+        > button {
+          background-color: unset;
+          border: unset;
+          color: var(--primary);
+
+          cursor: pointer;
+
+          padding: 0px;
+
+          width: 16px;
+          height: 16px;
+        }
+      }
+
+      > div.message {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+
+        > p {
+          margin: 0px;
+        }
+
+        > p:nth-child(1) {
+          flex-grow: 1;
+          min-width: 0px;
+        }
+
+        > p:nth-child(2) {
+          max-width: 100%;
+        }
+      }
+    }
+  }
+</style>

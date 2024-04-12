@@ -1,15 +1,31 @@
 <script lang="ts" context="module">
+  enum ActionTab {
+    Operations,
+    Notification,
+  }
 </script>
 
 <script lang="ts">
   import type { Client } from "$lib/client/client";
 
+  import { BellIcon, CheckSquareIcon } from "svelte-feather-icons";
+
   import LeftPanelNavigationBar from "./DesktopLayout/LeftPanelNavigationBar.svelte";
   import LeftPanelAccountBar from "./DesktopLayout/LeftPanelAccountBar.svelte";
   import TitleBar from "./DesktopLayout/TitleBar.svelte";
   import Keyboard from "../Keyboard.svelte";
+  import OperationsTab from "./DesktopLayout/OperationsTab.svelte";
+  import NotificationsTab from "./DesktopLayout/NotificationsTab.svelte";
+  import BackgroundTaskList, {
+    BackgroundTaskStatus,
+    backgroundTasks,
+    pendingTasks,
+  } from "../BackgroundTaskList.svelte";
+  import { get } from "svelte/store";
 
   export let client: Client;
+
+  let actionTab: ActionTab | null = null;
 </script>
 
 <Keyboard />
@@ -19,8 +35,40 @@
 
   <div class="panel-container">
     <div class="panel left-panel">
-      <LeftPanelNavigationBar />
-      <div class="divider"></div>
+      {#if actionTab === null}
+        <LeftPanelNavigationBar />
+        {#if $pendingTasks.length}
+          <div class="divider" />
+          <BackgroundTaskList />
+        {/if}
+        <div class="divider" />
+        <div class="actions">
+          <button on:click={() => (actionTab = ActionTab.Notification)}>
+            <p>0</p>
+            <BellIcon />
+          </button>
+          <button on:click={() => (actionTab = ActionTab.Operations)}>
+            <p>
+              {$pendingTasks.length}
+            </p>
+            <CheckSquareIcon />
+          </button>
+        </div>
+      {:else if actionTab === ActionTab.Operations}
+        <OperationsTab
+          onDismiss={() => {
+            actionTab = null;
+          }}
+        />
+      {:else if actionTab === ActionTab.Notification}
+        <slot name="notification" />
+        <NotificationsTab
+          onDismiss={() => {
+            actionTab = null;
+          }}
+        />
+      {/if}
+      <div class="divider" />
       <LeftPanelAccountBar {client} />
     </div>
 
@@ -66,11 +114,34 @@
       display: flex;
       flex-direction: column;
 
+      min-height: 0px;
+
       padding: 0px 16px 0px 16px;
 
       > div.divider {
-        height: 1px;
+        min-height: 1px;
+        max-height: 1px;
         background-color: var(--primary);
+      }
+
+      > div.actions {
+        display: flex;
+        gap: 8px;
+
+        > button {
+          cursor: pointer;
+
+          flex-grow: 1;
+
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          justify-content: center;
+
+          color: var(--primary);
+          background-color: unset;
+          border: unset;
+        }
       }
     }
 

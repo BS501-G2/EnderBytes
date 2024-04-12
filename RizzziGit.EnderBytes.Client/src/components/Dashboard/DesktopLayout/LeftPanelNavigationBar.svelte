@@ -1,6 +1,5 @@
 <script lang="ts" context="module">
   import { page } from "$app/stores";
-  import { RootState } from "$lib/states/root-state";
   import { navigating } from "$app/stores";
 </script>
 

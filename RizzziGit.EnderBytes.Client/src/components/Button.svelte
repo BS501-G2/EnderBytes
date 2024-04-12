@@ -11,13 +11,13 @@
   export let enabled: boolean = true;
   export let onClick: () => Promise<void> | void;
 
-    let busy: boolean = false;
+  let busy: boolean = false;
 </script>
 
 <button
   disabled={!enabled || busy}
   class="button {buttonClass}"
-  on:click={onClick}><slot/></button
+  on:click={onClick}><slot /></button
 >
 
 <style lang="scss">

@@ -110,22 +110,34 @@
     {#if $$slots.error}
       <slot name="error" {error} retry={exec} />
     {:else}
-      <Banner bannerClass={BannerClass.Error}>
-        <div class="banner">
-          <p style="margin: 0">Error: {error.message}</p>
-          <Button onClick={exec} buttonClass={ButtonClass.Background}
-            >Retry</Button
-          >
-        </div>
-      </Banner>
+      <div class="container">
+        <Banner bannerClass={BannerClass.Error}>
+          <div class="banner">
+            <p style="margin: 0">Error: {error.message}</p>
+            <Button onClick={exec} buttonClass={ButtonClass.Background}
+              >Retry</Button
+            >
+          </div>
+        </Banner>
+      </div>
     {/if}
   {/await}
 {/if}
 
 <style lang="scss">
-  div.banner {
+  div.container {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    justify-content: center;
+
+    width: 100%;
+    height: 100%;
+
+    div.banner {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
   }
 </style>

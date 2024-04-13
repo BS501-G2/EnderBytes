@@ -15,7 +15,7 @@
   export let onRefresh: () => void;
 </script>
 
-<Awaiter callback={() => client.scanFolder(file.Id)} bind:reload={onRefresh}>
+<Awaiter callback={() => client.scanFolder(file.Id)} bind:reset={onRefresh}>
   <svelte:fragment slot="success" let:result={fileIds}>
     <div class="file-list">
       {#each fileIds as fileId, index}

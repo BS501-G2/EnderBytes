@@ -15,7 +15,7 @@
   export let required: boolean = false;
   export let disabled: boolean = false;
   export let text: string = "";
-  export let placeholder: string = "";
+  export let placeholder: string = "Type something...";
   export let valid: boolean = true;
   export let validate: (() => boolean) | null = null;
 

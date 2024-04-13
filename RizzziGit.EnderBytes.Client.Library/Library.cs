@@ -186,6 +186,8 @@ public static partial class Client
     if (responseCode == (uint)UserResponse.Okay)
     {
       LastResponsePayload = ClientPayload.Deserialize(responseBuffer);
+    } else {
+      LastResponsePayload = new ClientPayload.Raw(responseBuffer);
     }
 
     return (int)responseCode;

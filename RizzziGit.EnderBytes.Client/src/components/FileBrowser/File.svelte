@@ -1,11 +1,11 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import type { Client } from "$lib/client/client";
-  import { RootState } from "$lib/states/root-state";
-  import { onMount } from "svelte";
+
   import Loading from "../Widgets/LoadingSpinner.svelte";
 
   import { AlertTriangleIcon } from "svelte-feather-icons";
+  import Awaiter from "../Bindings/Awaiter.svelte";
 
   export let client: Client;
   export let fileId: number;
@@ -14,76 +14,51 @@
   export let onClick: () => void;
 
   let hovered: boolean = false;
-  let errored: boolean = false;
 
-  let loadPromise: Promise<any> | null = null;
-  async function load(): Promise<any> {
-    errored = false;
-    try {
-      return await client.getFile(fileId);
-    } catch (error) {
-      errored = true;
-
-      throw error;
-    }
-  }
-
-  onMount(() => (loadPromise = load()));
+  let loadPromise: Promise<Client> | null;
 </script>
 
 <button
   class="file-entry {selected ? 'selected' : ''}"
   on:pointerenter={() => (hovered = true)}
   on:pointerleave={() => (hovered = false)}
-  on:click={() => {
-    if (!errored) {
-      onClick();
-      return;
-    }
-
-    loadPromise = load();
-  }}
+  on:click={onClick}
   on:dblclick={() => goto("/app/files/" + fileId)}
 >
   <div class="overlay">
     {#if selected || hovered}
-      <input type="checkbox" disabled checked={selected} />
+      <input type="checkbox" disabled checked={selected} on:click={onClick} />
     {/if}
   </div>
   <div class="base">
-    {#if loadPromise == null}
-      <div class="file-preview" style="padding: 16px">
-        <Loading></Loading>
-      </div>
-    {:else}
-      {#await loadPromise}
-        <div class="file-preview" style="padding: 16px">
-          <Loading></Loading>
-        </div>
-      {:then}
-        <div class="file-preview">
-          <img class="file-preview" src="/favicon.svg" alt="asd" />
-        </div>
-      {:catch}
-        <div class="file-preview" style="padding: 16px; color: red">
-          <AlertTriangleIcon size="100%" />
-        </div>
-      {/await}
-    {/if}
+    {#key loadPromise}
+      <Awaiter callback={() => loadPromise}>
+        <svelte:fragment slot="loading">
+          <div class="file-preview" style="padding: 16px">
+            <Loading></Loading>
+          </div>
+        </svelte:fragment>
+        <svelte:fragment slot="success" let:result={file}>
+          <div class="file-preview">
+            <img class="file-preview" src="/favicon.svg" alt="asd" />
+          </div>
+        </svelte:fragment>
+        <svelte:fragment slot="error" let:error>
+          <div class="file-preview" style="padding: 16px; color: red">
+            <AlertTriangleIcon size="100%" />
+          </div>
+        </svelte:fragment>
+      </Awaiter>
+    {/key}
     <div class="file-info">
       <span class="file-name">
-        {#if loadPromise == null}
-          Loading...
-        {:else}
-          {#await loadPromise}
-            Loading...
-          {:then file}
+        <Awaiter callback={() => (loadPromise = client.getFile(fileId))}>
+          <svelte:fragment slot="loading">Loading...</svelte:fragment>
+          <svelte:fragment slot="success" let:result={file}>
             {file.Name}
-          {:catch}
-            [error]
-          {/await}
-        {/if}</span
-      >
+          </svelte:fragment>
+        </Awaiter>
+      </span>
     </div>
   </div>
 </button>
@@ -123,8 +98,8 @@
 
     > div.base {
       > div.file-preview {
-        width: 128px;
-        height: 128px;
+        max-width: 128px;
+        max-height: 128px;
 
         padding: 8px;
         box-sizing: border-box;

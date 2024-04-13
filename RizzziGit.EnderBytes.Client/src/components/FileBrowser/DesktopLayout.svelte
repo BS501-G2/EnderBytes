@@ -1,13 +1,12 @@
 <script lang="ts">
   import type { Client } from "$lib/client/client";
 
-  import AddressBar from "./DesktopLayout/AddressBar.svelte";
+  import AddressBar from "./DesktopLayout/AddressBar/AddressBar.svelte";
   import ControlBar from "./DesktopLayout/ControlBar.svelte";
   import FileArea from "./DesktopLayout/FileArea.svelte";
 
   export let currentFileId: number | null;
   export let client: Client;
-  export let fileCreationDialog: boolean;
 
   let selectedFileIds: number[] = [];
   let onRefresh: () => void
@@ -23,7 +22,6 @@
   <ControlBar
     {client}
     bind:currentFileId
-    bind:fileCreationDialog
     bind:selectedFileIds
     bind:onRefresh
   />

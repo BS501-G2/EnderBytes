@@ -33,7 +33,7 @@
   <svelte:fragment slot="loading" let:message>
     <div class="loading-page">
       <LoadingPage>
-        <p slot="with-spinner">{message}</p>
+        <p>{message}</p>
       </LoadingPage>
     </div>
   </svelte:fragment>

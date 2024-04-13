@@ -3,16 +3,19 @@
 <script lang="ts" context="module">
   import { get, writable, type Writable } from "svelte/store";
 
-  let spinner: Writable<[degrees: number, time: number | null]> = writable([0, null]);
+  let spinner: Writable<[degrees: number, time: number | null]> = writable([
+    0,
+    null,
+  ]);
   let activeCount: number = 0;
 
-  let degreesIncrement = 1000 / 360
+  let degreesIncrement = 1000 / 360;
 
   function connect() {
     if (activeCount == 0) {
-      const oldData = get(spinner)
+      const oldData = get(spinner);
 
-      if (oldData[1] == null || (oldData[1] < (Date.now() - 10000))) {
+      if (oldData[1] == null || oldData[1] < Date.now() - 10000) {
         spinner.set([0, null]);
       }
 
@@ -25,10 +28,13 @@
 
         spinner.update((v) => {
           if (v[0] >= 360) {
-            v[0] = 0
+            v[0] = 0;
           }
 
-          return [v[0] + ((Date.now() - (v[1] ?? Date.now())) / degreesIncrement), Date.now()]
+          return [
+            v[0] + (Date.now() - (v[1] ?? Date.now())) / degreesIncrement,
+            Date.now(),
+          ];
         });
 
         requestAnimationFrame(update);
@@ -50,7 +56,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
 
-  export let degrees: number = 0
+  export let degrees: number = 0;
+  export let size: number | null = null;
 
   onMount(() => {
     connect();
@@ -58,14 +65,17 @@
 
   onDestroy(() => disconnect());
 
-  $: degrees = $spinner[0]
+  $: degrees = $spinner[0];
 </script>
 
 <svg
+  class={size == null ? "nosize" : ""}
   viewBox="0 0 200 200"
   fill="none"
   style="transform: rotate({$spinner[0]}deg);"
   xmlns="http://www.w3.org/2000/svg"
+  width={size != null ? `${size}px` : null}
+  height={size != null ? `${size}px` : null}
 >
   <defs>
     <linearGradient id="spinner-secondHalf">
@@ -78,14 +88,23 @@
     </linearGradient>
   </defs>
 
-  <g stroke-width="8">
-    <path stroke="url(#spinner-secondHalf)" d="M 4 100 A 96 96 0 0 1 196 100" />
-    <path stroke="url(#spinner-firstHalf)" d="M 196 100 A 96 96 0 0 1 4 100" />
+  <g stroke-width="1">
+    <path
+      stroke="url(#spinner-secondHalf)"
+      d="M 4 100 A 96 96 0 0 1 196 100"
+      vector-effect="non-scaling-stroke"
+    />
+    <path
+      stroke="url(#spinner-firstHalf)"
+      d="M 196 100 A 96 96 0 0 1 4 100"
+      vector-effect="non-scaling-stroke"
+    />
 
     <path
       stroke="currentColor"
       stroke-linecap="round"
       d="M 4 100 A 96 96 0 0 1 4 98"
+      vector-effect="non-scaling-stroke"
     />
   </g>
 
@@ -100,7 +119,7 @@
 </svg>
 
 <style lang="scss">
-  svg {
+  svg.nosize {
     width: 100%;
     height: 100%;
   }

@@ -6,16 +6,16 @@
   }
 
   let keys: string[] = [];
-  let instances: WeakRef<(type: "up" | "down", keys: string[]) => boolean>[] = [];
+  let instances: WeakRef<(type: "up" | "down", keys: string[]) => boolean>[] =
+    [];
 
   export class KeyboardState {
     public constructor() {
-      this.#listeners = [];
-
-      instances.push(new WeakRef(() => this.#trigger()));
+      instances.push(new WeakRef(this.#_trigger));
     }
 
-    #listeners: KeyboardListener[];
+    #_trigger: () => boolean = () => this.#trigger();
+    #listeners: KeyboardListener[] = [];
 
     #trigger(): boolean {
       let prevent = false;
@@ -32,7 +32,7 @@
     }
 
     addListener(keys: string[], func: () => void): () => void {
-      const a = { keys, func }
+      const a = { keys, func };
 
       this.#listeners.push(a);
 
@@ -40,7 +40,7 @@
         const index = this.#listeners.indexOf(a);
 
         this.#listeners.splice(index, 1);
-      }
+      };
     }
 
     hasKeys(...findKeys: string[]): boolean {
@@ -51,7 +51,7 @@
 
 <script lang="ts">
   function onKey(type: "up" | "down", event: KeyboardEvent) {
-    const key = event.key?.toLowerCase() ?? '';
+    const key = event.key?.toLowerCase() ?? "";
 
     if (type == "down" && !keys.includes(key)) {
       keys.push(key);

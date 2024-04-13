@@ -102,7 +102,7 @@
         const refresh = () => backgroundTasks.update((e) => e);
         const setStatus: BackgroundTaskSetStatusFunction = (
           message = backgroundTask.message,
-          progress = backgroundTask.progress
+          progress = backgroundTask.progress,
         ) => {
           backgroundTask.message = message;
           backgroundTask.progress = progress;
@@ -122,7 +122,7 @@
             refresh();
             const result = await callback(client, setStatus);
             backgroundTask.status = BackgroundTaskStatus.Done;
-            setStatus("Completed", null);
+            refresh();
 
             if (autoDismiss) {
               backgroundTask.dismiss();
@@ -269,28 +269,28 @@
             {#if status == BackgroundTaskStatus.Running}
               {#if !cancelled}
                 <button on:click={() => cancel()} title="Cancel"
-                  ><XIcon size="16px" /></button
+                  ><XIcon size="16" /></button
                 >
               {/if}
             {:else if status == BackgroundTaskStatus.Done}
               <button on:click={() => dismiss()} title="Dismiss"
-                ><XIcon size="16px" /></button
+                ><XIcon size="16" /></button
               >
             {:else if status == BackgroundTaskStatus.Failed}
               {#if retryable}
                 <button on:click={() => run()} title="Run"
-                  ><RefreshCwIcon size="16px" /></button
+                  ><RefreshCwIcon size="16" /></button
                 >
               {/if}
               <button on:click={() => dismiss()} title="Dismiss"
-                ><XIcon size="16px" /></button
+                ><XIcon size="16" /></button
               >
             {:else if status == BackgroundTaskStatus.Ready}
               <button on:click={() => run()} title="Run"
-                ><PlayIcon size="16px" /></button
+                ><PlayIcon size="16" /></button
               >
               <button on:click={() => dismiss()} title="Dismiss"
-                ><XIcon size="16px" /></button
+                ><XIcon size="16" /></button
               >
             {/if}
           </div>

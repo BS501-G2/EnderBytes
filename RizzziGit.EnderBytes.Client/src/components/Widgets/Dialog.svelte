@@ -4,21 +4,13 @@
     Warning = "warning",
     Error = "error",
   }
-
-  export interface DialogButton {
-    label: string;
-    buttonClass?: ButtonClass;
-    enabled?: boolean;
-    onClick: () => void | Promise<void>;
-  }
 </script>
 
 <script lang="ts">
-  import Button, { ButtonClass } from "./Button.svelte";
   import Modal from "./Modal.svelte";
 
   export let onDismiss: () => void;
-  export let dialogClass: DialogClass;
+  export let dialogClass: DialogClass = DialogClass.Normal;
 </script>
 
 <Modal {onDismiss}>
@@ -55,10 +47,6 @@
 
     > div.head {
       text-align: left;
-
-      > h2 {
-        margin: 0px;
-      }
     }
 
     > div.body {

@@ -1,3 +1,4 @@
+import { dev } from '$app/environment'
 import { EventEmitter, type EventInterface } from '@rizzzi/eventemitter'
 
 export interface Session {
@@ -17,15 +18,17 @@ export interface PromiseObject {
 }
 
 export class ClientError extends Error {
-  public constructor(responseCode: number, responseCodeString: string) {
-    super(`Server response: ${responseCodeString}(${responseCode})`)
+  public constructor(responseCode: number, responseCodeString: string, errorMessage: string) {
+    super(`Server response: ${responseCodeString}(${responseCode}): ${errorMessage}`)
 
     this.responseCode = responseCode
     this.responseCodeString = responseCodeString
+    this.errorMessage = errorMessage
   }
 
   readonly responseCode: number
   readonly responseCodeString: string
+  readonly errorMessage: string
 }
 
 type ClientEventMap = {
@@ -184,7 +187,7 @@ export class Client {
     return this.#dotnet.GetResponseString(response)
   }
 
-  #request(request: string | number, requestData: ArrayBuffer | any = null): Promise<ArrayBuffer | any> {
+  async #request(request: string | number, requestData: ArrayBuffer | any = null): Promise<ArrayBuffer | any> {
     if (typeof (request) === 'string') {
       request = this.#getRequestInt(request)!
 
@@ -193,7 +196,11 @@ export class Client {
       }
     }
 
-    return this.#queue(async () => {
+    if (dev) {
+      // await new Promise<void>((resolve) => setTimeout(resolve, Math.floor(Math.random() * 1000)))
+    }
+
+    return await this.#queue(async () => {
       let responseCode: number | null = null
       if (requestData instanceof ArrayBuffer) {
         responseCode = await this.#dotnet.SendRawRequest(request, new Uint8Array(requestData))
@@ -204,7 +211,7 @@ export class Client {
       if (responseCode == null) {
         throw new Error("Unknown request/response data.")
       } else if (responseCode != this.#dotnet.GetResponseInt("Okay")) {
-        throw new ClientError(responseCode, this.#getResponseString(responseCode)!)
+        throw new ClientError(responseCode, this.#getResponseString(responseCode)!, new TextDecoder().decode(this.#dotnet.ReceiveRawResponse().buffer))
       }
 
       const responseType = this.#dotnet.GetResponseType()
@@ -282,8 +289,8 @@ export class Client {
     return await this.#request('GetRootFolderId')
   }
 
-  public async getFile(fileId: number): Promise<any> {
-    return await this.#request('GetFile', { fileId })
+  public async getFile(fileId: number | null = null): Promise<any> {
+    return await this.#request('GetFile', { fileId: fileId ?? await this.getRootFolderId() })
   }
 
   public async createFolder(name: string, folderId: number | null): Promise<number> {

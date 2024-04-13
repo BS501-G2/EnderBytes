@@ -23,7 +23,15 @@
   export let client: Client;
 
   let actionTab: ActionTab | null = null;
+
+  function onUnload() {
+    if ($pendingTasks.length > 0) {
+      actionTab = ActionTab.Operations;
+    }
+  }
 </script>
+
+<svelte:window on:beforeunload={onUnload} />
 
 <Keyboard />
 

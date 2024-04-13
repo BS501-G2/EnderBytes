@@ -14,8 +14,8 @@
     default: { client: Client };
     "not-loaded": {};
     loading: { message: string | null };
-    "loading-without-spinner": { message: string | null };
-    "loading-with-spinner": { message: string | null };
+    "loading-page-without-spinner": { message: string | null };
+    "loading-page": { message: string | null };
     error: { error: Error };
   }
 
@@ -71,15 +71,15 @@
     {/if}
   </svelte:fragment>
 
-  <svelte:fragment slot="loading-without-spinner" let:message>
-    {#if $$slots["loading-without-spinner"]}
-      <slot name="loading-without-spinner" {message} />
+  <svelte:fragment slot="loading-page-without-spinner" let:message>
+    {#if $$slots["loading-page-without-spinner"]}
+      <slot name="loading-page-without-spinner" {message} />
     {/if}
   </svelte:fragment>
 
-  <svelte:fragment slot="loading-with-spinner" let:message>
-    {#if $$slots["loading-with-spinner"]}
-      <slot name="loading-with-spinner" {message} />
+  <svelte:fragment slot="loading-page" let:message>
+    {#if $$slots["loading-page"]}
+      <slot name="loading-page" {message} />
     {/if}
   </svelte:fragment>
 

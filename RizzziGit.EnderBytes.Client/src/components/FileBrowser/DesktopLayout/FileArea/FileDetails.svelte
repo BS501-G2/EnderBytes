@@ -19,20 +19,19 @@
             <img alt="File preview for `file`" src="/favicon.svg" />
           </div>
           <div class="file-info">
+            <h2>{file.Name}</h2>
             <table>
               <tbody>
-                <tr>
-                  <td><p><b>File Name: </b></p></td>
-                  <td><p>{file.Name}</p></td>
-                </tr>
                 <tr>
                   <td><p><b>Created On: </b></p></td>
                   <td><p>{new Date(file.CreateTime).toLocaleString()}</p></td>
                 </tr>
-                <tr>
-                  <td><p><b>Modified On: </b></p></td>
-                  <td><p>{new Date(file.UpdateTime).toLocaleString()}</p></td>
-                </tr>
+                {#if file.UpdateTime !== file.CreateTime}
+                  <tr>
+                    <td><p><b>Modified On: </b></p></td>
+                    <td><p>{new Date(file.UpdateTime).toLocaleString()}</p></td>
+                  </tr>
+                {/if}
               </tbody>
             </table>
           </div>
@@ -80,6 +79,15 @@
     }
 
     > div.file-info {
+      display: flex;
+      flex-direction: column;
+
+      gap: 16px;
+
+      > h2 {
+        margin: 0px;
+        text-align: center;
+      }
       > table {
         > tbody {
           > tr {

@@ -11,13 +11,16 @@
   import DesktopLayout from "./DesktopLayout/DesktopLayout.svelte";
   import MobileLayout from "./MobileLayout/MobileLayout.svelte";
   import ResponsiveLayout from "../Bindings/ResponsiveLayout.svelte";
+  import AccountSettingsDialog from "./AccountSettingsDialog.svelte";
 
   const rootState = RootState.state;
 
   export let client: Client;
 
+  let accountSettingsDialog: boolean = false;
+
   onMount(async () => {
-    void (await $rootState.getClient()).on("sessionChange", (sessionToken) => {
+    void client.on("sessionChange", (sessionToken) => {
       $rootState.sessionToken = sessionToken ?? null;
     });
 
@@ -77,7 +80,7 @@
 {:else if $rootState.sessionToken != null}
   <ResponsiveLayout>
     <svelte:fragment slot="desktop">
-      <DesktopLayout {client}>
+      <DesktopLayout {client} bind:accountSettingsDialog>
         <slot />
       </DesktopLayout>
     </svelte:fragment>
@@ -87,4 +90,9 @@
       </MobileLayout>
     </svelte:fragment>
   </ResponsiveLayout>
+
+  {#if accountSettingsDialog}
+    <AccountSettingsDialog onDismiss={() => (accountSettingsDialog = false)}
+    ></AccountSettingsDialog>
+  {/if}
 {/if}

@@ -21,6 +21,7 @@
   } from "../../BackgroundTaskList/BackgroundTaskList.svelte";
 
   export let client: Client;
+  export let accountSettingsDialog: boolean
 
   let actionTab: ActionTab | null = null;
 
@@ -74,7 +75,7 @@
         />
       {/if}
       <div class="divider" />
-      <LeftPanelAccountBar {client} />
+      <LeftPanelAccountBar {client} bind:accountSettingsDialog />
     </div>
 
     <div class="panel right-panel">

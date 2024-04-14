@@ -100,6 +100,8 @@
       > div.file-preview {
         max-width: 128px;
         max-height: 128px;
+        min-width: 128px;
+        min-height: 128px;
 
         padding: 8px;
         box-sizing: border-box;
@@ -112,6 +114,7 @@
 
       > div.file-info {
         width: 128px;
+        min-height: 1em;
         display: flex;
         flex-direction: row;
 

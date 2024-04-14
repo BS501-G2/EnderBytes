@@ -7,18 +7,43 @@
 </script>
 
 <script lang="ts">
+  import Awaiter from "../Bindings/Awaiter.svelte";
+  import LoadingSpinner from "./LoadingSpinner.svelte";
+
   export let buttonClass: ButtonClass = ButtonClass.Primary;
   export let enabled: boolean = true;
   export let onClick: () => Promise<void> | void;
 
   let busy: boolean = false;
+
+  async function click() {
+    try {
+      busy = true;
+
+      return await onClick();
+    } finally {
+      reset();
+      busy = false;
+    }
+  }
+
+  let reset: () => void;
 </script>
 
 <button
   disabled={!enabled || busy}
   class="button {buttonClass}"
-  on:click={onClick}><slot /></button
+  on:click={onClick}
 >
+  <Awaiter callback={() => click()} autoLoad={false} bind:reset>
+    <svelte:fragment slot="loading">
+      <LoadingSpinner size={18}></LoadingSpinner>
+    </svelte:fragment>
+    <svelte:fragment slot="not-loaded">
+      <slot />
+    </svelte:fragment>
+  </Awaiter>
+</button>
 
 <style lang="scss">
   button.button {

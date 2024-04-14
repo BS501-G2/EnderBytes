@@ -66,8 +66,9 @@ export class Client {
 
             WS_URL: () => url.toString(),
 
-            OnStateChange: (state: number) => client!.#emit('stateChange', state),
-            OnSessionTokenChange: (session: string) => client!.#emit('sessionChange', client!.#sessionCache = JSON.parse(session))
+
+            SetState: (state: number) => client.#state = state,
+            GetState: () => { return client.#state },
           }))
 
           for (const eventName in events) {
@@ -105,70 +106,21 @@ export class Client {
 
   readonly #dotnet: any
   readonly #events: EventEmitter<ClientEvent>
-  get state(): number {
-    try {
-      return this.#dotnet.GetState()
-    } catch {
-      return Client.STATE_BORKED
-    }
-  }
+  #state: number = Client.STATE_NOT_CONNECTED
+  get state(): number { return this.#state }
   public get session(): Session | null { return this.#session }
 
-  #tasks: PromiseObject[] = []
-  #currentTask?: PromiseObject
-  #queueRunning: boolean = false
   #sessionCache: Session | null = null
   #session: Session | null = null
 
-  async #runQueue(): Promise<void> {
-    if (this.#queueRunning) {
-      return
-    }
-
-    this.#queueRunning = true
-    try {
-      while ((this.#currentTask ??= this.#tasks.shift()) != null) {
-        const { func, resolve, reject } = this.#currentTask
-
-        try {
-          resolve(await func())
-        }
-        catch (error: any) {
-          if (error?.message?.includes('Invalid state to send request.')) {
-            await this.#dotnet.Run();
-            continue;
-          }
-
-          reject(error)
-        }
-
-        this.#currentTask = undefined
-      }
-    }
-    finally {
-      this.#queueRunning = false
-    }
-  }
-
   async #run() {
     await this.#dotnet.Run();
-    void this.#runQueue()
 
     if (this.#sessionCache != null) {
       const { userId, token } = this.#sessionCache
 
       await this.loginToken(userId, token)
     }
-  }
-
-  #queue<T>(func: () => (T | Promise<T>)): Promise<T> {
-    const promise = new Promise<T>((resolve, reject) => {
-      this.#tasks.push({ func, resolve, reject })
-    })
-
-    void this.#runQueue()
-
-    return promise
   }
 
   #getRequestInt(request: string): number | null {
@@ -200,31 +152,41 @@ export class Client {
       // await new Promise<void>((resolve) => setTimeout(resolve, Math.floor(Math.random() * 1000)))
     }
 
-    return await this.#queue(async () => {
-      let responseCode: number | null = null
-      if (requestData instanceof ArrayBuffer) {
-        responseCode = await this.#dotnet.SendRawRequest(request, new Uint8Array(requestData))
-      } else {
-        responseCode = await this.#dotnet.SendJsonRequest(request, JSON.stringify(requestData))
+    while (true) {
+      try {
+
+        const responseId: number = requestData instanceof ArrayBuffer
+          ? await this.#dotnet.SendRawRequest(request, new Uint8Array(requestData))
+          : await this.#dotnet.SendJsonRequest(request, JSON.stringify(requestData))
+
+        const responseCode = this.#dotnet.GetResponseCode(responseId)
+
+        if (responseCode == null) {
+          throw new Error("Unknown request/response data.")
+        } else if (responseCode != this.#dotnet.GetResponseInt("Okay")) {
+          throw new ClientError(responseCode, this.#getResponseString(responseCode)!, new TextDecoder().decode(this.#dotnet.ReceiveRawResponse(responseId).buffer))
+        }
+
+        const responseType = this.#dotnet.GetResponseType(responseId)
+        let responseData: ArrayBuffer | any
+
+        if (responseType == 0) {
+          responseData = JSON.parse(this.#dotnet.ReceiveJsonResponse(responseId))
+        } else if (responseType == 1) {
+          responseData = (this.#dotnet.ReceiveRawResponse(responseId)).buffer
+        }
+
+        return responseData
       }
+      catch (error: any) {
+        if (error?.message?.includes('Invalid state to send request.')) {
+          await this.#dotnet.Run();
+          continue;
+        }
 
-      if (responseCode == null) {
-        throw new Error("Unknown request/response data.")
-      } else if (responseCode != this.#dotnet.GetResponseInt("Okay")) {
-        throw new ClientError(responseCode, this.#getResponseString(responseCode)!, new TextDecoder().decode(this.#dotnet.ReceiveRawResponse().buffer))
+        throw error
       }
-
-      const responseType = this.#dotnet.GetResponseType()
-      let responseData: ArrayBuffer | any
-
-      if (responseType == 0) {
-        responseData = JSON.parse(this.#dotnet.ReceiveJsonResponse())
-      } else if (responseType == 1) {
-        responseData = (this.#dotnet.ReceiveRawResponse()).buffer
-      }
-
-      return responseData
-    })
+    }
   }
 
   public echo<T>(message: T): Promise<T> {
@@ -302,7 +264,7 @@ export class Client {
   }
 
   get #emit() { return this.#events.bind().emit }
-  get on() { return this.#events.bind().on }
-  get off() { return this.#events.bind().off }
-  get once() { return this.#events.bind().once }
+  public get on() { return this.#events.bind().on }
+  public get off() { return this.#events.bind().off }
+  public get once() { return this.#events.bind().once }
 }

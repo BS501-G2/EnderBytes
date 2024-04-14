@@ -48,8 +48,15 @@
     <svelte:fragment let:client>
       <Awaiter callback={() => (userPromise = resolve(client))}>
         <svelte:fragment slot="success" let:result={user}>
-          // TODO: Add user page arvin dito 
+          // TODO: Add user page arvin dito
+          <div>
+              <div class="top">
+                
+              </div>
+              <div class="bottom">
 
+              </div>
+          </div>
           <p>
             {user.LastName}, {user.FirstName}
             {user.MiddleName ? `${user.MiddleName[0]}.` : ""} (@{user.Username})
@@ -65,4 +72,5 @@
     width: 100%;
     height: 100%;
   }
+
 </style>

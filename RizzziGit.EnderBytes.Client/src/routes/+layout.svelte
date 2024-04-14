@@ -8,6 +8,8 @@
     ColorScheme,
     serializeThemeColorsIntoInlineStyle,
   } from "$lib/color-schemes";
+  import { navigating } from "$app/stores";
+  import LoadingSpinnerPage from "../components/Widgets/LoadingSpinnerPage.svelte";
 
   const rootState = RootState.state;
 
@@ -66,8 +68,10 @@
 
 <svelte:window on:resize={onResize} />
 
-{#if $rootState.viewMode != ViewMode.Unset}
+{#if $rootState.viewMode != ViewMode.Unset || !$navigating}
   <slot />
+{:else}
+  <LoadingSpinnerPage></LoadingSpinnerPage>
 {/if}
 
 <style lang="scss">

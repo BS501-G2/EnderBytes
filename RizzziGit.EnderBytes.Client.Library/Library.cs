@@ -12,6 +12,7 @@ using Commons.Memory;
 
 using Services;
 using Newtonsoft.Json;
+using System.Collections.Generic;
 
 public static partial class Client
 {
@@ -32,21 +33,23 @@ public static partial class Client
   [JSImport("WS_URL", "main.js")]
   internal static partial string WS_URL();
 
-  [JSImport("OnStateChange", "main.js")]
-  internal static partial void OnStateChange(int state);
-
-  internal static int State = STATE_NOT_CONNECTED();
-  internal static void SetState(int state) => OnStateChange(State = state);
-  [JSExport]
-  internal static int GetState() => State;
+  [JSImport("SetState", "main.js")]
+  internal static partial void SetState(int state);
+  [JSImport("GetState", "main.js")]
+  internal static partial int GetState();
 
   internal static void Main() { }
 
   [JSExport]
-  internal static Task Run()
+  internal static Task<bool> Run()
   {
+    if ((GetState() != STATE_NOT_CONNECTED()) && (GetState() != STATE_BORKED()))
+    {
+      return Task.FromResult(false);
+    }
+
     SetState(STATE_NOT_CONNECTED());
-    TaskCompletionSource source = new();
+    TaskCompletionSource<bool> source = new();
 
     _ = Task.Run(run);
     return source.Task;
@@ -63,7 +66,7 @@ public static partial class Client
         {
           await clientWebSocket.ConnectAsync(new(WS_URL()), CancellationToken.None);
         }
-        catch(Exception exception)
+        catch (Exception exception)
         {
           SetState(STATE_NOT_CONNECTED());
           source.SetException(exception);
@@ -74,7 +77,7 @@ public static partial class Client
         UserClient client = UserClientWebSocket = new(clientWebSocket, (buffer) => Task.CompletedTask, (payload, cancellationToken) => Task.FromResult<HybridWebSocket.Payload>(new(0, [])));
         SetState(STATE_READY());
 
-        source.SetResult();
+        source.SetResult(true);
         await client.Start();
       }
       finally
@@ -142,31 +145,79 @@ public static partial class Client
     return null;
   }
 
-  private static ClientPayload? LastResponsePayload = null;
+  private sealed record Response(int Code, ClientPayload Payload);
+  private readonly static Dictionary<int, Response> Responses = [];
 
   [JSExport]
-  internal static int? GetResponseType() => (int?)LastResponsePayload?.Type;
-
-  [JSExport]
-  internal static byte[] ReceiveRawResponse()
+  internal static int GetResponseType(int id)
   {
-    if (LastResponsePayload == null || LastResponsePayload is not ClientPayload.Raw rawPayload)
+    if (
+      !Responses.TryGetValue(id, out Response? response)
+    )
     {
-      throw new Exception($"Invalid payload type {LastResponsePayload?.Type}.");
+      throw new Exception($"Response with id does not exist.");
+    };
+
+    return (int)response.Payload.Type;
+  }
+
+  [JSExport]
+  internal static int GetResponseCode(int id)
+  {
+    if (
+      !Responses.TryGetValue(id, out Response? response)
+    )
+    {
+      throw new Exception($"Response with id does not exist.");
+    };
+
+    return response.Code;
+  }
+
+  [JSExport]
+  internal static byte[] ReceiveRawResponse(int id)
+  {
+    if (
+      !Responses.TryGetValue(id, out Response? response)
+    )
+    {
+      throw new Exception($"Response with id does not exist.");
+    };
+
+    if (
+      response.Payload is not ClientPayload.Raw rawPayload
+    )
+    {
+      throw new Exception($"Invalid payload type {response.Payload.Type}.");
     }
 
     return rawPayload.Bytes.ToByteArray();
   }
 
   [JSExport]
-  internal static string ReceiveJsonResponse()
+  internal static string ReceiveJsonResponse(int id)
   {
-    if (LastResponsePayload == null || LastResponsePayload is not ClientPayload.JSON jsonPayload)
+    if (
+      !Responses.TryGetValue(id, out Response? response)
+    )
     {
-      throw new Exception($"Invalid payload type {LastResponsePayload?.Type}.");
+      throw new Exception($"Response with id does not exist.");
+    };
+
+    if (
+      response.Payload is not ClientPayload.JSON jsonPayload
+    )
+    {
+      throw new Exception($"Invalid payload type {response.Payload.Type}.");
     }
 
     return jsonPayload.Json.ToString(Formatting.None);
+  }
+
+  [JSExport]
+  internal static void ClearResponse(int id)
+  {
+    Responses.Remove(id);
   }
 
   [JSExport] internal static Task<int> SendJsonRequest(int requestCode, string requestPayload) => SendRequest(requestCode, new ClientPayload.JSON(JToken.Parse(requestPayload)));
@@ -174,8 +225,6 @@ public static partial class Client
 
   internal static async Task<int> SendRequest(int requestCode, ClientPayload requestPayload)
   {
-    LastResponsePayload = null;
-
     if (GetRequestString(requestCode) == null)
     {
       return (int)UserResponse.InvalidCommand;
@@ -183,13 +232,21 @@ public static partial class Client
 
     (uint responseCode, CompositeBuffer responseBuffer) = await UserClientWebSocket!.Request(new((uint)requestCode, requestPayload.Serialize()), CancellationToken.None);
 
+    int id;
+    do
+    {
+      id = Random.Shared.Next();
+    } while (Responses.ContainsKey(id));
+
     if (responseCode == (uint)UserResponse.Okay)
     {
-      LastResponsePayload = ClientPayload.Deserialize(responseBuffer);
-    } else {
-      LastResponsePayload = new ClientPayload.Raw(responseBuffer);
+      Responses.Add(id, new((int)responseCode, ClientPayload.Deserialize(responseBuffer)));
+    }
+    else
+    {
+      Responses.Add(id, new((int)responseCode, new ClientPayload.Raw(responseBuffer)));
     }
 
-    return (int)responseCode;
+    return id;
   }
 }

@@ -17,7 +17,6 @@
       "Folder Creation",
       true,
       async (_, setStatus) => {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
         const folderId = await client.createFolder(name, currentFileId);
         setStatus(`Folder "${name}" created.`);
 

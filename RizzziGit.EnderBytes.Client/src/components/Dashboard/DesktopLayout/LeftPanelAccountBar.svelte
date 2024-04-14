@@ -1,6 +1,5 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { RootState } from "$lib/states/root-state";
 
   import { UserIcon, LogOutIcon, SettingsIcon } from "svelte-feather-icons";
   import Dialog, { DialogClass } from "../../Widgets/Dialog.svelte";
@@ -8,8 +7,7 @@
   import type { Client } from "$lib/client/client";
 
   export let client: Client;
-
-  const rootState = RootState.state;
+  export let accountSettingsDialog: boolean;
 
   let logoutConfirm: boolean = false;
 </script>
@@ -57,7 +55,9 @@
   </button>
   <div class="account-actions">
     <button on:click={() => (logoutConfirm = true)}><LogOutIcon /></button>
-    <button on:click={() => goto("/app/settings")}><SettingsIcon /></button>
+    <button on:click={() => (accountSettingsDialog = true)}>
+      <SettingsIcon />
+    </button>
   </div>
 </div>
 

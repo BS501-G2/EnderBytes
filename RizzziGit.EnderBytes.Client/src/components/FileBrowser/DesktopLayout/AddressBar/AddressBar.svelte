@@ -1,15 +1,15 @@
 <script lang="ts">
   import { FolderIcon } from "svelte-feather-icons";
 
-  import type { Client } from "$lib/client/client";
   import AddressBarEntry from "./AddressBarEntry.svelte";
   import Awaiter from "../../../Bindings/Awaiter.svelte";
   import LoadingSpinner from "../../../Widgets/LoadingSpinner.svelte";
+  import ClientAwaiter from "../../../Bindings/ClientAwaiter.svelte";
+  import type { Client } from "$lib/client/client";
 
-  export let client: Client;
   export let currentFileId: number | null;
 
-  async function update(): Promise<number[]> {
+  async function update(client: Client): Promise<number[]> {
     const rootFolderId = await client.getRootFolderId();
     const storageId = await client.getOwnStorageId();
 
@@ -33,23 +33,20 @@
     <div class="address-icon">
       <FolderIcon size="100%" />
     </div>
-    {#key currentFileId}
-      <Awaiter callback={() => update()}>
-        <svelte:fragment slot="loading">
-          <LoadingSpinner size={18} />
-        </svelte:fragment>
-        <svelte:fragment slot="success" let:result={fileIds}>
-          {#each [null, ...fileIds] as fileId, index}
-            <AddressBarEntry
-              {fileId}
-              {index}
-              {client}
-              length={fileIds.length}
-            />
-          {/each}
-        </svelte:fragment>
-      </Awaiter>
-    {/key}
+    <ClientAwaiter let:client>
+      {#key currentFileId}
+        <Awaiter callback={async () => update(client)}>
+          <svelte:fragment slot="loading">
+            <LoadingSpinner size={18} />
+          </svelte:fragment>
+          <svelte:fragment slot="success" let:result={fileIds}>
+            {#each [null, ...fileIds] as fileId, index}
+              <AddressBarEntry {fileId} {index} length={fileIds.length} />
+            {/each}
+          </svelte:fragment>
+        </Awaiter>
+      {/key}
+    </ClientAwaiter>
   </div>
 </div>
 

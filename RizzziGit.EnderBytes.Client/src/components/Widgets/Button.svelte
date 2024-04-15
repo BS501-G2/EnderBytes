@@ -27,7 +27,7 @@
     }
   }
 
-  let reset: () => void;
+  let reset: (autoLoad?: boolean | undefined) => Promise<void>;
 </script>
 
 <button
@@ -51,7 +51,7 @@
 
     box-sizing: border-box;
 
-    border: solid 1px transparent;
+    border: solid 1px var(--primary);
     border-radius: 8px;
 
     cursor: pointer;

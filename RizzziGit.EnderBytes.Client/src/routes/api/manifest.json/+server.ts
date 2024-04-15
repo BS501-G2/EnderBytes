@@ -3,8 +3,6 @@ import { ColorScheme, colors } from '$lib/color-schemes';
 import { LocaleKey, Locale, bindLocalizedString } from '$lib/locale';
 import { _sizes } from '../../dynamic-icons/[size]/favicon.svg/+server';
 
-export const prerender = true
-
 const icon = (size: number) => ({ src: `/dynamic-icons/${size}x${size}/favicon.svg`, 'sizes': `${size}x${size}`, 'type': 'image/svg+xml' })
 const icons = () => _sizes.map((size) => icon(size))
 

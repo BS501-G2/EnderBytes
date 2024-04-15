@@ -48,6 +48,9 @@ export class RootState {
   keyboardState: Writable<KeyboardState>
   awaiterState: Writable<AwaiterState>
 
+  public get isDesktop(): boolean { return !!(this.viewMode & ViewMode.Desktop) }
+  public get isMobile(): boolean { return !!(this.viewMode & ViewMode.Mobile) }
+
   public async getClient(): Promise<Client> {
     const client = await Client.getInstance(new URL('ws://25.20.99.238:8083/'), {
       stateChange: (state) => RootState.state.update((value) => {

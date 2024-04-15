@@ -8,6 +8,10 @@
   import ClientAwaiter from "../../components/Bindings/ClientAwaiter.svelte";
 </script>
 
+<svelte:head>
+  <script type="module" src="/dotnet.js"></script>
+</svelte:head>
+
 <svelte:window
   on:beforeunload={(event) => {
     if ($pendingTasks.length == 0) {

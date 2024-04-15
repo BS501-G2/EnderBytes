@@ -1,4 +1,5 @@
 <script lang="ts">
+  import NavigationBar from "./NavigationBar.svelte";
 </script>
 
 <div class="panel-container">
@@ -6,7 +7,9 @@
   <div class="panel middle-panel">
     <slot />
   </div>
-  <div class="panel bottom-panel"></div>
+  <div class="panel bottom-panel">
+    <NavigationBar />
+  </div>
 </div>
 
 <style lang="scss">

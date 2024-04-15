@@ -1,14 +1,13 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import type { Client } from "$lib/client/client";
   import { FolderIcon, AlertTriangleIcon } from "svelte-feather-icons";
   import Awaiter from "../../../Bindings/Awaiter.svelte";
   import Overlay, {
     OverlayPositionType,
   } from "../../../Widgets/Overlay.svelte";
   import LoadingSpinner from "../../../Widgets/LoadingSpinner.svelte";
+  import ClientAwaiter from "../../../Bindings/ClientAwaiter.svelte";
 
-  export let client: Client;
   export let fileId: number | null;
   export let index: number;
   export let length: number;
@@ -39,90 +38,88 @@
       menuButton.clientWidth -
       (menuButton.parentElement?.parentElement?.scrollLeft ?? 0);
     menuOffsetY = menuButton.offsetTop - 4;
-
-    console.log(menuOffsetX, menuOffsetY);
   }
 </script>
 
 <svelte:window on:resize={updateMenuDimensions} />
 
-<div class="path-entry">
-  {#if fileId == null}
-    <button on:click={() => goto("/app/files")}><p>/</p></button>
-  {:else}
-    <Awaiter
-      callback={() => client.getFile(fileId)}
-    >
-      <svelte:fragment slot="success" let:result={file}>
-        <button on:click={() => goto(`/app/files/${fileId}`)}>
-          <p>{file.Name}</p>
-        </button>
-      </svelte:fragment>
-      <svelte:fragment slot="error" let:error let:reset>
-        <button on:click={() => reset(true)}>
-          <AlertTriangleIcon size="18" />
-        </button>
-      </svelte:fragment>
-      <svelte:fragment slot="loading">
-        <button>
-          <LoadingSpinner size={18} />
-        </button>
-      </svelte:fragment>
-    </Awaiter>
-  {/if}
-  {#if index != length}
-    <button
-      bind:this={menuButton}
-      on:scroll={updateMenuDimensions}
-      on:click={() => {
-        menuShown = true;
-        updateMenuDimensions();
-      }}><p>></p></button
-    >
-  {/if}
-</div>
-
-{#if menuShown}
-  <Overlay
-    onDismiss={() => (menuShown = false)}
-    position={[OverlayPositionType.Position, menuOffsetX, menuOffsetY]}
-  >
-    <div class="menu">
-      <Awaiter callback={() => client.scanFolder(fileId)}>
-        <svelte:fragment slot="loading">
-          <div class="loading-icon">
-            <LoadingSpinner />
-          </div>
+<ClientAwaiter let:client>
+  <div class="path-entry">
+    {#if fileId == null}
+      <button on:click={() => goto("/app/files")}><p>/</p></button>
+    {:else}
+      <Awaiter callback={() => client.getFile(fileId)}>
+        <svelte:fragment slot="success" let:result={file}>
+          <button on:click={() => goto(`/app/files/${fileId}`)}>
+            <p>{file.Name}</p>
+          </button>
         </svelte:fragment>
-        <svelte:fragment slot="success" let:result={fileIds}>
-          <div class="file-list">
-            {#each fileIds as fileId}
-              <button
-                on:click={() => {
-                  menuShown = false;
-                  goto(`/app/files/${fileId}`);
-                }}
-              >
-                <FolderIcon />
-                <Awaiter callback={() => client.getFile(fileId)}>
-                  <svelte:fragment slot="loading">
-                    <LoadingSpinner size={18} />
-                  </svelte:fragment>
-                  <svelte:fragment slot="success" let:result={file}>
-                    <p>{file.Name}</p>
-                  </svelte:fragment>
-                  <svelte:fragment slot="error" let:error>
-                    <p>[error]</p>
-                  </svelte:fragment>
-                </Awaiter>
-              </button>
-            {/each}
-          </div>
+        <svelte:fragment slot="error" let:error let:reset>
+          <button on:click={() => reset(true)}>
+            <AlertTriangleIcon size="18" />
+          </button>
+        </svelte:fragment>
+        <svelte:fragment slot="loading">
+          <button>
+            <LoadingSpinner size={18} />
+          </button>
         </svelte:fragment>
       </Awaiter>
-    </div>
-  </Overlay>
-{/if}
+    {/if}
+    {#if index != length}
+      <button
+        bind:this={menuButton}
+        on:scroll={updateMenuDimensions}
+        on:click={() => {
+          menuShown = true;
+          updateMenuDimensions();
+        }}><p>></p></button
+      >
+    {/if}
+  </div>
+
+  {#if menuShown}
+    <Overlay
+      onDismiss={() => (menuShown = false)}
+      position={[OverlayPositionType.Position, menuOffsetX, menuOffsetY]}
+    >
+      <div class="menu">
+        <Awaiter callback={() => client.scanFolder(fileId)}>
+          <svelte:fragment slot="loading">
+            <div class="loading-icon">
+              <LoadingSpinner />
+            </div>
+          </svelte:fragment>
+          <svelte:fragment slot="success" let:result={fileIds}>
+            <div class="file-list">
+              {#each fileIds as fileId}
+                <button
+                  on:click={() => {
+                    menuShown = false;
+                    goto(`/app/files/${fileId}`);
+                  }}
+                >
+                  <FolderIcon />
+                  <Awaiter callback={() => client.getFile(fileId)}>
+                    <svelte:fragment slot="loading">
+                      <LoadingSpinner size={18} />
+                    </svelte:fragment>
+                    <svelte:fragment slot="success" let:result={file}>
+                      <p>{file.Name}</p>
+                    </svelte:fragment>
+                    <svelte:fragment slot="error" let:error>
+                      <p>[error]</p>
+                    </svelte:fragment>
+                  </Awaiter>
+                </button>
+              {/each}
+            </div>
+          </svelte:fragment>
+        </Awaiter>
+      </div>
+    </Overlay>
+  {/if}
+</ClientAwaiter>
 
 <style lang="scss">
   div.path-entry {

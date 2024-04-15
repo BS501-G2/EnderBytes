@@ -66,7 +66,7 @@
   {@html `<style>:root { ${serializeThemeColorsIntoInlineStyle($rootState.theme)} } body { margin: unset; min-height: 100vh; }</style>`}
 </svelte:head>
 
-<svelte:window on:resize={onResize} />
+<!-- <svelte:window on:resize={onResize} /> -->
 
 {#if $rootState.viewMode != ViewMode.Unset || !$navigating}
   <slot />

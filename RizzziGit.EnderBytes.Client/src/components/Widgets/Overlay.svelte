@@ -30,7 +30,7 @@
   let element: HTMLElement;
 </script>
 
-<div class="container">
+<div class="content">
   <div class="layer">
     <div class="view">
       <button
@@ -68,7 +68,7 @@
 </div>
 
 <style lang="scss">
-  div.container {
+  div.content {
     z-index: 1;
 
     display: flex;

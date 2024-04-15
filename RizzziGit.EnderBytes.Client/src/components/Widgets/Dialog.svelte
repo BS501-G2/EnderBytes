@@ -7,23 +7,53 @@
 </script>
 
 <script lang="ts">
+  import { RootState } from "$lib/states/root-state";
+  import { XIcon } from "svelte-feather-icons";
+
+  import ResponsiveLayout from "../Bindings/ResponsiveLayout.svelte";
+  import Button, { ButtonClass } from "./Button.svelte";
   import Modal from "./Modal.svelte";
+
+  const rootState = RootState.state;
 
   export let onDismiss: () => void;
   export let dialogClass: DialogClass = DialogClass.Normal;
 </script>
 
 <Modal {onDismiss}>
-  <div class="dialog {dialogClass}">
-    <div class="head">
-      <slot name="head" />
-    </div>
-    <div class="body">
-      <slot name="body" />
-    </div>
-    <div class="actions">
-      <slot name="actions" />
-    </div>
+  <div class="dialog {dialogClass} {$rootState.isMobile ? 'mobile' : ''}">
+    {#if $$slots.head}
+      {#if $rootState.isDesktop}
+        <div class="head">
+          <slot name="head" />
+        </div>
+      {:else if $rootState.isMobile}
+        <div class="head-mobile">
+          <div class="head-element">
+            <slot name="head" />
+          </div>
+          <Button
+            buttonClass={ButtonClass.Background}
+            onClick={() => onDismiss()}><XIcon /></Button
+          >
+        </div>
+      {/if}
+    {/if}
+    {#if $$slots.body}
+      <div
+        class="body"
+        style="{$$slots.head ? 'margin-top: 16px;' : ''} {$$slots.actions
+          ? 'margin-bottom: 16px'
+          : ''}"
+      >
+        <slot name="body" />
+      </div>
+    {/if}
+    {#if $$slots.actions}
+      <div class="actions">
+        <slot name="actions" />
+      </div>
+    {/if}
   </div>
 </Modal>
 
@@ -35,24 +65,33 @@
 
     box-sizing: border-box;
 
-    padding: 16px;
+    padding: 32px;
     border: solid 1px var(--primary);
     border-radius: 8px;
     box-shadow: gray 0px 0px 8px;
 
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
 
     gap: 8px;
+
+    div.head-mobile {
+      display: flex;
+
+      > div.head-element {
+        flex-grow: 1;
+      }
+    }
 
     > div.head {
       text-align: left;
     }
 
     > div.body {
+      flex-grow: 1;
       text-align: left;
 
-      margin: 16px 0px 16px 0px;
       box-sizing: border-box;
 
       overflow-y: auto;
@@ -65,6 +104,19 @@
       gap: 8px;
       justify-content: flex-end;
     }
+  }
+
+  div.dialog.mobile {
+    width: 100vw;
+    height: 100vh;
+
+    max-width: 100vw;
+    max-height: 100vh;
+
+    padding: 16px;
+
+    border: none;
+    border-radius: 0px;
   }
 
   div.dialog.normal {

@@ -794,7 +794,7 @@
 
             <div class="starred-preview">
                 <div class="starred-preview-icon">
-                    <div class="previewIcon"><img src="https://cdn4.iconfinder.com/data/icons/ionicons/512/icon-image-512.png" width="80%"></div>
+                    <div class="previewIcon"><img alt="preview" src="https://cdn4.iconfinder.com/data/icons/ionicons/512/icon-image-512.png" width="80%"></div>
                 </div>
               <div class="starred-preview-info">
                 <div class="previewFileName">fileNamePlaceholder</div>

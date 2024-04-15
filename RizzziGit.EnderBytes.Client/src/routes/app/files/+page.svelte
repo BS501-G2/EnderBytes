@@ -16,6 +16,6 @@
 
 <Loader callback={() => $rootState.getClient()}>
   <svelte:fragment slot="success" let:result={client}>
-    <FileBrowser {client} currentFileId={getCurrentId($page.url)} />
+    <FileBrowser currentFileId={getCurrentId($page.url)} />
   </svelte:fragment>
 </Loader>

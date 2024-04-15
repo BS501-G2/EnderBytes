@@ -1,9 +1,7 @@
 <script lang="ts">
-  import { FileIcon } from "svelte-feather-icons";
   import Awaiter from "../../../Bindings/Awaiter.svelte";
-  import type { Client } from "$lib/client/client";
+  import ClientAwaiter from "../../../Bindings/ClientAwaiter.svelte";
 
-  export let client: Client;
   export let selectedFileIds: number[];
 </script>
 
@@ -13,30 +11,36 @@
   {:else if selectedFileIds.length === 1}
     {@const fileId = selectedFileIds[0]}
     {#key fileId}
-      <Awaiter callback={() => client.getFile(fileId)}>
-        <svelte:fragment slot="success" let:result={file}>
-          <div class="file-preview">
-            <img alt="File preview for `file`" src="/favicon.svg" />
-          </div>
-          <div class="file-info">
-            <h2>{file.Name}</h2>
-            <table>
-              <tbody>
-                <tr>
-                  <td><p><b>Created On: </b></p></td>
-                  <td><p>{new Date(file.CreateTime).toLocaleString()}</p></td>
-                </tr>
-                {#if file.UpdateTime !== file.CreateTime}
+      <ClientAwaiter let:client>
+        <Awaiter callback={() => client.getFile(fileId)}>
+          <svelte:fragment slot="success" let:result={file}>
+            <div class="file-preview">
+              <img alt="File preview for `file`" src="/favicon.svg" />
+            </div>
+            <div class="file-info">
+              <h2>{file.Name}</h2>
+              <table>
+                <tbody>
                   <tr>
-                    <td><p><b>Modified On: </b></p></td>
-                    <td><p>{new Date(file.UpdateTime).toLocaleString()}</p></td>
+                    <td><p><b>Created On: </b></p></td>
+                    <td>
+                      <p>{new Date(file.CreateTime).toLocaleString()}</p>
+                    </td>
                   </tr>
-                {/if}
-              </tbody>
-            </table>
-          </div>
-        </svelte:fragment>
-      </Awaiter>
+                  {#if file.UpdateTime !== file.CreateTime}
+                    <tr>
+                      <td><p><b>Modified On: </b></p></td>
+                      <td>
+                        <p>{new Date(file.UpdateTime).toLocaleString()}</p>
+                      </td>
+                    </tr>
+                  {/if}
+                </tbody>
+              </table>
+            </div>
+          </svelte:fragment>
+        </Awaiter>
+      </ClientAwaiter>
     {/key}
   {/if}
 </div>

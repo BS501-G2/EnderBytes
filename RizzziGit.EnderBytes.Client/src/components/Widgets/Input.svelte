@@ -18,11 +18,26 @@
   export let placeholder: string = "Type something...";
   export let valid: boolean = true;
   export let validate: (() => boolean) | null = null;
+  export let onSubmit: (() => Promise<void> | void) | null = null;
 
   let element: HTMLInputElement | null = null;
+  let busy: boolean = false;
 
-  const onChange: ChangeEventHandler<HTMLInputElement> = (event) => {
-    text = event.currentTarget.value || "";
+  async function submit() {
+    if (busy) {
+      return;
+    }
+
+    busy = true;
+    try {
+      await onSubmit?.();
+    } finally {
+      busy = false;
+    }
+  }
+
+  const applyChange = () => {
+    text = element?.value || "";
     valid = validate?.() ?? element?.checkValidity() ?? true;
   };
 </script>
@@ -34,9 +49,16 @@
     {type}
     {name}
     {required}
-    {disabled}
+    disabled={disabled || busy}
     {placeholder}
-    on:change={onChange}
+    on:keydown={async (event) => {
+      applyChange();
+
+      if (event.key === "Enter") {
+        await submit();
+      }
+    }}
+    on:change={applyChange}
   />
 </div>
 

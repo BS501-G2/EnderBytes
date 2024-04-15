@@ -10,14 +10,14 @@
   export let bannerClass: BannerClass = BannerClass.Info;
 </script>
 
-<div class="container">
+<div class="content">
   <div class="banner {bannerClass}">
     <slot />
   </div>
 </div>
 
 <style lang="scss">
-  div.container {
+  div.content {
     padding: 16px;
 
     > div.banner {

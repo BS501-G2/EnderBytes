@@ -45,7 +45,7 @@
   }
 </script>
 
-<div class="container">
+<div class="content">
   <div class="title-bar" />
 
   <div class="login-page">
@@ -117,7 +117,7 @@
 </div>
 
 <style lang="scss">
-  div.container {
+  div.content {
     margin: auto;
 
     height: 100vh;

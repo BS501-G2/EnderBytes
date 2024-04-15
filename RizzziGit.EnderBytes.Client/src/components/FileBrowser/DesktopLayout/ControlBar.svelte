@@ -1,6 +1,4 @@
 <script lang="ts">
-  import type { Client } from "$lib/client/client";
-
   import {
     ScissorsIcon,
     CopyIcon,
@@ -13,90 +11,108 @@
   } from "svelte-feather-icons";
   import FolderCreationDialog from "../FolderCreationDialog.svelte";
   import Awaiter from "../../Bindings/Awaiter.svelte";
+  import ClientAwaiter from "../../Bindings/ClientAwaiter.svelte";
+  import FileCreationDialog from "../FileCreationDialog.svelte";
 
-  export let client: Client;
   export let currentFileId: number | null;
   export let selectedFileIds: number[];
   export let onRefresh: () => void;
 
   let folderCreation: boolean = false;
+  let fileCreation: boolean = false;
 </script>
 
 <div class="controls">
-  {#key currentFileId}
-    <Awaiter callback={() => client.getFile(currentFileId)}>
-      <svelte:fragment slot="loading">
-        <div class="loading"></div>
-      </svelte:fragment>
-      <svelte:fragment slot="success" let:result={file}>
-        <div class="button" title="Upload">
-          <button on:click={() => {}}>
-            <UploadIcon />
-            <p>Upload</p>
-          </button>
-        </div>
-        <div class="button" title="New Folder">
-          <button
-            on:click={() => {
-              folderCreation = true;
-            }}
-          >
-            <FolderPlusIcon />
-            <p>New Folder</p>
-          </button>
-        </div>
-        <div class="divider"></div>
-        {#if currentFileId == null || file?.Type === 1}
-          <div class="button" title="Refresh">
-            <button on:click={onRefresh}>
-              <RefreshCwIcon />
-              <p>Refresh</p>
+  <ClientAwaiter let:client>
+    {#key currentFileId}
+      <Awaiter callback={() => client.getFile(currentFileId)}>
+        <svelte:fragment slot="loading">
+          <div class="loading"></div>
+        </svelte:fragment>
+        <svelte:fragment slot="success" let:result={file}>
+          <div class="button" title="Upload">
+            <button
+              on:click={() => {
+                fileCreation = true;
+              }}
+            >
+              <UploadIcon />
+              <p>Upload</p>
             </button>
           </div>
-        {/if}
-        {#if selectedFileIds.length !== 0}
-          <div class="button" title="Move To">
-            <button>
-              <ScissorsIcon />
-              <p>Move To</p>
+          <div class="button" title="New Folder">
+            <button
+              on:click={() => {
+                folderCreation = true;
+              }}
+            >
+              <FolderPlusIcon />
+              <p>New Folder</p>
             </button>
           </div>
-          <div class="button" title="Copy To">
-            <button>
-              <CopyIcon />
-              <p>Copy To</p>
-            </button>
-          </div>
-        {/if}
-        {#if selectedFileIds.length === 1}
-          <div class="button" title="Share">
-            <button>
-              <ShareIcon />
-              <p>Share</p>
-            </button>
-          </div>
-          <div class="button" title="Manage Accesss">
-            <button>
-              <UsersIcon />
-              <p>Manage Access</p>
-            </button>
-          </div>
-        {/if}
-        {#if selectedFileIds.length >= 1}
-          <div class="button" title="Move to Trash">
-            <button>
-              <TrashIcon />
-              <p>Move to Trash</p>
-            </button>
-          </div>
-        {/if}
-      </svelte:fragment>
-    </Awaiter>
-  {/key}
+          <div class="divider"></div>
+          {#if currentFileId == null || file?.Type === 1}
+            <div class="button" title="Refresh">
+              <button on:click={onRefresh}>
+                <RefreshCwIcon />
+                <p>Refresh</p>
+              </button>
+            </div>
+          {/if}
+          {#if selectedFileIds.length !== 0}
+            <div class="button" title="Move To">
+              <button>
+                <ScissorsIcon />
+                <p>Move To</p>
+              </button>
+            </div>
+            <div class="button" title="Copy To">
+              <button>
+                <CopyIcon />
+                <p>Copy To</p>
+              </button>
+            </div>
+          {/if}
+          {#if selectedFileIds.length === 1}
+            <div class="button" title="Share">
+              <button>
+                <ShareIcon />
+                <p>Share</p>
+              </button>
+            </div>
+            <div class="button" title="Manage Accesss">
+              <button>
+                <UsersIcon />
+                <p>Manage Access</p>
+              </button>
+            </div>
+          {/if}
+          {#if selectedFileIds.length >= 1}
+            <div class="button" title="Move to Trash">
+              <button>
+                <TrashIcon />
+                <p>Move to Trash</p>
+              </button>
+            </div>
+          {/if}
+        </svelte:fragment>
+      </Awaiter>
+    {/key}
+  </ClientAwaiter>
 </div>
 
 {#if folderCreation}
-  <FolderCreationDialog bind:currentFileId bind:client onCancel={() => (folderCreation = false)} />
+  <FolderCreationDialog
+    bind:currentFileId
+    onCancel={() => (folderCreation = false)}
+  />
+{/if}
+
+{#if fileCreation}
+  <FileCreationDialog
+    bind:currentFileId
+    onCancel={() => (fileCreation = false)}
+  />
 {/if}
 
 <style lang="scss">

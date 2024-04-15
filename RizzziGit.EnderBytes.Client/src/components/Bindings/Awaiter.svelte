@@ -37,15 +37,26 @@
     progress = newProgress;
   };
 
-  async function exec() {
-    try {
-      const result = callback(setStatus);
+  let busy: boolean = false;
 
-      if (result != null) {
-        promise = (async () => await result)();
+  async function exec() {
+    if (busy) {
+      return;
+    }
+
+    busy = true;
+    try {
+      try {
+        const result = callback(setStatus);
+
+        if (result != null) {
+          promise = (async () => await result)();
+        }
+      } catch (error: any) {
+        promise = Promise.reject(error);
       }
-    } catch (error: any) {
-      promise = Promise.reject(error);
+    } finally {
+      busy = false;
     }
   }
 
@@ -55,13 +66,54 @@
     }
   });
 
-  export const reset: (autoLoad?: boolean) => void = (load = autoLoad) => {
+  export const load: () => Promise<void> = async () => {
+    if (promise != null) {
+      return;
+    }
+
+    await exec();
+  };
+
+  export const reset: (autoLoad?: boolean) => Promise<void> = async (
+    load = autoLoad,
+  ) => {
+    if (busy) {
+      return;
+    }
+
     promise = <any>undefined;
 
     if (load) {
-      exec();
+      await exec();
     }
   };
+
+  interface $$Slots {
+    default: {
+      reset: (autoLoad?: boolean) => Promise<void>;
+    };
+
+    "not-loaded": {
+      load: () => Promise<void>;
+    };
+    loading: {
+      message: string | null;
+    };
+    "loading-page": {
+      message: string | null;
+    };
+    "loading-page-without-spinner": {
+      message: string | null;
+    };
+    success: {
+      result: T;
+    };
+    error: {
+      error: any;
+      reset: (autoLoad?: boolean) => Promise<void>;
+      retry: () => void;
+    };
+  }
 </script>
 
 {#key promise}
@@ -74,9 +126,9 @@
       <Banner bannerClass={BannerClass.Info}>
         <div class="banner">
           <p style="margin: 0">Not loaded.</p>
-          <Button onClick={exec} buttonClass={ButtonClass.Background}
-            >Load</Button
-          >
+          <Button onClick={exec} buttonClass={ButtonClass.Background}>
+            Load
+          </Button>
         </div>
       </Banner>
     {/if}
@@ -119,11 +171,11 @@
       {#if $$slots.error}
         <slot name="error" {error} retry={exec} {reset} />
       {:else}
-        <div class="container">
+        <div class="content">
           <Banner bannerClass={BannerClass.Error}>
             <div class="banner">
               <p style="margin: 0">Error: {error.message}</p>
-              <Button onClick={exec} buttonClass={ButtonClass.Background}>
+              <Button onClick={() => reset()} buttonClass={ButtonClass.Background}>
                 Retry
               </Button>
             </div>
@@ -135,7 +187,7 @@
 {/key}
 
 <style lang="scss">
-  div.container {
+  div.content {
     display: flex;
     flex-direction: column;
     gap: 8px;

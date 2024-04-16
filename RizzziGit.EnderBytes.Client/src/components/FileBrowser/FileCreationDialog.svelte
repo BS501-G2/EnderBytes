@@ -23,16 +23,58 @@
       throw new Error("No files selected");
     }
 
-    const result = <number>(
-      await executeBackgroundTask(
-        "File Creation",
-        true,
-        async (_, setStatus) => {},
-        false,
-      ).run()
-    );
+    const result = <number>await executeBackgroundTask(
+      "File Upload",
+      true,
+      async (_, setStatus) => {
+        onCancel();
+        const delay = async () => {};
+        // const delay = () => new Promise((resolve) => setTimeout(resolve, 100));
 
-    onCancel();
+        setStatus("Creating file resource...", null);
+
+        await delay();
+        for (const file of files ?? []) {
+          const bufferSize = 32 * 1024;
+
+          let promises: Promise<any>[] = [];
+
+          for (
+            let fileOffset = 0;
+            fileOffset < file.size;
+            fileOffset += bufferSize
+          ) {
+            const capturedFileOffset = fileOffset;
+            const sliced = await file
+              .slice(capturedFileOffset, capturedFileOffset + bufferSize)
+              .arrayBuffer();
+
+            promises.push(
+              (async () => {
+                await client.sendToVoid(sliced);
+
+                setStatus(
+                  file.name,
+                  capturedFileOffset / file.size,
+                );
+
+                if (_.cancelled) {
+                  throw new Error("Cancelled");
+                }
+              })(),
+            );
+          }
+
+          await Promise.all(promises);
+
+          setStatus("Uploading content for " + file.name + " completed");
+          await delay();
+        }
+        return 0;
+      },
+      false,
+    ).run();
+
     return result;
   }
 </script>
@@ -44,7 +86,8 @@
     <h2 slot="head">Upload</h2>
     <div class="body" slot="body">
       <p style="margin-top: 0px">
-        The uploaded files will be put inside the current folder. Alternatively, you can drag and drop files on the folder's area.
+        The uploaded files will be put inside the current folder. Alternatively,
+        you can drag and drop files on the folder's area.
       </p>
 
       <!-- <Input name="File name" bind:text={name} onSubmit={load} /> -->

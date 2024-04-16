@@ -85,10 +85,100 @@
                      <div>{user.LastName}, {user.FirstName} {user.MiddleName ? `${user.MiddleName[0]}.` : ""}</div>
                      <div class="username" style="padding-top:5px">(@{user.Username})</div>
                      <hr style="width: 90%; border: none; border-top: 1px solid var(--onPrimaryContainerVariant); margin: 20px auto;">
+
+                     <div style="display:flex; justify-content:center;">
+                      <div class="photos">
+                        <button style="border:none;
+                                   cursor:pointer;
+                                   background-color: transparent;">
+                          <div style="display:flex;">
+                              <p style="border-color: var(--onPrimaryContainerVariant);
+                                        background-color: var(--onPrimaryContainerVariant);
+                                        padding:5px; 5px;
+                                        border-radius:8px;
+                                        font-weight: bold;
+                                        font-size:14px;
+                                        color: var(--onPrimaryVariant);"
+                                        >14</p>
+                              <p style="font-weight: bold;
+                                        padding:5px;5px;
+                                        font-size:14px;"
+                                        >Photos</p>
+                          </div>
+                        </button>
+                      </div>
+
+                      <div class="videos">
+                        <button style="border:none;
+                                   cursor:pointer;
+                                   background-color: transparent;">
+                          <div style="display:flex;">
+                              <p style="border-color: var(--onPrimaryContainerVariant);
+                                        background-color: var(--onPrimaryContainerVariant);
+                                        padding:5px; 5px;
+                                        border-radius:8px;
+                                        font-weight: bold;
+                                        font-size:14px;
+                                        color: var(--onPrimaryVariant);"
+                                        >26</p>
+                              <p style="font-weight: bold;
+                                        padding:5px;5px;
+                                        font-size:14px;"
+                                        >Videos</p>
+                          </div>
+                        </button>
+                      </div>
+
+                      <div class="docs">
+                        <button style="border:none;
+                                   cursor:pointer;
+                                   background-color: transparent;">
+                          <div style="display:flex;">
+                              <p style="border-color: var(--onPrimaryContainerVariant);
+                                        background-color: var(--onPrimaryContainerVariant);
+                                        padding:5px; 5px;
+                                        border-radius:8px;
+                                        font-weight: bold;
+                                        font-size:14px;
+                                        color: var(--onPrimaryVariant);"
+                                        >120</p>
+                              <p style="font-weight: bold;
+                                        padding:5px;5px;
+                                        font-size:14px;"
+                                        >Docs</p>
+                          </div>
+                        </button>
+                      </div>
+
+                      <div class="Audios">
+                        <button style="border:none;
+                                   cursor:pointer;
+                                   background-color: transparent;">
+                          <div style="display:flex;">
+                              <p style="border-color: var(--onPrimaryContainerVariant);
+                                        background-color: var(--onPrimaryContainerVariant);
+                                        padding:5px; 5px;
+                                        border-radius:8px;
+                                        font-weight: bold;
+                                        font-size:14px;
+                                        color: var(--onPrimaryVariant);"
+                                        >3</p>
+                              <p style="font-weight: bold;
+                                        padding:5px;5px;
+                                        font-size:14px;"
+                                        >Audios</p>
+                          </div>
+                        </button>
+                      </div>
+
+
+                    </div>
                 </div>
             </div>
 
             </div>
+
+
             <div
               class="bottom w-50"
               style="height:250px; background-color: var(--onPrimary); border-radius: 15px; margin:20px;"
@@ -98,6 +188,8 @@
               <a href="#a" style="padding-right: 60px;">See All</a>
             </div>
             <div><hr style="width: 90%; border: none; border-top: 1px solid var(--onPrimaryContainerVariant);"></div>
+
+
 
             <div class="file-container" style="display:flex">
 

@@ -1,63 +1,22 @@
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
-  import Awaiter from "../../components/Bindings/Awaiter.svelte";
-  import LoadingBar from "../../components/Widgets/LoadingBar.svelte";
-  import Input from "../../components/Widgets/Input.svelte";
+  import Client from "../../components/Bindings/Client.svelte";
 
-  export let progress: number | null = 0;
-
-  let a: boolean = false;
-
-  async function exec() {
-    while (a) {
-      if (progress != null) {
-        progress += 0.001;
-
-        if (progress >= 1) {
-          progress = null;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 30 / 1000));
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        progress = 0;
-      }
-    }
-  }
-
-  onMount(() => {
-    a = true;
-    exec();
-  });
-
-  onDestroy(() => {
-    a = false;
-  });
-
-  let text: string;
-  let valid: boolean
+  let username: string;
+  let password: string;
 </script>
 
-<div class="content">
-  <!-- <LoadingBar {progress} /> -->
-  <Input name="test" type="email" bind:valid bind:text />
-  <p>{text}</p>
-  <p>Valid? {valid}</p>
-  <Awaiter
-    callback={async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+<Client let:fetch let:session>
+  <div>
+    Session: <pre>{JSON.stringify(session)}</pre>
+  </div>
 
-      throw new Error("Test");
-    }}
-  ></Awaiter>
-</div>
+  <input type="username" bind:value={username} />
+  <input type="password" bind:value={password} />
 
-<style lang="scss">
-  div.content {
-    width: 100%;
-    height: 100%;
-
-    position: fixed;
-    top: 0;
-    left: 0;
-  }
-</style>
+  <button
+    on:click={() =>
+      fetch("/auth/password-login", "POST", { username, password })}
+  >
+    Login
+  </button>
+</Client>

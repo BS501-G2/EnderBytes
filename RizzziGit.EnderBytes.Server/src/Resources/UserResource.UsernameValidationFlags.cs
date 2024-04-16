@@ -4,7 +4,7 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Services;
 
-public sealed partial class UserResource
+public sealed partial record UserResource
 {
   [Flags]
   public enum UsernameValidationFlag : byte

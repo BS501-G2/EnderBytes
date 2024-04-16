@@ -4,12 +4,18 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Services;
 
-public sealed class UserAuthenticationSessionTokenResource(UserAuthenticationSessionTokenResource.ResourceManager manager, UserAuthenticationSessionTokenResource.ResourceData data) : Resource<UserAuthenticationSessionTokenResource.ResourceManager, UserAuthenticationSessionTokenResource.ResourceData, UserAuthenticationSessionTokenResource>(manager, data)
+public sealed record UserAuthenticationSessionTokenResource(UserAuthenticationSessionTokenResource.ResourceManager Manager,
+  long Id,
+  long CreateTime,
+  long UpdateTime,
+  long AuthenticationId,
+  long ExpiryTime
+) : Resource<UserAuthenticationSessionTokenResource.ResourceManager, UserAuthenticationSessionTokenResource>(Manager, Id, CreateTime, UpdateTime)
 {
   public const string NAME = "UserAuthenticationSessionToken";
   public const int VERSION = 1;
 
-  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserAuthenticationSessionTokenResource>.ResourceManager
+  public new sealed class ResourceManager : Resource<ResourceManager, UserAuthenticationSessionTokenResource>.ResourceManager
   {
     public const string COLUMN_USER_AUTHENTICATION_ID = "UserAuthenticationId";
     public const string COLUMN_EXPIRY_TIME = "ExpiryTime";
@@ -22,9 +28,8 @@ public sealed class UserAuthenticationSessionTokenResource(UserAuthenticationSes
       };
     }
 
-    protected override UserAuthenticationSessionTokenResource NewResource(ResourceData data) => new(this, data);
-    protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
-      id, createTime, updateTime,
+    protected override UserAuthenticationSessionTokenResource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
+      this, id, createTime, updateTime,
 
       reader.GetInt64(reader.GetOrdinal(COLUMN_USER_AUTHENTICATION_ID)),
       reader.GetInt64(reader.GetOrdinal(COLUMN_EXPIRY_TIME))
@@ -41,60 +46,34 @@ public sealed class UserAuthenticationSessionTokenResource(UserAuthenticationSes
 
     public UserAuthenticationSessionTokenResource Create(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication, long expireTimer, CancellationToken cancellationToken = default)
     {
-      lock (userAuthentication)
+      if (userAuthentication.Type != UserAuthenticationType.SessionToken)
       {
-        userAuthentication.ThrowIfInvalid();
-
-        if (userAuthentication.Type != UserAuthenticationResource.UserAuthenticationType.SessionToken)
-        {
-          throw new ArgumentException("Invalid user authentication type.", nameof(userAuthentication));
-        }
-
-        return InsertAndGet(transaction, new(
-          (COLUMN_USER_AUTHENTICATION_ID, userAuthentication.Id),
-          (COLUMN_EXPIRY_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + expireTimer)
-        ), cancellationToken);
+        throw new ArgumentException("Invalid user authentication type.", nameof(userAuthentication));
       }
+
+      return InsertAndGet(transaction, new(
+        (COLUMN_USER_AUTHENTICATION_ID, userAuthentication.Id),
+        (COLUMN_EXPIRY_TIME, userAuthentication.CreateTime + expireTimer)
+      ), cancellationToken);
     }
 
     public UserAuthenticationSessionTokenResource GetByUserAuthentication(ResourceService.Transaction transaction, UserAuthenticationResource userAuthentication, CancellationToken cancellationToken = default)
     {
-      lock (userAuthentication)
+      if (userAuthentication.Type != UserAuthenticationType.SessionToken)
       {
-        userAuthentication.ThrowIfInvalid();
-
-        if (userAuthentication.Type != UserAuthenticationResource.UserAuthenticationType.SessionToken)
-        {
-          throw new ArgumentException("Invalid user authentication type.", nameof(userAuthentication));
-        }
-
-        return SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_USER_AUTHENTICATION_ID, "=", userAuthentication.Id), cancellationToken: cancellationToken)!;
+        throw new ArgumentException("Invalid user authentication type.", nameof(userAuthentication));
       }
+
+      return SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_USER_AUTHENTICATION_ID, "=", userAuthentication.Id), cancellationToken: cancellationToken)!;
     }
 
     public bool ResetExpiryTime(ResourceService.Transaction transaction, UserAuthenticationSessionTokenResource userAuthenticationSessionToken, long expireTimer, CancellationToken cancellationToken = default)
     {
-      lock (userAuthenticationSessionToken)
-      {
-        userAuthenticationSessionToken.ThrowIfInvalid();
-
-        return Update(transaction, userAuthenticationSessionToken, new(
-          (COLUMN_EXPIRY_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + expireTimer)
-        ), cancellationToken);
-      }
+      return Update(transaction, userAuthenticationSessionToken, new(
+        (COLUMN_EXPIRY_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + expireTimer)
+      ), cancellationToken);
     }
   }
-
-  public new sealed record ResourceData(
-    long Id,
-    long CreateTime,
-    long UpdateTime,
-    long AuthenticationId,
-    long ExpiryTime
-  ) : Resource<ResourceManager, ResourceData, UserAuthenticationSessionTokenResource>.ResourceData(Id, CreateTime, UpdateTime);
-
-  public long AuthenticationId => Data.AuthenticationId;
-  public long ExpiryTime => Data.ExpiryTime;
 
   public bool Expired => ExpiryTime <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 }

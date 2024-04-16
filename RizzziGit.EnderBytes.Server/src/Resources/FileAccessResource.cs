@@ -7,15 +7,24 @@ using Commons.Memory;
 using Utilities;
 using Services;
 
-public sealed class FileAccessResource(FileAccessResource.ResourceManager manager, FileAccessResource.ResourceData data) : Resource<FileAccessResource.ResourceManager, FileAccessResource.ResourceData, FileAccessResource>(manager, data)
-{
-  public enum FileAccessTargetEntityType : byte { None, User }
-  public enum FileAccessType : byte { ManageShares, ReadWrite, Read, None }
+public enum FileAccessTargetEntityType : byte { None, User }
+public enum FileAccessType : byte { ManageShares, ReadWrite, Read, None }
 
+public sealed record FileAccessResource(FileAccessResource.ResourceManager Manager,
+  long Id,
+  long CreateTime,
+  long UpdateTime,
+  long TargetFileId,
+  long TargetEntityId,
+  FileAccessTargetEntityType TargetEntityType,
+  byte[] AesKey,
+  FileAccessType Type
+) : Resource<FileAccessResource.ResourceManager, FileAccessResource>(Manager, Id, CreateTime, UpdateTime)
+{
   public const string NAME = "FileAccess";
   public const int VERSION = 1;
 
-  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, FileAccessResource>.ResourceManager
+  public new sealed class ResourceManager : Resource<ResourceManager,  FileAccessResource>.ResourceManager
   {
     public const string COLUMN_TARGET_FILE_ID = "TargetFileId";
     public const string COLUMN_TARGET_ENTITY_ID = "TargetEntityId";
@@ -32,8 +41,8 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
       ), cancellationToken);
     }
 
-    protected override FileAccessResource NewResource(ResourceData data) => new(this, data);
-    protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
+    protected override FileAccessResource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
+      this,
       id, createTime, updateTime,
 
       reader.GetInt64(reader.GetOrdinal(COLUMN_TARGET_FILE_ID)),
@@ -57,89 +66,40 @@ public sealed class FileAccessResource(FileAccessResource.ResourceManager manage
 
     public IEnumerable<FileAccessResource> List(ResourceService.Transaction transaction, StorageResource storage, FileResource file, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, LimitClause? limit = null, OrderByClause? orderBy = null, CancellationToken cancellationToken = default)
     {
-      lock (storage)
-      {
-        storage.ThrowIfInvalid();
+      file.ThrowIfDoesNotBelongTo(storage);
 
-        lock (file)
-        {
-          file.ThrowIfInvalid();
-          file.ThrowIfDoesNotBelongTo(storage);
+      List<FileAccessResource> fileAccesses = Select(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), limit, orderBy, cancellationToken).ToList();
+      _ = Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ManageShares, cancellationToken);
 
-          List<FileAccessResource> fileAccesses = Select(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), limit, orderBy, cancellationToken).ToList();
-          _ = Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ManageShares, cancellationToken);
-
-          return fileAccesses;
-        }
-      }
+      return fileAccesses;
     }
 
     public FileAccessResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource targetFile, FileAccessType type, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      lock (storage)
-      {
-        lock (targetFile)
-        {
-          return userAuthenticationToken.Enter(() =>
-          {
-            KeyService.AesPair fileKey = transaction.ResourceService.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
+      KeyService.AesPair fileKey = transaction.ResourceService.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
 
-            return InsertAndGet(transaction, new(
-              (COLUMN_TARGET_FILE_ID, targetFile.Id),
-              (COLUMN_TARGET_ENTITY_ID, null),
-              (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.None),
-              (COLUMN_KEY, fileKey.Serialize()),
-              (COLUMN_TYPE, (byte)type)
-            ), cancellationToken);
-          });
-        }
-      }
+      return InsertAndGet(transaction, new(
+        (COLUMN_TARGET_FILE_ID, targetFile.Id),
+        (COLUMN_TARGET_ENTITY_ID, null),
+        (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.None),
+        (COLUMN_KEY, fileKey.Serialize()),
+        (COLUMN_TYPE, (byte)type)
+      ), cancellationToken);
     }
 
     public FileAccessResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource targetFile, UserResource targetUser, FileAccessType type, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      lock (storage)
-      {
-        storage.ThrowIfInvalid();
+      targetFile.ThrowIfDoesNotBelongTo(storage);
 
-        lock (targetFile)
-        {
-          targetFile.ThrowIfInvalid();
-          targetFile.ThrowIfDoesNotBelongTo(storage);
+      KeyService.AesPair fileKey = transaction.ResourceService.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
 
-          return userAuthenticationToken.Enter(() =>
-          {
-            userAuthenticationToken.ThrowIfInvalid();
-
-            KeyService.AesPair fileKey = transaction.ResourceService.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
-
-            return InsertAndGet(transaction, new(
-              (COLUMN_TARGET_FILE_ID, targetFile.Id),
-              (COLUMN_TARGET_ENTITY_ID, targetUser.Id),
-              (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.User),
-              (COLUMN_KEY, targetUser.Encrypt(fileKey.Serialize())),
-              (COLUMN_TYPE, (byte)type)
-            ), cancellationToken);
-          });
-        }
-      }
+      return InsertAndGet(transaction, new(
+        (COLUMN_TARGET_FILE_ID, targetFile.Id),
+        (COLUMN_TARGET_ENTITY_ID, targetUser.Id),
+        (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.User),
+        (COLUMN_KEY, targetUser.Encrypt(fileKey.Serialize())),
+        (COLUMN_TYPE, (byte)type)
+      ), cancellationToken);
     }
   }
-
-  public new sealed record ResourceData(
-    long Id,
-    long CreateTime,
-    long UpdateTime,
-    long TargetFileId,
-    long TargetEntityId,
-    FileAccessTargetEntityType TargetEntityType,
-    byte[] AesKey,
-    FileAccessType Type
-  ) : Resource<ResourceManager, ResourceData, FileAccessResource>.ResourceData(Id, CreateTime, UpdateTime);
-
-  public long TargetFileId => Data.TargetFileId;
-  public long TargetEntityId => Data.TargetEntityId;
-  public FileAccessTargetEntityType TargetEntityType => Data.TargetEntityType;
-  public byte[] Key => Data.AesKey;
-  public FileAccessType Type => Data.Type;
 }

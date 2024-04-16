@@ -15,7 +15,7 @@
         <Awaiter callback={() => client.getFile(fileId)}>
           <svelte:fragment slot="success" let:result={file}>
             <div class="file-preview">
-              <img alt="File preview for `file`" src="/favicon.svg" />
+              <img alt={`File preview for \"${file.Name}\"`} src="/favicon.svg" />
             </div>
             <div class="file-info">
               <h2>{file.Name}</h2>

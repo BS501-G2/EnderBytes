@@ -6,12 +6,6 @@
   export type AwaiterCallback<T> = (
     setStatus: AwaiterSetStatusFunction,
   ) => T | Promise<T>;
-
-  export interface AwaiterTask {}
-
-  export class AwaiterState {
-    public constructor() {}
-  }
 </script>
 
 <script lang="ts" generics="T extends any">
@@ -55,6 +49,8 @@
       } catch (error: any) {
         promise = Promise.reject(error);
       }
+
+      await promise
     } finally {
       busy = false;
     }

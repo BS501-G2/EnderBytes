@@ -9,14 +9,23 @@ using DatabaseWrappers;
 using Services;
 using Newtonsoft.Json;
 
-public sealed partial class UserResource(UserResource.ResourceManager manager, UserResource.ResourceData data) : Resource<UserResource.ResourceManager, UserResource.ResourceData, UserResource>(manager, data)
+public sealed partial record UserResource(UserResource.ResourceManager manager,
+  long Id,
+  long CreateTime,
+  long UpdateTime,
+  string Username,
+  string LastName,
+  string FirstName,
+  string? MiddleName,
+  byte[] PublicKey
+) : Resource<UserResource.ResourceManager, UserResource>(manager, Id, CreateTime, UpdateTime)
 {
   public sealed record UserPair(UserResource User, UserAuthenticationResource.UserAuthenticationToken AuthenticationToken);
 
   public const string NAME = "User";
   public const int VERSION = 1;
 
-  public new sealed partial class ResourceManager(ResourceService service) : Resource<ResourceManager, ResourceData, UserResource>.ResourceManager(service, NAME, VERSION)
+  public new sealed partial class ResourceManager(ResourceService service) : Resource<ResourceManager, UserResource>.ResourceManager(service, NAME, VERSION)
   {
     public const string COLUMN_USERNAME = "Username";
     public const string COLUMN_PUBLIC_KEY = "PublicKey";
@@ -27,9 +36,8 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
 
     public const string INDEX_USERNAME = $"Index_{NAME}_{COLUMN_USERNAME}";
 
-    protected override UserResource NewResource(ResourceData data) => new(this, data);
-    protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
-      id, createTime, updateTime,
+    protected override UserResource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
+      this, id, createTime, updateTime,
 
       reader.GetString(reader.GetOrdinal(COLUMN_USERNAME)),
       reader.GetString(reader.GetOrdinal(COLUMN_LAST_NAME)),
@@ -73,17 +81,12 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
 
     public bool Update(ResourceService.Transaction transaction, UserResource user, string username, string lastName, string firstName, string? middleName)
     {
-      lock (user)
-      {
-        user.ThrowIfInvalid();
-
-        return Update(transaction, user, new(
-          (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
-          (COLUMN_LAST_NAME, lastName),
-          (COLUMN_FIRST_NAME, firstName),
-          (COLUMN_MIDDLE_NAME, middleName)
-        ));
-      }
+      return Update(transaction, user, new(
+        (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
+        (COLUMN_LAST_NAME, lastName),
+        (COLUMN_FIRST_NAME, firstName),
+        (COLUMN_MIDDLE_NAME, middleName)
+      ));
     }
 
     public bool TryGetByUsername(ResourceService.Transaction transaction, string username, [NotNullWhen(true)] out UserResource? user, CancellationToken cancellationToken = default)
@@ -98,22 +101,8 @@ public sealed partial class UserResource(UserResource.ResourceManager manager, U
     }
   }
 
-  public new sealed record ResourceData(
-    long Id,
-    long CreateTime,
-    long UpdateTime,
-    string Username,
-    string LastName,
-    string FirstName,
-    string? MiddleName,
-    byte[] PublicKey) : Resource<ResourceManager, ResourceData, UserResource>.ResourceData(Id, CreateTime, UpdateTime);
-
-  public string Username => Data.Username;
-  public string LastName => Data.LastName;
-  public string FirstName => Data.FirstName;
-  public string? MiddleName => Data.MiddleName;
   [JsonIgnore]
-  public byte[] PublicKey => Data.PublicKey;
+  public byte[] PublicKey = PublicKey;
 
   private RSACryptoServiceProvider? RSACryptoServiceProvider;
 

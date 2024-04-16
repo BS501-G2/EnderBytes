@@ -12,7 +12,6 @@ public sealed partial class Server : Service
 
     KeyService = new(this);
     ResourceService = new(this);
-    ClientService = new(this);
     WebService = new(this);
 
     if (!File.Exists(WorkingPath))
@@ -26,14 +25,12 @@ public sealed partial class Server : Service
 
   public readonly KeyService KeyService;
   public readonly ResourceService ResourceService;
-  public readonly ClientService ClientService;
   public readonly WebService WebService;
 
   protected override async Task OnStart(CancellationToken cancellationToken)
   {
     await KeyService.Start(cancellationToken);
     await ResourceService.Start(cancellationToken);
-    await ClientService.Start(cancellationToken);
     await WebService.Start(cancellationToken);
 
     await base.OnStart(cancellationToken);
@@ -41,13 +38,12 @@ public sealed partial class Server : Service
 
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
-    await WatchDog([KeyService, ResourceService, ClientService, WebService], cancellationToken);
+    await WatchDog([KeyService, ResourceService, WebService], cancellationToken);
   }
 
   protected override async Task OnStop(Exception? exception)
   {
     await WebService.Stop();
-    await ClientService.Stop();
     await ResourceService.Stop();
     await KeyService.Stop();
 

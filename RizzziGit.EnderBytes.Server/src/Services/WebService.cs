@@ -25,6 +25,7 @@ public sealed partial class WebService(Server server) : Server.SubService(server
         });
       })
       .AddSingleton(Server)
+      .AddResponseCaching()
       .AddControllers();
 
     builder.WebHost.ConfigureKestrel((kestrelConfiguration) =>
@@ -50,22 +51,13 @@ public sealed partial class WebService(Server server) : Server.SubService(server
     WebApplication app = builder.Build();
 
     app.UseCors(corsPolicy);
-    app.UseWebSockets();
     if (Server.Configuration.HttpsClient != null)
     {
       app.UseHttpsRedirection();
     }
-
-    app.Run(async (context) =>
-    {
-      if (!context.WebSockets.IsWebSocketRequest)
-      {
-        context.Response.StatusCode = 400;
-        return;
-      }
-
-      await Server.ClientService.HandleUserClient(await context.WebSockets.AcceptWebSocketAsync(), cancellationToken);
-    });
+    app.Use((context, next) => WebApi.UserAuthenticationTokenMiddleWare(Server, context, next));
+    app.MapControllers();
+    app.Use((context, next) => WebApi.ClearUserAuthenticationTokenMiddleWare(context, next));
 
     return app;
   }

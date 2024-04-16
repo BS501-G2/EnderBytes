@@ -7,24 +7,24 @@ using Commons.Collections;
 using Services;
 using Utilities;
 
-public sealed partial class FileResource(FileResource.ResourceManager manager, FileResource.ResourceData data) : Resource<FileResource.ResourceManager, FileResource.ResourceData, FileResource>(manager, data)
+public enum FileType : byte { File, Folder }
+
+[Flags]
+public enum FileHandleFlags : byte
 {
-  public enum FileType : byte { File, Folder }
+  Read = 1 << 0,
+  Modify = 1 << 1,
+  Exclusive = 1 << 2,
 
-  [Flags]
-  public enum FileHandleFlags : byte
-  {
-    Read = 1 << 0,
-    Modify = 1 << 1,
-    Exclusive = 1 << 2,
+  ReadModify = Read | Modify
+}
 
-    ReadModify = Read | Modify
-  }
-
+public sealed partial record FileResource(FileResource.ResourceManager Manager, long Id, long CreateTime, long UpdateTime, long StorageId, byte[] Key, long? ParentId, FileType Type, string Name) : Resource<FileResource.ResourceManager, FileResource>(Manager, Id, CreateTime, UpdateTime)
+{
   public const string NAME = "File";
   public const int VERSION = 1;
 
-  public new sealed partial class ResourceManager : Resource<ResourceManager, ResourceData, FileResource>.ResourceManager
+  public new sealed partial class ResourceManager : Resource<ResourceManager, FileResource>.ResourceManager
   {
     public const string COLUMN_STORAGE_ID = "StorageId";
     public const string COLUMN_KEY = "AesKey";
@@ -38,16 +38,10 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
     {
       Service.GetManager<StorageResource.ResourceManager>().ResourceDeleted += (transaction, storage, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storage.Id), cancellationToken);
       ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", file.Id), cancellationToken);
-
-      Handles = [];
     }
 
-    private readonly WeakList<FileHandle> Handles;
-
-    protected override FileResource NewResource(ResourceData data) => new(this, data);
-
-    protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
-      id, createTime, updateTime,
+    protected override FileResource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
+      this, id, createTime, updateTime,
 
       reader.GetInt64(reader.GetOrdinal(COLUMN_STORAGE_ID)),
       reader.GetBytes(reader.GetOrdinal(COLUMN_KEY)),
@@ -73,57 +67,43 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
     public bool Move(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileResource? newParent, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       cancellationToken.ThrowIfCancellationRequested();
+      file.ThrowIfDoesNotBelongTo(storage);
 
-      lock (storage)
+      if (newParent != null)
       {
-        storage.ThrowIfInvalid();
-        file.ThrowIfDoesNotBelongTo(storage);
+        newParent.ThrowIfDoesNotBelongTo(storage);
 
-        if (newParent == null)
+        FileResource currentParent = newParent;
+        while (currentParent != null)
         {
-          return moveParent();
-        }
-
-        lock (newParent)
-        {
-          newParent.ThrowIfDoesNotBelongTo(storage);
-          newParent.ThrowIfInvalid();
-
-          FileResource currentParent = newParent;
-          while (currentParent != null)
+          if (currentParent.Id == file.Id)
           {
-            if (currentParent.Id == file.Id)
-            {
-              throw new ArgumentException("Moving the file inside the new parent folder closes the loop.", nameof(newParent));
-            }
-            else if (currentParent.ParentId == null)
-            {
-              break;
-            }
-
-            currentParent = GetById(transaction, (long)currentParent.ParentId, cancellationToken);
+            throw new ArgumentException("Moving the file inside the new parent folder closes the loop.", nameof(newParent));
+          }
+          else if (currentParent.ParentId == null)
+          {
+            break;
           }
 
-          return moveParent();
+          cancellationToken.ThrowIfCancellationRequested();
+
+          currentParent = GetById(transaction, (long)currentParent.ParentId, cancellationToken);
         }
       }
 
-      bool moveParent()
+      cancellationToken.ThrowIfCancellationRequested();
+
+      if ((newParent != null) && (newParent.Type != FileType.Folder))
       {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if ((newParent != null) && (newParent.Type != FileType.Folder))
-        {
-          throw new ArgumentException("Invalid new parent.", nameof(newParent));
-        }
-
-        bool result = Update(transaction, file, new(
-          (COLUMN_PARENT_FILE_ID, newParent?.Id),
-          (COLUMN_KEY, Service.GetManager<StorageResource.ResourceManager>().EncryptFileKey(transaction, storage, Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken).Key, newParent, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken))
-        ), cancellationToken);
-
-        return result;
+        throw new ArgumentException("Invalid new parent.", nameof(newParent));
       }
+
+      bool result = Update(transaction, file, new(
+        (COLUMN_PARENT_FILE_ID, newParent?.Id),
+        (COLUMN_KEY, Service.GetManager<StorageResource.ResourceManager>().EncryptFileKey(transaction, storage, Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key, newParent, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken))
+      ), cancellationToken);
+
+      return result;
     }
 
     public FileResource CreateFile(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, string name, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
@@ -139,77 +119,37 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
     private FileResource Create(ResourceService.Transaction transaction, StorageResource storage, FileResource? parent, FileType type, string name, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
     {
       cancellationToken.ThrowIfCancellationRequested();
-      lock (storage)
+      parent?.ThrowIfDoesNotBelongTo(storage);
+
+      if (!Enum.IsDefined(type))
       {
-        storage.ThrowIfInvalid();
-
-        if (parent == null)
-        {
-          return create();
-        }
-
-        lock (parent)
-        {
-          parent.ThrowIfInvalid();
-          parent.ThrowIfDoesNotBelongTo(storage);
-
-          return create();
-        }
+        throw new ArgumentException("Invalid file type.", nameof(type));
+      }
+      else if ((parent != null) && (parent.Type != FileType.Folder))
+      {
+        throw new ArgumentException("Parent is not a folder.", nameof(parent));
       }
 
-      FileResource create()
-      {
-        cancellationToken.ThrowIfCancellationRequested();
+      KeyService.AesPair fileKey = Service.Server.KeyService.GetNewAesPair();
 
-        if (!Enum.IsDefined(type))
-        {
-          throw new ArgumentException("Invalid file type.", nameof(type));
-        }
-        else if ((parent != null) && (parent.Type != FileType.Folder))
-        {
-          throw new ArgumentException("Parent is not a folder.", nameof(parent));
-        }
+      FileResource file = InsertAndGet(transaction, new(
+        (COLUMN_STORAGE_ID, storage.Id),
+        (COLUMN_KEY, Service.GetManager<StorageResource.ResourceManager>().EncryptFileKey(transaction, storage, fileKey, parent, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken)),
+        (COLUMN_PARENT_FILE_ID, parent?.Id),
+        (COLUMN_NAME, name),
+        (COLUMN_TYPE, (byte)type)
+      ), cancellationToken);
 
-        KeyService.AesPair fileKey = Service.Server.KeyService.GetNewAesPair();
-
-        FileResource file = InsertAndGet(transaction, new(
-          (COLUMN_STORAGE_ID, storage.Id),
-          (COLUMN_KEY, Service.GetManager<StorageResource.ResourceManager>().EncryptFileKey(transaction, storage, fileKey, parent, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken)),
-          (COLUMN_PARENT_FILE_ID, parent?.Id),
-          (COLUMN_NAME, name),
-          (COLUMN_TYPE, (byte)type)
-        ), cancellationToken);
-
-        return file;
-      }
+      return file;
     }
 
     public bool Delete(ResourceService.Transaction transaction, StorageResource storage, FileResource file, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      lock (storage)
-      {
-        storage.ThrowIfInvalid();
+      file.ThrowIfDoesNotBelongTo(storage);
 
-        lock (file)
-        {
-          file.ThrowIfInvalid();
-          file.ThrowIfDoesNotBelongTo(storage);
+      Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
 
-          if (userAuthenticationToken == null)
-          {
-            return delete();
-          }
-
-          return userAuthenticationToken.Enter(delete);
-
-          bool delete()
-          {
-            Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.ReadWrite, cancellationToken);
-
-            return base.Delete(transaction, file, cancellationToken);
-          }
-        }
-      }
+      return base.Delete(transaction, file, cancellationToken);
     }
 
     public override bool Delete(ResourceService.Transaction transaction, FileResource file, CancellationToken cancellationToken = default)
@@ -219,169 +159,66 @@ public sealed partial class FileResource(FileResource.ResourceManager manager, F
 
     public FileResource? ResolvePath(ResourceService.Transaction transaction, StorageResource storage, string[] path, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      lock (storage)
+      FileResource? file = null;
+      for (int index = 0; index < path.Length; index++)
       {
-        storage.ThrowIfInvalid();
-
-        FileResource? file = null;
-        for (int index = 0; index < path.Length; index++)
-        {
-          file = SelectOne(transaction, new WhereClause.Nested("and",
-            new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storage.Id),
-            new WhereClause.Raw($"lower({COLUMN_NAME}) = {{0}}", path[index].ToLower())
-          ), null, null, cancellationToken);
-        }
-
-        _ = Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
-        return file;
+        file = SelectOne(transaction, new WhereClause.Nested("and",
+          new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storage.Id),
+          new WhereClause.Raw($"lower({COLUMN_NAME}) = {{0}}", path[index].ToLower())
+        ), null, null, cancellationToken);
       }
+
+      _ = Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.Read, cancellationToken);
+      return file;
     }
 
     public IEnumerable<FileResource> ScanFolder(ResourceService.Transaction transaction, StorageResource storage, FileResource? folder, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      lock (storage)
+      if (folder != null)
       {
-        if (folder == null)
-        {
-          return scanFolder();
-        }
-
-        lock (folder)
-        {
-          return scanFolder();
-        }
-
-        IEnumerable<FileResource> scanFolder()
-        {
-          if (userAuthenticationToken == null)
-          {
-            return scanFolder();
-          }
-
-          lock (userAuthenticationToken)
-          {
-            return scanFolder();
-          }
-
-          IEnumerable<FileResource> scanFolder()
-          {
-            if (folder != null)
-            {
-              Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, folder, userAuthenticationToken, FileAccessResource.FileAccessType.Read, cancellationToken);
-            }
-
-            foreach (FileResource file in Select(transaction, new WhereClause.Nested("and",
-              new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storage.Id),
-              new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", folder?.Id)
-            ), null, null, cancellationToken))
-            {
-              yield return file;
-            }
-
-            yield break;
-          }
-        }
+        Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, folder, userAuthenticationToken, FileAccessType.Read, cancellationToken);
       }
-    }
 
-    public FileResource.FileHandle OpenFile(ResourceService.Transaction transaction, StorageResource storage, FileResource file, FileSnapshotResource fileSnapshot, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileHandleFlags handleFlags, CancellationToken cancellationToken = default)
-    {
-      lock (storage)
+      foreach (FileResource file in Select(transaction, new WhereClause.Nested("and",
+        new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storage.Id),
+        new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", folder?.Id)
+      ), null, null, cancellationToken))
       {
-        lock (file)
-        {
-          if (userAuthenticationToken == null)
-          {
-            return openFile();
-          }
-
-          lock (userAuthenticationToken)
-          {
-            return openFile();
-          }
-
-          FileResource.FileHandle openFile()
-          {
-            StorageResource.DecryptedKeyInfo decryptedFileKeyInfo = Service.GetManager<StorageResource.ResourceManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, handleFlags.HasFlag(FileHandleFlags.Modify)
-              ? FileAccessResource.FileAccessType.ReadWrite
-              : FileAccessResource.FileAccessType.Read, cancellationToken);
-
-            if (file.Type != FileType.File)
-            {
-              throw new ArgumentException("Not a file.", nameof(file));
-            }
-
-            foreach (FileHandle fileHandle in Handles)
-            {
-              if (fileHandle.File != file)
-              {
-                continue;
-              }
-
-              if (fileHandle.Flags.HasFlag(FileHandleFlags.Exclusive))
-              {
-                throw new InvalidOperationException("File is currently locked for exclusive access.");
-              }
-            }
-
-            FileSnapshotResource use = handleFlags.HasFlag(FileHandleFlags.Modify) && (Service.GetManager<FileBufferMapResource.ResourceManager>().GetSize(transaction, storage, file, fileSnapshot, cancellationToken) > 0)
-              ? Service.GetManager<FileSnapshotResource.ResourceManager>().Create(transaction, storage, file, fileSnapshot, userAuthenticationToken, cancellationToken)
-              : fileSnapshot;
-
-            return new FileHandle(this, storage, file, use, userAuthenticationToken, handleFlags);
-          }
-        }
+        yield return file;
       }
+
+      yield break;
     }
 
     public bool IsInsideOf(ResourceService.Transaction transaction, StorageResource storage, FileResource haystack, FileResource needle, CancellationToken cancellationToken = default)
     {
-      lock (haystack)
+      haystack.ThrowIfDoesNotBelongTo(storage);
+      needle.ThrowIfDoesNotBelongTo(storage);
+
+      FileResource? current = needle;
+      while (true)
       {
-        haystack.ThrowIfInvalid();
-        haystack.ThrowIfDoesNotBelongTo(storage);
-
-        lock (needle)
+        if (current.ParentId == haystack.ParentId || current.ParentId == haystack.Id)
         {
-          needle.ThrowIfInvalid();
-          needle.ThrowIfDoesNotBelongTo(storage);
+          return true;
+        }
 
-          FileResource? current = needle;
-          while (true) {
-            if (current.ParentId == haystack.ParentId || current.ParentId == haystack.Id) {
-              return true;
-            }
-
-            if (current.ParentId == null || !TryGetById(transaction, (long)current.ParentId, out current, cancellationToken)) {
-              break;
-            }
-          }
-
-          return false;
+        if (current.ParentId == null || !TryGetById(transaction, (long)current.ParentId, out current, cancellationToken))
+        {
+          break;
         }
       }
+
+      return false;
     }
   }
 
-  public new sealed record ResourceData(long Id, long CreateTime, long UpdateTime, long StorageId, byte[] Key, long? ParentId, FileType Type, string Name) : Resource<ResourceManager, ResourceData, FileResource>.ResourceData(Id, CreateTime, UpdateTime);
-
-  public long StorageId => Data.StorageId;
-
   [JsonIgnore]
-  public byte[] Key => Data.Key;
-  public long? ParentId => Data.ParentId;
-  public FileType Type => Data.Type;
-  public string Name => Data.Name;
+  public byte[] Key = Key;
 
   public bool BelongsTo(StorageResource storage)
   {
-    lock (this)
-    {
-      lock (storage)
-      {
-        return storage.Id == StorageId;
-      }
-    }
+    return storage.Id == StorageId;
   }
 
   public void ThrowIfDoesNotBelongTo(StorageResource storage)

@@ -11,70 +11,24 @@ using Commons.Logging;
 using Services;
 using Newtonsoft.Json;
 
-public abstract partial class Resource<M, D, R>(M manager, D data)
-  where M : Resource<M, D, R>.ResourceManager
-  where D : Resource<M, D, R>.ResourceData
-  where R : Resource<M, D, R>
+public abstract partial record Resource<M, R>(M Manager, long Id, long CreateTime, long UpdateTime)
+  where M : Resource<M, R>.ResourceManager
+  where R : Resource<M, R>
 {
-  public delegate void ResourceInsertHandler(ResourceService.Transaction transaction, CancellationToken cancellationToken);
-  public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, D oldData, CancellationToken cancellationTokens);
-  public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, CancellationToken cancellationToken);
-
   public abstract partial class ResourceManager(ResourceService service, string name, int version) : ResourceService.ResourceManager(service, name, version)
   {
-    public delegate void ResourceInsertHandler(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken);
-    public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, D oldData, CancellationToken cancellationToken);
+    public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, R oldResource, CancellationToken cancellationToken);
     public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken);
 
-    private readonly WeakDictionary<long, R> Resources = [];
-
-    public event ResourceInsertHandler? ResourceInserted = null;
     public event ResourceUpdateHandler? ResourceUpdated;
     public event ResourceDeleteHandler? ResourceDeleted;
 
-    public bool IsResourceValid(R resource)
-    {
-      lock (Resources)
-      {
-        lock (resource)
-        {
-          return Resources.TryGetValue(resource.Id, out R? testResource) && testResource == resource;
-        }
-      }
-    }
-
-    public void ThrowIfResourceInvalid(R resource)
-    {
-      if (!IsResourceValid(resource))
-      {
-        throw new ArgumentException("Invalid resource.", nameof(resource));
-      }
-    }
-
-    protected abstract R NewResource(D data);
-    private D CastToData(DbDataReader reader) => CastToData(reader,
+    private R ToResource(DbDataReader reader) => ToResource(reader,
       reader.GetInt64(reader.GetOrdinal(COLUMN_ID)),
       reader.GetInt64(reader.GetOrdinal(COLUMN_CREATE_TIME)),
       reader.GetInt64(reader.GetOrdinal(COLUMN_UPDATE_TIME))
     );
-    protected abstract D CastToData(DbDataReader reader, long id, long createTime, long updateTime);
-
-    protected R GetResource(D data)
-    {
-      lock (Resources)
-      {
-        if (!Resources.TryGetValue(data.Id, out R? resource))
-        {
-          Resources.Add(data.Id, resource = NewResource(data));
-        }
-        else
-        {
-          resource.Data = data;
-        }
-
-        return resource;
-      }
-    }
+    protected abstract R ToResource(DbDataReader reader, long id, long createTime, long updateTime);
 
     protected R InsertAndGet(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default) => GetById(transaction, Insert(transaction, values, cancellationToken), cancellationToken);
     protected long Insert(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default)
@@ -102,7 +56,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
     {
       cancellationToken.ThrowIfCancellationRequested();
       List<object?> parameterList = [];
-      foreach (D data in SqlEnumeratedQuery(
+      foreach (R resource in SqlEnumeratedQuery(
         transaction,
         castToData,
         $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")}{(order != null ? $" order by {order.Apply()}" : "")};",
@@ -110,17 +64,17 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
       ))
       {
         cancellationToken.ThrowIfCancellationRequested();
-        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Enumerated {Name} resource: #{data.Id}");
-        yield return GetResource(data);
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Enumerated {Name} resource: #{resource.Id}");
+        yield return resource;
       }
 
       yield break;
 
-      IEnumerable<D> castToData(DbDataReader reader)
+      IEnumerable<R> castToData(DbDataReader reader)
       {
         while (reader.Read())
         {
-          yield return CastToData(reader);
+          yield return ToResource(reader);
         }
       }
     }
@@ -159,15 +113,7 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
             while (reader.Read())
             {
               long id = reader.GetInt64(reader.GetOrdinal(COLUMN_ID));
-              actions += () =>
-              {
-                if (Resources.TryGetValue(id, out R? resource))
-                {
-                  resource.Deleted?.Invoke(transaction, cancellationToken);
-                }
-
-                log(id);
-              };
+              actions += () => log(id);
 
               count++;
             }
@@ -176,24 +122,13 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
           {
             while (reader.Read())
             {
-              D data = CastToData(reader);
+              R resource = ToResource(reader);
 
-              actions += !Resources.TryGetValue(data.Id, out R? resource)
-              ? () =>
-                {
-                  resource = NewResource(data);
-                  ResourceDeleted?.Invoke(transaction, resource, cancellationToken);
-                  transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
-                  log(data.Id);
-                }
-              : () =>
-                {
-                  resource.Deleted?.Invoke(transaction, cancellationToken);
-                  ResourceDeleted?.Invoke(transaction, resource, cancellationToken);
-                  Resources.Remove(data.Id);
-                  transaction.RegisterOnFailureHandler(() => Resources.Add(data.Id, resource));
-                  log(data.Id);
-                };
+              actions += () =>
+              {
+                ResourceDeleted?.Invoke(transaction, resource, cancellationToken);
+                log(resource.Id);
+              };
 
               count++;
             }
@@ -229,66 +164,19 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
         transaction,
         (reader) =>
         {
-          if (ResourceDeleted == null)
-          {
-            while (reader.Read())
-            {
-              D oldData = CastToData(reader);
-              D newData() => SqlQuery(transaction, (reader) =>
-              {
-                reader.Read();
-                return CastToData(reader);
-              }, $"select * from {Name} where {COLUMN_ID} = {{0}};", oldData.Id);
-
-              if (Resources.TryGetValue(oldData.Id, out R? resource))
-              {
-                actions += () =>
-                {
-                  resource.Data = newData();
-                  transaction.RegisterOnFailureHandler(() => resource.Data = oldData);
-
-                  resource.Updated?.Invoke(transaction, oldData, cancellationToken);
-                  log(oldData.Id);
-                };
-              }
-
-              count++;
-            }
-
-            return;
-          }
-
           while (reader.Read())
           {
-            D oldData = CastToData(reader);
-            D newData() => SqlQuery(transaction, (reader) =>
+            R oldResource = ToResource(reader);
+            R newResource() => SqlQuery(transaction, (reader) =>
             {
               reader.Read();
-              return CastToData(reader);
-            }, $"select * from {Name} where {COLUMN_ID} = {{0}};", oldData.Id);
+              return ToResource(reader);
+            }, $"select * from {Name} where {COLUMN_ID} = {{0}};", oldResource.Id);
 
-            actions += Resources.TryGetValue(oldData.Id, out R? resource)
-            ? () =>
+            actions += () =>
             {
-              resource.Data = newData();
-              transaction.RegisterOnFailureHandler(() => resource.Data = oldData);
-
-              ResourceUpdated?.Invoke(transaction, resource, oldData, cancellationToken);
-              resource.Updated?.Invoke(transaction, oldData, cancellationToken);
-              log(resource.Id);
-            }
-            : () =>
-            {
-              R resource = NewResource(newData());
-              transaction.RegisterOnFailureHandler(() =>
-              {
-                resource.Data = oldData;
-                Resources.Add(resource.Id, resource);
-              });
-
-              ResourceUpdated?.Invoke(transaction, resource, oldData, cancellationToken);
-              resource.Updated?.Invoke(transaction, oldData, cancellationToken);
-              log(resource.Id);
+              ResourceUpdated?.Invoke(transaction, newResource(), oldResource, cancellationToken);
+              log(oldResource.Id);
             };
 
             count++;
@@ -308,45 +196,18 @@ public abstract partial class Resource<M, D, R>(M manager, D data)
 
     protected bool Update(ResourceService.Transaction transaction, R resource, SetClause set, CancellationToken cancellationToken = default)
     {
-      lock (resource)
-      {
-        resource.ThrowIfInvalid();
-
-        return Update(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), set, cancellationToken) != 0;
-      }
+      return Update(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), set, cancellationToken) != 0;
     }
 
-    public virtual R GetById(ResourceService.Transaction transaction, long Id, CancellationToken cancellationToken = default) => Resources.TryGetValue(Id, out R? resource) ? resource : Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id), cancellationToken: cancellationToken).First();
-    public virtual bool TryGetById(ResourceService.Transaction transaction, long Id, [NotNullWhen(true)] out R? resource, CancellationToken cancellationToken = default) => Resources.TryGetValue(Id, out resource) || ((resource = Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id), cancellationToken: cancellationToken).FirstOrDefault()) != null);
+    public virtual R GetById(ResourceService.Transaction transaction, long Id, CancellationToken cancellationToken = default) => Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id), cancellationToken: cancellationToken).First();
+    public virtual bool TryGetById(ResourceService.Transaction transaction, long Id, [NotNullWhen(true)] out R? resource, CancellationToken cancellationToken = default) => (resource = Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id), cancellationToken: cancellationToken).FirstOrDefault()) != null;
 
     public virtual bool Delete(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken = default)
     {
-      lock (resource)
-      {
-        resource.ThrowIfInvalid();
-
-        return Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), cancellationToken) != 0;
-      }
+      return Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), cancellationToken) != 0;
     }
   }
 
-  public abstract partial record ResourceData(long Id, long CreateTime, long UpdateTime);
-
   [JsonIgnore]
-  public readonly M Manager = manager;
-  [JsonIgnore]
-  protected D Data { get; private set; } = data;
-
-  public event ResourceUpdateHandler? Updated;
-  public event ResourceDeleteHandler? Deleted;
-
-  public long Id => Data.Id;
-  public long CreateTime => Data.CreateTime;
-  public long UpdateTime => Data.UpdateTime;
-
-  [JsonIgnore]
-  public bool IsValid => Manager.IsResourceValid((R)this);
-  public void ThrowIfInvalid() => Manager.ThrowIfResourceInvalid((R)this);
-
-  public override string ToString() => Data.ToString();
+  public readonly M Manager = Manager;
 }

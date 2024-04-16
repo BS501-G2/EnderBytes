@@ -5,12 +5,18 @@ namespace RizzziGit.EnderBytes.Resources;
 using Utilities;
 using Services;
 
-public sealed class FileBufferResource(FileBufferResource.ResourceManager manager, FileBufferResource.ResourceData data) : Resource<FileBufferResource.ResourceManager, FileBufferResource.ResourceData, FileBufferResource>(manager, data)
+public sealed record FileBufferResource(FileBufferResource.ResourceManager manager,
+  long Id,
+  long CreateTime,
+  long UpdateTime,
+
+  byte[] Buffer
+) : Resource<FileBufferResource.ResourceManager, FileBufferResource>(manager, Id, CreateTime, UpdateTime)
 {
   public const string NAME = "FileBuffer";
   public const int VERSION = 1;
 
-  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, FileBufferResource>.ResourceManager
+  public new sealed class ResourceManager : Resource<ResourceManager, FileBufferResource>.ResourceManager
   {
     public const string COLUMN_BUFFER = "Buffer";
     public const string COLUMN_FILE_ID = "FileId";
@@ -21,16 +27,15 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
     {
       Service.GetManager<FileResource.ResourceManager>().ResourceDeleted += (transaction, resource, cancellationToken) =>
       {
-        if (resource.Type == FileResource.FileType.File)
+        if (resource.Type == FileType.File)
         {
           SqlNonQuery(transaction, $"delete from {NAME} where {COLUMN_FILE_ID} = {{0}}", [resource.Id]);
         }
       };
     }
 
-    protected override FileBufferResource NewResource(ResourceData data) => new(this, data);
-    protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
-      id, createTime, updateTime,
+    protected override FileBufferResource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
+      this, id, createTime, updateTime,
 
       reader.GetBytes(reader.GetOrdinal(COLUMN_BUFFER))
     );
@@ -54,20 +59,15 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
 
     public long Create(ResourceService.Transaction transaction, FileResource file, byte[] buffer, CancellationToken cancellationToken = default)
     {
-      lock (file)
+      if (file.Type != FileType.File)
       {
-        file.ThrowIfInvalid();
-
-        if (file.Type != FileResource.FileType.File)
-        {
-          throw new ArgumentException("Not a file.", nameof(file));
-        }
-
-        return Insert(transaction, new(
-          (COLUMN_BUFFER, buffer),
-          (COLUMN_FILE_ID, file.Id)
-        ), cancellationToken);
+        throw new ArgumentException("Not a file.", nameof(file));
       }
+
+      return Insert(transaction, new(
+        (COLUMN_BUFFER, buffer),
+        (COLUMN_FILE_ID, file.Id)
+      ), cancellationToken);
     }
 
     public long Delete(ResourceService.Transaction transaction, long id, CancellationToken cancellationToken = default)
@@ -88,14 +88,4 @@ public sealed class FileBufferResource(FileBufferResource.ResourceManager manage
       SqlNonQuery(transaction, $"delete from {NAME} where ({COLUMN_ID} = {{0}}) and ({COLUMN_ID} not in (select {otherColumn} from {otherTable} where {otherColumn} is not null));", fileBufferId);
     }
   }
-
-  public new sealed record ResourceData(
-    long Id,
-    long CreateTime,
-    long UpdateTime,
-
-    byte[] Buffer
-  ) : Resource<ResourceManager, ResourceData, FileBufferResource>.ResourceData(Id, CreateTime, UpdateTime);
-
-  public byte[] Buffer => Data.Buffer;
 }

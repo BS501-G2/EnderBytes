@@ -4,12 +4,19 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Services;
 
-public sealed class UserConfigurationResource(UserConfigurationResource.ResourceManager manager, UserConfigurationResource.ResourceData data) : Resource<UserConfigurationResource.ResourceManager, UserConfigurationResource.ResourceData, UserConfigurationResource>(manager, data)
+public sealed record UserConfigurationResource(UserConfigurationResource.ResourceManager manager,
+  long Id,
+  long CreateTime,
+  long UpdateTime,
+
+  long UserId,
+  bool EnableFtpAccess
+) : Resource<UserConfigurationResource.ResourceManager, UserConfigurationResource>(manager, Id, CreateTime, UpdateTime)
 {
   public const string NAME = "UserConfiguration";
   public const int VERSION = 1;
 
-  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, UserConfigurationResource>.ResourceManager
+  public new sealed class ResourceManager : Resource<ResourceManager, UserConfigurationResource>.ResourceManager
   {
     public const string COLUMN_USER_ID = "UserId";
     public const string COLUMN_ENABLE_FTP_ACCESS = "EnableFTPAccess";
@@ -21,9 +28,8 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
       service.GetManager<UserResource.ResourceManager>().ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), cancellationToken);
     }
 
-    protected override UserConfigurationResource NewResource(ResourceData data) => new(this, data);
-    protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
-      id, createTime, updateTime,
+    protected override UserConfigurationResource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
+      this, id, createTime, updateTime,
 
       reader.GetInt64(reader.GetOrdinal(COLUMN_USER_ID)),
       reader.GetBoolean(reader.GetOrdinal(COLUMN_ENABLE_FTP_ACCESS))
@@ -42,28 +48,11 @@ public sealed class UserConfigurationResource(UserConfigurationResource.Resource
 
     public UserConfigurationResource Get(ResourceService.Transaction transaction, UserResource user)
     {
-      lock (user)
-      {
-        user.ThrowIfInvalid();
-
-        return SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id))
-          ?? InsertAndGet(transaction, new(
-            (COLUMN_USER_ID, user.Id),
-            (COLUMN_ENABLE_FTP_ACCESS, false)
-          ));
-      }
+      return SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id))
+        ?? InsertAndGet(transaction, new(
+          (COLUMN_USER_ID, user.Id),
+          (COLUMN_ENABLE_FTP_ACCESS, false)
+        ));
     }
   }
-
-  public new sealed record ResourceData(
-    long Id,
-    long CreateTime,
-    long UpdateTime,
-
-    long UserId,
-    bool EnableFtpAccess
-  ) : Resource<ResourceManager, ResourceData, UserConfigurationResource>.ResourceData(Id, CreateTime, UpdateTime);
-
-  public long UserId => Data.UserId;
-  public bool EnableFtpAccess => Data.EnableFtpAccess;
 }

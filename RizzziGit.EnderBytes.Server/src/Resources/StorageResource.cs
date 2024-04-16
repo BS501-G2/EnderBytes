@@ -6,14 +6,25 @@ namespace RizzziGit.EnderBytes.Resources;
 using Utilities;
 using Services;
 
-public sealed class StorageResource(StorageResource.ResourceManager manager, StorageResource.ResourceData data) : Resource<StorageResource.ResourceManager, StorageResource.ResourceData, StorageResource>(manager, data)
+public sealed record StorageResource(StorageResource.ResourceManager Manager,
+  long Id,
+  long CreateTime,
+  long UpdateTime,
+
+  long OwnerUserId,
+  byte[] Key,
+
+  long? RootFolderId,
+  long? TrashFolderId,
+  long? InternalFolderId
+) : Resource<StorageResource.ResourceManager, StorageResource>(Manager, Id, CreateTime, UpdateTime)
 {
   public sealed record DecryptedKeyInfo(KeyService.AesPair Key, FileAccessResource? FileAccess);
 
   public const string NAME = "Storage";
   public const int VERSION = 1;
 
-  public new sealed class ResourceManager : Resource<ResourceManager, ResourceData, StorageResource>.ResourceManager
+  public new sealed class ResourceManager : Resource<ResourceManager, StorageResource>.ResourceManager
   {
     public const string COLUMN_OWNER_USER_ID = "OwnerUserId";
     public const string COLUMN_KEY = "AesKey";
@@ -27,10 +38,8 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
       service.GetManager<UserResource.ResourceManager>().ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", user.Id), cancellationToken);
     }
 
-    protected override StorageResource NewResource(ResourceData data) => new(this, data);
-
-    protected override ResourceData CastToData(DbDataReader reader, long id, long createTime, long updateTime) => new(
-      id, createTime, updateTime,
+    protected override StorageResource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
+      this, id, createTime, updateTime,
 
       reader.GetInt64(reader.GetOrdinal(COLUMN_OWNER_USER_ID)),
       reader.GetBytes(reader.GetOrdinal(COLUMN_KEY)),
@@ -55,255 +64,175 @@ public sealed class StorageResource(StorageResource.ResourceManager manager, Sto
 
     public StorageResource Create(ResourceService.Transaction transaction, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      return userAuthenticationToken.Enter(() =>
-      {
-        userAuthenticationToken.ThrowIfInvalid();
-
-        return InsertAndGet(transaction, new(
-          (COLUMN_OWNER_USER_ID, userAuthenticationToken.UserId),
-          (COLUMN_KEY, userAuthenticationToken.Encrypt(Service.Server.KeyService.GetNewAesPair().Serialize()))
-        ), cancellationToken);
-      });
+      return InsertAndGet(transaction, new(
+        (COLUMN_OWNER_USER_ID, userAuthenticationToken.UserId),
+        (COLUMN_KEY, userAuthenticationToken.Encrypt(Service.Server.KeyService.GetNewAesPair().Serialize()))
+      ), cancellationToken);
     }
 
     public bool Update(ResourceService.Transaction transaction, StorageResource storage, long? rootFolderId, long? trashFolderId, long? internalFolderId, CancellationToken cancellationToken = default)
     {
-      lock (storage)
-      {
-        storage.ThrowIfInvalid();
-
-        return Update(transaction, storage, new(
-          (COLUMN_ROOT_FOLDER_ID, rootFolderId),
-          (COLUMN_TRASH_FOLDER_ID, trashFolderId),
-          (COLUMN_INTERNAL_FOLDER_ID, internalFolderId)
-        ), cancellationToken);
-      }
+      return Update(transaction, storage, new(
+        (COLUMN_ROOT_FOLDER_ID, rootFolderId),
+        (COLUMN_TRASH_FOLDER_ID, trashFolderId),
+        (COLUMN_INTERNAL_FOLDER_ID, internalFolderId)
+      ), cancellationToken);
     }
 
-    public byte[] EncryptFileKey(ResourceService.Transaction transaction, StorageResource storage, KeyService.AesPair key, FileResource? parent, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileAccessResource.FileAccessType fileAccessType, CancellationToken cancellationToken = default)
+    public byte[] EncryptFileKey(ResourceService.Transaction transaction, StorageResource storage, KeyService.AesPair key, FileResource? parent, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileAccessType fileAccessType, CancellationToken cancellationToken = default)
     {
-      lock (storage)
+
+      if (parent == null)
       {
-        storage.ThrowIfInvalid();
-
-        if (parent == null)
+        if (storage.OwnerUserId != userAuthenticationToken?.UserId)
         {
-          if (storage.OwnerUserId != userAuthenticationToken?.UserId)
-          {
-            throw new ArgumentException("Other users cannot encrypt using the storage key.", nameof(userAuthenticationToken));
-          }
-
-          KeyService.AesPair storageKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key));
-
-          return encryptFileKey(storageKey, null);
+          throw new ArgumentException("Other users cannot encrypt using the storage key.", nameof(userAuthenticationToken));
         }
 
-        lock (parent)
-        {
-          parent.ThrowIfInvalid();
+        KeyService.AesPair storageKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key));
 
-          return encryptFileKey(null, parent);
-        }
-
-        byte[] encryptFileKey(KeyService.AesPair? storageKey, FileResource? parent) => storageKey == null && parent != null
-          ? DecryptKey(transaction, storage, parent, userAuthenticationToken, fileAccessType, cancellationToken).Key.Encrypt(key.Serialize())
-          : storageKey!.Encrypt(key.Serialize());
+        return encryptFileKey(storageKey, null);
       }
+
+      return encryptFileKey(null, parent);
+
+      byte[] encryptFileKey(KeyService.AesPair? storageKey, FileResource? parent) => storageKey == null && parent != null
+        ? DecryptKey(transaction, storage, parent, userAuthenticationToken, fileAccessType, cancellationToken).Key.Encrypt(key.Serialize())
+        : storageKey!.Encrypt(key.Serialize());
     }
 
-    public DecryptedKeyInfo DecryptKey(ResourceService.Transaction transaction, StorageResource storage, FileResource? file, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileAccessResource.FileAccessType? fileAccessType = null, CancellationToken cancellationToken = default)
+    public DecryptedKeyInfo DecryptKey(ResourceService.Transaction transaction, StorageResource storage, FileResource? file, UserAuthenticationResource.UserAuthenticationToken? userAuthenticationToken, FileAccessType? fileAccessType = null, CancellationToken cancellationToken = default)
     {
-      lock (storage)
+      if (file == null)
       {
-        storage.ThrowIfInvalid();
-
-        if (file == null)
+        if (userAuthenticationToken?.UserId != storage.OwnerUserId)
         {
-          if (userAuthenticationToken?.UserId != storage.OwnerUserId)
-          {
-            throw new ArgumentException("The owner's authentication token is required to decrypt the storage key.", nameof(userAuthenticationToken));
-          }
-
-          return new(KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key)), null);
+          throw new ArgumentException("The owner's authentication token is required to decrypt the storage key.", nameof(userAuthenticationToken));
         }
 
-        lock (file)
+        return new(KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key)), null);
+      }
+
+      FileAccessResource? fileAccessUsed = null;
+
+      if (storage.OwnerUserId != userAuthenticationToken?.UserId)
+      {
+        return new(decryptFileKey2(file), fileAccessUsed);
+
+        KeyService.AesPair decryptFileKey2(FileResource file)
         {
-          file.ThrowIfInvalid();
-
-          FileAccessResource? fileAccessUsed = null;
-
-          if (userAuthenticationToken == null)
+          foreach (FileAccessResource fileAccess in Service.GetManager<FileAccessResource.ResourceManager>().List(transaction, storage, file, userAuthenticationToken, cancellationToken: cancellationToken))
           {
-            return new(decryptFileKey(), fileAccessUsed);
-          }
-
-          return userAuthenticationToken.Enter(() => new DecryptedKeyInfo(decryptFileKey(), fileAccessUsed));
-
-          KeyService.AesPair decryptFileKey()
-          {
-            if (storage.OwnerUserId != userAuthenticationToken?.UserId)
+            if (fileAccess.Type > fileAccessType)
             {
-              return decryptFileKey2(file);
+              continue;
+            }
 
-              KeyService.AesPair decryptFileKey2(FileResource file)
-              {
-                foreach (FileAccessResource fileAccess in Service.GetManager<FileAccessResource.ResourceManager>().List(transaction, storage, file, userAuthenticationToken, cancellationToken: cancellationToken))
+            switch (fileAccess.TargetEntityType)
+            {
+              case FileAccessTargetEntityType.User:
+                if (userAuthenticationToken?.UserId != fileAccess.TargetEntityId)
                 {
-                  if (fileAccess.Type > fileAccessType)
-                  {
-                    continue;
-                  }
-
-                  switch (fileAccess.TargetEntityType)
-                  {
-                    case FileAccessResource.FileAccessTargetEntityType.User:
-                      if (userAuthenticationToken?.UserId != fileAccess.TargetEntityId)
-                      {
-                        break;
-                      }
-
-                      fileAccessUsed = fileAccess;
-                      return KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(fileAccess.Key));
-
-                    case FileAccessResource.FileAccessTargetEntityType.None:
-                      fileAccessUsed = fileAccess;
-                      return KeyService.AesPair.Deserialize(fileAccess.Key);
-                  }
+                  break;
                 }
 
-                if (file.ParentId == null)
-                {
-                  throw new ArgumentException($"No {fileAccessType} access to the file.", nameof(userAuthenticationToken));
-                }
+                fileAccessUsed = fileAccess;
+                return KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(fileAccess.AesKey));
 
-                return KeyService.AesPair.Deserialize(decryptFileKey2(Service.GetManager<FileResource.ResourceManager>().GetById(transaction, (long)file.ParentId, cancellationToken)).Decrypt(file.Key));
-              }
-            }
-            else
-            {
-              KeyService.AesPair storageKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key));
-
-              return decryptFileKey2(file);
-
-              KeyService.AesPair decryptFileKey2(FileResource file) => file.ParentId != null
-                ? KeyService.AesPair.Deserialize(decryptFileKey2(Service.GetManager<FileResource.ResourceManager>().GetById(transaction, (long)file.ParentId, cancellationToken)).Decrypt(file.Key))
-                : KeyService.AesPair.Deserialize(storageKey.Decrypt(file.Key));
+              case FileAccessTargetEntityType.None:
+                fileAccessUsed = fileAccess;
+                return KeyService.AesPair.Deserialize(fileAccess.AesKey);
             }
           }
+
+          if (file.ParentId == null)
+          {
+            throw new ArgumentException($"No {fileAccessType} access to the file.", nameof(userAuthenticationToken));
+          }
+
+          return KeyService.AesPair.Deserialize(decryptFileKey2(Service.GetManager<FileResource.ResourceManager>().GetById(transaction, (long)file.ParentId, cancellationToken)).Decrypt(file.Key));
         }
+      }
+      else
+      {
+        KeyService.AesPair storageKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key));
+
+        return new(decryptFileKey2(file), fileAccessUsed);
+
+        KeyService.AesPair decryptFileKey2(FileResource file) => file.ParentId != null
+          ? KeyService.AesPair.Deserialize(decryptFileKey2(Service.GetManager<FileResource.ResourceManager>().GetById(transaction, (long)file.ParentId, cancellationToken)).Decrypt(file.Key))
+          : KeyService.AesPair.Deserialize(storageKey.Decrypt(file.Key));
       }
     }
 
     public StorageResource GetByOwnerUser(ResourceService.Transaction transaction, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      return userAuthenticationToken.Enter(() =>
+      StorageResource? storage = SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", userAuthenticationToken.UserId));
+
+      if (storage == null)
       {
-        StorageResource? storage = SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", userAuthenticationToken.UserId));
+        storage = Create(transaction, userAuthenticationToken);
+      }
 
-        if (storage == null)
-        {
-          storage = Create(transaction, userAuthenticationToken);
-        }
-
-        return storage;
-      });
+      return storage;
     }
 
     public FileResource GetRootFolder(ResourceService.Transaction transaction, StorageResource storage, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      lock (storage)
+      if (storage.RootFolderId != null && transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, (long)storage.RootFolderId, out FileResource? file, cancellationToken))
       {
-        storage.ThrowIfInvalid();
-
-        return userAuthenticationToken.Enter(() =>
-        {
-          if (storage.RootFolderId != null && transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, (long)storage.RootFolderId, out FileResource? file, cancellationToken))
-          {
-            return file;
-          }
-
-          FileResource newFile = transaction.GetManager<FileResource.ResourceManager>().CreateFolder(transaction, storage, null, "_ROOT", userAuthenticationToken, cancellationToken);
-
-          Update(transaction, storage, new(
-            (COLUMN_ROOT_FOLDER_ID, newFile.Id)
-          ), cancellationToken);
-
-          return newFile;
-        });
+        return file;
       }
+
+      FileResource newFile = transaction.GetManager<FileResource.ResourceManager>().CreateFolder(transaction, storage, null, "_ROOT", userAuthenticationToken, cancellationToken);
+
+      Update(transaction, storage, new(
+        (COLUMN_ROOT_FOLDER_ID, newFile.Id)
+      ), cancellationToken);
+
+      return newFile;
     }
 
     public FileResource GetTrashFolder(ResourceService.Transaction transaction, StorageResource storage, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      lock (storage)
+      if (storage.TrashFolderId != null && transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, (long)storage.TrashFolderId, out FileResource? file, cancellationToken))
       {
-        storage.ThrowIfInvalid();
-
-        return userAuthenticationToken.Enter(() =>
-        {
-          if (storage.TrashFolderId != null && transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, (long)storage.TrashFolderId, out FileResource? file, cancellationToken))
-          {
-            return file;
-          }
-
-          FileResource newFile = transaction.GetManager<FileResource.ResourceManager>().CreateFolder(transaction, storage, null, "_TRASH", userAuthenticationToken, cancellationToken);
-
-          Update(transaction, storage, new(
-            (COLUMN_TRASH_FOLDER_ID, newFile.Id)
-          ), cancellationToken);
-
-          return newFile;
-        });
+        return file;
       }
+
+      FileResource newFile = transaction.GetManager<FileResource.ResourceManager>().CreateFolder(transaction, storage, null, "_TRASH", userAuthenticationToken, cancellationToken);
+
+      Update(transaction, storage, new(
+        (COLUMN_TRASH_FOLDER_ID, newFile.Id)
+      ), cancellationToken);
+
+      return newFile;
     }
 
     public FileResource GetInternalFolder(ResourceService.Transaction transaction, StorageResource storage, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
     {
-      lock (storage)
+      if (storage.InternalFolderId != null && transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, (long)storage.InternalFolderId, out FileResource? file, cancellationToken))
       {
-        storage.ThrowIfInvalid();
-
-        return userAuthenticationToken.Enter(() =>
-        {
-          if (storage.InternalFolderId != null && transaction.GetManager<FileResource.ResourceManager>().TryGetById(transaction, (long)storage.InternalFolderId, out FileResource? file, cancellationToken))
-          {
-            return file;
-          }
-
-          FileResource newFile = transaction.GetManager<FileResource.ResourceManager>().CreateFolder(transaction, storage, null, "_INTERNAL", userAuthenticationToken, cancellationToken);
-
-          Update(transaction, storage, new(
-            (COLUMN_INTERNAL_FOLDER_ID, newFile.Id)
-          ), cancellationToken);
-
-          return newFile;
-        });
+        return file;
       }
+
+      FileResource newFile = transaction.GetManager<FileResource.ResourceManager>().CreateFolder(transaction, storage, null, "_INTERNAL", userAuthenticationToken, cancellationToken);
+
+      Update(transaction, storage, new(
+        (COLUMN_INTERNAL_FOLDER_ID, newFile.Id)
+      ), cancellationToken);
+
+      return newFile;
     }
   }
 
-  public new sealed record ResourceData(
-    long Id,
-    long CreateTime,
-    long UpdateTime,
-
-    long OwnerUserId,
-    byte[] Key,
-
-    long? RootFolderId,
-    long? TrashFolderId,
-    long? InternalFolderId
-  ) : Resource<ResourceManager, ResourceData, StorageResource>.ResourceData(Id, CreateTime, UpdateTime);
-
-  public long OwnerUserId => Data.OwnerUserId;
   [JsonIgnore]
-  public byte[] Key => Data.Key;
+  public byte[] Key = Key;
 
   [JsonIgnore]
-  public long? RootFolderId => Data.RootFolderId;
+  public long? RootFolderId = RootFolderId;
   [JsonIgnore]
-  public long? TrashFolderId => Data.TrashFolderId;
+  public long? TrashFolderId = TrashFolderId;
   [JsonIgnore]
-  public long? InternalFolderId => Data.InternalFolderId;
+  public long? InternalFolderId = InternalFolderId;
 }

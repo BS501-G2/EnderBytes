@@ -2,7 +2,7 @@ using System.Text;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-public abstract partial class Resource<M, D, R>
+public abstract partial record Resource<M, R>
 {
   public abstract partial class ResourceManager
   {

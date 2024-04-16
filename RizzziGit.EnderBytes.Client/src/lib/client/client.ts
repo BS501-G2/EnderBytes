@@ -193,6 +193,14 @@ export class Client {
     return this.#request('Echo', message)
   }
 
+  public sendToVoid<T>(message: T): Promise<T> {
+    return this.#request('Void', message)
+  }
+
+  public randomBytes<T>(size: number): Promise<T> {
+    return this.#request('Random', { size })
+  }
+
   public async loginPassword(username: string, password: string): Promise<void> {
     const session = await this.#request('LoginPassword', { username, password })
 

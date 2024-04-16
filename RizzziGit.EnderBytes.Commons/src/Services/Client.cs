@@ -51,7 +51,7 @@ public abstract record ClientPayload(uint Type, CompositeBuffer Bytes) {
 
 public enum UserRequest : uint
 {
-  Echo,
+  Echo, Void, Random,
 
   LoginToken, LoginPassword, Register, Logout,
 

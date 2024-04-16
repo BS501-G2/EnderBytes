@@ -5,7 +5,6 @@ import { writable, type Writable } from "svelte/store";
 import { AppState } from "./app-state";
 import { Client, type Session } from "$lib/client/client";
 import { KeyboardState } from "../../components/Bindings/Keyboard.svelte";
-import { AwaiterState } from "../../components/Bindings/Awaiter.svelte";
 
 export class RootState {
   static #state?: Writable<RootState>
@@ -35,7 +34,6 @@ export class RootState {
 
     this.appState = writable(new AppState())
     this.keyboardState = writable(new KeyboardState())
-    this.awaiterState = writable(new AwaiterState())
   }
 
   theme: ColorScheme;
@@ -46,7 +44,6 @@ export class RootState {
   sessionToken: Session | null
   appState: Writable<AppState>
   keyboardState: Writable<KeyboardState>
-  awaiterState: Writable<AwaiterState>
 
   public get isDesktop(): boolean { return !!(this.viewMode & ViewMode.Desktop) }
   public get isMobile(): boolean { return !!(this.viewMode & ViewMode.Mobile) }

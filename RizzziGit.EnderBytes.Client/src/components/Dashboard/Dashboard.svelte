@@ -70,7 +70,7 @@
 <svelte:head>
   <link
     rel="manifest"
-    href="/api/manifest.json?locale={$rootState.locale}&theme={$rootState.theme}"
+    href="/manifest.json?locale={$rootState.locale}&theme={$rootState.theme}"
   />
   <title>{$rootState.getString(LocaleKey.AppName)}</title>
 </svelte:head>

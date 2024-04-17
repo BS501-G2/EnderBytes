@@ -96,10 +96,10 @@ public static class Program
   {
     server.ResourceService.Transact((transaction, cancellationToken) =>
     {
-      (UserResource user, UserAuthenticationResource.UserAuthenticationToken userAuthenticationToken) = server.ResourceService.GetManager<UserResource.ResourceManager>().Create(transaction, "Testuser", "LastName", "FirstName", "MiddleName", "TestTest123;",  cancellationToken);
+      (UserManager.Resource user, UserAuthenticationToken userAuthenticationToken) = server.ResourceService.GetManager<UserManager>().Create(transaction, "Testuser", "LastName", "FirstName", "MiddleName", "TestTest123;",  cancellationToken);
       Handler += (transaction, cancellationToken) =>
       {
-        server.ResourceService.GetManager<UserResource.ResourceManager>().Delete(transaction, user, cancellationToken);
+        server.ResourceService.GetManager<UserManager>().Delete(transaction, user, cancellationToken);
       };
     });
   });

@@ -10,16 +10,16 @@ public sealed partial class ResourceService : Server.SubService
   {
     ResourceManagers = [];
 
-    ResourceManagers.Add(new UserResource.ResourceManager(this));
-    ResourceManagers.Add(new UserAuthenticationResource.ResourceManager(this));
-    ResourceManagers.Add(new UserAuthenticationSessionTokenResource.ResourceManager(this));
-    ResourceManagers.Add(new UserConfigurationResource.ResourceManager(this));
-    ResourceManagers.Add(new StorageResource.ResourceManager(this));
-    ResourceManagers.Add(new FileResource.ResourceManager(this));
-    ResourceManagers.Add(new FileAccessResource.ResourceManager(this));
-    ResourceManagers.Add(new FileSnapshotResource.ResourceManager(this));
-    ResourceManagers.Add(new FileBufferResource.ResourceManager(this));
-    ResourceManagers.Add(new FileBufferMapResource.ResourceManager(this));
+    ResourceManagers.Add(new UserManager(this));
+    ResourceManagers.Add(new UserAuthenticationManager(this));
+    ResourceManagers.Add(new UserAuthenticationSessionTokenManager(this));
+    ResourceManagers.Add(new UserConfigurationManager(this));
+    ResourceManagers.Add(new StorageManager(this));
+    ResourceManagers.Add(new FileManager(this));
+    ResourceManagers.Add(new FileAccessManager(this));
+    ResourceManagers.Add(new FileSnapshotManager(this));
+    ResourceManagers.Add(new FileBufferManager(this));
+    ResourceManagers.Add(new FileBufferMapManager(this));
   }
 
   private Database? Database;

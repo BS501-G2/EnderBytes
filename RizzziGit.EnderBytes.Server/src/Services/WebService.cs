@@ -5,6 +5,7 @@ namespace RizzziGit.EnderBytes.Services;
 
 using Core;
 using Utilities;
+using Web;
 
 public sealed partial class WebService(Server server) : Server.SubService(server, "WebService")
 {
@@ -25,6 +26,7 @@ public sealed partial class WebService(Server server) : Server.SubService(server
         });
       })
       .AddSingleton(Server)
+      .AddScoped<WebApi.AuthenticationHolder>()
       .AddResponseCaching()
       .AddControllers();
 
@@ -55,9 +57,11 @@ public sealed partial class WebService(Server server) : Server.SubService(server
     {
       app.UseHttpsRedirection();
     }
-    app.Use((context, next) => WebApi.UserAuthenticationTokenMiddleWare(Server, context, next));
+    app.Use((context, next) =>
+    {
+      return WebApi.UserAuthenticationTokenMiddleWare(Server, context, next);
+    });
     app.MapControllers();
-    app.Use((context, next) => WebApi.ClearUserAuthenticationTokenMiddleWare(context, next));
 
     return app;
   }

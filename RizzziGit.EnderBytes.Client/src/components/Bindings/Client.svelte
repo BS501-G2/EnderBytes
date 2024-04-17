@@ -36,14 +36,14 @@
     }
 
     public interpret(): Promise<Blob | any> {
-      return interpret(this.response);
+      return interpretResponse(this.response);
     }
   }
 
-  export async function interpret(response: Response): Promise<Blob | any> {
+  export async function interpretResponse(response: Response): Promise<Blob | any> {
     const responseType = response.headers.get("Content-Type");
 
-    if (responseType != null && responseType === "application/json") {
+    if (responseType != null && responseType.startsWith("application/json")) {
       return await response.json();
     } else {
       return await response.blob();
@@ -89,7 +89,7 @@
       } else if (pathname === "/auth/logout" && request.method === "POST") {
         sessionStore.set(null);
       } else {
-        return await interpret(response);
+        return response;
       }
     } else if (response.status === 401) {
       sessionStore.set(null);

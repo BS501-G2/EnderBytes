@@ -1,5 +1,6 @@
 <script lang="ts">
-  import Client from "../../components/Bindings/Client.svelte";
+  import Awaiter from "../../components/Bindings/Awaiter.svelte";
+import Client, { interpretResponse } from "../../components/Bindings/Client.svelte";
 
   let username: string;
   let password: string;
@@ -19,4 +20,10 @@
   >
     Login
   </button>
+
+  <Awaiter callback={async () => await interpretResponse(await fetch("/user/@testuser", "GET"))}>
+    <svelte:fragment slot="success" let:result={user}>
+    <pre>{JSON.stringify(user, undefined, '  ')}</pre>
+    </svelte:fragment>
+  </Awaiter>
 </Client>

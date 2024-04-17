@@ -3,7 +3,6 @@ using Newtonsoft.Json;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-using Commons.Collections;
 using Services;
 using Utilities;
 
@@ -19,9 +18,34 @@ public enum FileHandleFlags : byte
   ReadModify = Read | Modify
 }
 
-public sealed partial class FileManager : ResourceManager<FileManager, FileManager.Resource>
+public sealed partial class FileManager : ResourceManager<FileManager, FileManager.Resource, FileManager.Exception>
 {
-  public sealed new partial record Resource(long Id, long CreateTime, long UpdateTime, long StorageId, byte[] Key, long? ParentId, FileType Type, string Name) : ResourceManager<FileManager, Resource>.Resource(Id, CreateTime, UpdateTime)
+  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+  public sealed class FileDontBelongToStorageException(StorageManager.Resource storage, Resource file) : Exception($"File #{file.Id} does not belong to storage #{storage.Id}.")
+  {
+    public readonly StorageManager.Resource Storage = storage;
+    public readonly Resource File = file;
+  }
+  public sealed class FileTreeException(Resource file, Resource destination) : Exception($"Moving file #{file.Id} to #{destination.Id} may close the loop.")
+  {
+    public readonly Resource File = file;
+    public readonly Resource Destination = destination;
+  }
+  public sealed class NotAFolderException(Resource file) : Exception($"Resource #{file.Id} a folder.")
+  {
+    public readonly Resource File = file;
+  }
+  public sealed class NotAFileException(Resource file) : Exception($"Resource #{file.Id} a file.")
+  {
+    public readonly Resource File = file;
+  }
+  public sealed class InvalidFileTypeException(FileType type) : Exception($"Invalid file type: {(byte)type}.")
+  {
+    public readonly FileType Type = type;
+  }
+  public sealed class NotSupportedException(string? message) : Exception(message ?? "This operation is not supported.");
+
+  public sealed new partial record Resource(long Id, long CreateTime, long UpdateTime, long StorageId, byte[] Key, long? ParentId, FileType Type, string Name) : ResourceManager<FileManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
   {
     [JsonIgnore]
     public byte[] Key = Key;
@@ -35,7 +59,7 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
     {
       if (!BelongsTo(storage))
       {
-        throw new ArgumentException("The specified file does not belong to storage.", nameof(storage));
+        throw new FileDontBelongToStorageException(storage, this);
       }
     }
   }
@@ -90,21 +114,12 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
     {
       newParent.ThrowIfDoesNotBelongTo(storage);
 
-      Resource currentParent = newParent;
-      while (currentParent != null)
+      if (
+        IsEqualToOrInsideOf(transaction, storage, newParent, file, cancellationToken) ||
+        IsEqualToOrInsideOf(transaction, storage, file, newParent, cancellationToken)
+      )
       {
-        if (currentParent.Id == file.Id)
-        {
-          throw new ArgumentException("Moving the file inside the new parent folder closes the loop.", nameof(newParent));
-        }
-        else if (currentParent.ParentId == null)
-        {
-          break;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        currentParent = GetById(transaction, (long)currentParent.ParentId, cancellationToken);
+        throw new FileTreeException(file, newParent);
       }
     }
 
@@ -112,7 +127,7 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
 
     if ((newParent != null) && (newParent.Type != FileType.Folder))
     {
-      throw new ArgumentException("Invalid new parent.", nameof(newParent));
+      throw new NotAFolderException(file);
     }
 
     bool result = Update(transaction, file, new(
@@ -140,11 +155,11 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
 
     if (!Enum.IsDefined(type))
     {
-      throw new ArgumentException("Invalid file type.", nameof(type));
+      throw new InvalidFileTypeException(type);
     }
     else if ((parent != null) && (parent.Type != FileType.Folder))
     {
-      throw new ArgumentException("Parent is not a folder.", nameof(parent));
+      throw new NotAFolderException(parent);
     }
 
     KeyService.AesPair fileKey = Service.Server.KeyService.GetNewAesPair();
@@ -171,7 +186,7 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
 
   public override bool Delete(ResourceService.Transaction transaction, Resource file, CancellationToken cancellationToken = default)
   {
-    throw new NotSupportedException("Please specify user token.");
+    throw new NotSupportedException("Deleting a file without providing user token is not supported.");
   }
 
   public Resource? ResolvePath(ResourceService.Transaction transaction, StorageManager.Resource storage, string[] path, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
@@ -193,7 +208,7 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
   {
     if (folder != null)
     {
-      Service.GetManager<StorageManager>().DecryptKey(transaction, storage, folder, userAuthenticationToken, FileAccessType.Read, cancellationToken);
+      _ = Service.GetManager<StorageManager>().DecryptKey(transaction, storage, folder, userAuthenticationToken, FileAccessType.Read, cancellationToken);
     }
 
     foreach (Resource file in Select(transaction, new WhereClause.Nested("and",
@@ -205,6 +220,11 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
     }
 
     yield break;
+  }
+
+  public bool IsEqualToOrInsideOf(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource haystack, Resource needle, CancellationToken cancellationToken = default)
+  {
+    return IsInsideOf(transaction, storage, haystack, needle, cancellationToken) || needle.Id == haystack.Id;
   }
 
   public bool IsInsideOf(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource haystack, Resource needle, CancellationToken cancellationToken = default)

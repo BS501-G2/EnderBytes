@@ -5,8 +5,10 @@ namespace RizzziGit.EnderBytes.Resources;
 using Utilities;
 using Services;
 
-public sealed class FileSnapshotManager : ResourceManager<FileSnapshotManager, FileSnapshotManager.Resource>
+public sealed class FileSnapshotManager : ResourceManager<FileSnapshotManager, FileSnapshotManager.Resource, FileSnapshotManager.Exception>
 {
+  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+
   public new sealed record Resource(
       long Id,
       long CreateTime,
@@ -15,7 +17,7 @@ public sealed class FileSnapshotManager : ResourceManager<FileSnapshotManager, F
       long? BaseSnapshotId,
       long? AuthorFileAccessId,
       long? AuthorId
-  ) : ResourceManager<FileSnapshotManager, Resource>.Resource(Id, CreateTime, UpdateTime)
+  ) : ResourceManager<FileSnapshotManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
   {
   }
 

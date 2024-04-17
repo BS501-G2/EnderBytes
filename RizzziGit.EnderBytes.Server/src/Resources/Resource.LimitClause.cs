@@ -1,6 +1,6 @@
 namespace RizzziGit.EnderBytes.Resources;
 
-public abstract partial class ResourceManager<M, R>
+public abstract partial class ResourceManager<M, R, E>
 {
   public sealed record LimitClause(int Limit, int? Skip = null)
   {

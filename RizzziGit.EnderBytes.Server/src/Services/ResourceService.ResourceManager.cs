@@ -102,7 +102,7 @@ public sealed partial class ResourceService
       return command.ExecuteScalar();
     }
 
-    protected sealed override Task OnStop(Exception? exception) => base.OnStop(exception);
+    protected sealed override Task OnStop(System.Exception? exception) => base.OnStop(exception);
     protected sealed override Task OnRun(CancellationToken cancellationToken) => base.OnRun(cancellationToken);
     protected sealed override async Task OnStart(CancellationToken cancellationToken)
     {

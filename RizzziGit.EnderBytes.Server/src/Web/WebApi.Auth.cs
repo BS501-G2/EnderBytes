@@ -8,7 +8,6 @@ using  Services;
 
 public sealed partial class WebApi
 {
-
   public sealed record PasswordLoginRequest(string Username, string Password);
   public sealed record PasswordLoginResponse(long UserId, string Token);
 
@@ -18,7 +17,7 @@ public sealed partial class WebApi
   {
     if (TryGetUserAuthenticationToken(out _))
     {
-      return StatusCode(409);
+      return Conflict();
     }
 
     (string Username, string Password) = request;
@@ -28,7 +27,7 @@ public sealed partial class WebApi
       !GetResourceManager<UserAuthenticationManager>().TryGetByPayload(transaction, user, Encoding.UTF8.GetBytes(Password), UserAuthenticationType.Password, out UserAuthenticationToken? userAuthenticationToken)
     )
     {
-      return StatusCode(401);
+      return Unauthorized();
     }
 
     string token = GetResourceManager<UserAuthenticationManager>().CreateSessionToken(transaction, user, userAuthenticationToken, cancellationToken);
@@ -42,7 +41,7 @@ public sealed partial class WebApi
   {
     if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
     {
-      return StatusCode(401);
+      return Unauthorized(401);
     }
 
     await ResourceService.Transact((transaction, cancellationToken) =>

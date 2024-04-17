@@ -5,18 +5,17 @@ namespace RizzziGit.EnderBytes.Resources;
 using Utilities;
 using Services;
 
-public sealed class FileBufferManager : ResourceManager<FileBufferManager, FileBufferManager.Resource>
+public sealed class FileBufferManager : ResourceManager<FileBufferManager, FileBufferManager.Resource, FileBufferManager.Exception>
 {
+  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+
   public new sealed record Resource(
     long Id,
     long CreateTime,
     long UpdateTime,
 
     byte[] Buffer
-  ) : ResourceManager<FileBufferManager, Resource>.Resource(Id, CreateTime, UpdateTime)
-  {
-
-  }
+  ) : ResourceManager<FileBufferManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime);
 
   public const string NAME = "FileBuffer";
   public const int VERSION = 1;
@@ -64,7 +63,7 @@ public sealed class FileBufferManager : ResourceManager<FileBufferManager, FileB
   {
     if (file.Type != FileType.File)
     {
-      throw new ArgumentException("Not a file.", nameof(file));
+      throw new FileManager.NotAFileException(file);
     }
 
     return Insert(transaction, new(

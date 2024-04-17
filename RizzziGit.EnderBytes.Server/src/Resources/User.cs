@@ -11,8 +11,10 @@ using Newtonsoft.Json;
 
 public sealed record UserPair(UserManager.Resource User, UserAuthenticationToken AuthenticationToken);
 
-public sealed partial class UserManager(ResourceService service) : ResourceManager<UserManager, UserManager.Resource>(service, NAME, VERSION)
+public sealed partial class UserManager(ResourceService service) : ResourceManager<UserManager, UserManager.Resource, UserManager.Exception>(service, NAME, VERSION)
 {
+  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+
   public new sealed partial record Resource(
     long Id,
     long CreateTime,
@@ -22,7 +24,7 @@ public sealed partial class UserManager(ResourceService service) : ResourceManag
     string FirstName,
     string? MiddleName,
     byte[] PublicKey
-  ) : ResourceManager<UserManager, Resource>.Resource(Id, CreateTime, UpdateTime)
+  ) : ResourceManager<UserManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
   {
     [JsonIgnore]
     public byte[] PublicKey = PublicKey;

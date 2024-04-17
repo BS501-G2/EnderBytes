@@ -8,8 +8,15 @@ using Services;
 
 public sealed record DecryptedKeyInfo(KeyService.AesPair Key, FileAccessManager.Resource? FileAccess);
 
-public sealed class StorageManager : ResourceManager<StorageManager, StorageManager.Resource>
+public sealed class StorageManager : ResourceManager<StorageManager, StorageManager.Resource, StorageManager.Exception>
 {
+  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+
+  public sealed class AccessDenied()
+  {
+
+  }
+
   public new sealed record Resource(
     long Id,
     long CreateTime,
@@ -21,7 +28,7 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
     long? RootFolderId,
     long? TrashFolderId,
     long? InternalFolderId
-  ) : ResourceManager<StorageManager, Resource>.Resource(Id, CreateTime, UpdateTime)
+  ) : ResourceManager<StorageManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
   {
     [JsonIgnore]
     public byte[] Key = Key;

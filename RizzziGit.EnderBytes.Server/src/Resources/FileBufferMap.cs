@@ -3,11 +3,18 @@ using System.Data.Common;
 namespace RizzziGit.EnderBytes.Resources;
 
 using Commons.Memory;
-
 using Services;
 
-public sealed class FileBufferMapManager : ResourceManager<FileBufferMapManager, FileBufferMapManager.Resource>
+public sealed class FileBufferMapManager : ResourceManager<FileBufferMapManager, FileBufferMapManager.Resource, FileBufferMapManager.Exception>
 {
+  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+
+  public class SnapshotAlreadyInitializedException(FileManager.Resource file, FileSnapshotManager.Resource snapshot) : Exception("Snapshot is already initialized.")
+  {
+    public readonly FileManager.Resource File = file;
+    public readonly FileSnapshotManager.Resource Snapshot = snapshot;
+  }
+
   public new sealed record Resource(
     long Id,
     long CreateTime,
@@ -18,7 +25,7 @@ public sealed class FileBufferMapManager : ResourceManager<FileBufferMapManager,
     long? FileBufferId,
     long Index,
     long Length
-  ) : ResourceManager<FileBufferMapManager, Resource>.Resource(Id, CreateTime, UpdateTime)
+  ) : ResourceManager<FileBufferMapManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
   {
     public byte[]? CachedBuffer = null;
   }
@@ -83,7 +90,7 @@ public sealed class FileBufferMapManager : ResourceManager<FileBufferMapManager,
     return (long)(decimal)(SqlScalar(transaction, $"select coalesce(sum({COLUMN_LENGTH}), 0) as result from {NAME} where {whereClause.Apply(parameters)}", [.. parameters]) ?? 0);
   }
 
-  public IEnumerable<FileBufferMapManager.Resource> Initialize(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, FileSnapshotManager.Resource fileSnapshot, CancellationToken cancellationToken = default)
+  public IEnumerable<Resource> Initialize(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, FileSnapshotManager.Resource fileSnapshot, CancellationToken cancellationToken = default)
   {
     if (fileSnapshot.BaseSnapshotId == null)
     {
@@ -92,7 +99,7 @@ public sealed class FileBufferMapManager : ResourceManager<FileBufferMapManager,
 
     if (Count(transaction, new WhereClause.CompareColumn(COLUMN_FILE_SNAPSHOT_ID, "=", fileSnapshot.Id), cancellationToken) != 0)
     {
-      throw new ArgumentException("Snapshot already has data.", nameof(fileSnapshot));
+      throw new SnapshotAlreadyInitializedException(file, fileSnapshot);
     }
 
     return Select(transaction, new WhereClause.Nested("and",

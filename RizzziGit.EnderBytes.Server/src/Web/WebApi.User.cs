@@ -12,13 +12,13 @@ public sealed partial class WebApi
   public async Task<ActionResult<UserManager.Resource>> GetUser(string username)
   {
     if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken)) {
-      return StatusCode(401);
+      return Unauthorized();
     }
 
     UserManager.Resource? user = null;
     if (!await ResourceService.Transact((transaction, cancellationToken) => GetResourceManager<UserManager>().TryGetByUsername(transaction, username, out user, cancellationToken)))
     {
-      return StatusCode(404);
+      return NotFound();
     }
 
     return Ok(user);
@@ -30,13 +30,13 @@ public sealed partial class WebApi
   {
     if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
     {
-      return StatusCode(401);
+      return Unauthorized();
     }
 
     UserManager.Resource? user = null;
     if (!await ResourceService.Transact((transaction, cancellationToken) => GetResourceManager<UserManager>().TryGetById(transaction, userId, out user, cancellationToken)))
     {
-      return StatusCode(404);
+      return NotFound();
     }
 
     return Ok(user);
@@ -50,10 +50,10 @@ public sealed partial class WebApi
   {
     if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
     {
-      return StatusCode(401);
+      return Unauthorized();
     } else if (userAuthenticationToken.UserId != userId)
     {
-      return StatusCode(403);
+      return Forbid();
     }
 
     return Ok(await ResourceService.Transact((transaction, cancellationToken) =>

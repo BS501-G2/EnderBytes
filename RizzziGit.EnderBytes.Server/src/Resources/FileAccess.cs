@@ -2,16 +2,16 @@ using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-using Commons.Memory;
-
 using Utilities;
 using Services;
 
 public enum FileAccessTargetEntityType : byte { None, User }
 public enum FileAccessType : byte { ManageShares, ReadWrite, Read, None }
 
-public sealed class FileAccessManager : ResourceManager<FileAccessManager, FileAccessManager.Resource>
+public sealed class FileAccessManager : ResourceManager<FileAccessManager, FileAccessManager.Resource, FileAccessManager.Exception>
 {
+  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+
   public new sealed record Resource(
     long Id,
     long CreateTime,
@@ -21,7 +21,7 @@ public sealed class FileAccessManager : ResourceManager<FileAccessManager, FileA
     FileAccessTargetEntityType TargetEntityType,
     byte[] AesKey,
     FileAccessType Type
-  ) : ResourceManager<FileAccessManager, Resource>.Resource(Id, CreateTime, UpdateTime)
+  ) : ResourceManager<FileAccessManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
   {
     public const string NAME = "FileAccess";
     public const int VERSION = 1;

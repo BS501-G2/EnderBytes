@@ -26,7 +26,7 @@ public sealed partial class WebService(Server server) : Server.SubService(server
         });
       })
       .AddSingleton(Server)
-      .AddScoped<WebApi.AuthenticationHolder>()
+      .AddScoped<MiscellaneousRequestContext>()
       .AddResponseCaching()
       .AddControllers();
 

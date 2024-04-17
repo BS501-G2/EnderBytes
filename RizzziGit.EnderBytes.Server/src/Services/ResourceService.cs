@@ -6,6 +6,8 @@ using DatabaseWrappers;
 
 public sealed partial class ResourceService : Server.SubService
 {
+  public abstract class Exception(string? message = null) : System.Exception(message ?? "A resource error has been thrown.");
+
   public ResourceService(Server server) : base(server, "Resources")
   {
     ResourceManagers = [];
@@ -56,7 +58,7 @@ public sealed partial class ResourceService : Server.SubService
     );
   }
 
-  protected override async Task OnStop(Exception? exception = null)
+  protected override async Task OnStop(System.Exception? exception = null)
   {
     foreach (ResourceManager resourceManager in ResourceManagers.Reverse<ResourceManager>())
     {

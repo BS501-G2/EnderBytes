@@ -4,15 +4,17 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Services;
 
-public sealed class UserAuthenticationSessionTokenManager : ResourceManager<UserAuthenticationSessionTokenManager, UserAuthenticationSessionTokenManager.Resource>
+public sealed class UserAuthenticationSessionTokenManager : ResourceManager<UserAuthenticationSessionTokenManager, UserAuthenticationSessionTokenManager.Resource, UserAuthenticationSessionTokenManager.Exception>
 {
+  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+
   public new sealed record Resource(
     long Id,
     long CreateTime,
     long UpdateTime,
     long AuthenticationId,
     long ExpiryTime
-  ) : ResourceManager<UserAuthenticationSessionTokenManager, Resource>.Resource(Id, CreateTime, UpdateTime)
+  ) : ResourceManager<UserAuthenticationSessionTokenManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
   {
     public bool Expired => ExpiryTime <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
   }

@@ -12,11 +12,6 @@ using Resources;
 
 public partial class WebApi
 {
-  public sealed record AuthenticationHolder()
-  {
-    public UserAuthenticationToken? Token;
-  };
-
   [NonAction]
   public static async Task UserAuthenticationTokenMiddleWare(Server server, HttpContext context, Func<Task> next)
   {
@@ -36,7 +31,10 @@ public partial class WebApi
 
       if (type != "Basic")
       {
-        context.Response.StatusCode = 401;
+        new UnauthorizedResult().ExecuteResult(new()
+        {
+          HttpContext = context
+        });
 
         return;
       }
@@ -50,7 +48,10 @@ public partial class WebApi
       }
       catch
       {
-        context.Response.StatusCode = 401;
+        new UnauthorizedResult().ExecuteResult(new()
+        {
+          HttpContext = context
+        });
 
         return;
       }
@@ -62,7 +63,7 @@ public partial class WebApi
           server.ResourceService.GetManager<UserAuthenticationManager>().TryGetSessionToken(transaction, user, token, out var userAuthenticationToken, cancellationToken)
         )
         {
-          context.RequestServices.GetRequiredService<AuthenticationHolder>().Token = userAuthenticationToken;
+          context.RequestServices.GetRequiredService<MiscellaneousRequestContext>().Token = userAuthenticationToken;
 
           UserAuthenticationSessionTokenManager.Resource userAuthenticationSessionTokenResource = server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().GetByUserAuthentication(transaction, userAuthenticationToken.UserAuthentication, cancellationToken);
 
@@ -73,7 +74,10 @@ public partial class WebApi
         return false;
       }))
       {
-        context.Response.StatusCode = 401;
+        new UnauthorizedResult().ExecuteResult(new()
+        {
+          HttpContext = context
+        });
 
         return;
       }
@@ -86,6 +90,6 @@ public partial class WebApi
   [NonAction]
   public bool TryGetUserAuthenticationToken([NotNullWhen(true)] out UserAuthenticationToken? userAuthenticationToken)
   {
-    return (userAuthenticationToken = HttpContext.RequestServices.GetRequiredService<AuthenticationHolder>().Token) != null;
+    return (userAuthenticationToken = HttpContext.RequestServices.GetRequiredService<MiscellaneousRequestContext>().Token) != null;
   }
 }

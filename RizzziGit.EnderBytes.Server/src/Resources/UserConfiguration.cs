@@ -4,8 +4,10 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Services;
 
-public sealed class UserConfigurationManager : ResourceManager<UserConfigurationManager, UserConfigurationManager.Resource>
+public sealed class UserConfigurationManager : ResourceManager<UserConfigurationManager, UserConfigurationManager.Resource, UserConfigurationManager.Exception>
 {
+  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+
   public new sealed record Resource(
     long Id,
     long CreateTime,
@@ -13,7 +15,7 @@ public sealed class UserConfigurationManager : ResourceManager<UserConfiguration
 
     long UserId,
     bool EnableFtpAccess
-  ) : ResourceManager<UserConfigurationManager, Resource>.Resource(Id, CreateTime, UpdateTime)
+  ) : ResourceManager<UserConfigurationManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
   {
   }
 

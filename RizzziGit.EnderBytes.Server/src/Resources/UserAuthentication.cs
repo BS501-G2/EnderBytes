@@ -17,8 +17,10 @@ public sealed record UserAuthenticationToken(KeyService service, UserManager.Res
   public byte[] Decrypt(byte[] bytes) => UserAuthentication.Decrypt(service, bytes, PayloadHash);
 }
 
-public sealed partial class UserAuthenticationManager : ResourceManager<UserAuthenticationManager, UserAuthenticationManager.Resource>
+public sealed partial class UserAuthenticationManager : ResourceManager<UserAuthenticationManager, UserAuthenticationManager.Resource, UserAuthenticationManager.Exception>
 {
+  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+
   public new sealed partial record Resource(
     long Id,
     long CreateTime,
@@ -37,7 +39,7 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
     byte[] EncryptedPrivateKey,
     byte[] EncryptedPrivateKeyIv,
     byte[] PublicKey
-  ) : ResourceManager<UserAuthenticationManager, Resource>.Resource(Id, CreateTime, UpdateTime)
+  ) : ResourceManager<UserAuthenticationManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
   {
 
     public static byte[] AesEncrypt(byte[] key, byte[] iv, byte[] bytes)

@@ -1,21 +1,12 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import type { Client } from "$lib/client/client";
 
-  import Loading from "../Widgets/LoadingSpinner.svelte";
-
-  import { AlertTriangleIcon } from "svelte-feather-icons";
-  import Awaiter from "../Bindings/Awaiter.svelte";
-
-  export let client: Client;
-  export let fileId: number;
+  export let file: any;
   export let selected: boolean = false;
 
   export let onClick: () => void;
 
   let hovered: boolean = false;
-
-  let loadPromise: Promise<Client> | null;
 </script>
 
 <button
@@ -23,7 +14,7 @@
   on:pointerenter={() => (hovered = true)}
   on:pointerleave={() => (hovered = false)}
   on:click={onClick}
-  on:dblclick={() => goto("/app/files/" + fileId)}
+  on:dblclick={() => goto("/app/files/" + file.id)}
 >
   <div class="overlay">
     {#if selected || hovered}
@@ -31,33 +22,12 @@
     {/if}
   </div>
   <div class="base">
-    {#key loadPromise}
-      <Awaiter callback={() => loadPromise}>
-        <svelte:fragment slot="loading">
-          <div class="file-preview" style="padding: 16px">
-            <Loading></Loading>
-          </div>
-        </svelte:fragment>
-        <svelte:fragment slot="success" let:result={file}>
-          <div class="file-preview">
-            <img class="file-preview" src="/favicon.svg" alt="asd" />
-          </div>
-        </svelte:fragment>
-        <svelte:fragment slot="error" let:error>
-          <div class="file-preview" style="padding: 16px; color: red">
-            <AlertTriangleIcon size="100%" />
-          </div>
-        </svelte:fragment>
-      </Awaiter>
-    {/key}
+    <div class="file-preview">
+      <img class="file-preview" src="/favicon.svg" alt="asd" />
+    </div>
     <div class="file-info">
       <span class="file-name">
-        <Awaiter callback={() => (loadPromise = client.getFile(fileId))}>
-          <svelte:fragment slot="loading">Loading...</svelte:fragment>
-          <svelte:fragment slot="success" let:result={file}>
-            {file.Name}
-          </svelte:fragment>
-        </Awaiter>
+        {file.name}
       </span>
     </div>
   </div>

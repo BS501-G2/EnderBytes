@@ -4,9 +4,8 @@
   import { UserIcon, LogOutIcon, SettingsIcon } from "svelte-feather-icons";
   import Dialog, { DialogClass } from "../../Widgets/Dialog.svelte";
   import Button, { ButtonClass } from "../../Widgets/Button.svelte";
-  import type { Client } from "$lib/client/client";
+  import Client, { interpretResponse } from "../../Bindings/Client.svelte";
 
-  export let client: Client;
   export let accountSettingsDialog: boolean;
 
   let logoutConfirm: boolean = false;
@@ -18,17 +17,22 @@
     onDismiss={() => (logoutConfirm = false)}
   >
     <svelte:fragment slot="actions">
-      <Button onClick={() => client.logout()} buttonClass={ButtonClass.Primary}>
-        OK
-      </Button>
-      <Button
-        onClick={() => {
-          logoutConfirm = false;
-        }}
-        buttonClass={ButtonClass.Background}
-      >
-        Cancel
-      </Button>
+      <Client let:fetch>
+        <Button
+          onClick={() => fetch("/auth/logout", "POST")}
+          buttonClass={ButtonClass.Primary}
+        >
+          OK
+        </Button>
+        <Button
+          onClick={() => {
+            logoutConfirm = false;
+          }}
+          buttonClass={ButtonClass.Background}
+        >
+          Cancel
+        </Button>
+      </Client>
     </svelte:fragment>
     <h2 slot="head" style="margin: 0px;">Account Logout</h2>
     <span slot="body">This will log you out from the dashboard.</span>
@@ -36,23 +40,25 @@
 {/if}
 
 <div class="account">
-  <button
-    class="account-info"
-    on:click={() => goto(`/app/profile/:${client.session?.userId ?? "null"}`)}
-  >
-    <UserIcon />
-    <p>
-      {#if client.session != null}
-        {#await client.getLoginUser()}
-          ...
-        {:then user}
-          {user.LastName}, {user.FirstName[0]}.{user.MiddleName[0]
-            ? `${user.MiddleName[0]}.`
-            : ""}
-        {/await}
-      {/if}
-    </p>
-  </button>
+  <Client let:session let:fetchAndInterpret>
+    <button
+      class="account-info"
+      on:click={() => goto(`/app/profile/:${session?.userId ?? "null"}`)}
+    >
+      <UserIcon />
+      <p>
+        {#if session != null}
+          {#await fetchAndInterpret("/user/!me", "GET")}
+            ...
+          {:then user}
+            {user.lastName}, {user.firstName[0]}.{user.middleName[0]
+              ? `${user.middleName[0]}.`
+              : ""}
+          {/await}
+        {/if}
+      </p>
+    </button>
+  </Client>
   <div class="account-actions">
     <button on:click={() => (logoutConfirm = true)}><LogOutIcon /></button>
     <button on:click={() => (accountSettingsDialog = true)}>

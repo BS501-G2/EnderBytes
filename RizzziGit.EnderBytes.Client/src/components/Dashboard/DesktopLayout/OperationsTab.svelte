@@ -1,9 +1,8 @@
 <script lang="ts">
   import BackgroundTasks, {
-    BackgroundTaskStatus,
     dismissAll,
     executeBackgroundTask,
-  } from "../../BackgroundTaskList/BackgroundTaskList.svelte";
+  } from "../../BackgroundTaskList.svelte";
   import Button from "../../Widgets/Button.svelte";
   import NavigationTab from "./NavigationTab.svelte";
 
@@ -44,7 +43,6 @@
       <BackgroundTasks filter={null} />
     </div>
     <div class="buttons">
-      <Button onClick={run}>Add</Button>
       <Button onClick={dismissAll}>Clear All</Button>
     </div>
   </svelte:fragment>

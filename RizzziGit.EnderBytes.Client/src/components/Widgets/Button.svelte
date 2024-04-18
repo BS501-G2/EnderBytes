@@ -12,7 +12,7 @@
 
   export let buttonClass: ButtonClass = ButtonClass.Primary;
   export let enabled: boolean = true;
-  export let onClick: () => Promise<void> | void;
+  export let onClick: () => Promise<any> | any;
 
   let busy: boolean = false;
 
@@ -50,6 +50,7 @@
     padding: 8px 16px 8px 16px;
 
     box-sizing: border-box;
+    transition: all linear 150ms;
 
     border: solid 1px var(--primary);
     border-radius: 8px;

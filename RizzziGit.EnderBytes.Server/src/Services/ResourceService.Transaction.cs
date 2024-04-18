@@ -17,7 +17,7 @@ public sealed partial class ResourceService
   public delegate void TransactionFailureHandler();
 
   private long NextTransactionId;
-  public sealed record Transaction(DbConnection Connection, long Id, Action<TransactionFailureHandler> RegisterOnFailureHandler, ResourceService ResourceService, CancellationToken CancellationToken)
+  public sealed record Transaction(DbConnection Connection, long Id, ResourceService ResourceService, CancellationToken CancellationToken)
   {
     public Server Server => ResourceService.Server;
 
@@ -84,29 +84,33 @@ public sealed partial class ResourceService
       using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(GetCancellationToken(), cancellationToken);
       using DbTransaction dbTransaction = connection.BeginTransaction();
 
-      List<TransactionFailureHandler> failureHandlers = [];
-      Transaction transaction = new(connection, NextTransactionId++, failureHandlers.Add, this, linkedCancellationTokenSource.Token);
+      Transaction transaction = new(connection, NextTransactionId++, this, linkedCancellationTokenSource.Token);
       Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");
 
-      try
+      while (true)
       {
-        handler(transaction, linkedCancellationTokenSource.Token);
-        linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
-
-        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");
-        dbTransaction.Commit();
-      }
-      catch (Exception exception)
-      {
-        Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
-        dbTransaction.Rollback();
-
-        foreach (TransactionFailureHandler failureHandler in failureHandlers.Reverse<TransactionFailureHandler>())
+        try
         {
-          failureHandler();
-        }
+          handler(transaction, linkedCancellationTokenSource.Token);
+          linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
-        throw;
+          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");
+
+          dbTransaction.Commit();
+          break;
+        }
+        catch (Exception exception)
+        {
+          if (exception.Message.Contains("deadlock"))
+          {
+            continue;
+          }
+
+          Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
+
+          dbTransaction.Rollback();
+          throw;
+        }
       }
     }, cancellationToken);
   }

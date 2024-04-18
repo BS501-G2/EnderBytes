@@ -57,10 +57,8 @@ public sealed partial class WebService(Server server) : Server.SubService(server
     {
       app.UseHttpsRedirection();
     }
-    app.Use((context, next) =>
-    {
-      return WebApi.UserAuthenticationTokenMiddleWare(Server, context, next);
-    });
+    // app.Use((context, next) => WebApi.CheckAdmin(Server, context, next));
+    app.Use((context, next) => WebApi.UserAuthenticationTokenMiddleWare(Server, context, next));
     app.MapControllers();
 
     return app;

@@ -4,65 +4,65 @@
   import File from "../../File.svelte";
   import FileDetails from "./FileDetails.svelte";
   import Awaiter from "../../../Bindings/Awaiter.svelte";
-  import ClientAwaiter from "../../../Bindings/ClientAwaiter.svelte";
+  import { fetchAndInterpret } from "../../../Bindings/Client.svelte";
 
   const rootState = RootState.state;
   const keyboardState = $rootState.keyboardState;
 
   export let file: any;
-  export let selectedFileIds: number[];
+  export let selectedFiles: any[];
   export let onRefresh: (autoLoad?: boolean | undefined) => Promise<void>;
 </script>
 
-<ClientAwaiter let:client>
-  <Awaiter callback={() => client.scanFolder(file.Id)} bind:reset={onRefresh}>
-    <svelte:fragment slot="success" let:result={fileIds}>
-      <div class="file-list">
-        {#each fileIds as fileId, index}
-          <File
-            {client}
-            {fileId}
-            selected={selectedFileIds.includes(fileId)}
-            onClick={() => {
-              if ($keyboardState.hasKeys("control")) {
-                selectedFileIds = !selectedFileIds.includes(fileId)
-                  ? [...selectedFileIds, fileId]
-                  : selectedFileIds.filter((id) => id !== fileId);
-              } else if ($keyboardState.hasKeys("shift")) {
-                if (selectedFileIds.length === 0) {
-                  selectedFileIds = [fileId];
-                } else {
-                  const startIndex = fileIds.indexOf(selectedFileIds[0]);
-                  const endIndex = index;
-
-                  if (startIndex > endIndex) {
-                    selectedFileIds = fileIds
-                      .slice(endIndex, startIndex + 1)
-                      .toReversed();
-                  } else {
-                    selectedFileIds = fileIds.slice(startIndex, endIndex + 1);
-                  }
-                }
-              } else if (
-                selectedFileIds.length !== 1 ||
-                selectedFileIds[0] !== fileId
-              ) {
-                selectedFileIds = [fileId];
+<Awaiter
+  callback={() => fetchAndInterpret(`/file/:${file.id}/files`)}
+  bind:reset={onRefresh}
+>
+  <svelte:fragment slot="success" let:result={files}>
+    <div class="file-list">
+      {#each files as file, index}
+        <File
+          {file}
+          selected={selectedFiles.includes(file)}
+          onClick={() => {
+            if ($keyboardState.hasKeys("control")) {
+              selectedFiles = !selectedFiles.includes(file)
+                ? [...selectedFiles, file]
+                : selectedFiles.filter((id) => id !== file);
+            } else if ($keyboardState.hasKeys("shift")) {
+              if (selectedFiles.length === 0) {
+                selectedFiles = [file];
               } else {
-                selectedFileIds = [];
+                const startIndex = files.indexOf(selectedFiles[0]);
+                const endIndex = index;
+
+                if (startIndex > endIndex) {
+                  selectedFiles = files
+                    .slice(endIndex, startIndex + 1)
+                    .toReversed();
+                } else {
+                  selectedFiles = files.slice(startIndex, endIndex + 1);
+                }
               }
+            } else if (
+              selectedFiles.length !== 1 ||
+              selectedFiles[0] !== file
+            ) {
+              selectedFiles = [file];
+            } else {
+              selectedFiles = [];
+            }
 
-              selectedFileIds = selectedFileIds;
-            }}
-          />
-        {/each}
-      </div>
+            selectedFiles = selectedFiles;
+          }}
+        />
+      {/each}
+    </div>
 
-      <div class="divider"></div>
-      <FileDetails bind:selectedFileIds />
-    </svelte:fragment>
-  </Awaiter>
-</ClientAwaiter>
+    <div class="divider"></div>
+    <FileDetails bind:selectedFiles />
+  </svelte:fragment>
+</Awaiter>
 
 <style lang="scss">
   div.file-list {

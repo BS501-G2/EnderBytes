@@ -14,7 +14,7 @@ public sealed partial class WebApi
   [NonAction]
   public static async Task CheckAdmin(Server server, HttpContext context, Func<Task> next)
   {
-    if ((context.Request.Path == "/admin/setup") == (await server.ResourceService.Transact((transaction, _) => transaction.GetManager<UserManager>().CountUsers(transaction)) == 0))
+    if (context.Request.Path == "/admin/setup" == (await server.ResourceService.Transact((transaction, _) => transaction.GetManager<UserManager>().CountUsers(transaction)) == 0))
     {
       await next();
     }

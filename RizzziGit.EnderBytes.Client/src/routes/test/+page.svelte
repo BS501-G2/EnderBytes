@@ -21,7 +21,7 @@ import Client, { interpretResponse } from "../../components/Bindings/Client.svel
     Login
   </button>
 
-  <Awaiter callback={async () => await interpretResponse(await fetch("/user/@testuser", "GET"))}>
+  <Awaiter callback={() => fetch("/user/@testuser", "GET")}>
     <svelte:fragment slot="success" let:result={user}>
     <pre>{JSON.stringify(user, undefined, '  ')}</pre>
     </svelte:fragment>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Dialog from "../Widgets/Dialog.svelte";
+  import Dialog from "./Widgets/Dialog.svelte";
 
   export let onDismiss: () => void;
 </script>

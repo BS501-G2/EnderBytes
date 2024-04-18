@@ -1,16 +1,24 @@
 <script lang="ts">
-  import { navigating } from "$app/stores";
+  import { goto } from '$app/navigation'
+  import { navigating, page } from "$app/stores";
 
-  import Dashboard from "../../components/Dashboard/Dashboard.svelte";
-  import LoadingPage from "../../components/Widgets/LoadingSpinnerPage.svelte";
+  import Dashboard from "../../components/Dashboard.svelte";
   import LoadingBar from "../../components/Widgets/LoadingBar.svelte";
-  import { pendingTasks } from "../../components/BackgroundTaskList/BackgroundTaskList.svelte";
-  import ClientAwaiter from "../../components/Bindings/ClientAwaiter.svelte";
-</script>
+  import { pendingTasks } from "../../components/BackgroundTaskList.svelte";
+  import { session } from '../../components/Bindings/Client.svelte';
 
-<svelte:head>
-  <script type="module" src="/dotnet.js"></script>
-</svelte:head>
+  $: {
+    if ($session == null) {
+      if (!$page.url.pathname.startsWith('/app/auth')) {
+        goto('/app/auth/login', { replaceState: true });
+      }
+    } else {
+      if ($page.url.pathname.startsWith('/app/auth')) {
+        goto('/app', { replaceState: true });
+      }
+    }
+  }
+</script>
 
 <svelte:window
   on:beforeunload={(event) => {
@@ -23,25 +31,14 @@
   }}
 />
 
-<ClientAwaiter>
-  <svelte:fragment let:client>
-    <Dashboard {client}>
-      {#if $navigating}
-        <div class="top-loading">
-          <LoadingBar />
-        </div>
-      {/if}
-      <slot />
-    </Dashboard>
-  </svelte:fragment>
-  <svelte:fragment slot="loading" let:message>
-    <div class="loading-page">
-      <LoadingPage>
-        <p>{message}</p>
-      </LoadingPage>
+<Dashboard>
+  {#if $navigating}
+    <div class="top-loading">
+      <LoadingBar />
     </div>
-  </svelte:fragment>
-</ClientAwaiter>
+  {/if}
+  <slot />
+</Dashboard>
 
 <style lang="scss">
   div.loading-page {

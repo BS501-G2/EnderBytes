@@ -1,6 +1,6 @@
 <script lang="ts">
-  import DesktopLayout from "./DesktopLayout.svelte";
-  import ResponsiveLayout from "../Bindings/ResponsiveLayout.svelte";
+  import DesktopLayout from "./FileBrowser/DesktopLayout.svelte";
+  import ResponsiveLayout from "./Bindings/ResponsiveLayout.svelte";
 
   export let currentFileId: number | null;
 </script>

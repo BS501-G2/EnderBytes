@@ -5,7 +5,7 @@
 
   import SiteBanner from "./SiteBanner.svelte";
   import Banner from "./Banner.svelte";
-  import { ClientError } from "$lib/client/client";
+  import { fetchAndInterpret } from "../../../../components/Bindings/Client.svelte";
 </script>
 
 <script lang="ts">
@@ -32,13 +32,9 @@
     try {
       errorMessage = null;
 
-      await (await $rootState.getClient()).loginPassword(username, password);
+      await fetchAndInterpret('/auth/password-login', 'POST', { username, password });
     } catch (error: any) {
-      if (error instanceof ClientError) {
-        errorMessage = $rootState.getClientResponseString(error.responseCodeString)
-      } else {
-        errorMessage = error.message;
-      }
+      errorMessage = error.message;
 
       throw error;
     }

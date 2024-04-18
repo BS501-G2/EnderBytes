@@ -1,12 +1,13 @@
 <script lang="ts">
-  import type { Client } from "$lib/client/client";
-  import { executeBackgroundTask } from "../BackgroundTaskList/BackgroundTaskList.svelte";
+  import {
+    executeBackgroundTask,
+    executeBackgroundTaskSeries,
+    type BackgroundTaskCallback,
+  } from "../BackgroundTaskList.svelte";
   import Awaiter from "../Bindings/Awaiter.svelte";
-  import ClientAwaiter from "../Bindings/ClientAwaiter.svelte";
   import Button, { ButtonClass } from "../Widgets/Button.svelte";
   import Dialog from "../Widgets/Dialog.svelte";
-  import Input from "../Widgets/Input.svelte";
-  import LoadingSpinner from "../Widgets/LoadingSpinner.svelte";
+  import { fetchAndInterpret } from "../Bindings/Client.svelte";
 
   export let currentFileId: number | null;
   export let onCancel: () => void;
@@ -18,139 +19,88 @@
   let load: () => Promise<void>;
   let openDialog: () => void;
 
-  async function createFile(client: Client): Promise<number> {
+  async function createFile(): Promise<any[]> {
     if (files == null || files.length == 0) {
       throw new Error("No files selected");
     }
 
-    const result = <number>await executeBackgroundTask(
+    // const client = await executeBackgroundTaskSeries<any[]>('File Upload', true, Array.from((files ?? [])).map<BackgroundTaskCallback<any>>((file) => async (client, setStatus) => {
+    //   const bufferSize = 1024 * 1024
+    //   for (let offset = 0; offset < file.size; offset += bufferSize) {
+    //     const chunk = file.slice(offset, offset + bufferSize);
+
+    //     setStatus('Uploading...', offset / file.size);
+    //   }
+    // }), false)
+
+    const client = executeBackgroundTask<any[]>(
       "File Upload",
       true,
-      async (_, setStatus) => {
-        onCancel();
-        const delay = async () => {};
-        // const delay = () => new Promise((resolve) => setTimeout(resolve, 100));
+      async (client, setStatus) => {
+        for (const file of (files ?? [])) {
+          const bufferSize = 1024 * 1024;
+          for (let offset = 0; offset < file.size; offset += bufferSize) {
+            const chunk = file.slice(offset, offset + bufferSize);
+            await chunk.arrayBuffer()
 
-        setStatus("Creating file resource...", null);
-
-        await delay();
-        for (const file of files ?? []) {
-          const bufferSize = 32 * 1024;
-
-          let promises: Promise<any>[] = [];
-
-          for (
-            let fileOffset = 0;
-            fileOffset < file.size;
-            fileOffset += bufferSize
-          ) {
-            const capturedFileOffset = fileOffset;
-            const sliced = await file
-              .slice(capturedFileOffset, capturedFileOffset + bufferSize)
-              .arrayBuffer();
-
-            promises.push(
-              (async () => {
-                await client.sendToVoid(sliced);
-
-                setStatus(
-                  file.name,
-                  capturedFileOffset / file.size,
-                );
-
-                if (_.cancelled) {
-                  throw new Error("Cancelled");
-                }
-              })(),
-            );
+            setStatus("Uploading...", offset / file.size);
           }
-
-          await Promise.all(promises);
-
-          setStatus("Uploading content for " + file.name + " completed");
-          await delay();
         }
-        return 0;
+
+        return ['']
       },
       false,
-    ).run();
+    );
 
-    return result;
+    onCancel();
+    return await client.run();
   }
 </script>
 
 <input type="file" bind:files multiple hidden bind:this={fileInput} />
 
-<ClientAwaiter let:client>
-  <Dialog onDismiss={onCancel}>
-    <h2 slot="head">Upload</h2>
-    <div class="body" slot="body">
-      <p style="margin-top: 0px">
-        The uploaded files will be put inside the current folder. Alternatively,
-        you can drag and drop files on the folder's area.
-      </p>
+<Dialog onDismiss={onCancel}>
+  <h2 slot="head">Upload</h2>
+  <div class="body" slot="body">
+    <p style="margin-top: 0px">
+      The uploaded files will be put inside the current folder. Alternatively,
+      you can drag and drop files on the folder's area.
+    </p>
 
-      <!-- <Input name="File name" bind:text={name} onSubmit={load} /> -->
-    </div>
-    <svelte:fragment slot="actions">
-      <Awaiter callback={() => createFile(client)} autoLoad={false} bind:load>
-        <svelte:fragment slot="not-loaded">
-          <div class="button">
-            <Button
-              onClick={() => {
-                fileInput.click();
-              }}
-              buttonClass={ButtonClass.Background}
-            >
-              <p>
-                {#if files?.length === 1}
-                  {files[0].name}
-                {:else if files?.length ?? 0 > 1}
-                  {files?.length} Files
-                {:else}
-                  Cilck here to select files.
-                {/if}
-              </p>
-            </Button>
-          </div>
-
-          <div class="button">
-            <Button onClick={load}>Upload</Button>
-          </div>
-          <div class="button">
-            <Button onClick={onCancel}>Cancel</Button>
-          </div>
-        </svelte:fragment>
-      </Awaiter>
-    </svelte:fragment>
-    <!-- <div class="actions" slot="actions">
-      <Awaiter
-        callback={() => createFile(client, name)}
-        autoLoad={false}
-        bind:load
-      >
-        <svelte:fragment slot="not-loaded">
-          <Button onClick={load}>Create</Button>
-          <Button buttonClass={ButtonClass.Background} onClick={onCancel}>
-            Cancel
+    <!-- <Input name="File name" bind:text={name} onSubmit={load} /> -->
+  </div>
+  <svelte:fragment slot="actions">
+    <Awaiter callback={() => createFile()} autoLoad={false} bind:load>
+      <svelte:fragment slot="not-loaded">
+        <div class="button">
+          <Button
+            onClick={() => {
+              fileInput.click();
+            }}
+            buttonClass={ButtonClass.Background}
+          >
+            <p>
+              {#if files?.length === 1}
+                {files[0].name}
+              {:else if files?.length ?? 0 > 1}
+                {files?.length} Files
+              {:else}
+                Cilck here to select files.
+              {/if}
+            </p>
           </Button>
-        </svelte:fragment>
-        <svelte:fragment slot="error" let:error let:reset>
-          <span class="error-message">
-            Error: {error.errorMessage ?? error.message}
-          </span>
-          <Button onClick={() => reset(false)}>Retry</Button>
-        </svelte:fragment>
+        </div>
 
-        <svelte:fragment slot="loading">
-          <div class="loading">
-            <LoadingSpinner></LoadingSpinner>
-          </div>
-        </svelte:fragment>
-      </Awaiter>
-    </div> -->
-  </Dialog>
-</ClientAwaiter>
+        <div class="button">
+          <Button onClick={load}>Upload</Button>
+        </div>
+        <div class="button">
+          <Button onClick={onCancel}>Cancel</Button>
+        </div>
+      </svelte:fragment>
+    </Awaiter>
+  </svelte:fragment>
+</Dialog>
 
 <style lang="scss">
   div.body {

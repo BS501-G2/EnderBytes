@@ -6,6 +6,17 @@
     token: string;
   }
 
+  export type FetchFunction = (
+    pathname: string,
+    method?: string,
+    data?: Blob | any,
+    headers?: Record<string, string>,
+  ) => Promise<Response>;
+
+  export type FetchAndInterpretFunction = (
+    ...args: Parameters<FetchFunction>
+  ) => Promise<Blob | any>;
+
   function getUrl() {
     let url = localStorage.getItem("client-url");
 
@@ -40,7 +51,9 @@
     }
   }
 
-  export async function interpretResponse(response: Response): Promise<Blob | any> {
+  export async function interpretResponse(
+    response: Response,
+  ): Promise<Blob | any> {
     const responseType = response.headers.get("Content-Type");
 
     if (responseType != null && responseType.startsWith("application/json")) {
@@ -50,7 +63,7 @@
     }
   }
 
-  export async function fetch(
+  export const fetch: FetchFunction = async function fetch(
     pathname: string,
     method: string = "GET",
     data?: Blob | any,
@@ -76,14 +89,17 @@
     }
     request.method = method;
 
-    const response = await window.fetch(
-      Object.assign(getUrl(), { pathname }),
-      request,
-    );
+    const url = Object.assign(getUrl(), {
+      pathname: pathname,
+    });
+
+    const response = await window.fetch(url, request);
 
     if (response.status === 200) {
       if (pathname === "/auth/password-login" && request.method === "POST") {
         const session: Session = await response.json();
+
+        Object.assign(response, { json: () => session });
 
         sessionStore.set(session);
       } else if (pathname === "/auth/logout" && request.method === "POST") {
@@ -93,6 +109,8 @@
       }
     } else if (response.status === 401) {
       sessionStore.set(null);
+
+      location.pathname = '/app/auth/login';
     }
 
     if (response.status >= 200 && response.status <= 300) {
@@ -100,28 +118,22 @@
     } else {
       throw new ClientError(response);
     }
-  }
+  };
+
+  export const fetchAndInterpret: FetchAndInterpretFunction = async (...args) =>
+    interpretResponse(await fetch(...args));
+
+  export { sessionStore as session };
 </script>
 
 <script lang="ts">
-  import { page } from "$app/stores";
-
-  const wrapFetch: typeof fetch = async function wrapFetch(
-    pathname: string,
-    method?: string,
-    data?: any,
-    headers?: Record<string, string>,
-  ): Promise<Response> {
-    const response = await fetch(pathname, method, data, headers);
-
-    if (response.status === 401) {
-      sessionStore.set(null);
-
-      window.open($page.url, "_self");
-    }
-
-    return response;
-  };
+  interface $$Slots {
+    default: {
+      fetch: FetchFunction;
+      fetchAndInterpret: FetchAndInterpretFunction;
+      session: Session | null;
+    };
+  }
 </script>
 
-<slot fetch={wrapFetch} session={$sessionStore} />
+<slot {fetch} {fetchAndInterpret} session={$sessionStore} />

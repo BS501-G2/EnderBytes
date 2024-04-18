@@ -2,10 +2,10 @@
   import { onMount } from "svelte";
 
   export let file: any;
-  export let selectedFileIds: number[] = [];
+  export let selectedFiles: any[];
 
   onMount(() => {
-    selectedFileIds = [file.Id];
+    selectedFiles = [file];
   });
 </script>
 

@@ -24,6 +24,7 @@
     retryable: boolean;
     status: BackgroundTaskStatus;
     cancelled: boolean;
+    hidden: boolean;
 
     isDismissed: boolean;
 
@@ -74,11 +75,79 @@
     });
   }
 
+  export function executeBackgroundTaskSeries<T>(
+    name: string,
+    retryable: boolean,
+    callbacks: Array<BackgroundTaskCallback<T>>,
+    autoDismiss: boolean = false,
+  ): BackgroundTaskClient<T[]> {
+    const client = internalExecuteBackgroundTask<T[]>(
+      name,
+      retryable,
+      async (): Promise<T[]> => {
+        const toExec: Array<() => Promise<void>> = [];
+        const promises: Promise<T>[] = callbacks.map((callback) => (async () => {
+          const client = executeBackgroundTask<T>(
+            name,
+            retryable,
+            async (client, setStatus) => {
+              setStatus('Waiting...', null)
+
+              const { promise } = await new Promise<{ promise: Promise<T> }>(
+                (resolve) => {
+                  toExec.push(async () => {
+                    const promise = (async () => {
+                        return await callback(client, setStatus);
+                      })()
+
+                    resolve({ promise });
+                    await promise
+                  });
+                },
+              );
+
+              return await promise;
+            },
+            autoDismiss,
+          )
+
+          return await client.run()
+        })());
+
+        for (const exec of toExec) {
+          await exec();
+        }
+
+        return await Promise.all(promises)
+      },
+      true,
+      true
+    );
+
+    return client
+  }
+
   export function executeBackgroundTask<T>(
     name: string,
     retryable: boolean,
     callback: BackgroundTaskCallback<T>,
     autoDismiss: boolean = false,
+  ) {
+    return internalExecuteBackgroundTask(
+      name,
+      retryable,
+      callback,
+      autoDismiss,
+      false,
+    );
+  }
+
+  function internalExecuteBackgroundTask<T>(
+    name: string,
+    retryable: boolean,
+    callback: BackgroundTaskCallback<T>,
+    autoDismiss: boolean = false,
+    hidden: boolean = false,
   ): BackgroundTaskClient<T> {
     let firstRun: boolean = false;
     let task: Promise<T> | null = null;
@@ -90,6 +159,7 @@
       progress: null,
       retryable,
       status: BackgroundTaskStatus.Ready,
+      hidden,
 
       get isDismissed() {
         return get(backgroundTasks).indexOf(backgroundTask) === -1;
@@ -108,6 +178,7 @@
           backgroundTask.progress = progress;
           refresh();
         };
+
         const run = async (client: BackgroundTaskClient<T>): Promise<T> => {
           if (backgroundTask.status === BackgroundTaskStatus.Running) {
             throw new Error("Operation is already running.");
@@ -118,6 +189,8 @@
           }
 
           try {
+            backgroundTask.cancelled = false;
+
             backgroundTask.status = BackgroundTaskStatus.Running;
             refresh();
             const result = await callback(client, setStatus);
@@ -203,7 +276,7 @@
 </script>
 
 <script lang="ts">
-  import LoadingBar from "../Widgets/LoadingBar.svelte";
+  import LoadingBar from "./Widgets/LoadingBar.svelte";
   import { RefreshCwIcon, XIcon, PlayIcon } from "svelte-feather-icons";
   import { onDestroy, onMount } from "svelte";
 
@@ -356,6 +429,8 @@
 
         > p {
           margin: 0px;
+
+          font-size: 12px;
         }
 
         > p:nth-child(1) {

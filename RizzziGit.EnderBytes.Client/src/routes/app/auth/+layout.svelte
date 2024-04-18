@@ -1,12 +1,10 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
 
-  import { RootState } from '$lib/states/root-state'
-
-  const rootState = RootState.state
+  import { session } from "../../../components/Bindings/Client.svelte";
 
   $: {
-    if ($rootState.sessionToken != null) {
+    if ($session != null) {
       goto('/app', { replaceState: true })
     }
   }

@@ -6,21 +6,19 @@
 </script>
 
 <script lang="ts">
-  import type { Client } from "$lib/client/client";
 
   import { BellIcon, CheckSquareIcon } from "svelte-feather-icons";
 
-  import LeftPanelNavigationBar from "./LeftPanelNavigationBar.svelte";
-  import LeftPanelAccountBar from "./LeftPanelAccountBar.svelte";
-  import TitleBar from "./TitleBar.svelte";
-  import Keyboard from "../../Bindings/Keyboard.svelte";
-  import OperationsTab from "./OperationsTab.svelte";
-  import NotificationsTab from "./NotificationsTab.svelte";
+  import LeftPanelNavigationBar from "./DesktopLayout/LeftPanelNavigationBar.svelte";
+  import LeftPanelAccountBar from "./DesktopLayout/LeftPanelAccountBar.svelte";
+  import TitleBar from "./DesktopLayout/TitleBar.svelte";
+  import Keyboard from "../Bindings/Keyboard.svelte";
+  import OperationsTab from "./DesktopLayout/OperationsTab.svelte";
+  import NotificationsTab from "./DesktopLayout/NotificationsTab.svelte";
   import BackgroundTaskList, {
     pendingTasks,
-  } from "../../BackgroundTaskList/BackgroundTaskList.svelte";
+  } from "../BackgroundTaskList.svelte";
 
-  export let client: Client;
   export let accountSettingsDialog: boolean
 
   let actionTab: ActionTab | null = null;
@@ -75,7 +73,7 @@
         />
       {/if}
       <div class="divider" />
-      <LeftPanelAccountBar {client} bind:accountSettingsDialog />
+      <LeftPanelAccountBar bind:accountSettingsDialog />
     </div>
 
     <div class="panel right-panel">
@@ -106,16 +104,16 @@
     display: flex;
     min-height: 0px;
 
+      background-color: var(--primaryContainer);
+
     > div.panel {
       box-sizing: border-box;
     }
 
     > div.left-panel {
-      min-width: 256px;
-      max-width: 256px;
+      min-width: 320px;
+      max-width: 320px;
       height: 100%;
-
-      background-color: var(--primaryContainer);
 
       display: flex;
       flex-direction: column;
@@ -157,6 +155,11 @@
       flex-grow: 1;
 
       min-width: 0px;
+
+      border-radius: 16px 0px 0px 0px;
+
+      background-color: var(--background);
+      color: var(--onBackground);
     }
   }
 </style>

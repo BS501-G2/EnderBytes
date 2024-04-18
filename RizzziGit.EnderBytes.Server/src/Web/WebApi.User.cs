@@ -11,7 +11,8 @@ public sealed partial class WebApi
   [HttpGet]
   public async Task<ActionResult<UserManager.Resource>> GetUser(string username)
   {
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken)) {
+    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+    {
       return Unauthorized();
     }
 
@@ -42,6 +43,18 @@ public sealed partial class WebApi
     return Ok(user);
   }
 
+  [Route("/user/!me")]
+  [HttpGet]
+  public ActionResult<UserManager.Resource> GetUserSelf()
+  {
+    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+    {
+      return Unauthorized();
+    }
+
+    return Ok(userAuthenticationToken.User);
+  }
+
   public sealed record UpdateUserRequest(string Username, string LastName, string FirstName, string? MiddleName);
 
   [Route("/user/:{userId}")]
@@ -51,7 +64,8 @@ public sealed partial class WebApi
     if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
     {
       return Unauthorized();
-    } else if (userAuthenticationToken.UserId != userId)
+    }
+    else if (userAuthenticationToken.UserId != userId)
     {
       return Forbid();
     }

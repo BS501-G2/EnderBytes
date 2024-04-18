@@ -15,6 +15,7 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
     where E : ResourceService.Exception
 {
   public abstract partial record Resource(long Id, long CreateTime, long UpdateTime);
+  public sealed class NotFoundException(string name, long id) : ResourceService.Exception($"\"{name}\" resource #{id} does not exist.");
 
   public delegate void ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, R oldResource, CancellationToken cancellationToken);
   public delegate void ResourceDeleteHandler(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken);
@@ -198,7 +199,15 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
     return Update(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), set, cancellationToken) != 0;
   }
 
-  public virtual R GetById(ResourceService.Transaction transaction, long Id, CancellationToken cancellationToken = default) => Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id), cancellationToken: cancellationToken).First();
+  public virtual R GetById(ResourceService.Transaction transaction, long Id, CancellationToken cancellationToken = default)
+  {
+    foreach (R resource in Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id), cancellationToken: cancellationToken)) {
+      return resource;
+    }
+
+    throw new NotFoundException(Name, Id);
+  }
+
   public virtual bool TryGetById(ResourceService.Transaction transaction, long Id, [NotNullWhen(true)] out R? resource, CancellationToken cancellationToken = default) => (resource = Select(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id), cancellationToken: cancellationToken).FirstOrDefault()) != null;
 
   public virtual bool Delete(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken = default)

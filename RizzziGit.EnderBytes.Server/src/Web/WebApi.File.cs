@@ -28,10 +28,15 @@ public sealed partial class WebApi
         return NotFound();
       }
 
-      FileManager.Resource rootFolder = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
-      if (!files.IsEqualToOrInsideOf(transaction, storage, rootFolder, file, cancellationToken))
+      DecryptedKeyInfo decryptedKey = storages.DecryptKey(transaction, storage, file, userAuthenticationToken, cancellationToken: cancellationToken);
+      if (decryptedKey.Key == null)
       {
-        return Forbid();
+        FileManager.Resource rootFolder = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+
+        if (!files.IsEqualToOrInsideOf(transaction, storage, rootFolder, file, cancellationToken))
+        {
+          return Forbid();
+        }
       }
 
       return Ok(file);
@@ -82,12 +87,18 @@ public sealed partial class WebApi
         return Unauthorized();
       }
 
-      FileManager.Resource rootFolder = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
-      if (!files.IsEqualToOrInsideOf(transaction, storage, rootFolder, parentFolder, cancellationToken))
+      DecryptedKeyInfo decryptedKey = storages.DecryptKey(transaction, storage, parentFolder, userAuthenticationToken, cancellationToken: cancellationToken);
+      if (decryptedKey.Key == null)
       {
-        return Forbid();
+        FileManager.Resource rootFolder = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+
+        if (!files.IsEqualToOrInsideOf(transaction, storage, rootFolder, parentFolder, cancellationToken))
+        {
+          return Forbid();
+        }
       }
-      else if (parentFolder.Type != FileType.Folder)
+
+      if (parentFolder.Type != FileType.Folder)
       {
         return BadRequest();
       }
@@ -146,7 +157,8 @@ public sealed partial class WebApi
         FileManager.Resource file = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
 
         return Ok(files.ScanFolder(transaction, storage, file, userAuthenticationToken, cancellationToken).ToArray());
-      } else
+      }
+      else
       {
         if (
           !files.TryGetById(transaction, (long)id, out FileManager.Resource? file, cancellationToken) ||
@@ -156,14 +168,66 @@ public sealed partial class WebApi
           return NotFound();
         }
 
-        FileManager.Resource rootFolder = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
-        if (!files.IsEqualToOrInsideOf(transaction, storage, rootFolder, file, cancellationToken))
+        DecryptedKeyInfo decryptedKey = storages.DecryptKey(transaction, storage, file, userAuthenticationToken, cancellationToken: cancellationToken);
+        if (decryptedKey.Key == null)
         {
-          return Forbid();
+          FileManager.Resource rootFolder = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+          if (!files.IsEqualToOrInsideOf(transaction, storage, rootFolder, file, cancellationToken))
+          {
+            return Forbid();
+          }
         }
 
         return Ok(files.ScanFolder(transaction, storage, file, userAuthenticationToken, cancellationToken).ToArray());
       }
     });
   }
+
+  // [Route("/file/:{id}/path-chain")]
+  // [Route("/file/!root/path-chain")]
+  // [HttpGet]
+  // public async Task<ActionResult<FileManager.Resource[]>> GetPathChain(long? id)
+  // {
+  //   if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+  //   {
+  //     return Unauthorized();
+  //   }
+
+  //   FileManager files = GetResourceManager<FileManager>();
+  //   StorageManager storages = GetResourceManager<StorageManager>();
+  //   FileAccessManager fileAccesses = GetResourceManager<FileAccessManager>();
+
+  //   return await ResourceService.Transact<ActionResult<FileManager.Resource[]>>((transaction, cancellationToken) =>
+  //   {
+  //     if (id == null)
+  //     {
+  //       return Ok(Array.Empty<FileManager.Resource>());
+  //     }
+
+  //     List<FileManager.Resource> chain = [];
+  //     if (
+  //       !files.TryGetById(transaction, (long)id, out FileManager.Resource? file, cancellationToken) ||
+  //       !storages.TryGetById(transaction, file.StorageId, out StorageManager.Resource? storage, cancellationToken)
+  //     )
+  //     {
+  //       return NotFound();
+  //     }
+
+  //     DecryptedKeyInfo decryptedKeyInfo = storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.Read, cancellationToken);
+
+  //     if (decryptedKeyInfo.FileAccess == null)
+  //     {
+  //       FileManager.Resource rootFolder = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+
+  //       if (!files.IsEqualToOrInsideOf(transaction, storage, rootFolder, file, cancellationToken))
+  //       {
+  //         return Forbid();
+  //       }
+
+  //       chain.Add(file);
+  //     }
+
+  //     return Ok(chain);
+  //   });
+  // }
 }

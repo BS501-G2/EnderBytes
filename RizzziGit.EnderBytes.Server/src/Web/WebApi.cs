@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using System.Text;
 
 namespace RizzziGit.EnderBytes.Web;
 
@@ -13,6 +12,7 @@ public sealed class MiscellaneousRequestContext
 }
 
 [ApiController]
+[RequestSizeLimit(1024 * 1024 * 256)]
 public sealed partial class WebApi(Server server) : Controller, IDisposable
 {
   public readonly Server Server = server;

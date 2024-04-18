@@ -106,14 +106,16 @@ public sealed partial class WebApi
       }
       else
       {
+        if (request.BaseSnapshotId == null && fileSnapshots.List(transaction, storage, file, userAuthenticationToken, cancellationToken: cancellationToken).Any())
+        {
+          return Forbid();
+        }
+
         FileSnapshotManager.Resource? baseSnapshot = null;
 
-        if (request.BaseSnapshotId != null)
+        if (request.BaseSnapshotId != null && !fileSnapshots.TryGetById(transaction, (long)request.BaseSnapshotId, out baseSnapshot, cancellationToken))
         {
-          if (!fileSnapshots.TryGetById(transaction, (long)request.BaseSnapshotId, out baseSnapshot, cancellationToken))
-          {
-            return NotFound();
-          }
+          return NotFound();
         }
 
         FileSnapshotManager.Resource snapshot = fileSnapshots.Create(transaction, storage, file, baseSnapshot, userAuthenticationToken, cancellationToken);

@@ -4,6 +4,7 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Utilities;
 using Services;
+using Newtonsoft.Json;
 
 public enum FileAccessTargetEntityType : byte { None, User }
 public enum FileAccessType : byte { ManageShares, ReadWrite, Read, None }
@@ -23,8 +24,8 @@ public sealed class FileAccessManager : ResourceManager<FileAccessManager, FileA
     FileAccessType Type
   ) : ResourceManager<FileAccessManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
   {
-    public const string NAME = "FileAccess";
-    public const int VERSION = 1;
+    [JsonIgnore]
+    public byte[] AesKey = AesKey;
   }
 
   private const string NAME = "FileAccess";

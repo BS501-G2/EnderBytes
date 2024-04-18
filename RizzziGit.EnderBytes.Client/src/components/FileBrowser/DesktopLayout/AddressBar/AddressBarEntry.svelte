@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { FolderIcon, AlertTriangleIcon } from "svelte-feather-icons";
+  import { FolderIcon, ChevronRightIcon } from "svelte-feather-icons";
   import Awaiter from "../../../Bindings/Awaiter.svelte";
   import Overlay, {
     OverlayPositionType,
@@ -58,7 +58,7 @@
       on:click={() => {
         menuShown = true;
         updateMenuDimensions();
-      }}><p>></p></button
+      }}><ChevronRightIcon strokeWidth={1} size="20em"/></button
     >
   {/if}
 </div>
@@ -89,7 +89,7 @@
                   goto(`/app/files/${file.id}`);
                 }}
               >
-                <FolderIcon />
+                <FolderIcon size="18em" />
                 <p>{file.name}</p>
               </button>
             {/each}
@@ -121,7 +121,7 @@
     border-style: solid;
     border-width: 1px;
     border-color: transparent;
-    // border-radius: 8px;
+    border-radius: 8px;
     user-select: none;
 
     > p {
@@ -137,7 +137,7 @@
   }
 
   button:hover {
-    border-color: var(--onPrimaryContainer);
+    border-color: var(--primary);
   }
 
   button:active {
@@ -151,13 +151,14 @@
     display: flex;
     flex-direction: column;
 
-    background-color: var(--background);
+    background-color: var(--backgroundVariant);
 
     padding: 4px;
-    // border-radius: 8px;
-    border-style: solid;
-    border-width: 1px;
-    border-color: var(--primary);
+    border-radius: 8px;
+    // border-style: solid;
+    // border-width: 1px;
+    // border-color: var(--primary);
+    box-shadow: 1px 1px 8px rgba(0, 0, 0, 0.25);
 
     > div.loading-icon {
       max-width: 72px;

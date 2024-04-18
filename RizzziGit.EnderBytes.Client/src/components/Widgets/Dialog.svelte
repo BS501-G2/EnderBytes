@@ -65,10 +65,10 @@
 
     box-sizing: border-box;
 
-    padding: 32px;
-    border: solid 1px var(--primary);
+    padding: 16px;
+    // border: solid 1px var(--primary);
     border-radius: 8px;
-    box-shadow: gray 0px 0px 8px;
+    box-shadow: gray 2px 2px 8px;
 
     display: flex;
     flex-direction: column;
@@ -120,8 +120,8 @@
   }
 
   div.dialog.normal {
-    background-color: var(--background);
-    color: var(--onBackground);
+    background-color: var(--backgroundVariant);
+    color: var(--onBackgroundVariant);
   }
 
   div.dialog.warning {

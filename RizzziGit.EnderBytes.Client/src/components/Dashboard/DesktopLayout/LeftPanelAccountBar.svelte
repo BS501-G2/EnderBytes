@@ -2,42 +2,10 @@
   import { goto } from "$app/navigation";
 
   import { UserIcon, LogOutIcon, SettingsIcon } from "svelte-feather-icons";
-  import Dialog, { DialogClass } from "../../Widgets/Dialog.svelte";
-  import Button, { ButtonClass } from "../../Widgets/Button.svelte";
-  import Client, { interpretResponse } from "../../Bindings/Client.svelte";
-
-  export let accountSettingsDialog: boolean;
-
-  let logoutConfirm: boolean = false;
+  import Client from "../../Bindings/Client.svelte";
+  import { enabled as logoutConfirmationDialog } from "../LogoutConfirmationDialog.svelte";
+  import { enabled as accountSettingsDialog } from "../../AccountSettingsDialog.svelte";
 </script>
-
-{#if logoutConfirm}
-  <Dialog
-    dialogClass={DialogClass.Normal}
-    onDismiss={() => (logoutConfirm = false)}
-  >
-    <svelte:fragment slot="actions">
-      <Client let:fetch>
-        <Button
-          onClick={() => fetch("/auth/logout", "POST")}
-          buttonClass={ButtonClass.Primary}
-        >
-          OK
-        </Button>
-        <Button
-          onClick={() => {
-            logoutConfirm = false;
-          }}
-          buttonClass={ButtonClass.Background}
-        >
-          Cancel
-        </Button>
-      </Client>
-    </svelte:fragment>
-    <h2 slot="head" style="margin: 0px;">Account Logout</h2>
-    <span slot="body">This will log you out from the dashboard.</span>
-  </Dialog>
-{/if}
 
 <div class="account">
   <Client let:session let:fetchAndInterpret>
@@ -60,8 +28,10 @@
     </button>
   </Client>
   <div class="account-actions">
-    <button on:click={() => (logoutConfirm = true)}><LogOutIcon /></button>
-    <button on:click={() => (accountSettingsDialog = true)}>
+    <button on:click={() => ($logoutConfirmationDialog = true)}>
+      <LogOutIcon />
+    </button>
+    <button on:click={() => ($accountSettingsDialog = true)}>
       <SettingsIcon />
     </button>
   </div>

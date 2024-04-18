@@ -1,7 +1,4 @@
 <script lang="ts">
-  import Awaiter from "../../../Bindings/Awaiter.svelte";
-    import { fetchAndInterpret } from "../../../Bindings/Client.svelte";
-
   export let selectedFiles: any[];
 </script>
 
@@ -11,44 +8,40 @@
   {:else if selectedFiles.length === 1}
     {@const file = selectedFiles[0]}
     {#key file}
-      <Awaiter callback={() => fetchAndInterpret(
-            `/file/${file != null ? `:${file.id}` : "!root"}`,
-          )}>
-        <svelte:fragment slot="success" let:result={file}>
-          <div class="file-preview">
-            <img alt={`File preview for \"${file.name}\"`} src="/favicon.svg" />
-          </div>
-          <div class="file-info">
-            <h2>{file.name}</h2>
-            <table>
-              <tbody>
-                <tr>
-                  <td><p><b>Created On: </b></p></td>
-                  <td>
-                    <p>{new Date(file.createTime).toLocaleString()}</p>
-                  </td>
-                </tr>
-                {#if file.UpdateTime !== file.createTime}
-                  <tr>
-                    <td><p><b>Modified On: </b></p></td>
-                    <td>
-                      <p>{new Date(file.updateTime).toLocaleString()}</p>
-                    </td>
-                  </tr>
-                {/if}
-              </tbody>
-            </table>
-          </div>
-        </svelte:fragment>
-      </Awaiter>
+      <div class="file-preview">
+        <img alt={`File preview for \"${file.name}\"`} src="/favicon.svg" />
+      </div>
+      <div class="file-info">
+        <h2>{file.name}</h2>
+        <table>
+          <tbody>
+            <tr>
+              <td><p><b>Created On: </b></p></td>
+              <td>
+                <p>{new Date(file.createTime).toLocaleString()}</p>
+              </td>
+            </tr>
+            {#if file.UpdateTime !== file.createTime}
+              <tr>
+                <td><p><b>Modified On: </b></p></td>
+                <td>
+                  <p>{new Date(file.updateTime).toLocaleString()}</p>
+                </td>
+              </tr>
+            {/if}
+          </tbody>
+        </table>
+      </div>
     {/key}
   {/if}
 </div>
 
 <style lang="scss">
   div.file-details {
-    // background-color: var(--backgroundVariant);
-    // color: var(--onBackgroundVariant);
+    background-color: var(--backgroundVariant);
+    color: var(--onBackgroundVariant);
+
+    border-radius: 16px;
 
     display: flex;
     flex-direction: column;
@@ -92,12 +85,16 @@
         margin: 0px;
         text-align: center;
       }
+
       > table {
         > tbody {
           > tr {
             > td {
+              padding: 4px;
+
               > p {
                 margin: 0px;
+                text-align: right;
               }
             }
           }

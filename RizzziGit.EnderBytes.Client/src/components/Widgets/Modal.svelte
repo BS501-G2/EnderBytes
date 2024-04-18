@@ -2,7 +2,9 @@
   import Overlay from "./Overlay.svelte";
 
   export let onDismiss: () => void;
-  export let dim: boolean = false;
+  export let dim: boolean = true;
 </script>
 
-<Overlay {dim} {onDismiss}><slot /></Overlay>
+<Overlay {dim} {onDismiss}>
+  <slot />
+</Overlay>

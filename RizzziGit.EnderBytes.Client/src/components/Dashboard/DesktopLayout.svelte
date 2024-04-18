@@ -19,8 +19,6 @@
     pendingTasks,
   } from "../BackgroundTaskList.svelte";
 
-  export let accountSettingsDialog: boolean
-
   let actionTab: ActionTab | null = null;
 
   function onUnload() {
@@ -73,7 +71,7 @@
         />
       {/if}
       <div class="divider" />
-      <LeftPanelAccountBar bind:accountSettingsDialog />
+      <LeftPanelAccountBar />
     </div>
 
     <div class="panel right-panel">

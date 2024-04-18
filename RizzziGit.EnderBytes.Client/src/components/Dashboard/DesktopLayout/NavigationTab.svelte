@@ -9,6 +9,9 @@
     <button class="back" on:click={onDismiss}><ArrowLeftIcon /></button>
     <slot name="head" />
   </div>
+  <div
+    style="min-height: 1px;  max-height: 1px; background-color: var(--primary);"
+  />
   <div class="body">
     <slot name="body" />
   </div>
@@ -23,12 +26,12 @@
     min-height: 0px;
 
     div.header {
-      border-bottom: 1px solid var(--primary);
-
       display: flex;
       flex-direction: row;
       align-items: center;
       gap: 8px;
+
+      padding: 8px 0px 8px 0px;
 
       > button.back {
         background-color: unset;
@@ -36,6 +39,9 @@
         border: unset;
 
         cursor: pointer;
+
+        display: flex;
+        align-items: center;
       }
     }
 

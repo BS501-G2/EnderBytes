@@ -17,9 +17,9 @@
 
 <div class="content">
   {#key currentFileId}
-    <AddressBar bind:currentFileId />
+    <ControlBar bind:currentFileId bind:selectedFiles bind:onRefresh />
     <div class="bezel">
-      <ControlBar bind:currentFileId bind:selectedFiles bind:onRefresh />
+      <AddressBar bind:currentFileId />
       <FileArea bind:onRefresh bind:currentFileId bind:selectedFiles />
     </div>
   {/key}
@@ -41,6 +41,11 @@
 
       display: flex;
       flex-direction: column;
+
+      padding: 16px;
+      box-sizing: border-box;
+
+      gap: 16px;
 
       border-radius: 16px 0px 0px 0px;
       overflow: hidden;

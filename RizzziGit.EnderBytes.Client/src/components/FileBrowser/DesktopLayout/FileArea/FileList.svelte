@@ -2,7 +2,6 @@
   import { RootState } from "$lib/states/root-state";
 
   import File from "../../File.svelte";
-  import FileDetails from "./FileDetails.svelte";
   import Awaiter from "../../../Bindings/Awaiter.svelte";
   import { fetchAndInterpret } from "../../../Bindings/Client.svelte";
 
@@ -14,12 +13,16 @@
   export let onRefresh: (autoLoad?: boolean | undefined) => Promise<void>;
 </script>
 
-<Awaiter
-  callback={() => fetchAndInterpret(`/file/:${file.id}/files`)}
-  bind:reset={onRefresh}
->
-  <svelte:fragment slot="success" let:result={files}>
-    <div class="file-list">
+<div class="file-list">
+  <Awaiter
+    callback={() => {
+      selectedFiles = [];
+
+      return fetchAndInterpret(`/file/:${file.id}/files`);
+    }}
+    bind:reset={onRefresh}
+  >
+    <svelte:fragment slot="success" let:result={files}>
       {#each files as file, index}
         <File
           {file}
@@ -57,15 +60,15 @@
           }}
         />
       {/each}
-    </div>
-
-    <div class="divider"></div>
-    <FileDetails bind:selectedFiles />
-  </svelte:fragment>
-</Awaiter>
+    </svelte:fragment>
+  </Awaiter>
+</div>
 
 <style lang="scss">
   div.file-list {
+    background-color: var(--backgroundVariant);
+    border-radius: 16px;
+
     flex-grow: 1;
 
     padding: 16px;

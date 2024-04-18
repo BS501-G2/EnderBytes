@@ -32,7 +32,10 @@
     try {
       errorMessage = null;
 
-      await fetchAndInterpret('/auth/password-login', 'POST', { username, password });
+      await fetchAndInterpret("/auth/password-login", "POST", {
+        username,
+        password,
+      });
     } catch (error: any) {
       errorMessage = error.message;
 
@@ -55,59 +58,51 @@
         ? 'form-area-mobile'
         : ''}"
     >
-      <SiteBanner />
+      <div class="form-content">
+        <SiteBanner />
 
-      <form
-        on:submit={async (e) => {
-          e.preventDefault();
+        <form
+          on:submit={async (e) => {
+            e.preventDefault();
 
-          await onActivity(() => onSubmit(username, password));
-        }}
-      >
-        {#if errorMessage != null}
-          <p class="error-message">{errorMessage}</p>
-        {/if}
+            await onActivity(() => onSubmit(username, password));
+          }}
+        >
+          {#if errorMessage != null}
+            <p class="error-message">{errorMessage}</p>
+          {/if}
 
-        <div class="field">
-          <label for="-username"
-            >{$rootState.getString(
-              LocaleKey.AuthLoginPageUsernamePlaceholder,
-            )}</label
-          >
-          <input
-            type="text"
-            id="-username"
-            name="username"
-            placeholder={$rootState.getString(
-              LocaleKey.AuthLoginPageUsernamePlaceholder,
-            )}
-            bind:value={username}
-            disabled={!enabled}
-          />
-        </div>
-        <div class="field">
-          <label for="-password"
-            >{$rootState.getString(
-              LocaleKey.AuthLoginPagePasswordPlaceholder,
-            )}</label
-          >
-          <input
-            type="password"
-            id="-password"
-            name="password"
-            placeholder={$rootState.getString(
-              LocaleKey.AuthLoginPagePasswordPlaceholder,
-            )}
-            bind:value={password}
-            disabled={!enabled}
-          />
-        </div>
-        <div class="field">
-          <button disabled={!enabled}
-            >{$rootState.getString(LocaleKey.AuthLoginPageSubmit)}</button
-          >
-        </div>
-      </form>
+          <div class="field">
+            <input
+              type="text"
+              id="-username"
+              name="username"
+              placeholder={$rootState.getString(
+                LocaleKey.AuthLoginPageUsernamePlaceholder,
+              )}
+              bind:value={username}
+              disabled={!enabled}
+            />
+          </div>
+          <div class="field">
+            <input
+              type="password"
+              id="-password"
+              name="password"
+              placeholder={$rootState.getString(
+                LocaleKey.AuthLoginPagePasswordPlaceholder,
+              )}
+              bind:value={password}
+              disabled={!enabled}
+            />
+          </div>
+          <div class="field">
+            <button disabled={!enabled}
+              >{$rootState.getString(LocaleKey.AuthLoginPageSubmit)}</button
+            >
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </div>
@@ -155,82 +150,93 @@
 
         overflow-y: auto;
 
-        background-color: var(--primaryContainer);
+        padding: 16px;
+        box-sizing: border-box;
 
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
 
-        > form {
-          width: 100%;
-          max-width: 420px;
+        > div.form-content {
+          background-color: var(--backgroundVariant);
+          border-radius: 16px;
+          flex-grow: 1;
 
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
 
-          padding: 8px 32px 8px 32px;
-          box-sizing: border-box;
+          > form {
+            width: 100%;
+            max-width: 420px;
 
-          gap: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
 
-          > p.error-message {
-            padding: 8px;
-            margin: 0px;
-
-            min-width: 100%;
-            max-width: 100%;
-
+            padding: 8px 32px 8px 32px;
             box-sizing: border-box;
 
-            background-color: var(--error);
-            color: var(--onError);
-          }
+            gap: 16px;
 
-          > div.field {
-            width: 100%;
+            > p.error-message {
+              padding: 8px;
+              margin: 0px;
 
-            > label {
-              color: var(--onPrimary);
-            }
-
-            > input,
-            > button {
-              width: 100%;
+              min-width: 100%;
+              max-width: 100%;
 
               box-sizing: border-box;
 
-              border: none;
-              outline: none;
-
-              font-size: 18px;
-              padding: 8px;
-
-              transition: all linear 150ms;
+              background-color: var(--error);
+              color: var(--onError);
             }
 
-            > input {
-              border-style: solid;
-              border-color: transparent;
-              border-width: 1px;
-            }
+            > div.field {
+              width: 100%;
 
-            > input:focus {
-              border-color: var(--primary);
-            }
+              border: solid 1px rgba(0, 0, 0, 0.25);
+              color: var(--onBackgroundVariant);
 
-            > button {
-              background-color: var(--primary);
-              color: var(--onPrimary);
-            }
+              > input,
+              > button {
+                width: 100%;
 
-            > button:hover {
-              cursor: pointer;
+                box-sizing: border-box;
 
-              background-color: var(--onPrimary);
-              color: var(--primary);
+                border: none;
+                outline: none;
+
+                font-size: 18px;
+                padding: 8px;
+
+                transition: all linear 150ms;
+              }
+
+              > input {
+                border-style: solid;
+                border-color: transparent;
+                border-width: 1px;
+              }
+
+              > input:focus {
+                border-color: var(--primary);
+              }
+
+              > button {
+                background-color: var(--primary);
+                color: var(--onPrimary);
+              }
+
+              > button:hover {
+                cursor: pointer;
+
+                background-color: var(--onPrimary);
+                color: var(--primary);
+              }
             }
           }
         }

@@ -7,6 +7,8 @@
 </script>
 
 <script lang="ts">
+    import { onMount } from "svelte";
+
   import type { ChangeEventHandler } from "svelte/elements";
 
   export let inputClass: InputClass = InputClass.Background;
@@ -17,6 +19,7 @@
   export let text: string = "";
   export let placeholder: string = "Type something...";
   export let valid: boolean = true;
+  export let autoFocus: boolean = false
   export let validate: (() => boolean) | null = null;
   export let onSubmit: (() => Promise<void> | void) | null = null;
 
@@ -40,6 +43,12 @@
     text = element?.value || "";
     valid = validate?.() ?? element?.checkValidity() ?? true;
   };
+
+  onMount(() => {
+    if (autoFocus && element != null) {
+      element.focus()
+    }
+  })
 </script>
 
 <div class="input {inputClass}">
@@ -94,7 +103,7 @@
     }
 
     > input {
-      background-color: var(--background);
+      background-color: var(--backgroundVariant);
       color: unset;
       border: unset;
 
@@ -139,8 +148,8 @@
     }
 
     > input {
-      background-color: var(--background);
-      color: var(--onBackground);
+      background-color: var(--backgroundVariant);
+      color: var(--onBackgroundVariant);
     }
   }
 

@@ -1,29 +1,27 @@
 <script lang="ts">
-  import Awaiter from "../../components/Bindings/Awaiter.svelte";
-import Client, { interpretResponse } from "../../components/Bindings/Client.svelte";
-
-  let username: string;
-  let password: string;
 </script>
 
-<Client let:fetch let:session>
-  <div>
-    Session: <pre>{JSON.stringify(session)}</pre>
-  </div>
+<div class="test">
+  <div style="">Testas</div>
+  <div style="">Test2</div>
+</div>
 
-  <input type="username" bind:value={username} />
-  <input type="password" bind:value={password} />
+<style lang="scss">
+  div.test {
+    padding: 16px;
 
-  <button
-    on:click={() =>
-      fetch("/auth/password-login", "POST", { username, password })}
-  >
-    Login
-  </button>
+    box-sizing: border-box;
 
-  <Awaiter callback={() => fetch("/user/@testuser", "GET")}>
-    <svelte:fragment slot="success" let:result={user}>
-    <pre>{JSON.stringify(user, undefined, '  ')}</pre>
-    </svelte:fragment>
-  </Awaiter>
-</Client>
+    > div {
+      width: 100%;
+      height: 100%;
+
+      box-sizing: border-box;
+
+      background-color: black;
+      color: white;
+
+      float: left;
+    }
+  }
+</style>

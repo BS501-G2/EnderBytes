@@ -8,10 +8,9 @@
   import MobileLayout from "./Dashboard/MobileLayout/MobileLayout.svelte";
   import ResponsiveLayout from "./Bindings/ResponsiveLayout.svelte";
   import AccountSettingsDialog from "./AccountSettingsDialog.svelte";
+  import LogoutConfirmationDialog from "./Dashboard/LogoutConfirmationDialog.svelte";
 
   const rootState = RootState.state;
-
-  let accountSettingsDialog: boolean = false;
 </script>
 
 <svelte:head>
@@ -27,7 +26,7 @@
 {:else}
   <ResponsiveLayout>
     <svelte:fragment slot="desktop">
-      <DesktopLayout bind:accountSettingsDialog>
+      <DesktopLayout>
         <slot />
       </DesktopLayout>
     </svelte:fragment>
@@ -38,8 +37,6 @@
     </svelte:fragment>
   </ResponsiveLayout>
 
-  {#if accountSettingsDialog}
-    <AccountSettingsDialog onDismiss={() => (accountSettingsDialog = false)}
-    ></AccountSettingsDialog>
-  {/if}
+  <LogoutConfirmationDialog />
+  <AccountSettingsDialog />
 {/if}

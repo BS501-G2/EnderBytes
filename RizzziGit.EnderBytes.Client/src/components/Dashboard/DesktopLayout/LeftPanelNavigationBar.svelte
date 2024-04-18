@@ -37,7 +37,7 @@
           ? 'active'
           : ''}"
       >
-        <svelte:component this={entry.icon}></svelte:component>
+        <svelte:component this={entry.icon} size="18 em"></svelte:component>
         <p>{entry.name}</p>
       </div>
     </a>

@@ -3,6 +3,7 @@
   import FileView from "./FileArea/FileView.svelte";
   import Awaiter from "../../Bindings/Awaiter.svelte";
   import { fetchAndInterpret } from "../../Bindings/Client.svelte";
+    import FileDetails from "./FileArea/FileDetails.svelte";
 
   export let currentFileId: number | null;
   export let selectedFiles: number[] = [];
@@ -24,6 +25,7 @@
           <FileView {file} bind:selectedFiles />
         {:else if file.type == 1}
           <FileList {file} bind:onRefresh bind:selectedFiles />
+          <FileDetails bind:selectedFiles />
         {/if}
       </svelte:fragment>
     </Awaiter>
@@ -38,5 +40,7 @@
     min-height: 0px;
 
     user-select: none;
+
+    gap: 16px;
   }
 </style>

@@ -9,11 +9,11 @@
 </script>
 
 <script lang="ts">
-    import AccountSettingsDialog from "./AccountSettingsDialog.svelte";
+  import AccountSettingsDialog, { enabled as accountSettingsDialog } from "./AccountSettingsDialog.svelte";
 
   import Awaiter from "./Bindings/Awaiter.svelte";
-    import { fetchAndInterpret } from "./Bindings/Client.svelte";
-    import Button, { ButtonClass } from "./Widgets/Button.svelte";
+  import { fetchAndInterpret } from "./Bindings/Client.svelte";
+  import Button, { ButtonClass } from "./Widgets/Button.svelte";
 
   export let identifier: UserResolve;
   let userPromise: Promise<any> | null;
@@ -25,8 +25,6 @@
       return await fetchAndInterpret(`/user/:${identifier.userId}`)
     }
   }
-
-  let accountSettingsDialog = false
 </script>
 
 <svelte:head>
@@ -50,7 +48,7 @@
           style="height:400px; background-color: var(--onPrimary); border-radius: 15px; margin:20px;"
         >
           <div class="EditProfile" style="position: absolute; top: 70px; right: 0; margin: 20px; margin-right: 50px;">
-            <Button buttonClass={ButtonClass.PrimaryContainer} onClick={() => accountSettingsDialog = true}>Edit Profile</Button>
+            <Button buttonClass={ButtonClass.PrimaryContainer} onClick={() => $accountSettingsDialog = true}>Edit Profile</Button>
             <!-- <button
             on:click={() => accountSettingsDialog = true}
             class="profilebutton"
@@ -252,11 +250,6 @@
     </svelte:fragment>
   </Awaiter>
 </div>
-
-{#if accountSettingsDialog}
-  <AccountSettingsDialog onDismiss={() => accountSettingsDialog = false} />
-
-{/if}
 
 <style lang="scss">
   div.user-page {

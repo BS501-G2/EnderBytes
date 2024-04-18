@@ -25,8 +25,6 @@
   export let position: OverlayPosition = [OverlayPositionType.Center];
   export let onDismiss: () => void;
 
-  let width: number = 0;
-  let height: number = 0;
   let element: HTMLElement;
 </script>
 
@@ -46,8 +44,6 @@
           <div
             style="margin-top: {position[2]}px; margin-left: {position[1]}px;"
             class="main"
-            bind:clientWidth={width}
-            bind:clientHeight={height}
             bind:this={element}
           >
             <slot />
@@ -56,8 +52,6 @@
       {:else if position[0] === OverlayPositionType.Center}
         <div
           class="main"
-          bind:clientWidth={width}
-          bind:clientHeight={height}
           bind:this={element}
         >
           <slot />
@@ -73,12 +67,12 @@
 
     display: flex;
     flex-direction: column;
-    position: fixed;
+    position: absolute;
     left: 0px;
     top: 0px;
 
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
 
     > div.layer {
       max-height: 0px;

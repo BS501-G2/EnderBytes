@@ -9,7 +9,7 @@
   export let currentFileId: number | null;
 
   async function update(): Promise<any[]> {
-    const rootFolder = await fetchAndInterpret('/file/!root');
+    const rootFolder = await fetchAndInterpret("/file/!root");
 
     const newFiledIds: any[] = [];
 
@@ -48,9 +48,8 @@
 
 <style lang="scss">
   div.address {
-    background-color: var(--primaryContainer);
-    color: var(--primary);
-    padding: 8px 8px 8px 24px;
+    // background-color: var(--primaryContainer);
+    // color: var(--primary);
 
     min-height: 32px;
     max-height: 32px;
@@ -68,7 +67,8 @@
         margin-right: 8px;
       }
 
-      background-color: var(--background);
+      background-color: var(--backgroundVariant);
+      border-radius: 8px;
 
       flex-grow: 1;
 
@@ -77,11 +77,7 @@
       padding: 0px 8px 0px 8px;
       height: calc(32px);
 
-      border-style: solid;
-      border-width: 1px;
-      border-color: var(--primary);
-
-      max-width: max(75%, 640px);
+      // max-width: max(75%, 640px);
 
       margin: auto;
 

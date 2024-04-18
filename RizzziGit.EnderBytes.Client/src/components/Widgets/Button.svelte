@@ -12,6 +12,7 @@
 
   export let buttonClass: ButtonClass = ButtonClass.Primary;
   export let enabled: boolean = true;
+  export let outline: boolean = true;
   export let onClick: () => Promise<any> | any;
 
   let busy: boolean = false;
@@ -32,7 +33,7 @@
 
 <button
   disabled={!enabled || busy}
-  class="button {buttonClass}"
+  class="button {buttonClass} {outline ? 'outline' : ''}"
   on:click={onClick}
 >
   <Awaiter callback={() => click()} autoLoad={false} bind:reset>
@@ -52,10 +53,14 @@
     box-sizing: border-box;
     transition: all linear 150ms;
 
-    border: solid 1px var(--primary);
+    border: solid 1px transparent;
     border-radius: 8px;
 
     cursor: pointer;
+  }
+
+  button.button.outline {
+    border-color: var(--primary);
   }
 
   button.primary {
@@ -70,7 +75,6 @@
 
   button.primary:active {
     background-color: var(--onPrimary);
-    color: var(--primary);
   }
 
   button.primary-container {
@@ -85,7 +89,7 @@
 
   button.primary-container:active {
     background-color: var(--onPrimaryContainer);
-    color: var(--primaryContainer);
+    color: var(--onPrimary);
   }
 
   button.background {

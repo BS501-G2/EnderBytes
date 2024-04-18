@@ -22,7 +22,7 @@
       async (_, setStatus) => {
         setStatus(`Creating folder "${name}"...`);
         const folder = await fetchAndInterpret(
-          `/file/${currentFileId != null ? `:${currentFileId}` : "!root"}`,
+          `/file/${currentFileId != null ? `:${currentFileId}` : "!root"}/files`,
           "POST",
           {
             name: name,

@@ -2,232 +2,101 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace RizzziGit.EnderBytes.Web;
 
+using Commons.Memory;
 using Resources;
+using Services;
 
 public sealed partial class WebApi
 {
+  [Route("/file/!root")]
   [Route("/file/:{id}")]
   [HttpGet]
-  public async Task<ActionResult<FileManager.Resource>> GetFile(long id)
+  public Task<ActionResult> GetFile(long? id) => HandleFileRoute(new Route_File.Id(id));
+
+  public record Route_File()
   {
-    FileManager files = GetResourceManager<FileManager>();
-    StorageManager storages = GetResourceManager<StorageManager>();
-
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+    public record Id(long? FileId) : Route_File()
     {
-      return Unauthorized();
-    }
-
-    return await ResourceService.Transact<ActionResult<FileManager.Resource>>((transaction, cancellationToken) =>
-    {
-      if (
-        !files.TryGetById(transaction, id, out FileManager.Resource? file, cancellationToken) ||
-        !storages.TryGetById(transaction, file.StorageId, out StorageManager.Resource? storage, cancellationToken)
-      )
+      public record Share(long? FileId) : Id(FileId)
       {
-        return NotFound();
+        public new record Id(long? FileId, long ShareId) : Share(FileId);
+
+        public record Create(long? FileId, FileAccessType FileAccessType, long TargetUserId) : Share(FileId);
       }
 
-      DecryptedKeyInfo decryptedKey = storages.DecryptKey(transaction, storage, file, userAuthenticationToken, cancellationToken: cancellationToken);
-      if (decryptedKey.Key == null)
+      public record Files(long? FileId) : Id(FileId)
       {
-        FileManager.Resource rootFolder = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+        public record Create(long? FileId, bool IsFile, string Name) : Files(FileId);
+      }
 
-        if (!files.IsEqualToOrInsideOf(transaction, storage, rootFolder, file, cancellationToken))
+      public record Snapshot(long? FileId) : Id(FileId)
+      {
+        public new record Id(long? FileId, long SnapshotId) : Snapshot(FileId)
         {
-          return Forbid();
-        }
-      }
-
-      return Ok(file);
-    });
-  }
-
-  [Route("/file/!root")]
-  [HttpGet]
-  public async Task<ActionResult<FileManager.Resource>> GetRootFolder()
-  {
-    FileManager files = GetResourceManager<FileManager>();
-    StorageManager storages = GetResourceManager<StorageManager>();
-
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
-    {
-      return Unauthorized();
-    }
-
-    return await ResourceService.Transact<ActionResult<FileManager.Resource>>((transaction, cancellationToken) =>
-    {
-      StorageManager.Resource storage = storages.GetByOwnerUser(transaction, userAuthenticationToken, cancellationToken);
-
-      return Ok(storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken));
-    });
-  }
-
-  public sealed record CreateFileRequest(bool IsFile, string Name);
-
-  [Route("/file/:{id}")]
-  [HttpPost]
-  public async Task<ActionResult<FileManager.Resource>> CreateFile(long id, [FromBody] CreateFileRequest request)
-  {
-    FileManager files = GetResourceManager<FileManager>();
-    StorageManager storages = GetResourceManager<StorageManager>();
-
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
-    {
-      return Unauthorized();
-    }
-
-    return await ResourceService.Transact<ActionResult<FileManager.Resource>>((transaction, cancellationToken) =>
-    {
-      if (
-        !files.TryGetById(transaction, id, out FileManager.Resource? parentFolder, cancellationToken) ||
-        !storages.TryGetById(transaction, parentFolder.StorageId, out StorageManager.Resource? storage, cancellationToken)
-      )
-      {
-        return Unauthorized();
-      }
-
-      DecryptedKeyInfo decryptedKey = storages.DecryptKey(transaction, storage, parentFolder, userAuthenticationToken, cancellationToken: cancellationToken);
-      if (decryptedKey.Key == null)
-      {
-        FileManager.Resource rootFolder = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
-
-        if (!files.IsEqualToOrInsideOf(transaction, storage, rootFolder, parentFolder, cancellationToken))
-        {
-          return Forbid();
-        }
-      }
-
-      if (parentFolder.Type != FileType.Folder)
-      {
-        return BadRequest();
-      }
-
-      FileManager.Resource newFile = request.IsFile
-        ? files.CreateFile(transaction, storage, parentFolder, request.Name, userAuthenticationToken, cancellationToken)
-        : files.CreateFolder(transaction, storage, parentFolder, request.Name, userAuthenticationToken, cancellationToken);
-
-      return Ok(newFile);
-    });
-  }
-
-  [Route("/file/!root")]
-  [HttpPost]
-  public async Task<ActionResult<FileManager.Resource>> CreateFile([FromBody] CreateFileRequest request)
-  {
-    FileManager files = GetResourceManager<FileManager>();
-    StorageManager storages = GetResourceManager<StorageManager>();
-
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
-    {
-      return Unauthorized();
-    }
-
-    return await ResourceService.Transact<ActionResult<FileManager.Resource>>((transaction, cancellationToken) =>
-    {
-      StorageManager.Resource storage = storages.GetByOwnerUser(transaction, userAuthenticationToken, cancellationToken);
-      FileManager.Resource file = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
-
-      FileManager.Resource newFile = request.IsFile
-        ? files.CreateFile(transaction, storage, file, request.Name, userAuthenticationToken, cancellationToken)
-        : files.CreateFolder(transaction, storage, file, request.Name, userAuthenticationToken, cancellationToken);
-
-      return Ok(newFile);
-    });
-  }
-
-  [Route("/file/!root/files")]
-  [Route("/file/:{id}/files")]
-  [HttpGet]
-  public async Task<ActionResult<FileManager.Resource[]>> ScanFolder(long? id)
-  {
-    FileManager files = GetResourceManager<FileManager>();
-    StorageManager storages = GetResourceManager<StorageManager>();
-
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
-    {
-      return Unauthorized();
-    }
-
-    return await ResourceService.Transact<ActionResult<FileManager.Resource[]>>((transaction, cancellationToken) =>
-    {
-      if (id == null)
-      {
-        StorageManager.Resource storage = storages.GetByOwnerUser(transaction, userAuthenticationToken, cancellationToken);
-        FileManager.Resource file = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
-
-        return Ok(files.ScanFolder(transaction, storage, file, userAuthenticationToken, cancellationToken).ToArray());
-      }
-      else
-      {
-        if (
-          !files.TryGetById(transaction, (long)id, out FileManager.Resource? file, cancellationToken) ||
-          !storages.TryGetById(transaction, file.StorageId, out StorageManager.Resource? storage, cancellationToken)
-        )
-        {
-          return NotFound();
+          public record Upload(long? FileId, long SnapshotId, long Offset, CompositeBuffer Bytes) : Id(FileId, SnapshotId);
         }
 
-        DecryptedKeyInfo decryptedKey = storages.DecryptKey(transaction, storage, file, userAuthenticationToken, cancellationToken: cancellationToken);
-        if (decryptedKey.Key == null)
-        {
-          FileManager.Resource rootFolder = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
-          if (!files.IsEqualToOrInsideOf(transaction, storage, rootFolder, file, cancellationToken))
-          {
-            return Forbid();
-          }
-        }
-
-        return Ok(files.ScanFolder(transaction, storage, file, userAuthenticationToken, cancellationToken).ToArray());
+        public record Create(long? FileId, long BaseSnapshotId) : Snapshot(FileId);
       }
+    }
+  }
+
+  [NonAction]
+  public async Task<ActionResult> HandleFileRoute(Route_File request)
+  {
+    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+    {
+      return Unauthorized();
+    }
+
+    return await ResourceService.Transact((transaction, cancellationToken) => request switch
+    {
+      Route_File.Id fileIdRequest => HandleFileIdRoute(fileIdRequest, transaction, userAuthenticationToken, cancellationToken),
+
+      _ => BadRequest(),
     });
   }
 
-  // [Route("/file/:{id}/path-chain")]
-  // [Route("/file/!root/path-chain")]
-  // [HttpGet]
-  // public async Task<ActionResult<FileManager.Resource[]>> GetPathChain(long? id)
-  // {
-  //   if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
-  //   {
-  //     return Unauthorized();
-  //   }
+  [NonAction]
+  public ActionResult HandleFileIdRoute(Route_File.Id request, ResourceService.Transaction transaction, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
+  {
+    StorageManager storageManager = ResourceService.GetManager<StorageManager>();
+    FileManager fileManager = ResourceService.GetManager<FileManager>();
 
-  //   FileManager files = GetResourceManager<FileManager>();
-  //   StorageManager storages = GetResourceManager<StorageManager>();
-  //   FileAccessManager fileAccesses = GetResourceManager<FileAccessManager>();
+    FileManager.Resource? file;
+    StorageManager.Resource? storage;
 
-  //   return await ResourceService.Transact<ActionResult<FileManager.Resource[]>>((transaction, cancellationToken) =>
-  //   {
-  //     if (id == null)
-  //     {
-  //       return Ok(Array.Empty<FileManager.Resource>());
-  //     }
+    if (request.FileId == null)
+    {
+      storage = storageManager.GetByOwnerUser(transaction, userAuthenticationToken, cancellationToken);
+      file = storageManager.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+    }
+    else if (
+      (!fileManager.TryGetById(transaction, (long)request.FileId, out file, cancellationToken)) ||
+      (!storageManager.TryGetById(transaction, file.StorageId, out storage, cancellationToken))
+    )
+    {
+      return NotFound();
+    }
 
-  //     List<FileManager.Resource> chain = [];
-  //     if (
-  //       !files.TryGetById(transaction, (long)id, out FileManager.Resource? file, cancellationToken) ||
-  //       !storages.TryGetById(transaction, file.StorageId, out StorageManager.Resource? storage, cancellationToken)
-  //     )
-  //     {
-  //       return NotFound();
-  //     }
+    DecryptedKeyInfo decryptedKeyInfo = storageManager.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.Read, cancellationToken);
 
-  //     DecryptedKeyInfo decryptedKeyInfo = storages.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.Read, cancellationToken);
+    if (decryptedKeyInfo.FileAccess == null)
+    {
+      FileManager.Resource rootFolder = storageManager.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
 
-  //     if (decryptedKeyInfo.FileAccess == null)
-  //     {
-  //       FileManager.Resource rootFolder = storages.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+      if (!fileManager.IsEqualToOrInsideOf(transaction, storage, rootFolder, file, cancellationToken))
+      {
+        return Forbid();
+      }
+    }
 
-  //       if (!files.IsEqualToOrInsideOf(transaction, storage, rootFolder, file, cancellationToken))
-  //       {
-  //         return Forbid();
-  //       }
+    return request switch
+    {
+      Route_File.Id.Files fileIdFilesRequest => HandleFileIdFilesRoute(fileIdFilesRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
+      Route_File.Id.Snapshot fileIdSnapshotRequest => HandleFileIdSnapshotRoute(fileIdSnapshotRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
 
-  //       chain.Add(file);
-  //     }
-
-  //     return Ok(chain);
-  //   });
-  // }
+      _ => Ok(file),
+    };
+  }
 }

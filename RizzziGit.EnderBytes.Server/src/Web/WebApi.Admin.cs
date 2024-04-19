@@ -26,8 +26,8 @@ public sealed partial class WebApi
   }
 
   [Route("/admin/setup")]
-  public async Task<ActionResult> Create()
+  public Task<ActionResult> Create()
   {
-    return Ok();
+    return Task.FromResult<ActionResult>(Ok());
   }
 }

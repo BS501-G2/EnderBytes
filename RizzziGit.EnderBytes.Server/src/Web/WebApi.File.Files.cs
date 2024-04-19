@@ -20,7 +20,7 @@ public sealed partial class WebApi
   public Task<ActionResult> CreateFile(long? id, [FromBody] CreateFileRequest request) => HandleFileRoute(new Route_File.Id.Files.Create(id, request.IsFile, request.Name));
 
   [NonAction]
-  public ActionResult HandleFileIdFilesRoute(Route_File.Id.Files request, ResourceService.Transaction transaction, FileManager.Resource file, StorageManager.Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
+  public async Task<ActionResult> HandleFileIdFilesRoute(Route_File.Id.Files request, ResourceService.Transaction transaction, FileManager.Resource file, StorageManager.Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
   {
     if (file.Type != FileType.Folder)
     {
@@ -31,20 +31,20 @@ public sealed partial class WebApi
 
     return request switch
     {
-      Route_File.Id.Files.Create fileIdFilesCreateRequest => HandleFileIdFilesCreateRoute(fileIdFilesCreateRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
+      Route_File.Id.Files.Create fileIdFilesCreateRequest => await HandleFileIdFilesCreateRoute(fileIdFilesCreateRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
 
-      _ => Ok(fileManager.ScanFolder(transaction, storage, file, userAuthenticationToken, cancellationToken).ToArray())
+      _ => Ok(fileManager.ScanFolder(transaction, storage, file, userAuthenticationToken, cancellationToken).ToArrayAsync())
     };
   }
 
   [NonAction]
-  public ActionResult HandleFileIdFilesCreateRoute(Route_File.Id.Files.Create request, ResourceService.Transaction transaction, FileManager.Resource file, StorageManager.Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
+  public async Task<ActionResult> HandleFileIdFilesCreateRoute(Route_File.Id.Files.Create request, ResourceService.Transaction transaction, FileManager.Resource file, StorageManager.Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
   {
     FileManager fileManager = ResourceService.GetManager<FileManager>();
 
     FileManager.Resource newFile = request.IsFile
-      ? fileManager.CreateFile(transaction, storage, file, request.Name, userAuthenticationToken, cancellationToken)
-      : fileManager.CreateFolder(transaction, storage, file, request.Name, userAuthenticationToken, cancellationToken);
+      ? await fileManager.CreateFile(transaction, storage, file, request.Name, userAuthenticationToken, cancellationToken)
+      : await fileManager.CreateFolder(transaction, storage, file, request.Name, userAuthenticationToken, cancellationToken);
 
     return Ok(newFile);
   }

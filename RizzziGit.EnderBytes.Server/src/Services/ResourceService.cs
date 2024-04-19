@@ -53,7 +53,6 @@ public sealed partial class ResourceService : Server.SubService
   protected override async Task OnRun(CancellationToken cancellationToken)
   {
     await await Task.WhenAny(
-      RunPeriodicCheck(cancellationToken),
       WatchDog([.. ResourceManagers], cancellationToken)
     );
   }

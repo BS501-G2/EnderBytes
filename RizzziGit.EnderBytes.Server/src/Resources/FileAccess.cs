@@ -5,6 +5,7 @@ namespace RizzziGit.EnderBytes.Resources;
 using Utilities;
 using Services;
 using Newtonsoft.Json;
+using System.Runtime.CompilerServices;
 
 public enum FileAccessTargetEntityType : byte { None, User }
 public enum FileAccessType : byte { ManageShares, ReadWrite, Read, None }
@@ -39,11 +40,11 @@ public sealed class FileAccessManager : ResourceManager<FileAccessManager, FileA
 
   public FileAccessManager(ResourceService service) : base(service, NAME, VERSION)
   {
-    Service.GetManager<FileManager>().ResourceDeleted += (transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), cancellationToken);
-    Service.GetManager<UserManager>().ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.Nested("and",
+    Service.GetManager<FileManager>().RegisterDeleteHandler((transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), cancellationToken));
+    Service.GetManager<UserManager>().RegisterDeleteHandler((transaction, user, cancellationToken) => Delete(transaction, new WhereClause.Nested("and",
       new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", (byte)FileAccessTargetEntityType.User),
       new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id)
-    ), cancellationToken);
+    ), cancellationToken));
   }
 
   protected override Resource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
@@ -56,33 +57,35 @@ public sealed class FileAccessManager : ResourceManager<FileAccessManager, FileA
     (FileAccessType)reader.GetByte(reader.GetOrdinal(COLUMN_TYPE))
   );
 
-  protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
+  protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
   {
     if (oldVersion < 1)
     {
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_FILE_ID} bigint not null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_ENTITY_ID} bigint null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_ENTITY_TYPE} tinyint not null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_KEY} blob not null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TYPE} tinyint not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_FILE_ID} bigint not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_ENTITY_ID} bigint null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_ENTITY_TYPE} tinyint not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_KEY} blob not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TYPE} tinyint not null;");
     }
   }
 
-  public IEnumerable<Resource> List(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, UserAuthenticationToken? userAuthenticationToken, LimitClause? limit = null, OrderByClause? orderBy = null, CancellationToken cancellationToken = default)
+  public async IAsyncEnumerable<Resource> List(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, UserAuthenticationToken? userAuthenticationToken, LimitClause? limit = null, OrderByClause? orderBy = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
   {
     file.ThrowIfDoesNotBelongTo(storage);
 
-    List<Resource> fileAccesses = Select(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), limit, orderBy, cancellationToken).ToList();
-    _ = Service.GetManager<StorageManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ManageShares, cancellationToken);
+    _ = await Service.GetManager<StorageManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ManageShares, cancellationToken);
 
-    return fileAccesses;
+    await foreach (var fileAccess in Select(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), limit, orderBy, cancellationToken))
+    {
+      yield return fileAccess;
+    }
   }
 
-  public Resource Create(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource targetFile, FileAccessType type, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<Resource> Create(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource targetFile, FileAccessType type, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
-    KeyService.AesPair fileKey = transaction.ResourceService.GetManager<StorageManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
+    KeyService.AesPair fileKey = (await transaction.ResourceService.GetManager<StorageManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken)).Key;
 
-    return InsertAndGet(transaction, new(
+    return await InsertAndGet(transaction, new(
       (COLUMN_TARGET_FILE_ID, targetFile.Id),
       (COLUMN_TARGET_ENTITY_ID, null),
       (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.None),
@@ -91,13 +94,13 @@ public sealed class FileAccessManager : ResourceManager<FileAccessManager, FileA
     ), cancellationToken);
   }
 
-  public Resource Create(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource targetFile, UserManager.Resource targetUser, FileAccessType type, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<Resource> Create(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource targetFile, UserManager.Resource targetUser, FileAccessType type, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
     targetFile.ThrowIfDoesNotBelongTo(storage);
 
-    KeyService.AesPair fileKey = transaction.ResourceService.GetManager<StorageManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken).Key;
+    KeyService.AesPair fileKey = (await transaction.ResourceService.GetManager<StorageManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken)).Key;
 
-    return InsertAndGet(transaction, new(
+    return await InsertAndGet(transaction, new(
       (COLUMN_TARGET_FILE_ID, targetFile.Id),
       (COLUMN_TARGET_ENTITY_ID, targetUser.Id),
       (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.User),

@@ -17,7 +17,7 @@ public sealed partial class WebApi
     }
 
     UserManager.Resource? user = null;
-    if (!await ResourceService.Transact((transaction, cancellationToken) => GetResourceManager<UserManager>().TryGetByUsername(transaction, username, out user, cancellationToken)))
+    if ((user = await ResourceService.Transact((transaction, cancellationToken) => GetResourceManager<UserManager>().GetByUsername(transaction, username, cancellationToken))) == null)
     {
       return NotFound();
     }
@@ -35,7 +35,7 @@ public sealed partial class WebApi
     }
 
     UserManager.Resource? user = null;
-    if (!await ResourceService.Transact((transaction, cancellationToken) => GetResourceManager<UserManager>().TryGetById(transaction, userId, out user, cancellationToken)))
+    if ((user = await ResourceService.Transact((transaction, cancellationToken) => GetResourceManager<UserManager>().GetById(transaction, userId, cancellationToken))) == null)
     {
       return NotFound();
     }

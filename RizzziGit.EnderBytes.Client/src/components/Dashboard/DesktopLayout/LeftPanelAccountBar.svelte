@@ -11,7 +11,7 @@
   <Client let:session let:fetchAndInterpret>
     <button
       class="account-info"
-      on:click={() => goto(`/app/profile/:${session?.userId ?? "null"}`)}
+      on:click={() => goto(`/app/users/:${session?.userId ?? "null"}`)}
     >
       <UserIcon />
       <p>

@@ -58,7 +58,7 @@
       on:click={() => {
         menuShown = true;
         updateMenuDimensions();
-      }}><ChevronRightIcon strokeWidth={1} size="20em"/></button
+      }}><ChevronRightIcon strokeWidth={1} size="20em" /></button
     >
   {/if}
 </div>
@@ -82,15 +82,17 @@
         </svelte:fragment>
         <svelte:fragment slot="success" let:result={files}>
           <div class="file-list">
-            {#each files as file}
+            {#each files as fileEntry}
               <button
                 on:click={() => {
                   menuShown = false;
-                  goto(`/app/files/${file.id}`);
+                  goto(`/app/files/${fileEntry.id}`);
                 }}
               >
                 <FolderIcon size="18em" />
-                <p>{file.name}</p>
+                <p>
+                  {fileEntry.name}
+                </p>
               </button>
             {/each}
           </div>

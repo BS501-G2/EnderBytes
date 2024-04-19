@@ -21,6 +21,9 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
 {
   public abstract class Exception(string? message = null) : ResourceService.Exception(message);
 
+  public sealed class InvalidPayloadException() : Exception("Invalid payload specified.");
+  public sealed class InvalidSessionTokenException() : Exception("Invalid session token specified.");
+
   public new sealed partial record Resource(
     long Id,
     long CreateTime,
@@ -156,7 +159,7 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
 
   public UserAuthenticationManager(ResourceService service) : base(service, NAME, VERSION)
   {
-    service.GetManager<UserManager>().ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), cancellationToken);
+    service.GetManager<UserManager>().RegisterDeleteHandler((transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), cancellationToken));
   }
 
   protected override Resource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
@@ -177,66 +180,66 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
     reader.GetBytes(reader.GetOrdinal(COLUMN_PUBLIC_KEY))
   );
 
-  protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
+  protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
   {
     if (oldVersion < 1)
     {
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_USER_ID} bigint not null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TYPE} tinyint not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_USER_ID} bigint not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TYPE} tinyint not null;");
 
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_SALT} blob not null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ITERATIONS} bigint not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_SALT} blob not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ITERATIONS} bigint not null;");
 
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_CHALLENGE_IV} blob not null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_CHALLENGE_BYTES} blob not null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_CHALLENGE_ENCRYPTED_BYTES} blob not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_CHALLENGE_IV} blob not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_CHALLENGE_BYTES} blob not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_CHALLENGE_ENCRYPTED_BYTES} blob not null;");
 
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ENCRYPTED_PRIVATE_KEY} blob not null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ENCRYPTED_PRIVATE_KEY_IV} blob not null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_PUBLIC_KEY} blob not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ENCRYPTED_PRIVATE_KEY} blob not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ENCRYPTED_PRIVATE_KEY_IV} blob not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_PUBLIC_KEY} blob not null;");
 
-      SqlNonQuery(transaction, $"create index {INDEX_USER_ID} on {NAME}({COLUMN_USER_ID});");
+      await SqlNonQuery(transaction, $"create index {INDEX_USER_ID} on {NAME}({COLUMN_USER_ID});");
     }
   }
 
-  public UserAuthenticationToken CreatePassword(ResourceService.Transaction transaction, UserManager.Resource user, UserAuthenticationToken existing, string password) => Create(transaction, user, existing, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
-  public UserAuthenticationToken CreatePassword(ResourceService.Transaction transaction, UserManager.Resource user, string password, byte[] privateKey, byte[] publicKey) => Create(transaction, user, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password), privateKey, publicKey);
+  public async Task <UserAuthenticationToken> CreatePassword(ResourceService.Transaction transaction, UserManager.Resource user, UserAuthenticationToken existing, string password) => await Create(transaction, user, existing, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password));
+  public async Task <UserAuthenticationToken> CreatePassword(ResourceService.Transaction transaction, UserManager.Resource user, string password, byte[] privateKey, byte[] publicKey) => await Create(transaction, user, UserAuthenticationType.Password, Encoding.UTF8.GetBytes(password), privateKey, publicKey);
 
-  public string CreateSessionToken(ResourceService.Transaction transaction, UserManager.Resource user, UserAuthenticationToken baseToken, CancellationToken cancellationToken = default)
+  public async Task<string> CreateSessionToken(ResourceService.Transaction transaction, UserManager.Resource user, UserAuthenticationToken baseToken, CancellationToken cancellationToken = default)
   {
     byte[] sessionToken = RandomNumberGenerator.GetBytes(64);
 
-    UserAuthenticationToken userAuthenticationToken = Create(transaction, user, baseToken, UserAuthenticationType.SessionToken, sessionToken);
-    transaction.GetManager<UserAuthenticationSessionTokenManager>().Create(transaction, userAuthenticationToken.UserAuthentication, 36000 * 1000, cancellationToken);
+    UserAuthenticationToken userAuthenticationToken = await Create(transaction, user, baseToken, UserAuthenticationType.SessionToken, sessionToken);
+    await transaction.GetManager<UserAuthenticationSessionTokenManager>().Create(transaction, userAuthenticationToken.UserAuthentication, 36000 * 1000, cancellationToken);
 
     return Convert.ToHexString(sessionToken);
   }
 
-  public bool TryTruncateSessionTokens(ResourceService.Transaction transaction, UserManager.Resource user, CancellationToken cancellationToken = default)
+  public async Task<bool> TruncateSessionToken(ResourceService.Transaction transaction, UserManager.Resource user, CancellationToken cancellationToken = default)
   {
-    foreach (Resource userAuthentication in Select(transaction, new WhereClause.Nested("and",
+    foreach (Resource userAuthentication in await Select(transaction, new WhereClause.Nested("and",
       new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)UserAuthenticationType.SessionToken),
       new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)
-    ), order: new OrderByClause(COLUMN_CREATE_TIME, OrderByClause.OrderBy.Descending), cancellationToken: cancellationToken).Skip(10).ToList())
+    ), order: new OrderByClause(COLUMN_CREATE_TIME, OrderByClause.OrderBy.Descending), cancellationToken: cancellationToken).Skip(10).ToListAsync(cancellationToken))
     {
-      Delete(transaction, userAuthentication, cancellationToken);
+      await Delete(transaction, userAuthentication, cancellationToken);
     }
 
     return true;
   }
 
-  public bool TryGetSessionToken(ResourceService.Transaction transaction, UserManager.Resource user, string sessionToken, [NotNullWhen(true)] out UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<UserAuthenticationToken?> GetSessionToken(ResourceService.Transaction transaction, UserManager.Resource user, string sessionToken, CancellationToken cancellationToken = default)
   {
-    userAuthenticationToken = null;
+    UserAuthenticationToken? userAuthenticationToken = null;
 
-    foreach (Resource userAuthentication in Select(transaction, new WhereClause.Nested("and",
+    foreach (Resource userAuthentication in await Select(transaction, new WhereClause.Nested("and",
       new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)UserAuthenticationType.SessionToken),
       new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)
-    ), cancellationToken: cancellationToken).ToList())
+    ), cancellationToken: cancellationToken).ToListAsync(cancellationToken))
     {
-      if (transaction.GetManager<UserAuthenticationSessionTokenManager>().GetByUserAuthentication(transaction, userAuthentication, cancellationToken).Expired)
+      if ((await transaction.GetManager<UserAuthenticationSessionTokenManager>().GetByUserAuthentication(transaction, userAuthentication, cancellationToken)).Expired)
       {
-        Delete(transaction, userAuthentication, cancellationToken);
+        await Delete(transaction, userAuthentication, cancellationToken);
 
         continue;
       }
@@ -249,7 +252,7 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
 
     if (userAuthenticationToken != null)
     {
-      UserAuthenticationSessionTokenManager.Resource userAuthenticationSessionToken = Service.GetManager<UserAuthenticationSessionTokenManager>().GetByUserAuthentication(transaction, userAuthenticationToken.UserAuthentication, cancellationToken);
+      UserAuthenticationSessionTokenManager.Resource userAuthenticationSessionToken = await Service.GetManager<UserAuthenticationSessionTokenManager>().GetByUserAuthentication(transaction, userAuthenticationToken.UserAuthentication, cancellationToken);
 
       if (userAuthenticationSessionToken.Expired)
       {
@@ -257,11 +260,16 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
       }
     }
 
-    return userAuthenticationToken != null;
+    if (userAuthenticationToken == null)
+    {
+      return null;
+    }
+
+    return userAuthenticationToken;
   }
 
 
-  private UserAuthenticationToken Create(ResourceService.Transaction transaction, UserManager.Resource user, UserAuthenticationToken existing, UserAuthenticationType type, byte[] payload)
+  private async Task<UserAuthenticationToken> Create(ResourceService.Transaction transaction, UserManager.Resource user, UserAuthenticationToken existing, UserAuthenticationType type, byte[] payload)
   {
     byte[] privateKey = existing.UserAuthentication.GetPrivateKey(existing.PayloadHash);
     byte[] publicKey = existing.UserAuthentication.PublicKey;
@@ -281,7 +289,7 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
     byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
     byte[] encryptedPrivateKey = Resource.AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
 
-    return new(Service.Server.KeyService, user, InsertAndGet(transaction, new(
+    return new(Service.Server.KeyService, user, await InsertAndGet(transaction, new(
       (COLUMN_USER_ID, user.Id),
       (COLUMN_TYPE, (byte)type),
 
@@ -298,9 +306,9 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
     )), payloadHash);
   }
 
-  private UserAuthenticationToken Create(ResourceService.Transaction transaction, UserManager.Resource user, UserAuthenticationType type, byte[] payload, byte[] privateKey, byte[] publicKey)
+  private async Task<UserAuthenticationToken> Create(ResourceService.Transaction transaction, UserManager.Resource user, UserAuthenticationType type, byte[] payload, byte[] privateKey, byte[] publicKey)
   {
-    if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)) != 0)
+    if (await Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)) != 0)
     {
       throw new InvalidOperationException("Must use an existing rsa key.");
     }
@@ -320,7 +328,7 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
     byte[] encryptedPrivateKeyIv = RandomNumberGenerator.GetBytes(16);
     byte[] encryptedPrivateKey = Resource.AesEncrypt(payloadHash, encryptedPrivateKeyIv, privateKey);
 
-    return new(Service.Server.KeyService, user, InsertAndGet(transaction, new(
+    return new(Service.Server.KeyService, user, await InsertAndGet(transaction, new(
       (COLUMN_USER_ID, user.Id),
       (COLUMN_TYPE, (byte)type),
 
@@ -337,13 +345,13 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
     )), payloadHash);
   }
 
-  public IEnumerable<Resource> List(ResourceService.Transaction transaction, UserManager.Resource user, LimitClause? limitClause = null, OrderByClause? orderByClause = null) => Select(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), limitClause, orderByClause);
+  public IAsyncEnumerable<Resource> List(ResourceService.Transaction transaction, UserManager.Resource user, LimitClause? limitClause = null, OrderByClause? orderByClause = null) => Select(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), limitClause, orderByClause);
 
-  public bool TryGetByPayload(ResourceService.Transaction transaction, UserManager.Resource user, byte[] payload, UserAuthenticationType type, [NotNullWhen(true)] out UserAuthenticationToken? userAuthenticationToken)
+  public async Task<UserAuthenticationToken?> GetByPayload(ResourceService.Transaction transaction, UserManager.Resource user, byte[] payload, UserAuthenticationType type)
   {
-    userAuthenticationToken = null;
+    UserAuthenticationToken? userAuthenticationToken = null;
 
-    foreach (Resource userAuthentication in Select(transaction,
+    await foreach (Resource userAuthentication in Select(transaction,
       new WhereClause.Nested("and",
         new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id),
         new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)type)
@@ -358,31 +366,16 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
       catch { }
     }
 
-    return userAuthenticationToken != null;
+    return userAuthenticationToken;
   }
 
-  public UserAuthenticationToken? GetByPayload(ResourceService.Transaction transaction, UserManager.Resource user, byte[] payload, UserAuthenticationType type)
+  public override async Task<bool> Delete(ResourceService.Transaction transaction, Resource userAuthentication, CancellationToken cancellationToken = default)
   {
-    foreach (Resource userAuthentication in Select(transaction,
-      new WhereClause.Nested("and",
-        new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id),
-        new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)type)
-      )
-    ))
-    {
-      try { return new(Service.Server.KeyService, user, userAuthentication, userAuthentication.GetPayloadHash(payload)); } catch { }
-    }
-
-    return null;
-  }
-
-  public override bool Delete(ResourceService.Transaction transaction, Resource userAuthentication, CancellationToken cancellationToken = default)
-  {
-    if (Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userAuthentication.UserId), cancellationToken) < 2)
+    if (await Count(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", userAuthentication.UserId), cancellationToken) < 2)
     {
       throw new InvalidOperationException("Must have at least two user authentications before deleting one.");
     }
 
-    return base.Delete(transaction, userAuthentication, cancellationToken);
+    return await base.Delete(transaction, userAuthentication, cancellationToken);
   }
 }

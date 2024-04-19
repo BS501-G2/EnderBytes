@@ -49,16 +49,16 @@ public sealed partial class WebApi
       return Unauthorized();
     }
 
-    return await ResourceService.Transact((transaction, cancellationToken) => request switch
+    return await ResourceService.Transact(async (transaction, cancellationToken) => request switch
     {
-      Route_File.Id fileIdRequest => HandleFileIdRoute(fileIdRequest, transaction, userAuthenticationToken, cancellationToken),
+      Route_File.Id fileIdRequest => await HandleFileIdRoute(fileIdRequest, transaction, userAuthenticationToken, cancellationToken),
 
       _ => BadRequest(),
     });
   }
 
   [NonAction]
-  public ActionResult HandleFileIdRoute(Route_File.Id request, ResourceService.Transaction transaction, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
+  public async Task<ActionResult> HandleFileIdRoute(Route_File.Id request, ResourceService.Transaction transaction, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
   {
     StorageManager storageManager = ResourceService.GetManager<StorageManager>();
     FileManager fileManager = ResourceService.GetManager<FileManager>();
@@ -68,24 +68,24 @@ public sealed partial class WebApi
 
     if (request.FileId == null)
     {
-      storage = storageManager.GetByOwnerUser(transaction, userAuthenticationToken, cancellationToken);
-      file = storageManager.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+      storage = await storageManager.GetByOwnerUser(transaction, userAuthenticationToken, cancellationToken);
+      file = await storageManager.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
     }
     else if (
-      (!fileManager.TryGetById(transaction, (long)request.FileId, out file, cancellationToken)) ||
-      (!storageManager.TryGetById(transaction, file.StorageId, out storage, cancellationToken))
+      ((file = await fileManager.GetById(transaction, (long)request.FileId, cancellationToken)) == null) ||
+      ((storage = await storageManager.GetById(transaction, file.StorageId, cancellationToken)) == null)
     )
     {
       return NotFound();
     }
 
-    DecryptedKeyInfo decryptedKeyInfo = storageManager.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.Read, cancellationToken);
+    DecryptedKeyInfo decryptedKeyInfo = await storageManager.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.Read, cancellationToken);
 
     if (decryptedKeyInfo.FileAccess == null)
     {
-      FileManager.Resource rootFolder = storageManager.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+      FileManager.Resource rootFolder = await storageManager.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
 
-      if (!fileManager.IsEqualToOrInsideOf(transaction, storage, rootFolder, file, cancellationToken))
+      if (!await fileManager.IsEqualToOrInsideOf(transaction, storage, rootFolder, file, cancellationToken))
       {
         return Forbid();
       }
@@ -93,8 +93,8 @@ public sealed partial class WebApi
 
     return request switch
     {
-      Route_File.Id.Files fileIdFilesRequest => HandleFileIdFilesRoute(fileIdFilesRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
-      Route_File.Id.Snapshot fileIdSnapshotRequest => HandleFileIdSnapshotRoute(fileIdSnapshotRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
+      Route_File.Id.Files fileIdFilesRequest => await HandleFileIdFilesRoute(fileIdFilesRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
+      Route_File.Id.Snapshot fileIdSnapshotRequest => await HandleFileIdSnapshotRoute(fileIdSnapshotRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
 
       _ => Ok(file),
     };

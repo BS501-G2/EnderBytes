@@ -15,6 +15,8 @@ public sealed partial class UserManager(ResourceService service) : ResourceManag
 {
   public abstract class Exception(string? message = null) : ResourceService.Exception(message);
 
+  public sealed class UsernameNotFoundException(string Username) : Exception($"Username not found: {Username}.");
+
   public new sealed partial record Resource(
     long Id,
     long CreateTime,
@@ -66,42 +68,42 @@ public sealed partial class UserManager(ResourceService service) : ResourceManag
     reader.GetBytes(reader.GetOrdinal(COLUMN_PUBLIC_KEY))
   );
 
-  protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
+  protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
   {
     if (oldVersion < 1)
     {
-      SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_USERNAME} varchar(16) not null collate {DatabaseWrapper switch
+      await SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_USERNAME} varchar(16) not null collate {DatabaseWrapper switch
       {
         MySQLDatabase => "utf8_general_ci",
         _ => "nocase"
       }};");
-      SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_PUBLIC_KEY} blob null;");
-      SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_LAST_NAME} varchar(32) not null;");
-      SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_FIRST_NAME} varchar(32) not null;");
-      SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_MIDDLE_NAME} varchar(32) null;");
+      await SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_PUBLIC_KEY} blob null;");
+      await SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_LAST_NAME} varchar(32) not null;");
+      await SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_FIRST_NAME} varchar(32) not null;");
+      await SqlNonQuery(transaction, $"alter table {Name} add column {COLUMN_MIDDLE_NAME} varchar(32) null;");
 
-      SqlNonQuery(transaction, $"create unique index {INDEX_USERNAME} on {Name}({COLUMN_USERNAME});");
+      await SqlNonQuery(transaction, $"create unique index {INDEX_USERNAME} on {Name}({COLUMN_USERNAME});");
     }
   }
 
-  public UserPair Create(ResourceService.Transaction transaction, string username, string lastName, string firstName, string? middleName, string password, CancellationToken cancellationToken = default)
+  public async Task<UserPair> Create(ResourceService.Transaction transaction, string username, string lastName, string firstName, string? middleName, string password, CancellationToken cancellationToken = default)
   {
     (byte[] privateKey, byte[] publicKey) = Service.Server.KeyService.GetNewRsaKeyPair();
 
-    Resource user = InsertAndGet(transaction, new(
-      (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
+    Resource user = await InsertAndGet(transaction, new(
+      (COLUMN_USERNAME, await FilterValidUsername(transaction, username)),
       (COLUMN_PUBLIC_KEY, publicKey),
       (COLUMN_LAST_NAME, lastName),
       (COLUMN_FIRST_NAME, firstName),
       (COLUMN_MIDDLE_NAME, middleName)
     ), cancellationToken);
 
-    return new(user, Service.GetManager<UserAuthenticationManager>().CreatePassword(transaction, user, password, privateKey, publicKey));
+    return new(user, await Service.GetManager<UserAuthenticationManager>().CreatePassword(transaction, user, password, privateKey, publicKey));
   }
 
-  public bool Update(ResourceService.Transaction transaction, Resource user, string username, string lastName, string firstName, string? middleName)
+  public async Task<bool> Update(ResourceService.Transaction transaction, Resource user, string username, string lastName, string firstName, string? middleName)
   {
-    return Update(transaction, user, new(
+    return await Update(transaction, user, new(
       (COLUMN_USERNAME, FilterValidUsername(transaction, username)),
       (COLUMN_LAST_NAME, lastName),
       (COLUMN_FIRST_NAME, firstName),
@@ -109,16 +111,15 @@ public sealed partial class UserManager(ResourceService service) : ResourceManag
     ));
   }
 
-  public bool TryGetByUsername(ResourceService.Transaction transaction, string username, [NotNullWhen(true)] out Resource? user, CancellationToken cancellationToken = default)
+  public async Task<Resource?> GetByUsername(ResourceService.Transaction transaction, string username, CancellationToken cancellationToken = default)
   {
     if (ValidateUsername(username) != UsernameValidationFlag.NoErrors)
     {
-      user = null;
-      return false;
+      return null;
     }
 
-    return (user = Select(transaction, new WhereClause.CompareColumn(COLUMN_USERNAME, "=", username), new(1), cancellationToken: cancellationToken).FirstOrDefault()) != null;
+    return await SelectFirst(transaction, new WhereClause.CompareColumn(COLUMN_USERNAME, "=", username), cancellationToken: cancellationToken);
   }
 
-  public long CountUsers(ResourceService.Transaction transaction) => (long)SqlScalar(transaction, $"select count(*) from {NAME};")!;
+  public async Task<long> CountUsers(ResourceService.Transaction transaction) => (long)(await SqlScalar(transaction, $"select count(*) from {NAME};"))!;
 }

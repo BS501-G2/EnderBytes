@@ -53,7 +53,7 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
 
   public StorageManager(ResourceService service) : base(service, NAME, VERSION)
   {
-    service.GetManager<UserManager>().ResourceDeleted += (transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", user.Id), cancellationToken);
+    service.GetManager<UserManager>().RegisterDeleteHandler((transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", user.Id), cancellationToken));
   }
 
   protected override Resource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
@@ -67,37 +67,37 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
     reader.GetInt64Optional(reader.GetOrdinal(COLUMN_INTERNAL_FOLDER_ID))
   );
 
-  protected override void Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
+  protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
   {
     if (oldVersion < 1)
     {
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_OWNER_USER_ID} bigint not null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_KEY} blob not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_OWNER_USER_ID} bigint not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_KEY} blob not null;");
 
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ROOT_FOLDER_ID} bigint null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TRASH_FOLDER_ID} bigint null;");
-      SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_INTERNAL_FOLDER_ID} bigint null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_ROOT_FOLDER_ID} bigint null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TRASH_FOLDER_ID} bigint null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_INTERNAL_FOLDER_ID} bigint null;");
     }
   }
 
-  public Resource Create(ResourceService.Transaction transaction, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<Resource> Create(ResourceService.Transaction transaction, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
-    return InsertAndGet(transaction, new(
+    return await InsertAndGet(transaction, new(
       (COLUMN_OWNER_USER_ID, userAuthenticationToken.UserId),
       (COLUMN_KEY, userAuthenticationToken.Encrypt(Service.Server.KeyService.GetNewAesPair().Serialize()))
     ), cancellationToken);
   }
 
-  public bool Update(ResourceService.Transaction transaction, Resource storage, long? rootFolderId, long? trashFolderId, long? internalFolderId, CancellationToken cancellationToken = default)
+  public async Task<bool> Update(ResourceService.Transaction transaction, Resource storage, long? rootFolderId, long? trashFolderId, long? internalFolderId, CancellationToken cancellationToken = default)
   {
-    return Update(transaction, storage, new(
+    return await Update(transaction, storage, new(
       (COLUMN_ROOT_FOLDER_ID, rootFolderId),
       (COLUMN_TRASH_FOLDER_ID, trashFolderId),
       (COLUMN_INTERNAL_FOLDER_ID, internalFolderId)
     ), cancellationToken);
   }
 
-  public byte[] EncryptFileKey(ResourceService.Transaction transaction, Resource storage, KeyService.AesPair key, FileManager.Resource? parent, UserAuthenticationToken? userAuthenticationToken, FileAccessType fileAccessType, CancellationToken cancellationToken = default)
+  public Task<byte[]> EncryptFileKey(ResourceService.Transaction transaction, Resource storage, KeyService.AesPair key, FileManager.Resource? parent, UserAuthenticationToken? userAuthenticationToken, FileAccessType fileAccessType, CancellationToken cancellationToken = default)
   {
 
     if (parent == null)
@@ -114,12 +114,12 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
 
     return encryptFileKey(null, parent);
 
-    byte[] encryptFileKey(KeyService.AesPair? storageKey, FileManager.Resource? parent) => storageKey == null && parent != null
-      ? DecryptKey(transaction, storage, parent, userAuthenticationToken, fileAccessType, cancellationToken).Key.Encrypt(key.Serialize())
+    async Task<byte[]> encryptFileKey(KeyService.AesPair? storageKey, FileManager.Resource? parent) => storageKey == null && parent != null
+      ? (await DecryptKey(transaction, storage, parent, userAuthenticationToken, fileAccessType, cancellationToken)).Key.Encrypt(key.Serialize())
       : storageKey!.Encrypt(key.Serialize());
   }
 
-  public DecryptedKeyInfo DecryptKey(ResourceService.Transaction transaction, Resource storage, FileManager.Resource? file, UserAuthenticationToken? userAuthenticationToken, FileAccessType? fileAccessType = null, CancellationToken cancellationToken = default)
+  public async Task<DecryptedKeyInfo> DecryptKey(ResourceService.Transaction transaction, Resource storage, FileManager.Resource? file, UserAuthenticationToken? userAuthenticationToken, FileAccessType? fileAccessType = null, CancellationToken cancellationToken = default)
   {
     if (file == null)
     {
@@ -135,11 +135,11 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
 
     if (storage.OwnerUserId != userAuthenticationToken?.UserId)
     {
-      return new(decryptFileKey2(file), fileAccessUsed);
+      return new(await decryptFileKey2(file), fileAccessUsed);
 
-      KeyService.AesPair decryptFileKey2(FileManager.Resource file)
+      async Task<KeyService.AesPair> decryptFileKey2(FileManager.Resource file)
       {
-        foreach (FileAccessManager.Resource fileAccess in Service.GetManager<FileAccessManager>().List(transaction, storage, file, userAuthenticationToken, cancellationToken: cancellationToken))
+        await foreach (FileAccessManager.Resource fileAccess in Service.GetManager<FileAccessManager>().List(transaction, storage, file, userAuthenticationToken, cancellationToken: cancellationToken))
         {
           if (fileAccess.Type > fileAccessType)
           {
@@ -168,75 +168,77 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
           throw new ArgumentException($"No {fileAccessType} access to the file.", nameof(userAuthenticationToken));
         }
 
-        return KeyService.AesPair.Deserialize(decryptFileKey2(Service.GetManager<FileManager>().GetById(transaction, (long)file.ParentId, cancellationToken)).Decrypt(file.Key));
+        return KeyService.AesPair.Deserialize((await decryptFileKey2(await Service.GetManager<FileManager>().GetByRequiredId(transaction, (long)file.ParentId, cancellationToken))).Decrypt(file.Key));
       }
     }
     else
     {
       KeyService.AesPair storageKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key));
 
-      return new(decryptFileKey2(file), fileAccessUsed);
+      return new(await decryptFileKey2(file), fileAccessUsed);
 
-      KeyService.AesPair decryptFileKey2(FileManager.Resource file) => file.ParentId != null
-        ? KeyService.AesPair.Deserialize(decryptFileKey2(Service.GetManager<FileManager>().GetById(transaction, (long)file.ParentId, cancellationToken)).Decrypt(file.Key))
+      async Task<KeyService.AesPair> decryptFileKey2(FileManager.Resource file) => file.ParentId != null
+        ? KeyService.AesPair.Deserialize((await decryptFileKey2(await Service.GetManager<FileManager>().GetByRequiredId(transaction, (long)file.ParentId, cancellationToken))).Decrypt(file.Key))
         : KeyService.AesPair.Deserialize(storageKey.Decrypt(file.Key));
     }
   }
 
-  public Resource GetByOwnerUser(ResourceService.Transaction transaction, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<Resource> GetByOwnerUser(ResourceService.Transaction transaction, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
-    Resource? storage = SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", userAuthenticationToken.UserId));
+    Resource? storage = await SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", userAuthenticationToken.UserId));
 
     if (storage == null)
     {
-      storage = Create(transaction, userAuthenticationToken);
+      storage = await Create(transaction, userAuthenticationToken, cancellationToken);
     }
 
     return storage;
   }
 
-  public FileManager.Resource GetRootFolder(ResourceService.Transaction transaction, Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<FileManager.Resource> GetRootFolder(ResourceService.Transaction transaction, Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
-    if (storage.RootFolderId != null && transaction.GetManager<FileManager>().TryGetById(transaction, (long)storage.RootFolderId, out FileManager.Resource? file, cancellationToken))
+    FileManager.Resource? file;
+    if (storage.RootFolderId != null && (file = await transaction.GetManager<FileManager>().GetById(transaction, (long)storage.RootFolderId, cancellationToken)) != null)
     {
       return file;
     }
 
-    FileManager.Resource newFile = transaction.GetManager<FileManager>().CreateFolder(transaction, storage, null, "_ROOT", userAuthenticationToken, cancellationToken);
-
-    Update(transaction, storage, new(
+    FileManager.Resource newFile = await transaction.GetManager<FileManager>().CreateFolder(transaction, storage, null, "_ROOT", userAuthenticationToken, cancellationToken);
+    await Update(transaction, storage, new(
       (COLUMN_ROOT_FOLDER_ID, newFile.Id)
     ), cancellationToken);
 
     return newFile;
   }
 
-  public FileManager.Resource GetTrashFolder(ResourceService.Transaction transaction, Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<FileManager.Resource> GetTrashFolder(ResourceService.Transaction transaction, Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
-    if (storage.TrashFolderId != null && transaction.GetManager<FileManager>().TryGetById(transaction, (long)storage.TrashFolderId, out FileManager.Resource? file, cancellationToken))
+    FileManager.Resource? file;
+    if (storage.TrashFolderId != null && (file = await transaction.GetManager<FileManager>().GetById(transaction, (long)storage.TrashFolderId, cancellationToken)) != null)
     {
       return file;
     }
 
-    FileManager.Resource newFile = transaction.GetManager<FileManager>().CreateFolder(transaction, storage, null, "_TRASH", userAuthenticationToken, cancellationToken);
+    FileManager.Resource newFile = await transaction.GetManager<FileManager>().CreateFolder(transaction, storage, null, "_TRASH", userAuthenticationToken, cancellationToken);
 
-    Update(transaction, storage, new(
+    await Update(transaction, storage, new(
       (COLUMN_TRASH_FOLDER_ID, newFile.Id)
     ), cancellationToken);
 
     return newFile;
   }
 
-  public FileManager.Resource GetInternalFolder(ResourceService.Transaction transaction, Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<FileManager.Resource> GetInternalFolder(ResourceService.Transaction transaction, Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
-    if (storage.InternalFolderId != null && transaction.GetManager<FileManager>().TryGetById(transaction, (long)storage.InternalFolderId, out FileManager.Resource? file, cancellationToken))
+    FileManager.Resource? file;
+    if (storage.InternalFolderId != null && (file = await transaction.GetManager<FileManager>().GetById(transaction, (long)storage.InternalFolderId, cancellationToken)) != null)
     {
       return file;
     }
 
-    FileManager.Resource newFile = transaction.GetManager<FileManager>().CreateFolder(transaction, storage, null, "_INTERNAL", userAuthenticationToken, cancellationToken);
+    FileManager.Resource newFile = await transaction.GetManager<FileManager>().CreateFolder(transaction, storage, null, "_INTERNAL", userAuthenticationToken, cancellationToken);
 
-    Update(transaction, storage, new(
+    await Update(transaction, storage, new(
       (COLUMN_INTERNAL_FOLDER_ID, newFile.Id)
     ), cancellationToken);
 

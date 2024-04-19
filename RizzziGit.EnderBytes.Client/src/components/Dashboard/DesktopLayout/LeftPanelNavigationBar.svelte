@@ -25,7 +25,7 @@
     { name: "Starred", icon: StarIcon, path: "starred" },
     { name: "Shared", icon: ShareIcon, path: "shared" },
     { name: "Trash", icon: TrashIcon, path: "trash" },
-    { name: "Profile", icon: UserIcon, path: "profile" },
+    { name: "Users", icon: UserIcon, path: "users" },
   ];
 </script>
 

@@ -56,18 +56,20 @@ public partial class WebApi
         return;
       }
 
-      if (!await server.ResourceService.Transact((transaction, cancellationToken) =>
+      if (!await server.ResourceService.Transact(async (transaction, cancellationToken) =>
       {
+        UserManager.Resource? user;
+        UserAuthenticationToken? userAuthenticationToken;
         if (
-          server.ResourceService.GetManager<UserManager>().TryGetById(transaction, userId, out UserManager.Resource? user, cancellationToken) &&
-          server.ResourceService.GetManager<UserAuthenticationManager>().TryGetSessionToken(transaction, user, token, out var userAuthenticationToken, cancellationToken)
+          ((user = await server.ResourceService.GetManager<UserManager>().GetById(transaction, userId, cancellationToken)) != null) &&
+          ((userAuthenticationToken = await server.ResourceService.GetManager<UserAuthenticationManager>().GetSessionToken(transaction, user, token, cancellationToken)) != null)
         )
         {
           context.RequestServices.GetRequiredService<MiscellaneousRequestContext>().Token = userAuthenticationToken;
 
-          UserAuthenticationSessionTokenManager.Resource userAuthenticationSessionTokenResource = server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().GetByUserAuthentication(transaction, userAuthenticationToken.UserAuthentication, cancellationToken);
+          UserAuthenticationSessionTokenManager.Resource userAuthenticationSessionTokenResource = await server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().GetByUserAuthentication(transaction, userAuthenticationToken.UserAuthentication, cancellationToken);
 
-          server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().ResetExpiryTime(transaction, userAuthenticationSessionTokenResource, 36000 * 1000 * 24, cancellationToken);
+          await server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().ResetExpiryTime(transaction, userAuthenticationSessionTokenResource, 36000 * 1000 * 24, cancellationToken);
           return true;
         }
 

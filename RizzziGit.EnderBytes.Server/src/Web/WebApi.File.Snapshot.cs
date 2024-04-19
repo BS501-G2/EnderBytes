@@ -13,24 +13,25 @@ public sealed partial class WebApi
   public Task<ActionResult> GetFileSnapshots(long? id) => HandleFileRoute(new Route_File.Id.Snapshot(id));
 
   [NonAction]
-  public ActionResult HandleFileIdSnapshotRoute(Route_File.Id.Snapshot request, ResourceService.Transaction transaction, FileManager.Resource file, StorageManager.Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
+  public async Task<ActionResult> HandleFileIdSnapshotRoute(Route_File.Id.Snapshot request, ResourceService.Transaction transaction, FileManager.Resource file, StorageManager.Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
   {
     FileSnapshotManager fileSnapshotManager = ResourceService.GetManager<FileSnapshotManager>();
 
     return request switch
     {
-      Route_File.Id.Snapshot.Id fileIdSnapshotIdRequest => HandleFileIdSnapshotIdRoute(fileIdSnapshotIdRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
-      Route_File.Id.Snapshot.Create fileIdSnapshotCreateRequest => HandleFileIdSnapshotCreateRoute(fileIdSnapshotCreateRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
-      _ => Ok(fileSnapshotManager.List(transaction, storage, file, userAuthenticationToken, null, null, cancellationToken).ToArray())
+      Route_File.Id.Snapshot.Id fileIdSnapshotIdRequest => await HandleFileIdSnapshotIdRoute(fileIdSnapshotIdRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
+      Route_File.Id.Snapshot.Create fileIdSnapshotCreateRequest => await HandleFileIdSnapshotCreateRoute(fileIdSnapshotCreateRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
+      _ => Ok(await fileSnapshotManager.List(transaction, storage, file, userAuthenticationToken, null, null, cancellationToken).ToArrayAsync(cancellationToken))
     };
   }
 
   [NonAction]
-  public ActionResult HandleFileIdSnapshotCreateRoute(Route_File.Id.Snapshot.Create request, ResourceService.Transaction transaction, FileManager.Resource file, StorageManager.Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
+  public async Task<ActionResult> HandleFileIdSnapshotCreateRoute(Route_File.Id.Snapshot.Create request, ResourceService.Transaction transaction, FileManager.Resource file, StorageManager.Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
   {
     FileSnapshotManager fileSnapshotManager = ResourceService.GetManager<FileSnapshotManager>();
 
-    if (!fileSnapshotManager.TryGetById(transaction, request.BaseSnapshotId, out FileSnapshotManager.Resource? fileSnapshot, cancellationToken))
+    FileSnapshotManager.Resource? fileSnapshot;
+    if ((fileSnapshot = await fileSnapshotManager.GetById(transaction, request.BaseSnapshotId, cancellationToken)) == null)
     {
       return NotFound();
     }
@@ -39,27 +40,28 @@ public sealed partial class WebApi
   }
 
   [NonAction]
-  public ActionResult HandleFileIdSnapshotIdRoute(Route_File.Id.Snapshot.Id request, ResourceService.Transaction transaction, FileManager.Resource file, StorageManager.Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
+  public async Task<ActionResult> HandleFileIdSnapshotIdRoute(Route_File.Id.Snapshot.Id request, ResourceService.Transaction transaction, FileManager.Resource file, StorageManager.Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
   {
     FileSnapshotManager fileSnapshotManager = ResourceService.GetManager<FileSnapshotManager>();
 
-    if (!fileSnapshotManager.TryGetById(transaction, request.SnapshotId, out FileSnapshotManager.Resource? fileSnapshot, cancellationToken))
+    FileSnapshotManager.Resource? fileSnapshot;
+    if ((fileSnapshot = await fileSnapshotManager.GetById(transaction, request.SnapshotId, cancellationToken)) == null)
     {
       return NotFound();
     }
 
     return request switch
     {
-      Route_File.Id.Snapshot.Id.Upload fileIdSnapshotIdUploadRequest => HandleFileIdSnapshotIdUploadRoute(fileIdSnapshotIdUploadRequest, transaction, fileSnapshot, file, storage, userAuthenticationToken, cancellationToken),
+      Route_File.Id.Snapshot.Id.Upload fileIdSnapshotIdUploadRequest => await HandleFileIdSnapshotIdUploadRoute(fileIdSnapshotIdUploadRequest, transaction, fileSnapshot, file, storage, userAuthenticationToken, cancellationToken),
       _ => Ok(fileSnapshot),
     };
   }
 
   [NonAction]
-  public ActionResult HandleFileIdSnapshotIdUploadRoute(Route_File.Id.Snapshot.Id.Upload request, ResourceService.Transaction transaction, FileSnapshotManager.Resource fileSnapshot, FileManager.Resource file, StorageManager.Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
+  public async Task<ActionResult> HandleFileIdSnapshotIdUploadRoute(Route_File.Id.Snapshot.Id.Upload request, ResourceService.Transaction transaction, FileSnapshotManager.Resource fileSnapshot, FileManager.Resource file, StorageManager.Resource storage, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken)
   {
     FileBufferMapManager fileBufferMapManager = ResourceService.GetManager<FileBufferMapManager>();
-    fileBufferMapManager.Write(transaction, storage, file, fileSnapshot, request.Offset, request.Bytes, userAuthenticationToken, cancellationToken);
+    await fileBufferMapManager.Write(transaction, storage, file, fileSnapshot, request.Offset, request.Bytes, userAuthenticationToken, cancellationToken);
 
     return Ok();
   }

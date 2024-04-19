@@ -32,11 +32,11 @@ public sealed partial class UserManager
     return flag;
   }
 
-  public UsernameValidationFlag ValidateUsername(ResourceService.Transaction transaction, string username)
+  public async Task<UsernameValidationFlag> ValidateUsername(ResourceService.Transaction transaction, string username)
   {
     UsernameValidationFlag flag = ValidateUsername(username);
 
-    if (Exists(transaction, new WhereClause.CompareColumn(COLUMN_USERNAME, "=", username)))
+    if (await Exists(transaction, new WhereClause.CompareColumn(COLUMN_USERNAME, "=", username)))
     {
       flag |= UsernameValidationFlag.AlreadyTaken;
     }
@@ -44,10 +44,18 @@ public sealed partial class UserManager
     return flag;
   }
 
-  public void ThrowIfInvalidUsername(string username) => ThrowIfInvalidUsername(null, username);
-  public void ThrowIfInvalidUsername(ResourceService.Transaction? transaction, string username)
+  public void ThrowIfInvalidUsername(string username)
   {
-    UsernameValidationFlag validationFlags = transaction == null ? ValidateUsername(username) : ValidateUsername(transaction, username);
+    UsernameValidationFlag validationFlags = ValidateUsername(username);
+    if (validationFlags != UsernameValidationFlag.NoErrors)
+    {
+      throw new ArgumentException($"Invalid username: Flag {validationFlags}.", nameof(username));
+    }
+  }
+
+  public async Task ThrowIfInvalidUsername(ResourceService.Transaction transaction, string username)
+  {
+    UsernameValidationFlag validationFlags = await ValidateUsername(transaction, username);
 
     if (validationFlags != UsernameValidationFlag.NoErrors)
     {
@@ -59,9 +67,9 @@ public sealed partial class UserManager
   public static partial Regex ValidUsernameRegex();
 
   public string FilterValidUsername(string username) => FilterValidUsername(username);
-  public string FilterValidUsername(ResourceService.Transaction? transaction, string username)
+  public async Task<string> FilterValidUsername(ResourceService.Transaction transaction, string username)
   {
-    ThrowIfInvalidUsername(transaction, username);
+    await ThrowIfInvalidUsername(transaction, username);
     return username;
   }
 }

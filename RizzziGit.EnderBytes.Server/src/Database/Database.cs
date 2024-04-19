@@ -4,7 +4,7 @@ namespace RizzziGit.EnderBytes.DatabaseWrappers;
 
 public abstract class Database(DbConnectionStringBuilder connectionStringBuilder) : IDisposable
 {
-  public delegate void DatabaseConnectionHandler(DbConnection connection, CancellationToken cancellationToken = default);
+  public delegate Task DatabaseConnectionHandler(DbConnection connection, CancellationToken cancellationToken = default);
 
   private readonly string ConnectionString = connectionStringBuilder.ToString();
   private bool Disposed = false;
@@ -21,7 +21,7 @@ public abstract class Database(DbConnectionStringBuilder connectionStringBuilder
     try
     {
       await connection.OpenAsync(cancellationToken);
-      handler(connection, cancellationToken);
+      await handler(connection, cancellationToken);
     }
     finally
     {

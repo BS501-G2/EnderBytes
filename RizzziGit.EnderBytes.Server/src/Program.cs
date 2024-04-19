@@ -60,7 +60,7 @@ public static class Program
       }
       catch
       {
-        Handler = null;
+        Handlers.Clear();
         throw;
       }
       await Server.Join();
@@ -80,13 +80,13 @@ public static class Program
     }
   }
 
-  private static event ResourceService.TransactionHandler? Handler = null;
+  private readonly static List<ResourceService.TransactionHandler> Handlers = [];
 
   public static async Task StopTest(Server server) => await Task.Run(async () =>
   {
-    if (Handler != null)
+    foreach (ResourceService.TransactionHandler handler in Handlers)
     {
-      await server.ResourceService.Transact(Handler);
+      await server.ResourceService.Transact(handler);
     }
 
     await server.Stop();
@@ -94,13 +94,13 @@ public static class Program
 
   public static Task RunTest(Logger logger, Server server) => Task.Run(() =>
   {
-    server.ResourceService.Transact((transaction, cancellationToken) =>
+    server.ResourceService.Transact(async (transaction, cancellationToken) =>
     {
-      (UserManager.Resource user, UserAuthenticationToken userAuthenticationToken) = server.ResourceService.GetManager<UserManager>().Create(transaction, "Testuser", "LastName", "FirstName", "MiddleName", "TestTest123;",  cancellationToken);
-      Handler += (transaction, cancellationToken) =>
+      (UserManager.Resource user, UserAuthenticationToken userAuthenticationToken) = await server.ResourceService.GetManager<UserManager>().Create(transaction, "Testuser", "LastName", "FirstName", "MiddleName", "TestTest123;",  cancellationToken);
+      Handlers.Add(async (transaction, cancellationToken) =>
       {
-        server.ResourceService.GetManager<UserManager>().Delete(transaction, user, cancellationToken);
-      };
+        await server.ResourceService.GetManager<UserManager>().Delete(transaction, user, cancellationToken);
+      });
     });
   });
 }

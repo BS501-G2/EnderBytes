@@ -4,7 +4,7 @@ using System.Text;
 namespace RizzziGit.EnderBytes.Web;
 
 using Resources;
-using  Services;
+using Services;
 
 public sealed partial class WebApi
 {
@@ -13,7 +13,7 @@ public sealed partial class WebApi
 
   [Route("/auth/password-login")]
   [HttpPost]
-  public Task<ActionResult<PasswordLoginResponse>> Login([FromBody] PasswordLoginRequest request) => ResourceService.Transact<ActionResult<PasswordLoginResponse>>((transaction, cancellationToken) =>
+  public Task<ActionResult<PasswordLoginResponse>> Login([FromBody] PasswordLoginRequest request) => ResourceService.Transact<ActionResult<PasswordLoginResponse>>(async (transaction, cancellationToken) =>
   {
     if (TryGetUserAuthenticationToken(out _))
     {
@@ -22,16 +22,19 @@ public sealed partial class WebApi
 
     (string Username, string Password) = request;
 
+    UserManager.Resource? user;
+    UserAuthenticationToken? userAuthenticationToken;
+
     if (
-      !GetResourceManager<UserManager>().TryGetByUsername(transaction, Username, out UserManager.Resource? user, cancellationToken) ||
-      !GetResourceManager<UserAuthenticationManager>().TryGetByPayload(transaction, user, Encoding.UTF8.GetBytes(Password), UserAuthenticationType.Password, out UserAuthenticationToken? userAuthenticationToken)
+      ((user = await GetResourceManager<UserManager>().GetByUsername(transaction, Username, cancellationToken)) == null) ||
+      ((userAuthenticationToken = await GetResourceManager<UserAuthenticationManager>().GetByPayload(transaction, user, Encoding.UTF8.GetBytes(Password), UserAuthenticationType.Password)) == null)
     )
     {
       return Unauthorized();
     }
 
-    string token = GetResourceManager<UserAuthenticationManager>().CreateSessionToken(transaction, user, userAuthenticationToken, cancellationToken);
-    Server.ResourceService.GetManager<UserAuthenticationManager>().TryTruncateSessionTokens(transaction, user, cancellationToken);
+    string token = await GetResourceManager<UserAuthenticationManager>().CreateSessionToken(transaction, user, userAuthenticationToken, cancellationToken);
+    await Server.ResourceService.GetManager<UserAuthenticationManager>().TruncateSessionToken(transaction, user, cancellationToken);
 
     return Ok(new PasswordLoginResponse(user.Id, token));
   });
@@ -44,9 +47,9 @@ public sealed partial class WebApi
       return Unauthorized(401);
     }
 
-    await ResourceService.Transact((transaction, cancellationToken) =>
+    await ResourceService.Transact(async (transaction, cancellationToken) =>
     {
-      GetResourceManager<UserAuthenticationManager>().Delete(transaction, userAuthenticationToken.UserAuthentication, cancellationToken);
+      await GetResourceManager<UserAuthenticationManager>().Delete(transaction, userAuthenticationToken.UserAuthentication, cancellationToken);
     });
 
     return Ok();

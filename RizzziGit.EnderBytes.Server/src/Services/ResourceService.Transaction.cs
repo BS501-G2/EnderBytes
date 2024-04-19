@@ -8,13 +8,13 @@ using Commons.Logging;
 
 using Utilities;
 using Core;
+using System.Runtime.ExceptionServices;
 
 public sealed partial class ResourceService
 {
-  public delegate void TransactionHandler(Transaction transaction, CancellationToken cancellationToken);
-  public delegate T TransactionHandler<T>(Transaction transaction, CancellationToken cancellationToken);
-  public delegate IEnumerable<T> TransactionEnumeratorHandler<T>(Transaction transaction, CancellationToken cancellationToken);
-  public delegate void TransactionFailureHandler();
+  public delegate Task TransactionHandler(Transaction transaction, CancellationToken cancellationToken);
+  public delegate Task<T> TransactionHandler<T>(Transaction transaction, CancellationToken cancellationToken);
+  public delegate IAsyncEnumerable<T> TransactionEnumeratorHandler<T>(Transaction transaction, CancellationToken cancellationToken);
 
   private long NextTransactionId;
   public sealed record Transaction(DbConnection Connection, long Id, ResourceService ResourceService, CancellationToken CancellationToken)
@@ -26,38 +26,39 @@ public sealed partial class ResourceService
 
   public async IAsyncEnumerable<T> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler, [EnumeratorCancellation] CancellationToken cancellationToken)
   {
-    using WaitQueue<TaskCompletionSource<StrongBox<T>?>> waitQueue = new();
+    WaitQueue<StrongBox<T>?> waitQueue = new(0);
+    ExceptionDispatchInfo? exceptionDispatchInfo = null;
 
-    _ = Transact((transaction, cancellationToken) =>
+    _ = Transact(async (transaction, cancellationToken) =>
     {
       try
       {
-        foreach (T item in handler(transaction, cancellationToken))
+        await foreach (T item in handler(transaction, cancellationToken))
         {
-          waitQueue.Dequeue(cancellationToken).WaitSync(cancellationToken).SetResult(new(item));
+          await waitQueue.Enqueue(new(item), cancellationToken);
         }
-
-        waitQueue.Dequeue(cancellationToken).WaitSync(cancellationToken).SetResult(null);
       }
       catch (Exception exception)
       {
-        waitQueue.Dequeue(cancellationToken).WaitSync(cancellationToken).SetException(exception);
-        throw;
+        exceptionDispatchInfo = ExceptionDispatchInfo.Capture(exception);
       }
+
+      await waitQueue.Enqueue(null, cancellationToken);
     }, cancellationToken);
 
-    while (true)
+    await foreach (StrongBox<T>? item in waitQueue)
     {
-      TaskCompletionSource<StrongBox<T>?> source = new();
-      await waitQueue.Enqueue(source, cancellationToken);
-      StrongBox<T>? strongBox = await source.Task;
-
-      if (strongBox == null)
+      if (item == null)
       {
-        yield break;
+        break;
       }
 
-      yield return strongBox.Value!;
+      yield return item.Value!;
+    }
+
+    if (exceptionDispatchInfo != null)
+    {
+      exceptionDispatchInfo.Throw();
     }
   }
 
@@ -67,7 +68,7 @@ public sealed partial class ResourceService
 
     try
     {
-      await Transact((transaction, cancellationToken) => source.SetResult(handler(transaction, cancellationToken)), cancellationToken);
+      await Transact(async (transaction, cancellationToken) => source.SetResult(await handler(transaction, cancellationToken)), cancellationToken);
     }
     catch (Exception exception)
     {
@@ -79,38 +80,27 @@ public sealed partial class ResourceService
 
   public Task Transact(TransactionHandler handler, CancellationToken cancellationToken = default)
   {
-    return Database!.Run((connection, cancellationToken) =>
+    return Database!.Run(async (connection, cancellationToken) =>
     {
       using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(GetCancellationToken(), cancellationToken);
-      using DbTransaction dbTransaction = connection.BeginTransaction();
+      using DbTransaction dbTransaction = await connection.BeginTransactionAsync();
 
       Transaction transaction = new(connection, NextTransactionId++, this, linkedCancellationTokenSource.Token);
       Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");
 
-      while (true)
+      try
       {
-        try
-        {
-          handler(transaction, linkedCancellationTokenSource.Token);
-          linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
+        await handler(transaction, linkedCancellationTokenSource.Token);
+        Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");
 
-          Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");
+        await dbTransaction.CommitAsync(linkedCancellationTokenSource.Token);
+      }
+      catch (Exception exception)
+      {
+        Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
 
-          dbTransaction.Commit();
-          break;
-        }
-        catch (Exception exception)
-        {
-          if (exception.Message.Contains("deadlock"))
-          {
-            continue;
-          }
-
-          Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
-
-          dbTransaction.Rollback();
-          throw;
-        }
+        await dbTransaction.RollbackAsync(linkedCancellationTokenSource.Token);
+        throw;
       }
     }, cancellationToken);
   }

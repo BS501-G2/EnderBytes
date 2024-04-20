@@ -2,15 +2,14 @@
   import { RootState } from "$lib/states/root-state";
 
   import File from "../../File.svelte";
-  import { type AwaiterResetFunction } from "../../../Bindings/Awaiter.svelte";
   import type {
     FileBrowserInformation,
     FileBrowserSelection,
   } from "../../../FileBrowser.svelte";
   import LoadingSpinnerPage from "../../../Widgets/LoadingSpinnerPage.svelte";
+    import { hasKeys } from "../../../Bindings/Keyboard.svelte";
 
   const rootState = RootState.state;
-  const keyboardState = $rootState.keyboardState;
 
   export let selection: FileBrowserSelection;
   export let info: FileBrowserInformation | null;
@@ -35,11 +34,11 @@
         {file}
         selected={$selection.includes(file)}
         onClick={() => {
-          if ($keyboardState.hasKeys("control")) {
+          if (hasKeys("control")) {
             $selection = !$selection.includes(file)
               ? [...$selection, file]
               : $selection.filter((id) => id !== file);
-          } else if ($keyboardState.hasKeys("shift")) {
+          } else if (hasKeys("shift")) {
             if ($selection.length === 0) {
               $selection = [file];
             } else {

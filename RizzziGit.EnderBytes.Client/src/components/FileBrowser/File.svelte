@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { hasKeys } from "../Bindings/Keyboard.svelte";
 
   export let file: any;
   export let selected: boolean = false;
@@ -14,7 +15,15 @@
   on:pointerenter={() => (hovered = true)}
   on:pointerleave={() => (hovered = false)}
   on:click={onClick}
-  on:dblclick={() => goto("/app/files/" + file.id)}
+  on:dblclick={() => {
+    const path = "/app/files/" + file.id;
+
+    if (hasKeys("control")) {
+      window.open(path, "_blank");
+    } else {
+      goto(path);
+    }
+  }}
 >
   <div class="overlay">
     {#if selected || hovered}

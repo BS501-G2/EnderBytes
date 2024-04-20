@@ -3,7 +3,6 @@ import { Locale, LocaleKey, getClientResponseString, getString } from "$lib/loca
 import { ViewMode } from "$lib/view-mode";
 import { writable, type Writable } from "svelte/store";
 import { AppState } from "./app-state";
-import { KeyboardState } from "../../components/Bindings/Keyboard.svelte";
 
 export class RootState {
   static #state?: Writable<RootState>
@@ -20,7 +19,6 @@ export class RootState {
     this.locale = Locale.en_US;
 
     this.appState = writable(new AppState())
-    this.keyboardState = writable(new KeyboardState())
   }
 
   theme: ColorScheme;
@@ -28,7 +26,6 @@ export class RootState {
   locale: Locale;
 
   appState: Writable<AppState>
-  keyboardState: Writable<KeyboardState>
 
   public get isDesktop(): boolean { return !!(this.viewMode & ViewMode.Desktop) }
   public get isMobile(): boolean { return !!(this.viewMode & ViewMode.Mobile) }

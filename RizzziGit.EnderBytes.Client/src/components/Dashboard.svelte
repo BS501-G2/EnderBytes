@@ -7,7 +7,7 @@
   import DesktopLayout from "./Dashboard/DesktopLayout.svelte";
   import MobileLayout from "./Dashboard/MobileLayout/MobileLayout.svelte";
   import ResponsiveLayout from "./Bindings/ResponsiveLayout.svelte";
-  import AccountSettingsDialog from "./AccountSettingsDialog.svelte";
+  import AccountSettingsDialog from "./Dashboard/AccountSettingsDialog.svelte";
   import LogoutConfirmationDialog from "./Dashboard/LogoutConfirmationDialog.svelte";
   import Awaiter from "./Bindings/Awaiter.svelte";
   import Client from "./Bindings/Client.svelte";

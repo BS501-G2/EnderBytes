@@ -1,11 +1,17 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import type {
+    FileBrowserInformation,
+    FileBrowserSelection,
+  } from "../../../FileBrowser.svelte";
+  import type { AwaiterResetFunction } from "../../../Bindings/Awaiter.svelte";
 
-  export let file: any;
-  export let selectedFiles: any[];
+  export let selection: FileBrowserSelection;
+  export let reset: AwaiterResetFunction;
+  export let info: FileBrowserInformation;
 
   onMount(() => {
-    selectedFiles = [file];
+    $selection = [info.current.id];
   });
 </script>
 

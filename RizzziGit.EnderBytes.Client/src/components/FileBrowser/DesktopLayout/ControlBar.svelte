@@ -9,103 +9,100 @@
     FolderPlusIcon,
     UploadIcon,
   } from "svelte-feather-icons";
-  import Awaiter from "../../Bindings/Awaiter.svelte";
-  import { fetchAndInterpret } from "../../Bindings/Client.svelte";
+  import { type AwaiterResetFunction } from "../../Bindings/Awaiter.svelte";
   import Button, { ButtonClass } from "../../Widgets/Button.svelte";
   import { enabled as fileCreationDialog } from "../FileCreationDialog.svelte";
   import { enabled as folderCreationDialog } from "../FolderCreationDialog.svelte";
+  import type {
+    FileBrowserInformation,
+    FileBrowserSelection,
+  } from "../../FileBrowser.svelte";
 
-  export let currentFileId: number | null;
-  export let selectedFiles: number[];
-  export let onRefresh: () => void;
+  export let selection: FileBrowserSelection;
+  export let reset: AwaiterResetFunction;
+  export let info: FileBrowserInformation | null;
 </script>
 
 <div class="controls">
-  <Awaiter
-    callback={() =>
-      fetchAndInterpret(
-        `/file/${currentFileId != null ? `:${currentFileId}` : "!root"}`,
-      )}
-  >
-    <svelte:fragment slot="loading">
-      <div class="loading"></div>
-    </svelte:fragment>
-    <svelte:fragment slot="success" let:result={file}>
+  {#if info == null}
+    <div class="loading"></div>
+  {:else}
+    {@const file = info.current}
+
+    <Button
+      buttonClass={ButtonClass.PrimaryContainer}
+      outline={false}
+      onClick={() => ($fileCreationDialog = true)}
+    >
+      <UploadIcon />
+      <p>Upload</p>
+    </Button>
+    <Button
+      buttonClass={ButtonClass.PrimaryContainer}
+      outline={false}
+      onClick={() => ($folderCreationDialog = true)}
+    >
+      <FolderPlusIcon />
+      <p>New Folder</p>
+    </Button>
+    <div class="divider" />
+    {#if file == null || file?.type === 1}
       <Button
         buttonClass={ButtonClass.PrimaryContainer}
         outline={false}
-        onClick={() => ($fileCreationDialog = true)}
+        onClick={reset}
       >
-        <UploadIcon />
-        <p>Upload</p>
+        <RefreshCwIcon />
+        <p>Refresh</p>
+      </Button>
+    {/if}
+    {#if $selection.length !== 0}
+      <Button
+        buttonClass={ButtonClass.PrimaryContainer}
+        outline={false}
+        onClick={() => {}}
+      >
+        <ScissorsIcon />
+        <p>Move To</p>
       </Button>
       <Button
         buttonClass={ButtonClass.PrimaryContainer}
         outline={false}
-        onClick={() => ($folderCreationDialog = true)}
+        onClick={() => {}}
       >
-        <FolderPlusIcon />
-        <p>New Folder</p>
+        <CopyIcon />
+        <p>Copy To</p>
       </Button>
-      <div class="divider" />
-      {#if currentFileId == null || file?.type === 1}
-        <Button
-          buttonClass={ButtonClass.PrimaryContainer}
-          outline={false}
-          onClick={onRefresh}
-        >
-          <RefreshCwIcon />
-          <p>Refresh</p>
-        </Button>
-      {/if}
-      {#if selectedFiles.length !== 0}
-        <Button
-          buttonClass={ButtonClass.PrimaryContainer}
-          outline={false}
-          onClick={() => {}}
-        >
-          <ScissorsIcon />
-          <p>Move To</p>
-        </Button>
-        <Button
-          buttonClass={ButtonClass.PrimaryContainer}
-          outline={false}
-          onClick={() => {}}
-        >
-          <CopyIcon />
-          <p>Copy To</p>
-        </Button>
-      {/if}
-      {#if selectedFiles.length === 1}
-        <Button
-          buttonClass={ButtonClass.PrimaryContainer}
-          outline={false}
-          onClick={() => {}}
-        >
-          <ShareIcon />
-          <p>Share</p>
-        </Button>
-        <Button
-          buttonClass={ButtonClass.PrimaryContainer}
-          outline={false}
-          onClick={() => {}}
-        >
-          <UsersIcon />
-          <p>Manage Access</p>
-        </Button>
-      {/if}
-      {#if selectedFiles.length >= 1}
-        <Button
-          buttonClass={ButtonClass.PrimaryContainer}
-          outline={false}
-          onClick={() => {}}
-        >
-          <TrashIcon />
-          <p>Move to Trash</p>
-        </Button>
-      {/if}
-    </svelte:fragment>
-  </Awaiter>
+    {/if}
+    {#if $selection.length === 1}
+      <Button
+        buttonClass={ButtonClass.PrimaryContainer}
+        outline={false}
+        onClick={() => {}}
+      >
+        <ShareIcon />
+        <p>Share</p>
+      </Button>
+      <Button
+        buttonClass={ButtonClass.PrimaryContainer}
+        outline={false}
+        onClick={() => {}}
+      >
+        <UsersIcon />
+        <p>Manage Access</p>
+      </Button>
+    {/if}
+    {#if $selection.length >= 1}
+      <Button
+        buttonClass={ButtonClass.PrimaryContainer}
+        outline={false}
+        onClick={() => {}}
+      >
+        <TrashIcon />
+        <p>Move to Trash</p>
+      </Button>
+    {/if}
+  {/if}
 </div>
 
 <style lang="scss">

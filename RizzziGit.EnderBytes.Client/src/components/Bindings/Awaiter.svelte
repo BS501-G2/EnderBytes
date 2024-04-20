@@ -3,6 +3,9 @@
     message?: string | null,
     progressPercentage?: number | null,
   ) => void;
+  export type AwaiterResetFunction = (autoLoad?: boolean) => Promise<void>;
+  export type AwaiterLoadFunction = () => Promise<void>;
+  export type AwaiterRetryFunction = () => void;
   export type AwaiterCallback<T> = (
     setStatus: AwaiterSetStatusFunction,
   ) => T | Promise<T>;
@@ -50,7 +53,7 @@
         promise = Promise.reject(error);
       }
 
-      await promise
+      await promise;
     } finally {
       busy = false;
     }
@@ -85,12 +88,8 @@
   };
 
   interface $$Slots {
-    default: {
-      reset: (autoLoad?: boolean) => Promise<void>;
-    };
-
     "not-loaded": {
-      load: () => Promise<void>;
+      load: AwaiterLoadFunction;
     };
     loading: {
       message: string | null;
@@ -106,8 +105,8 @@
     };
     error: {
       error: any;
-      reset: (autoLoad?: boolean) => Promise<void>;
-      retry: () => void;
+      reset: AwaiterResetFunction;
+      retry: AwaiterRetryFunction;
     };
   }
 </script>
@@ -171,7 +170,10 @@
           <Banner bannerClass={BannerClass.Error}>
             <div class="banner">
               <p style="margin: 0">Error: {error.message}</p>
-              <Button onClick={() => reset()} buttonClass={ButtonClass.Background}>
+              <Button
+                onClick={() => reset()}
+                buttonClass={ButtonClass.Background}
+              >
                 Retry
               </Button>
             </div>

@@ -6,18 +6,10 @@
 </script>
 
 <script lang="ts">
-
-  import { BellIcon, CheckSquareIcon } from "svelte-feather-icons";
-
-  import LeftPanelNavigationBar from "./DesktopLayout/LeftPanelNavigationBar.svelte";
-  import LeftPanelAccountBar from "./DesktopLayout/LeftPanelAccountBar.svelte";
+  import NavigationBar from "./DesktopLayout/NavigationBar.svelte";
   import TitleBar from "./DesktopLayout/TitleBar.svelte";
   import Keyboard from "../Bindings/Keyboard.svelte";
-  import OperationsTab from "./DesktopLayout/OperationsTab.svelte";
-  import NotificationsTab from "./DesktopLayout/NotificationsTab.svelte";
-  import BackgroundTaskList, {
-    pendingTasks,
-  } from "../BackgroundTaskList.svelte";
+  import { pendingTasks } from "../BackgroundTaskList.svelte";
 
   let actionTab: ActionTab | null = null;
 
@@ -37,41 +29,8 @@
 
   <div class="panel-container">
     <div class="panel left-panel">
-      {#if actionTab === null}
-        <LeftPanelNavigationBar />
-        {#if $pendingTasks.length}
-          <div class="divider" />
-          <BackgroundTaskList />
-        {/if}
-        <div class="divider" />
-        <div class="actions">
-          <button on:click={() => (actionTab = ActionTab.Notification)}>
-            <p>0</p>
-            <BellIcon />
-          </button>
-          <button on:click={() => (actionTab = ActionTab.Operations)}>
-            <p>
-              {$pendingTasks.length}
-            </p>
-            <CheckSquareIcon />
-          </button>
-        </div>
-      {:else if actionTab === ActionTab.Operations}
-        <OperationsTab
-          onDismiss={() => {
-            actionTab = null;
-          }}
-        />
-      {:else if actionTab === ActionTab.Notification}
-        <slot name="notification" />
-        <NotificationsTab
-          onDismiss={() => {
-            actionTab = null;
-          }}
-        />
-      {/if}
+      <NavigationBar />
       <div class="divider" />
-      <LeftPanelAccountBar />
     </div>
 
     <div class="panel right-panel">
@@ -102,15 +61,15 @@
     display: flex;
     min-height: 0px;
 
-      background-color: var(--primaryContainer);
+    background-color: var(--primaryContainer);
 
     > div.panel {
       box-sizing: border-box;
     }
 
     > div.left-panel {
-      min-width: 320px;
-      max-width: 320px;
+      min-width: 256px;
+      max-width: 256px;
       height: 100%;
 
       display: flex;
@@ -124,26 +83,6 @@
         min-height: 1px;
         max-height: 1px;
         background-color: var(--primary);
-      }
-
-      > div.actions {
-        display: flex;
-        gap: 8px;
-
-        > button {
-          cursor: pointer;
-
-          flex-grow: 1;
-
-          display: flex;
-          gap: 8px;
-          align-items: center;
-          justify-content: center;
-
-          color: var(--primary);
-          background-color: unset;
-          border: unset;
-        }
       }
     }
 

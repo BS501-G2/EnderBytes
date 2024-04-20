@@ -2,66 +2,65 @@
   import { RootState } from "$lib/states/root-state";
 
   import File from "../../File.svelte";
-  import Awaiter from "../../../Bindings/Awaiter.svelte";
-  import { fetchAndInterpret } from "../../../Bindings/Client.svelte";
+  import { type AwaiterResetFunction } from "../../../Bindings/Awaiter.svelte";
+  import type {
+    FileBrowserInformation,
+    FileBrowserSelection,
+  } from "../../../FileBrowser.svelte";
+  import LoadingSpinnerPage from "../../../Widgets/LoadingSpinnerPage.svelte";
 
   const rootState = RootState.state;
   const keyboardState = $rootState.keyboardState;
 
-  export let file: any;
-  export let selectedFiles: any[];
-  export let onRefresh: (autoLoad?: boolean | undefined) => Promise<void>;
+  export let selection: FileBrowserSelection;
+  export let info: FileBrowserInformation | null;
+
+  $: files = info?.files ?? [];
 </script>
 
-<div class="file-list">
-  <Awaiter
-    callback={() => {
-      selectedFiles = [];
-
-      return fetchAndInterpret(`/file/:${file.id}/files`);
-    }}
-    bind:reset={onRefresh}
-  >
-    <svelte:fragment slot="success" let:result={files}>
-      {#each files as file, index}
-        <File
-          {file}
-          selected={selectedFiles.includes(file)}
-          onClick={() => {
-            if ($keyboardState.hasKeys("control")) {
-              selectedFiles = !selectedFiles.includes(file)
-                ? [...selectedFiles, file]
-                : selectedFiles.filter((id) => id !== file);
-            } else if ($keyboardState.hasKeys("shift")) {
-              if (selectedFiles.length === 0) {
-                selectedFiles = [file];
-              } else {
-                const startIndex = files.indexOf(selectedFiles[0]);
-                const endIndex = index;
-
-                if (startIndex > endIndex) {
-                  selectedFiles = files
-                    .slice(endIndex, startIndex + 1)
-                    .toReversed();
-                } else {
-                  selectedFiles = files.slice(startIndex, endIndex + 1);
-                }
-              }
-            } else if (
-              selectedFiles.length !== 1 ||
-              selectedFiles[0] !== file
-            ) {
-              selectedFiles = [file];
+<div
+  class="file-list"
+  role="none"
+  on:click={(event) => {
+    if (event.target == event.currentTarget) {
+      $selection = [];
+    }
+  }}
+>
+  {#if info == null}
+    <LoadingSpinnerPage />
+  {:else}
+    {#each files as file, index}
+      <File
+        {file}
+        selected={$selection.includes(file)}
+        onClick={() => {
+          if ($keyboardState.hasKeys("control")) {
+            $selection = !$selection.includes(file)
+              ? [...$selection, file]
+              : $selection.filter((id) => id !== file);
+          } else if ($keyboardState.hasKeys("shift")) {
+            if ($selection.length === 0) {
+              $selection = [file];
             } else {
-              selectedFiles = [];
-            }
+              const startIndex = files.indexOf($selection[0]);
+              const endIndex = index;
 
-            selectedFiles = selectedFiles;
-          }}
-        />
-      {/each}
-    </svelte:fragment>
-  </Awaiter>
+              if (startIndex > endIndex) {
+                $selection = files.slice(endIndex, startIndex + 1).toReversed();
+              } else {
+                $selection = files.slice(startIndex, endIndex + 1);
+              }
+            }
+          } else if ($selection.length !== 1 || $selection[0] !== file) {
+            $selection = [file];
+          } else {
+            $selection = [];
+          }
+        }}
+      />
+    {/each}
+  {/if}
 </div>
 
 <style lang="scss">
@@ -81,10 +80,5 @@
 
     overflow: auto;
     min-height: 0px;
-  }
-
-  div.divider {
-    min-width: 1px;
-    background-color: var(--primaryContainer);
   }
 </style>

@@ -5,7 +5,7 @@
 </script>
 
 <script lang="ts">
-  import Dialog from "./Widgets/Dialog.svelte";
+  import Dialog from "../Widgets/Dialog.svelte";
 
   // export let targetElement: HTMLElement | null = null;
 </script>

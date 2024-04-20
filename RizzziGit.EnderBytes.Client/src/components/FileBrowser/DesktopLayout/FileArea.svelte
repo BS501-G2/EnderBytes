@@ -1,36 +1,32 @@
 <script lang="ts">
   import FileList from "./FileArea/FileList.svelte";
   import FileView from "./FileArea/FileView.svelte";
-  import Awaiter from "../../Bindings/Awaiter.svelte";
-  import { fetchAndInterpret } from "../../Bindings/Client.svelte";
-    import FileDetails from "./FileArea/FileDetails.svelte";
+  import { type AwaiterResetFunction } from "../../Bindings/Awaiter.svelte";
+  import FileDetails from "./FileArea/FileDetails.svelte";
+  import type {
+    FileBrowserInformation,
+    FileBrowserSelection,
+  } from "../../FileBrowser.svelte";
 
-  export let currentFileId: number | null;
-  export let selectedFiles: number[] = [];
-  export let onRefresh: (autoLoad?: boolean | undefined) => Promise<void>;
+  export let selection: FileBrowserSelection;
+  export let reset: AwaiterResetFunction;
+  export let info: FileBrowserInformation | null;
 </script>
 
-{#key currentFileId}
-  <div class="file-area">
-    <Awaiter
-      callback={() =>
-        fetchAndInterpret(
-          `/file/${currentFileId != null ? `:${currentFileId}` : "!root"}`,
-        )}
-    >
-      <svelte:fragment slot="success" let:result={file}>
-        {#if file == null}
-          <p>error</p>
-        {:else if file.type == 0}
-          <FileView {file} bind:selectedFiles />
-        {:else if file.type == 1}
-          <FileList {file} bind:onRefresh bind:selectedFiles />
-          <FileDetails bind:selectedFiles />
-        {/if}
-      </svelte:fragment>
-    </Awaiter>
-  </div>
-{/key}
+<div class="file-area">
+  {#if info == null}
+    <FileList {selection} info={null} />
+    <FileDetails {selection} />
+  {:else}
+    {@const file = info.current}
+    {#if file.type == 0}
+      <FileView {selection} {reset} {info} />
+    {:else if file.type == 1}
+      <FileList {selection} {info} />
+      <FileDetails {selection} />
+    {/if}
+  {/if}
+</div>
 
 <style lang="scss">
   div.file-area {

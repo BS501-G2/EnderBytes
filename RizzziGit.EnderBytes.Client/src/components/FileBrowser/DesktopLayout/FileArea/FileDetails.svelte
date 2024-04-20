@@ -1,12 +1,14 @@
 <script lang="ts">
-  export let selectedFiles: any[];
+  import type { FileBrowserSelection } from "../../../FileBrowser.svelte";
+
+  export let selection: FileBrowserSelection;
 </script>
 
 <div class="file-details">
-  {#if selectedFiles.length > 1}
-    <p>{selectedFiles.length} files</p>
-  {:else if selectedFiles.length === 1}
-    {@const file = selectedFiles[0]}
+  {#if $selection.length > 1}
+    <p>{$selection.length} files</p>
+  {:else if $selection.length === 1}
+    {@const file = $selection[0]}
     {#key file}
       <div class="file-preview">
         <img alt={`File preview for \"${file.name}\"`} src="/favicon.svg" />

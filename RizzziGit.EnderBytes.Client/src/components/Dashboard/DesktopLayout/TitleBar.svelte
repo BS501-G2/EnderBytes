@@ -1,12 +1,14 @@
 <script lang="ts">
+  import Account from "./TitleBar/Account.svelte";
   import AppTitle from "./TitleBar/AppTitle.svelte";
   import SearchBar from "./TitleBar/SearchBar.svelte";
 </script>
 
 <div class="top-bar-container">
   <div class="top-bar">
-    <AppTitle></AppTitle>
-    <SearchBar></SearchBar>
+    <AppTitle />
+    <SearchBar />
+    <Account />
   </div>
 </div>
 

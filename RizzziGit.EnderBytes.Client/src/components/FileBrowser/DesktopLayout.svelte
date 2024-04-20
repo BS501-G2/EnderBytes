@@ -1,28 +1,25 @@
 <script lang="ts">
+  import type { AwaiterResetFunction } from "../Bindings/Awaiter.svelte";
+  import type {
+    FileBrowserInformation,
+    FileBrowserSelection,
+  } from "../FileBrowser.svelte";
+
   import AddressBar from "./DesktopLayout/AddressBar.svelte";
   import ControlBar from "./DesktopLayout/ControlBar.svelte";
   import FileArea from "./DesktopLayout/FileArea.svelte";
 
-  export let currentFileId: number | null;
-
-  let selectedFiles: any[];
-  let onRefresh: (autoLoad?: boolean | undefined) => Promise<void>;
-
-  $: {
-    currentFileId;
-
-    selectedFiles = [];
-  }
+  export let selection: FileBrowserSelection;
+  export let reset: AwaiterResetFunction;
+  export let info: FileBrowserInformation | null;
 </script>
 
 <div class="content">
-  {#key currentFileId}
-    <ControlBar bind:currentFileId bind:selectedFiles bind:onRefresh />
-    <div class="bezel">
-      <AddressBar bind:currentFileId />
-      <FileArea bind:onRefresh bind:currentFileId bind:selectedFiles />
-    </div>
-  {/key}
+  <ControlBar {selection} {reset} {info} />
+  <div class="bezel">
+    <AddressBar {info} />
+    <FileArea {selection} {reset} {info} />
+  </div>
 </div>
 
 <style lang="scss">

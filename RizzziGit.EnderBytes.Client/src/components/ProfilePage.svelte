@@ -9,7 +9,7 @@
 </script>
 
 <script lang="ts">
-  import AccountSettingsDialog, { enabled as accountSettingsDialog } from "./AccountSettingsDialog.svelte";
+  import { enabled as accountSettingsDialog } from "./Dashboard/AccountSettingsDialog.svelte";
 
   import Awaiter from "./Bindings/Awaiter.svelte";
   import { fetchAndInterpret } from "./Bindings/Client.svelte";

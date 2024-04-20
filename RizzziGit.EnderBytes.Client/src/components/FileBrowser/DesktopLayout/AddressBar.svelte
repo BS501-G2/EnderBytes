@@ -2,30 +2,10 @@
   import { FolderIcon } from "svelte-feather-icons";
 
   import AddressBarEntry from "./AddressBar/AddressBarEntry.svelte";
-  import Awaiter from "../../Bindings/Awaiter.svelte";
   import LoadingSpinner from "../../Widgets/LoadingSpinner.svelte";
-  import { fetchAndInterpret } from "../../Bindings/Client.svelte";
+  import type { FileBrowserInformation } from "../../FileBrowser.svelte";
 
-  export let currentFileId: number | null;
-
-  async function update(): Promise<any[]> {
-    const rootFolder = await fetchAndInterpret("/file/!root");
-
-    const newFiledIds: any[] = [];
-
-    let file = await fetchAndInterpret(
-      `/file/${currentFileId != null ? `:${currentFileId}` : "!root"}`,
-    );
-
-    while (file.id != rootFolder.id) {
-      newFiledIds.unshift(file);
-      file = await fetchAndInterpret(
-        `/file/${file.parentId != null ? `:${file.parentId}` : "!root"}`,
-      );
-    }
-
-    return newFiledIds;
-  }
+  export let info: FileBrowserInformation | null;
 </script>
 
 <div class="address">
@@ -33,17 +13,15 @@
     <div class="address-icon">
       <FolderIcon size="100%" />
     </div>
-    <Awaiter callback={() => fetchAndInterpret(`/file/${currentFileId != null ? `:${currentFileId}` : "!root"}/path-chain`)}>
-      <svelte:fragment slot="loading">
-        <LoadingSpinner size={18} />
-      </svelte:fragment>
-      <svelte:fragment slot="success" let:result={{ isSharePoint, root, chain }}>
-      {@const files = [ isSharePoint ? root : null, ...chain]}
-        {#each files as _, index}
-          <AddressBarEntry {files} {index} />
-        {/each}
-      </svelte:fragment>
-    </Awaiter>
+    {#if info == null}
+      <LoadingSpinner size={18} />
+    {:else}
+      {@const { isSharePoint, root, chain } = info.pathChain}
+      {@const files = [isSharePoint ? root : null, ...chain]}
+      {#each files as _, index}
+        <AddressBarEntry {files} {index} />
+      {/each}
+    {/if}
   </div>
 </div>
 

@@ -1,12 +1,12 @@
 <script lang="ts" context="module">
   export enum OverlayPositionType {
     Center,
-    Position,
+    Offset,
   }
 
   export type OverlayPosition =
-    | [OverlayPositionType.Center]
-    | [OverlayPositionType.Position, x: number, y: number];
+    | [type: OverlayPositionType.Center]
+    | [type: OverlayPositionType.Offset, x: number, y: number];
 </script>
 
 <script lang="ts">
@@ -39,10 +39,13 @@
   </div>
   <div class="layer">
     <div class="view">
-      {#if position[0] === OverlayPositionType.Position}
-        <div class="custom-offset">
+      {#if position[0] === OverlayPositionType.Offset}
+        {@const overlayPositionX = Math.abs(position[1])}
+        {@const overlayPositionY = Math.abs(position[2])}
+
+        <div class="custom-offset" style="align-items: {position[1] < 0 ? 'flex-end' : 'flex-start'}; justify-content: {position[2] < 0 ? 'flex-end' : 'flex-start'}">
           <div
-            style="margin-top: {position[2]}px; margin-left: {position[1]}px;"
+            style="margin-{position[2] < 0 ? 'bottom' : 'top'}: {overlayPositionY}px; margin-{position[1] < 0 ? 'right' : 'left'}: {overlayPositionX}px;"
             class="main"
             bind:this={element}
           >
@@ -97,6 +100,9 @@
           height: 100vh;
           display: inline;
           pointer-events: none;
+
+          display: flex;
+          flex-direction: column;
 
           > div.main {
             pointer-events: auto;

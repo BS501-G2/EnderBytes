@@ -1,6 +1,11 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { FolderIcon, ChevronRightIcon } from "svelte-feather-icons";
+  import {
+    FolderIcon,
+    ChevronRightIcon,
+    Share2Icon,
+    UsersIcon,
+  } from "svelte-feather-icons";
   import Awaiter from "../../../Bindings/Awaiter.svelte";
   import Overlay, {
     OverlayPositionType,
@@ -50,7 +55,13 @@
       <p>/</p>
     </button>
   {:else}
-    <button on:click={() => goto(`/app/files/${file.id}`)}>
+    <button
+      class={index == 0 ? "share-button" : ""}
+      on:click={() => goto(`/app/files/${file.id}`)}
+    >
+      {#if index == 0}
+        <UsersIcon size="18em" />
+      {/if}
       <p>{file.name}</p>
     </button>
   {/if}
@@ -69,7 +80,7 @@
 {#if menuShown}
   <Overlay
     onDismiss={() => (menuShown = false)}
-    position={[OverlayPositionType.Position, menuOffsetX, menuOffsetY]}
+    position={[OverlayPositionType.Offset, menuOffsetX, menuOffsetY]}
   >
     <div class="menu">
       <Awaiter
@@ -129,6 +140,9 @@
     border-radius: 8px;
     user-select: none;
 
+    display: flex;
+    flex-direction: row;
+
     > p {
       margin: 4px 2px 4px 2px;
 
@@ -139,6 +153,11 @@
     gap: 8px;
     text-align: start;
     align-items: center;
+  }
+
+  button.share-button {
+    background-color: var(--primaryContainer);
+    color: var(--onPrimaryContainer);
   }
 
   button:hover {

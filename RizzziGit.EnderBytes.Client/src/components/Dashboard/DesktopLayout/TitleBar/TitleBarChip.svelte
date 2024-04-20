@@ -7,7 +7,6 @@
     user-select: none;
 
     margin: 8px;
-    padding: 8px;
 
     border-style: none;
     border-radius: 8px;

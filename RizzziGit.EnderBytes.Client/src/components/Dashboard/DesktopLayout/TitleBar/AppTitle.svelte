@@ -5,33 +5,39 @@
 </script>
 
 <script lang="ts">
-  import Chip from "./TitleBarChip.svelte";
+  import TitleBarChip from "./TitleBarChip.svelte";
 
   const rootState = RootState.state;
-  const appState = $rootState.appState;
 </script>
 
-<Chip>
-  <img
-    class="title-image"
-    src={faviconSrc(16)}
-    alt={$rootState.getString(LocaleKey.AltIconSite)}
-  />
+<TitleBarChip>
+  <div class="chip">
+    <img
+      class="title-image"
+      src={faviconSrc(16)}
+      alt={$rootState.getString(LocaleKey.AltIconSite)}
+    />
 
-  <p class="title-text">{$rootState.getString(LocaleKey.AppName)}</p>
-</Chip>
+    <p class="title-text">{$rootState.getString(LocaleKey.AppName)}</p>
+  </div>
+</TitleBarChip>
 
 <style lang="scss">
-  img.title-image {
-    height: 100%;
-  }
+  div.chip {
+    padding: 8px;
+    display: flex;
+    gap: 4px;
 
-  p.title-text {
-    margin: 0px;
+    img.title-image {
+      height: 100%;
+    }
 
-    font-size: 14px;
-    font-weight: 100;
+    p.title-text {
+      margin: 0px;
+      font-size: 14px;
+      font-weight: lighter;
 
-    color: var(--onPrimary);
+      color: var(--onPrimary);
+    }
   }
 </style>

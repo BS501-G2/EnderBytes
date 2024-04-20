@@ -33,13 +33,14 @@
     <div class="address-icon">
       <FolderIcon size="100%" />
     </div>
-    <Awaiter callback={async () => update()}>
+    <Awaiter callback={() => fetchAndInterpret(`/file/${currentFileId != null ? `:${currentFileId}` : "!root"}/path-chain`)}>
       <svelte:fragment slot="loading">
         <LoadingSpinner size={18} />
       </svelte:fragment>
-      <svelte:fragment slot="success" let:result={files}>
-        {#each [null, ...files] as file, index}
-          <AddressBarEntry {file} {index} length={files.length} />
+      <svelte:fragment slot="success" let:result={{ isSharePoint, root, chain }}>
+      {@const files = [ isSharePoint ? root : null, ...chain]}
+        {#each files as _, index}
+          <AddressBarEntry {files} {index} />
         {/each}
       </svelte:fragment>
     </Awaiter>

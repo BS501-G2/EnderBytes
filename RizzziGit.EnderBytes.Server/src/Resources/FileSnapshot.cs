@@ -55,7 +55,7 @@ public sealed class FileSnapshotManager : ResourceManager<FileSnapshotManager, F
     }
   }
 
-  public async Task<Resource> Create(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, Resource? baseFileSnapshot, UserAuthenticationToken? userAuthenticationToken = null, CancellationToken cancellationToken = default)
+  public async Task<Resource> Create(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, Resource? baseFileSnapshot, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
     (_, FileAccessManager.Resource? fileAccess) = await Service.GetManager<StorageManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
 
@@ -63,7 +63,7 @@ public sealed class FileSnapshotManager : ResourceManager<FileSnapshotManager, F
       (COLUMN_FILE_ID, file.Id),
       (COLUMN_BASE_SNAPSHOT_ID, baseFileSnapshot?.Id),
       (COLUMN_AUTHOR_FILE_ACCESS_ID, fileAccess?.Id),
-      (COLUMN_AUTHOR_ID, userAuthenticationToken?.UserId)
+      (COLUMN_AUTHOR_ID, userAuthenticationToken.UserId)
     ), cancellationToken);
 
     if (baseFileSnapshot != null)
@@ -74,7 +74,7 @@ public sealed class FileSnapshotManager : ResourceManager<FileSnapshotManager, F
     return fileSnapshot;
   }
 
-  public async IAsyncEnumerable<Resource> List(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, UserAuthenticationToken? userAuthenticationToken = null, LimitClause? limit = null, OrderByClause? orderBy = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+  public async IAsyncEnumerable<Resource> List(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, UserAuthenticationToken userAuthenticationToken, LimitClause? limit = null, OrderByClause? orderBy = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
   {
     file.ThrowIfDoesNotBelongTo(storage);
     _ = await Service.GetManager<StorageManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.Read, cancellationToken);

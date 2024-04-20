@@ -12,10 +12,10 @@ using RizzziGit.EnderBytes.Resources;
 
 public static class Program
 {
-  public static Server Server = new(new(
+  public static readonly Server Server = new(new(
       DatabaseConnectionStringBuilder: new MySqlConnectionStringBuilder()
       {
-        Server = "localhost",
+        Server = "25.20.99.238",
         Database = "enderbytes",
 
         UserID = "test",
@@ -94,13 +94,34 @@ public static class Program
 
   public static Task RunTest(Logger logger, Server server) => Task.Run(() =>
   {
-    server.ResourceService.Transact(async (transaction, cancellationToken) =>
+    return server.ResourceService.Transact(async (transaction, cancellationToken) =>
     {
-      (UserManager.Resource user, UserAuthenticationToken userAuthenticationToken) = await server.ResourceService.GetManager<UserManager>().Create(transaction, "Testuser", "LastName", "FirstName", "MiddleName", "TestTest123;",  cancellationToken);
+      UserManager userManager = transaction.GetManager<UserManager>();
+      StorageManager storageManager = transaction.GetManager<StorageManager>();
+      FileManager fileManager = transaction.GetManager<FileManager>();
+
+      (UserManager.Resource user, UserAuthenticationToken userAuthenticationToken) = await userManager.Create(transaction, "Testuser", "LastName", "FirstName", "MiddleName", "TestTest123;", cancellationToken);
       Handlers.Add(async (transaction, cancellationToken) =>
       {
         await server.ResourceService.GetManager<UserManager>().Delete(transaction, user, cancellationToken);
       });
+
+      (UserManager.Resource otherUser, UserAuthenticationToken otherUserAuthenticationToken) = await userManager.Create(transaction, "Testuser2", "LastName", "FirstName", "MiddleName", "TestTest123;", cancellationToken);
+      Handlers.Add(async (transaction, cancellationToken) =>
+      {
+        await server.ResourceService.GetManager<UserManager>().Delete(transaction, otherUser, cancellationToken);
+      });
+
+      StorageManager.Resource storage = await storageManager.GetByOwnerUser(transaction, userAuthenticationToken, cancellationToken);
+      FileManager.Resource rootFolder = await storageManager.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
+      FileManager.Resource testFolder = await fileManager.CreateFolder(transaction, storage, rootFolder, "Test Folder", userAuthenticationToken, cancellationToken);
+      FileAccessManager.Resource fileAccess = await server.ResourceService.GetManager<FileAccessManager>().Create(transaction, storage, testFolder, otherUser, FileAccessType.ManageShares, userAuthenticationToken, cancellationToken);
+
+      FileManager.Resource f = (await fileManager.GetById(transaction, fileAccess.TargetFileId, cancellationToken))!;
+
+      await storageManager.DecryptKey(transaction, storage, f, otherUserAuthenticationToken, FileAccessType.Read, cancellationToken);
+      // await fileManager.ScanFolder(transaction, storage, f, otherUserAuthenticationToken, cancellationToken).ToArrayAsync();
+      Console.WriteLine(f);
     });
   });
 }

@@ -118,7 +118,7 @@ public sealed class FileBufferMapManager : ResourceManager<FileBufferMapManager,
     }
   }
 
-  public async Task Write(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, FileSnapshotManager.Resource fileSnapshot, long offset, CompositeBuffer buffer, UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task Write(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, FileSnapshotManager.Resource fileSnapshot, long offset, CompositeBuffer buffer, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
     DecryptedKeyInfo decryptedKeyInfo = await transaction.ResourceService.GetManager<StorageManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
 
@@ -199,7 +199,7 @@ public sealed class FileBufferMapManager : ResourceManager<FileBufferMapManager,
     }
   }
 
-  public async Task<CompositeBuffer> Read(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, FileSnapshotManager.Resource fileSnapshot, long offset, long length, UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<CompositeBuffer> Read(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, FileSnapshotManager.Resource fileSnapshot, long offset, long length, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
     DecryptedKeyInfo decryptedKeyInfo = await transaction.ResourceService.GetManager<StorageManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.Read, cancellationToken);
 
@@ -238,7 +238,7 @@ public sealed class FileBufferMapManager : ResourceManager<FileBufferMapManager,
     return bytes.Slice(bytesOffset, long.Min(bytesOffset + length, bytes.Length));
   }
 
-  public async Task Truncate(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, FileSnapshotManager.Resource fileSnapshot, long length, UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task Truncate(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, FileSnapshotManager.Resource fileSnapshot, long length, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
     DecryptedKeyInfo decryptedKeyInfo = await transaction.ResourceService.GetManager<StorageManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.Read, cancellationToken);
     long beginIndex = length / BUFFER_SIZE;

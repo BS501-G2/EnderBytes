@@ -97,12 +97,12 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
     ), cancellationToken);
   }
 
-  public Task<byte[]> EncryptFileKey(ResourceService.Transaction transaction, Resource storage, KeyService.AesPair key, FileManager.Resource? parent, UserAuthenticationToken? userAuthenticationToken, FileAccessType fileAccessType, CancellationToken cancellationToken = default)
+  public Task<byte[]> EncryptFileKey(ResourceService.Transaction transaction, Resource storage, KeyService.AesPair key, FileManager.Resource? parent, UserAuthenticationToken userAuthenticationToken, FileAccessType fileAccessType, CancellationToken cancellationToken = default)
   {
 
     if (parent == null)
     {
-      if (storage.OwnerUserId != userAuthenticationToken?.UserId)
+      if (storage.OwnerUserId != userAuthenticationToken.UserId)
       {
         throw new ArgumentException("Other users cannot encrypt using the storage key.", nameof(userAuthenticationToken));
       }
@@ -119,11 +119,11 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
       : storageKey!.Encrypt(key.Serialize());
   }
 
-  public async Task<DecryptedKeyInfo> DecryptKey(ResourceService.Transaction transaction, Resource storage, FileManager.Resource? file, UserAuthenticationToken? userAuthenticationToken, FileAccessType? fileAccessType = null, CancellationToken cancellationToken = default)
+  public async Task<DecryptedKeyInfo> DecryptKey(ResourceService.Transaction transaction, Resource storage, FileManager.Resource? file, UserAuthenticationToken userAuthenticationToken, FileAccessType? fileAccessType = null, CancellationToken cancellationToken = default)
   {
     if (file == null)
     {
-      if (userAuthenticationToken?.UserId != storage.OwnerUserId)
+      if (userAuthenticationToken.UserId != storage.OwnerUserId)
       {
         throw new ArgumentException("The owner's authentication token is required to decrypt the storage key.", nameof(userAuthenticationToken));
       }
@@ -133,13 +133,13 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
 
     FileAccessManager.Resource? fileAccessUsed = null;
 
-    if (storage.OwnerUserId != userAuthenticationToken?.UserId)
+    if (storage.OwnerUserId != userAuthenticationToken.UserId)
     {
       return new(await decryptFileKey2(file), fileAccessUsed);
 
       async Task<KeyService.AesPair> decryptFileKey2(FileManager.Resource file)
       {
-        await foreach (FileAccessManager.Resource fileAccess in Service.GetManager<FileAccessManager>().List(transaction, storage, file, userAuthenticationToken, cancellationToken: cancellationToken))
+        await foreach (FileAccessManager.Resource fileAccess in Service.GetManager<FileAccessManager>().List(transaction, storage, file, cancellationToken: cancellationToken))
         {
           if (fileAccess.Type > fileAccessType)
           {
@@ -149,13 +149,13 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
           switch (fileAccess.TargetEntityType)
           {
             case FileAccessTargetEntityType.User:
-              if (userAuthenticationToken?.UserId != fileAccess.TargetEntityId)
+              if (userAuthenticationToken.UserId != fileAccess.TargetEntityId)
               {
                 break;
               }
 
               fileAccessUsed = fileAccess;
-              return KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(fileAccess.AesKey));
+              return KeyService.AesPair.Deserialize(userAuthenticationToken!.Decrypt(fileAccess.AesKey));
 
             case FileAccessTargetEntityType.None:
               fileAccessUsed = fileAccess;

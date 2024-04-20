@@ -101,7 +101,7 @@ public sealed partial class ResourceService
         int? version = null;
 
         {
-          version = await SqlQuery(transaction, (reader) => Task.FromResult(reader.GetInt32Optional(reader.GetOrdinal("Version"))), "select Version from __VERSIONS where Name = {0} limit 1;", Name).FirstAsync(cancellationToken);
+          version = await SqlQuery(transaction, (reader) => Task.FromResult(reader.GetInt32Optional(reader.GetOrdinal("Version"))), "select Version from __VERSIONS where Name = {0} limit 1;", Name).FirstOrDefaultAsync(cancellationToken);
         }
 
         if (version != Version)

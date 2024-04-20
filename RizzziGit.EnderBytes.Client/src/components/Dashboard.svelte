@@ -11,7 +11,7 @@
   import LogoutConfirmationDialog from "./Dashboard/LogoutConfirmationDialog.svelte";
   import Awaiter from "./Bindings/Awaiter.svelte";
   import Client from "./Bindings/Client.svelte";
-    import LoadingSpinnerPage from "./Widgets/LoadingSpinnerPage.svelte";
+  import LoadingSpinnerPage from "./Widgets/LoadingSpinnerPage.svelte";
 
   const rootState = RootState.state;
 </script>
@@ -46,12 +46,12 @@
         <AccountSettingsDialog />
       </svelte:fragment>
       <svelte:fragment slot="loading">
-        <div class="loading" style="display: flex; width: 100vw; height: 100vh;">
+        <div
+          class="loading"
+          style="display: flex; width: 100vw; height: 100vh;"
+        >
           <LoadingSpinnerPage />
         </div>
-      </svelte:fragment>
-      <svelte:fragment slot="error">
-        <div />
       </svelte:fragment>
     </Awaiter>
   </Client>

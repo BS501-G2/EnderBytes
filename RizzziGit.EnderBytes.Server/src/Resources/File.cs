@@ -106,7 +106,7 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
     }
   }
 
-  public async Task<bool> Move(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource file, Resource? newParent, UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<bool> Move(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource file, Resource? newParent, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
     cancellationToken.ThrowIfCancellationRequested();
     file.ThrowIfDoesNotBelongTo(storage);
@@ -142,17 +142,17 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
     return result;
   }
 
-  public async Task<Resource> CreateFile(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource? parent, string name, UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<Resource> CreateFile(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource? parent, string name, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
     return await Create(transaction, storage, parent, FileType.File, name, userAuthenticationToken, cancellationToken);
   }
 
-  public async Task<Resource> CreateFolder(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource? parent, string name, UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<Resource> CreateFolder(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource? parent, string name, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
     return await Create(transaction, storage, parent, FileType.Folder, name, userAuthenticationToken, cancellationToken);
   }
 
-  private async Task<Resource> Create(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource? parent, FileType type, string name, UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+  private async Task<Resource> Create(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource? parent, FileType type, string name, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
     cancellationToken.ThrowIfCancellationRequested();
     parent?.ThrowIfDoesNotBelongTo(storage);
@@ -179,7 +179,7 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
     return file;
   }
 
-  public async Task<bool> Delete(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource file, UserAuthenticationToken? userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<bool> Delete(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource file, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
     file.ThrowIfDoesNotBelongTo(storage);
 
@@ -193,7 +193,7 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
     throw new NotSupportedException("Deleting a file without providing user token is not supported.");
   }
 
-  public async IAsyncEnumerable<Resource> ScanFolder(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource? folder, UserAuthenticationToken? userAuthenticationToken, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+  public async IAsyncEnumerable<Resource> ScanFolder(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource? folder, UserAuthenticationToken userAuthenticationToken, [EnumeratorCancellation] CancellationToken cancellationToken = default)
   {
     if (folder != null)
     {

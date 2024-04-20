@@ -10,11 +10,11 @@
   $: {
     if ($session == null) {
       if (!$page.url.pathname.startsWith('/app/auth')) {
-        goto('/app/auth/login', { replaceState: true });
+        goto(`/app/auth/login?return=${decodeURIComponent($page.url.pathname)}`, { replaceState: true });
       }
     } else {
       if ($page.url.pathname.startsWith('/app/auth')) {
-        goto('/app', { replaceState: true });
+        goto($page.url.searchParams.get('return') ?? '/app', { replaceState: true });
       }
     }
   }
@@ -41,14 +41,6 @@
 </Dashboard>
 
 <style lang="scss">
-  div.loading-page {
-    min-height: 100vh;
-
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
   div.top-loading {
     height: 0px;
   }

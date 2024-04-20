@@ -21,7 +21,7 @@
     let url = localStorage.getItem("client-url");
 
     if (url == null) {
-      localStorage.setItem("client-url", (url = "http://25.20.99.238:8083/"));
+      localStorage.setItem("client-url", (url = "http://25.22.231.71:8083/"));
     }
 
     return new URL(url);

@@ -17,6 +17,8 @@ public sealed partial class WebApi
   {
     public record Id(long? FileId) : Route_File()
     {
+      public record PathChain(long? FileId) : Id(FileId);
+
       public record Share(long? FileId) : Id(FileId)
       {
         public new record Id(long? FileId, long ShareId) : Share(FileId);
@@ -93,6 +95,7 @@ public sealed partial class WebApi
 
     return request switch
     {
+      Route_File.Id.PathChain fileIdPathChainRequest => await HandleFileIdPathChainRoute(fileIdPathChainRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
       Route_File.Id.Files fileIdFilesRequest => await HandleFileIdFilesRoute(fileIdFilesRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
       Route_File.Id.Snapshot fileIdSnapshotRequest => await HandleFileIdSnapshotRoute(fileIdSnapshotRequest, transaction, file, storage, userAuthenticationToken, cancellationToken),
 

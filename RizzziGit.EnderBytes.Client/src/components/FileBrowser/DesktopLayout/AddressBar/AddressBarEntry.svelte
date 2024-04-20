@@ -8,9 +8,8 @@
   import LoadingSpinner from "../../../Widgets/LoadingSpinner.svelte";
   import { fetchAndInterpret } from "../../../Bindings/Client.svelte";
 
-  export let file: any | null;
+  export let files: any[];
   export let index: number;
-  export let length: number;
 
   let menuButton: HTMLButtonElement;
 
@@ -39,19 +38,23 @@
       (menuButton.parentElement?.parentElement?.scrollLeft ?? 0);
     menuOffsetY = menuButton.offsetTop - 4;
   }
+
+  $: file = files[index];
 </script>
 
 <svelte:window on:resize={updateMenuDimensions} />
 
 <div class="path-entry">
-  {#if file == null}
-    <button on:click={() => goto("/app/files")}><p>/</p></button>
+  {#if files[index] == null}
+    <button on:click={() => goto(`/app/files`)}>
+      <p>/</p>
+    </button>
   {:else}
     <button on:click={() => goto(`/app/files/${file.id}`)}>
       <p>{file.name}</p>
     </button>
   {/if}
-  {#if index != length}
+  {#if index < files.length - 1}
     <button
       bind:this={menuButton}
       on:scroll={updateMenuDimensions}

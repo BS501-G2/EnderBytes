@@ -6,7 +6,7 @@
   div.title-bar-chip {
     user-select: none;
 
-    margin: 8px;
+    margin: 8px 0px 8px 0px;
 
     border-style: none;
     border-radius: 8px;

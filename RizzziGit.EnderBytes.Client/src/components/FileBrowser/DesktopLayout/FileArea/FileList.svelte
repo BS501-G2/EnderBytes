@@ -1,15 +1,11 @@
 <script lang="ts">
-  import { RootState } from "$lib/states/root-state";
-
   import File from "../../File.svelte";
   import type {
     FileBrowserInformation,
     FileBrowserSelection,
   } from "../../../FileBrowser.svelte";
   import LoadingSpinnerPage from "../../../Widgets/LoadingSpinnerPage.svelte";
-    import { hasKeys } from "../../../Bindings/Keyboard.svelte";
-
-  const rootState = RootState.state;
+  import { hasKeys } from "../../../Bindings/Keyboard.svelte";
 
   export let selection: FileBrowserSelection;
   export let info: FileBrowserInformation | null;
@@ -17,67 +13,91 @@
   $: files = info?.files ?? [];
 </script>
 
-<div
-  class="file-list"
-  role="none"
-  on:click={(event) => {
-    if (event.target == event.currentTarget) {
-      $selection = [];
-    }
-  }}
->
-  {#if info == null}
-    <LoadingSpinnerPage />
-  {:else}
-    {#each files as file, index}
-      <File
-        {file}
-        selected={$selection.includes(file)}
-        onClick={() => {
-          if (hasKeys("control")) {
-            $selection = !$selection.includes(file)
-              ? [...$selection, file]
-              : $selection.filter((id) => id !== file);
-          } else if (hasKeys("shift")) {
-            if ($selection.length === 0) {
+<div class="file-list-container">
+  <div
+    class="file-list"
+    role="none"
+    on:click={(event) => {
+      if (event.target == event.currentTarget) {
+        if (hasKeys('shift') || hasKeys('control')) {
+          return
+        }
+
+        $selection = [];
+      }
+    }}
+  >
+    {#if info == null}
+      <LoadingSpinnerPage />
+    {:else}
+      {#each files as file, index}
+        <File
+          {file}
+          selected={$selection.includes(file)}
+          onClick={() => {
+            if (hasKeys("control")) {
+              $selection = !$selection.includes(file)
+                ? [...$selection, file]
+                : $selection.filter((id) => id !== file);
+            } else if (hasKeys("shift")) {
+              if ($selection.length === 0) {
+                $selection = [file];
+              } else {
+                const startIndex = files.indexOf($selection[0]);
+                const endIndex = index;
+
+                if (startIndex > endIndex) {
+                  $selection = files
+                    .slice(endIndex, startIndex + 1)
+                    .toReversed();
+                } else {
+                  $selection = files.slice(startIndex, endIndex + 1);
+                }
+              }
+            } else if ($selection.length !== 1 || $selection[0] !== file) {
               $selection = [file];
             } else {
-              const startIndex = files.indexOf($selection[0]);
-              const endIndex = index;
-
-              if (startIndex > endIndex) {
-                $selection = files.slice(endIndex, startIndex + 1).toReversed();
-              } else {
-                $selection = files.slice(startIndex, endIndex + 1);
-              }
+              $selection = [];
             }
-          } else if ($selection.length !== 1 || $selection[0] !== file) {
-            $selection = [file];
-          } else {
-            $selection = [];
-          }
-        }}
-      />
-    {/each}
-  {/if}
+          }}
+        />
+      {/each}
+    {/if}
+  </div>
 </div>
 
 <style lang="scss">
-  div.file-list {
-    background-color: var(--backgroundVariant);
-    border-radius: 16px;
-
-    flex-grow: 1;
-
-    padding: 16px;
-
+  div.file-list-container {
     display: flex;
-    flex-wrap: wrap;
-    align-content: flex-start;
-    justify-content: start;
-    gap: 8px;
+    flex-direction: column;
+    flex-grow: 1;
+    align-items: center;
+    background-color: var(--backgroundVariant);
+    border-radius: 8px;
 
-    overflow: auto;
+    padding: 8px;
+    flex-basis: 0px;
+
     min-height: 0px;
+
+    > div.file-list {
+      flex-grow: 1;
+
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+
+      padding: 8px;
+
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      align-content: start;
+      // justify-content: start;
+      gap: 8px;
+
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
   }
 </style>

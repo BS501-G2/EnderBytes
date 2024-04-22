@@ -184,6 +184,11 @@
     // border-color: var(--primary);
     box-shadow: 1px 1px 8px rgba(0, 0, 0, 0.25);
 
+      min-height: 0px;
+
+      overflow-y: auto;
+      overflow-x: hidden;
+
     > div.loading-icon {
       max-width: 72px;
       max-height: 72px;
@@ -197,6 +202,11 @@
     > div.file-list {
       display: flex;
       flex-direction: column;
+
+      min-height: 0px;
+
+      overflow-y: auto;
+      overflow-x: hidden;
     }
   }
 </style>

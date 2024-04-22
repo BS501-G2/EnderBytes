@@ -8,6 +8,7 @@
     RefreshCwIcon,
     FolderPlusIcon,
     UploadIcon,
+    BarChart2Icon,
   } from "svelte-feather-icons";
   import { type AwaiterResetFunction } from "../../Bindings/Awaiter.svelte";
   import Button, { ButtonClass } from "../../Widgets/Button.svelte";
@@ -21,111 +22,140 @@
   export let selection: FileBrowserSelection;
   export let reset: AwaiterResetFunction;
   export let info: FileBrowserInformation | null;
+
+  $: enabled = info != null;
+  $: file = info?.current;
+
+  const buttonClass = ButtonClass.BackgroundVariant;
+  const outline = false;
+  const size = "18em";
 </script>
 
 <div class="controls">
-  {#if info == null}
-    <div class="loading"></div>
-  {:else}
-    {@const file = info.current}
-
+  <div class="section left-section">
     <Button
-      buttonClass={ButtonClass.PrimaryContainer}
-      outline={false}
+      {buttonClass}
+      {outline}
+      {enabled}
       onClick={() => ($fileCreationDialog = true)}
     >
-      <UploadIcon />
-      <p>Upload</p>
+      <div class="button">
+        <UploadIcon {size} />
+        <p class="button-label">Upload</p>
+      </div>
     </Button>
     <Button
-      buttonClass={ButtonClass.PrimaryContainer}
-      outline={false}
+      {buttonClass}
+      {outline}
+      {enabled}
       onClick={() => ($folderCreationDialog = true)}
     >
-      <FolderPlusIcon />
-      <p>New Folder</p>
+      <div class="button">
+        <FolderPlusIcon {size} />
+        <p class="button-label">New Folder</p>
+      </div>
     </Button>
     <div class="divider" />
-    {#if file == null || file?.type === 1}
-      <Button
-        buttonClass={ButtonClass.PrimaryContainer}
-        outline={false}
-        onClick={reset}
-      >
-        <RefreshCwIcon />
-        <p>Refresh</p>
-      </Button>
-    {/if}
     {#if $selection.length !== 0}
-      <Button
-        buttonClass={ButtonClass.PrimaryContainer}
-        outline={false}
-        onClick={() => {}}
-      >
-        <ScissorsIcon />
-        <p>Move To</p>
+      <Button {buttonClass} {outline} onClick={() => {}} {enabled}>
+        <div class="button">
+          <ScissorsIcon {size} />
+          <p class="button-label">Move To</p>
+        </div>
       </Button>
-      <Button
-        buttonClass={ButtonClass.PrimaryContainer}
-        outline={false}
-        onClick={() => {}}
-      >
-        <CopyIcon />
-        <p>Copy To</p>
+      <Button {buttonClass} {outline} onClick={() => {}} {enabled}>
+        <div class="button">
+          <CopyIcon {size} />
+          <p class="button-label">Copy To</p>
+        </div>
       </Button>
     {/if}
     {#if $selection.length === 1}
-      <Button
-        buttonClass={ButtonClass.PrimaryContainer}
-        outline={false}
-        onClick={() => {}}
-      >
-        <ShareIcon />
-        <p>Share</p>
+      <Button {buttonClass} {outline} onClick={() => {}} {enabled}>
+        <div class="button">
+          <ShareIcon {size} />
+          <p class="button-label">Share</p>
+        </div>
       </Button>
-      <Button
-        buttonClass={ButtonClass.PrimaryContainer}
-        outline={false}
-        onClick={() => {}}
-      >
-        <UsersIcon />
-        <p>Manage Access</p>
+      <Button {buttonClass} {outline} onClick={() => {}} {enabled}>
+        <div class="button">
+          <UsersIcon {size} />
+          <p class="button-label">Manage Access</p>
+        </div>
       </Button>
     {/if}
     {#if $selection.length >= 1}
-      <Button
-        buttonClass={ButtonClass.PrimaryContainer}
-        outline={false}
-        onClick={() => {}}
-      >
-        <TrashIcon />
-        <p>Move to Trash</p>
+      <Button {buttonClass} {outline} onClick={() => {}} {enabled}>
+        <div class="button">
+          <TrashIcon {size} />
+          <p class="button-label">Move to Trash</p>
+        </div>
       </Button>
     {/if}
-  {/if}
+  </div>
+  <div class="divider" />
+  <div class="section right-section">
+    {#if file == null || file?.type === 1}
+      <Button {buttonClass} {outline} onClick={reset} {enabled}>
+        <div class="button">
+          <RefreshCwIcon {size} />
+          <p class="button-label">Refresh</p>
+        </div>
+      </Button>
+    {/if}
+    <Button {buttonClass} {outline} onClick={async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      console.log('asd')
+    }} {enabled}>
+      <div class="button">
+        <BarChart2Icon {size} />
+        <p class="button-label">Sort</p>
+      </div>
+    </Button>
+  </div>
 </div>
 
 <style lang="scss">
   div.controls {
-    background-color: var(--primaryContainer);
+    background-color: var(--backgroundVariant);
+    border-radius: 8px;
+
+    user-select: none;
 
     display: flex;
     flex-direction: row;
-    gap: 8px;
-    align-items: center;
+    // gap: 8px;
 
-    max-height: 64px;
-    min-height: 64px;
-
-    padding: 16px;
     box-sizing: border-box;
 
-    > div.divider {
+    overflow-x: auto;
+    overflow-y: hidden;
+
+    div.divider {
       min-width: 1px;
       max-width: 1px;
-      height: 100%;
+
       background-color: var(--onBackground);
-      margin: 4px 0px 4px 0px;
+      margin: 8px 0px 8px 0px;
+    }
+
+    div.button {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+
+      min-width: max-content;
+    }
+
+    div.section {
+      display: flex;
+      flex-direction: row;
+      // gap: 8px;
+    }
+
+    div.left-section {
+      flex-grow: 1;
     }
   }
 </style>

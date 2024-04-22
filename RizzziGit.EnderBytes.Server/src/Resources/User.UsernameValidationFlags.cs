@@ -15,6 +15,8 @@ public enum UsernameValidationFlag : byte
 
 public sealed partial class UserManager
 {
+  public sealed class InvalidUsernameException(string username, UsernameValidationFlag flag) : Exception($"Invalid username: {username}. Flag {flag}");
+
   public UsernameValidationFlag ValidateUsername(string username)
   {
     UsernameValidationFlag flag = UsernameValidationFlag.NoErrors;
@@ -49,7 +51,7 @@ public sealed partial class UserManager
     UsernameValidationFlag validationFlags = ValidateUsername(username);
     if (validationFlags != UsernameValidationFlag.NoErrors)
     {
-      throw new ArgumentException($"Invalid username: Flag {validationFlags}.", nameof(username));
+      throw new InvalidUsernameException(username, validationFlags);
     }
   }
 
@@ -59,7 +61,7 @@ public sealed partial class UserManager
 
     if (validationFlags != UsernameValidationFlag.NoErrors)
     {
-      throw new ArgumentException($"Invalid username: Flag {validationFlags}.", nameof(username));
+      throw new InvalidUsernameException(username, validationFlags);
     }
   }
 

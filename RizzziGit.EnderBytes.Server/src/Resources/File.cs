@@ -46,7 +46,17 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
   }
   public sealed class NotSupportedException(string? message) : Exception(message ?? "This operation is not supported.");
 
-  public sealed new partial record Resource(long Id, long CreateTime, long UpdateTime, long StorageId, byte[] Key, long? ParentId, FileType Type, string Name) : ResourceManager<FileManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
+  public sealed new partial record Resource(
+    long Id,
+    long CreateTime,
+    long UpdateTime,
+    long StorageId,
+    byte[] Key,
+    long? ParentId,
+    FileType Type,
+    string Name,
+    long AuthorUserId
+  ) : ResourceManager<FileManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
   {
     [JsonIgnore]
     public byte[] Key = Key;
@@ -73,6 +83,7 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
   public const string COLUMN_PARENT_FILE_ID = "ParentFileId";
   public const string COLUMN_TYPE = "Type";
   public const string COLUMN_NAME = "Name";
+  public const string COLUMN_AUTHOR_ID = "AuthorUserId";
 
   public const string UNIQUE_INDEX_NAME = $"Index_{NAME}_{COLUMN_NAME}";
 
@@ -89,7 +100,8 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
     reader.GetBytes(reader.GetOrdinal(COLUMN_KEY)),
     reader.GetInt64Optional(reader.GetOrdinal(COLUMN_PARENT_FILE_ID)),
     (FileType)reader.GetByte(reader.GetOrdinal(COLUMN_TYPE)),
-    reader.GetString(reader.GetOrdinal(COLUMN_NAME))
+    reader.GetString(reader.GetOrdinal(COLUMN_NAME)),
+    reader.GetInt64(reader.GetOrdinal(COLUMN_AUTHOR_ID))
   );
 
   protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
@@ -101,6 +113,7 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
       await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_PARENT_FILE_ID} bigint null;");
       await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TYPE} tinyint not null;");
       await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_NAME} varchar(128) not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_AUTHOR_ID} bigint not null;");
 
       await SqlNonQuery(transaction, $"create unique index {UNIQUE_INDEX_NAME} on {NAME}({COLUMN_STORAGE_ID},{COLUMN_PARENT_FILE_ID},{COLUMN_NAME});");
     }
@@ -173,7 +186,8 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
       (COLUMN_KEY, await Service.GetManager<StorageManager>().EncryptFileKey(transaction, storage, fileKey, parent, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken)),
       (COLUMN_PARENT_FILE_ID, parent?.Id),
       (COLUMN_NAME, name),
-      (COLUMN_TYPE, (byte)type)
+      (COLUMN_TYPE, (byte)type),
+      (COLUMN_AUTHOR_ID, userAuthenticationToken.UserId)
     ), cancellationToken);
 
     return file;
@@ -214,6 +228,14 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
   public async Task<bool> IsEqualToOrInsideOf(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource haystack, Resource needle, CancellationToken cancellationToken = default)
   {
     return await IsInsideOf(transaction, storage, haystack, needle, cancellationToken) || needle.Id == haystack.Id;
+  }
+
+  public async Task ThrowIfIsEqualToOrInsideOf(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource haystack, Resource needle, CancellationToken cancellationToken = default)
+  {
+    if (await IsEqualToOrInsideOf(transaction, storage, haystack, needle, cancellationToken))
+    {
+      throw new ConstraintException(NAME, "The resource is equal to or inside of the specified resource.");
+    }
   }
 
   public async Task<bool> IsInsideOf(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource haystack, Resource needle, CancellationToken cancellationToken = default)

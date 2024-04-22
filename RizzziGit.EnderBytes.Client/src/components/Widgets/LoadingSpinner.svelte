@@ -57,7 +57,7 @@
   import { onDestroy, onMount } from "svelte";
 
   export let degrees: number = 0;
-  export let size: number | null = null;
+  export let size: `${number}${'px' | 'em'}` | null = null;
 
   onMount(() => {
     connect();
@@ -74,8 +74,8 @@
   fill="none"
   style="transform: rotate({$spinner[0]}deg);"
   xmlns="http://www.w3.org/2000/svg"
-  width={size != null ? `${size}px` : null}
-  height={size != null ? `${size}px` : null}
+  width={size != null ? `${size}` : null}
+  height={size != null ? `${size}` : null}
 >
   <defs>
     <linearGradient id="spinner-secondHalf">

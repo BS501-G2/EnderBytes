@@ -44,18 +44,10 @@
           formData.append("content", data, "content");
 
           const file = await fetchAndInterpret(
-            `/file/${currentFileId != null ? `:${currentFileId}` : "!root"}`,
+            `/file/${currentFileId != null ? `:${currentFileId}/files` : "!root"}`,
             "POST",
             { isFile: true, name: data.name },
           );
-
-          const snapshot = await fetchAndInterpret(
-            `/file/${file.id}/snapshots`,
-            "POST",
-            formData,
-          );
-
-          // await fetchAndInterpret<any[]>('/file/' + currentFileId + '/snapshots', 'POST', formData);
         }
 
         return [""];

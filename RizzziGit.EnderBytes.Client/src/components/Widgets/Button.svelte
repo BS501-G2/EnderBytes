@@ -3,6 +3,7 @@
     Primary = "primary",
     PrimaryContainer = "primary-container",
     Background = "background",
+    BackgroundVariant = "background-variant",
   }
 </script>
 
@@ -38,7 +39,7 @@
 >
   <Awaiter callback={() => click()} autoLoad={false} bind:reset>
     <svelte:fragment slot="loading">
-      <LoadingSpinner size={18}></LoadingSpinner>
+      <LoadingSpinner size="18px"></LoadingSpinner>
     </svelte:fragment>
     <svelte:fragment slot="not-loaded">
       <slot />
@@ -105,6 +106,21 @@
   button.background:active {
     background-color: var(--onBackground);
     color: var(--background);
+  }
+
+  button.background-variant {
+    background-color: var(--backgroundVariant);
+    color: var(--onBackground);
+  }
+
+  button.background-variant:hover {
+    background-color: var(--background);
+    color: var(--onBackground);
+  }
+
+  button.background-variant:active {
+    background-color: var(--onBackground);
+    color: var(--backgroundVariant);
   }
 
   button:disabled {

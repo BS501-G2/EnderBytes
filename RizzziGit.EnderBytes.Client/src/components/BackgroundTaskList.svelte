@@ -53,17 +53,20 @@
   }
 
   export const backgroundTasks: Writable<BackgroundTask<any>[]> = writable([]);
-  export const pendingTasks: Readable<BackgroundTask<any>[]> = derived(
-    backgroundTasks,
-    (value, set, update) => {
+  export const runningBackgroundTasks: Readable<BackgroundTask<any>[]> =
+    derived(backgroundTasks, (value, set) => {
       set(
         value.filter(
           (value) =>
             value.status == BackgroundTaskStatus.Running ||
-            value.status == BackgroundTaskStatus.Failed ||
             value.status == BackgroundTaskStatus.Ready,
         ),
       );
+    });
+  export const failedTasks: Readable<BackgroundTask<any>[]> = derived(
+    backgroundTasks,
+    (value, set) => {
+      set(value.filter((value) => value.status == BackgroundTaskStatus.Failed));
     },
   );
 
@@ -86,45 +89,47 @@
       retryable,
       async (): Promise<T[]> => {
         const toExec: Array<() => Promise<void>> = [];
-        const promises: Promise<T>[] = callbacks.map((callback) => (async () => {
-          const client = executeBackgroundTask<T>(
-            name,
-            retryable,
-            async (client, setStatus) => {
-              setStatus('Waiting...', null)
+        const promises: Promise<T>[] = callbacks.map((callback) =>
+          (async () => {
+            const client = executeBackgroundTask<T>(
+              name,
+              retryable,
+              async (client, setStatus) => {
+                setStatus("Waiting...", null);
 
-              const { promise } = await new Promise<{ promise: Promise<T> }>(
-                (resolve) => {
-                  toExec.push(async () => {
-                    const promise = (async () => {
+                const { promise } = await new Promise<{ promise: Promise<T> }>(
+                  (resolve) => {
+                    toExec.push(async () => {
+                      const promise = (async () => {
                         return await callback(client, setStatus);
-                      })()
+                      })();
 
-                    resolve({ promise });
-                    await promise
-                  });
-                },
-              );
+                      resolve({ promise });
+                      await promise;
+                    });
+                  },
+                );
 
-              return await promise;
-            },
-            autoDismiss,
-          )
+                return await promise;
+              },
+              autoDismiss,
+            );
 
-          return await client.run()
-        })());
+            return await client.run();
+          })(),
+        );
 
         for (const exec of toExec) {
           await exec();
         }
 
-        return await Promise.all(promises)
+        return await Promise.all(promises);
       },
       true,
-      true
+      true,
     );
 
-    return client
+    return client;
   }
 
   export function executeBackgroundTask<T>(

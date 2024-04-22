@@ -6,7 +6,6 @@
   } from "../FileBrowser.svelte";
 
   import AddressBar from "./DesktopLayout/AddressBar.svelte";
-  import ControlBar from "./DesktopLayout/ControlBar.svelte";
   import FileArea from "./DesktopLayout/FileArea.svelte";
 
   export let selection: FileBrowserSelection;
@@ -14,16 +13,17 @@
   export let info: FileBrowserInformation | null;
 </script>
 
-<div class="content">
-  <ControlBar {selection} {reset} {info} />
+<div class="container">
   <div class="bezel">
-    <AddressBar {info} />
-    <FileArea {selection} {reset} {info} />
+    <div class="content">
+      <AddressBar {info} />
+      <FileArea {selection} {reset} {info} />
+    </div>
   </div>
 </div>
 
 <style lang="scss">
-  div.content {
+  div.container {
     background-color: var(--primaryContainer);
     color: var(--onPrimaryContainer);
 
@@ -44,11 +44,23 @@
 
       gap: 16px;
 
-      border-radius: 16px 0px 0px 0px;
-      overflow: hidden;
+      min-height: 0px;
+
+      border-radius: 16px;
 
       background-color: var(--background);
       color: var(--onBackground);
+
+      > div.content {
+        display: flex;
+        flex-direction: column;
+
+        gap: 16px;
+
+        flex-grow: 1;
+
+        overflow: auto;
+      }
     }
   }
 </style>

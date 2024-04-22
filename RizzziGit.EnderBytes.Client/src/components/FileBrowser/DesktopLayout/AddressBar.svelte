@@ -14,7 +14,7 @@
       <FolderIcon size="100%" />
     </div>
     {#if info == null}
-      <LoadingSpinner size={18} />
+      <LoadingSpinner size="18px" />
     {:else}
       {@const { isSharePoint, root, chain } = info.pathChain}
       {@const files = [isSharePoint ? root : null, ...chain]}

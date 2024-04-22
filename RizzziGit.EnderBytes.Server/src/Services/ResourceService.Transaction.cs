@@ -81,11 +81,11 @@ public sealed partial class ResourceService
   public async Task Transact(TransactionHandler handler, CancellationToken cancellationToken = default)
   {
     long transactionId = NextTransactionId++;
-    
+
     await Database!.Run(Logger, transactionId, async (connection, cancellationToken) =>
     {
       using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(GetCancellationToken(), cancellationToken);
-      using DbTransaction dbTransaction = await connection.BeginTransactionAsync(cancellationToken);
+      await using DbTransaction dbTransaction = await connection.BeginTransactionAsync(cancellationToken);
 
       Transaction transaction = new(connection, transactionId, this, linkedCancellationTokenSource.Token);
       Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");

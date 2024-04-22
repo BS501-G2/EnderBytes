@@ -15,9 +15,6 @@
     display: flex;
     align-items: center;
 
-    max-height: 100%;
-    min-height: 100%;
-
     cursor: pointer;
 
     border-radius: 8px;

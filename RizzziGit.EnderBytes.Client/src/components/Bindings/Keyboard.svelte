@@ -16,6 +16,7 @@
   function onKey(type: "up" | "down", event: KeyboardEvent) {
     const key = event.key?.toLowerCase() ?? "";
 
+    console.log(key, type)
     if (type == "down" && !keys.includes(key)) {
       keys.push(key);
     } else if (type == "up" && keys.includes(key)) {

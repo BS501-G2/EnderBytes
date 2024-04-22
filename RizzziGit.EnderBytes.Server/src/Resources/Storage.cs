@@ -12,10 +12,9 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
 {
   public abstract class Exception(string? message = null) : ResourceService.Exception(message);
 
-  public sealed class AccessDenied()
-  {
-
-  }
+  public sealed class StorageEncryptDeniedException() : Exception("Other users cannot encrypt using the storage key.");
+  public sealed class StorageDecryptDeniedException() : Exception("The owner's authentication token is required to decrypt the storage key.");
+  public sealed class AccessDeniedException(FileAccessType type) : Exception($"No {type} access to the file.");
 
   public new sealed record Resource(
     long Id,
@@ -104,7 +103,7 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
     {
       if (storage.OwnerUserId != userAuthenticationToken.UserId)
       {
-        throw new ArgumentException("Other users cannot encrypt using the storage key.", nameof(userAuthenticationToken));
+        throw new StorageEncryptDeniedException();
       }
 
       KeyService.AesPair storageKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key));
@@ -119,13 +118,13 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
       : storageKey!.Encrypt(key.Serialize());
   }
 
-  public async Task<DecryptedKeyInfo> DecryptKey(ResourceService.Transaction transaction, Resource storage, FileManager.Resource? file, UserAuthenticationToken userAuthenticationToken, FileAccessType? fileAccessType = null, CancellationToken cancellationToken = default)
+  public async Task<DecryptedKeyInfo> DecryptKey(ResourceService.Transaction transaction, Resource storage, FileManager.Resource? file, UserAuthenticationToken userAuthenticationToken, FileAccessType fileAccessType, CancellationToken cancellationToken = default)
   {
     if (file == null)
     {
       if (userAuthenticationToken.UserId != storage.OwnerUserId)
       {
-        throw new ArgumentException("The owner's authentication token is required to decrypt the storage key.", nameof(userAuthenticationToken));
+        throw new StorageDecryptDeniedException();
       }
 
       return new(KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(storage.Key)), null);
@@ -165,7 +164,7 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
 
         if (file.ParentId == null)
         {
-          throw new ArgumentException($"No {fileAccessType} access to the file.", nameof(userAuthenticationToken));
+          throw new AccessDeniedException(fileAccessType!);
         }
 
         return KeyService.AesPair.Deserialize((await decryptFileKey2(await Service.GetManager<FileManager>().GetByRequiredId(transaction, (long)file.ParentId, cancellationToken))).Decrypt(file.Key));

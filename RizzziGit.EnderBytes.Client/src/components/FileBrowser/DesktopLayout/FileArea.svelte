@@ -7,6 +7,7 @@
     FileBrowserInformation,
     FileBrowserSelection,
   } from "../../FileBrowser.svelte";
+  import ControlBar from "./ControlBar.svelte";
 
   export let selection: FileBrowserSelection;
   export let reset: AwaiterResetFunction;
@@ -15,14 +16,23 @@
 
 <div class="file-area">
   {#if info == null}
-    <FileList {selection} info={null} />
+    <div class="column">
+      <ControlBar {selection} {reset} {info} />
+      <FileList {selection} {info} />
+    </div>
     <FileDetails {selection} />
   {:else}
     {@const file = info.current}
     {#if file.type == 0}
-      <FileView {selection} {reset} {info} />
+      <div class="column">
+        <ControlBar {selection} {reset} {info} />
+        <FileView {selection} {reset} {info} />
+      </div>
     {:else if file.type == 1}
-      <FileList {selection} {info} />
+      <div class="column">
+        <ControlBar {selection} {reset} {info} />
+        <FileList {selection} {info} />
+      </div>
       <FileDetails {selection} />
     {/if}
   {/if}
@@ -38,5 +48,17 @@
     user-select: none;
 
     gap: 16px;
+
+    > div.column {
+      flex-grow: 1;
+
+      gap: 16px;
+
+      min-height: 0px;
+      overflow: hidden;
+
+      display: flex;
+      flex-direction: column;
+    }
   }
 </style>

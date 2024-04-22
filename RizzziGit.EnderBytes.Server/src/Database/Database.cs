@@ -19,7 +19,7 @@ public abstract class Database(DbConnectionStringBuilder connectionStringBuilder
 
   public async Task Run(Logger logger, long transactionId, DatabaseConnectionHandler handler, CancellationToken cancellationToken = default)
   {
-    using DbConnection connection = InternalCreateConnection(ConnectionString);
+    await using DbConnection connection = InternalCreateConnection(ConnectionString);
 
     while (true)
     {

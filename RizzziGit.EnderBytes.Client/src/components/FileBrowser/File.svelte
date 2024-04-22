@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { FolderIcon } from "svelte-feather-icons";
   import { hasKeys } from "../Bindings/Keyboard.svelte";
 
   export let file: any;
@@ -32,7 +33,11 @@
   </div>
   <div class="base">
     <div class="file-preview">
-      <img class="file-preview" src="/favicon.svg" alt="asd" />
+      {#if file.type === 1}
+        <FolderIcon size="100%" strokeWidth={0.5} />
+      {:else if file.type === 0}
+        <img class="file-preview" src="/favicon.svg" alt="asd" />
+      {/if}
     </div>
     <div class="file-info">
       <span class="file-name">
@@ -77,22 +82,22 @@
 
     > div.base {
       > div.file-preview {
-        max-width: 128px;
-        max-height: 128px;
-        min-width: 128px;
-        min-height: 128px;
+        max-width: 96px;
+        max-height: 96px;
+        min-width: 96px;
+        min-height: 96px;
 
         padding: 8px;
         box-sizing: border-box;
 
-        > img {
+        > img.file-preview {
           width: 100%;
           height: 100%;
         }
       }
 
       > div.file-info {
-        width: 128px;
+        width: 96px;
         min-height: 1em;
         display: flex;
         flex-direction: row;

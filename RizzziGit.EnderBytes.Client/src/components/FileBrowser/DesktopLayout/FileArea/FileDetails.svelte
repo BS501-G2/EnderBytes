@@ -1,5 +1,9 @@
 <script lang="ts">
+  import Awaiter from "../../../Bindings/Awaiter.svelte";
+  import { fetchAndInterpret } from "../../../Bindings/Client.svelte";
   import type { FileBrowserSelection } from "../../../FileBrowser.svelte";
+    import LoadingSpinner from "../../../Widgets/LoadingSpinner.svelte";
+  import UserFullName from "../../../Widgets/UserFullName.svelte";
 
   export let selection: FileBrowserSelection;
 </script>
@@ -18,19 +22,35 @@
         <table>
           <tbody>
             <tr>
-              <td><p><b>Created On: </b></p></td>
-              <td>
+              <td class="name"><p><b>Created On: </b></p></td>
+              <td class="value">
                 <p>{new Date(file.createTime).toLocaleString()}</p>
               </td>
             </tr>
             {#if file.UpdateTime !== file.createTime}
               <tr>
-                <td><p><b>Modified On: </b></p></td>
-                <td>
+                <td class="name"><p><b>Modified On: </b></p></td>
+                <td class="value">
                   <p>{new Date(file.updateTime).toLocaleString()}</p>
                 </td>
               </tr>
             {/if}
+            <tr>
+              <td class="name"><p><b>Created By: </b></p></td>
+              <td class="value">
+                <p>
+                  <Awaiter
+                    callback={() =>
+                      fetchAndInterpret(`/user/:${file.authorUserId}`)}
+                  >
+                    <svelte:fragment slot="success" let:result={user}>
+                      <UserFullName {user} />
+                    </svelte:fragment>
+                    <svelte:fragment slot="loading"><LoadingSpinner size="12px"/></svelte:fragment>
+                  </Awaiter>
+                </p>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -43,7 +63,7 @@
     background-color: var(--backgroundVariant);
     color: var(--onBackgroundVariant);
 
-    border-radius: 16px;
+    border-radius: 8px;
 
     display: flex;
     flex-direction: column;
@@ -96,8 +116,15 @@
 
               > p {
                 margin: 0px;
-                text-align: right;
               }
+            }
+
+            > td.name {
+              text-align: end;
+            }
+
+            > td.value {
+              text-align: start;
             }
           }
         }

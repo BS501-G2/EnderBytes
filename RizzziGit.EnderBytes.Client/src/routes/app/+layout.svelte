@@ -4,7 +4,7 @@
 
   import Dashboard from "../../components/Dashboard.svelte";
   import LoadingBar from "../../components/Widgets/LoadingBar.svelte";
-  import { pendingTasks } from "../../components/BackgroundTaskList.svelte";
+  import { runningBackgroundTasks } from "../../components/BackgroundTaskList.svelte";
   import { session } from '../../components/Bindings/Client.svelte';
 
   $: {
@@ -22,7 +22,7 @@
 
 <svelte:window
   on:beforeunload={(event) => {
-    if ($pendingTasks.length == 0) {
+    if ($runningBackgroundTasks.length == 0) {
       return;
     }
 

@@ -9,18 +9,7 @@
   import NavigationBar from "./DesktopLayout/NavigationBar.svelte";
   import TitleBar from "./DesktopLayout/TitleBar.svelte";
   import Keyboard from "../Bindings/Keyboard.svelte";
-  import { pendingTasks } from "../BackgroundTaskList.svelte";
-
-  let actionTab: ActionTab | null = null;
-
-  function onUnload() {
-    if ($pendingTasks.length > 0) {
-      actionTab = ActionTab.Operations;
-    }
-  }
 </script>
-
-<svelte:window on:beforeunload={onUnload} />
 
 <Keyboard />
 
@@ -87,13 +76,13 @@
     }
 
     > div.right-panel {
-      height: 100%;
-
       flex-grow: 1;
 
       min-width: 0px;
 
-      border-radius: 16px 0px 0px 0px;
+      border-radius: 16px;
+
+      margin: 0px 8px 8px 8px;
 
       background-color: var(--background);
       color: var(--onBackground);

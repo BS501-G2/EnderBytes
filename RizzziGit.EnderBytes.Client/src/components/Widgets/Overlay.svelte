@@ -18,34 +18,47 @@
       return;
     }
 
-    onDismiss();
+    onDismiss?.();
   };
 
   export let dim: boolean = false;
   export let position: OverlayPosition = [OverlayPositionType.Center];
-  export let onDismiss: () => void;
+  export let onDismiss: (() => void) | null = null;
 
   let element: HTMLElement;
 </script>
 
 <div class="content">
-  <div class="layer">
-    <div class="view">
-      <button
-        on:click={onClick}
-        style={dim ? "background-color: #0000003f" : ""}
-      />
+  {#if onDismiss != null}
+    <div class="layer">
+      <div class="view">
+        <button
+          on:click={onClick}
+          style={dim ? "background-color: #0000003f" : ""}
+        />
+      </div>
     </div>
-  </div>
+  {/if}
   <div class="layer">
     <div class="view">
       {#if position[0] === OverlayPositionType.Offset}
         {@const overlayPositionX = Math.abs(position[1])}
         {@const overlayPositionY = Math.abs(position[2])}
 
-        <div class="custom-offset" style="align-items: {position[1] < 0 ? 'flex-end' : 'flex-start'}; justify-content: {position[2] < 0 ? 'flex-end' : 'flex-start'}">
+        <div
+          class="custom-offset"
+          style="align-items: {position[1] < 0
+            ? 'flex-end'
+            : 'flex-start'}; justify-content: {position[2] < 0
+            ? 'flex-end'
+            : 'flex-start'}"
+        >
           <div
-            style="margin-{position[2] < 0 ? 'bottom' : 'top'}: {overlayPositionY}px; margin-{position[1] < 0 ? 'right' : 'left'}: {overlayPositionX}px;"
+            style="margin-{position[2] < 0
+              ? 'bottom'
+              : 'top'}: {overlayPositionY}px; margin-{position[1] < 0
+              ? 'right'
+              : 'left'}: {overlayPositionX}px;"
             class="main"
             bind:this={element}
           >
@@ -53,10 +66,7 @@
           </div>
         </div>
       {:else if position[0] === OverlayPositionType.Center}
-        <div
-          class="main"
-          bind:this={element}
-        >
+        <div class="main" bind:this={element}>
           <slot />
         </div>
       {/if}
@@ -104,10 +114,16 @@
           display: flex;
           flex-direction: column;
 
+          overflow: hidden;
+
           > div.main {
             pointer-events: auto;
 
-            float: left;
+            display: flex;
+            flex-direction: column;
+
+            min-height: 0px;
+            min-width: 0px;
           }
         }
 

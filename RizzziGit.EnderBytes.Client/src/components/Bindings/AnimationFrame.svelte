@@ -2,18 +2,19 @@
   import { onDestroy, onMount } from "svelte";
   import { get, writable, type Writable } from "svelte/store";
 
-  export type FrameCallback = (
+  export type FrameCallback<T> = (
     previousTime: number | null,
     time: number,
-  ) => void;
+    value?: T
+  ) => T;
 
-  export interface FrameListener {
+  export interface FrameListener<T> {
     previousTime: number | null;
 
-    callback: FrameCallback;
+    callback: FrameCallback<T>;
   }
 
-  let listeners: Writable<FrameListener[]> = writable([]);
+  let listeners: Writable<FrameListener<any>[]> = writable([]);
   let running: Writable<boolean> = writable(false);
 
   listeners.subscribe((updatedValue) => {
@@ -49,13 +50,14 @@
   });
 </script>
 
-<script lang="ts">
-  export let callback: FrameCallback;
+<script lang="ts" generics="T extends any">
+  export let callback: FrameCallback<T>;
 
-  const frameListener: FrameListener = {
+  let output: [T] | null = null;
+
+  const frameListener: FrameListener<T> = {
     previousTime: null,
-    callback: (previousTime, time) =>
-      callback?.(previousTime, time),
+    callback: (previousTime, time) => (output = [callback(previousTime, time, output?.[0])])[0],
   };
 
   onMount(() => {
@@ -77,6 +79,12 @@
       return value;
     });
   });
+
+  interface $$Slots {
+    default: { output: T }
+  }
 </script>
 
-<slot />
+{#if output != null}
+  <slot output={output[0]} />
+{/if}

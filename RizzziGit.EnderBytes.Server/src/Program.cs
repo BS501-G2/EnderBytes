@@ -92,9 +92,9 @@ public static class Program
     await server.Stop();
   });
 
-  public static Task RunTest(Logger logger, Server server) => Task.Run(() =>
+  public static Task RunTest(Logger logger, Server server) => Task.Run(async () =>
   {
-    return server.ResourceService.Transact(async (transaction, cancellationToken) =>
+    var (storage, folder, userAuthenticationToken) = await server.ResourceService.Transact(async (transaction, cancellationToken) =>
     {
       UserManager userManager = transaction.GetManager<UserManager>();
       StorageManager storageManager = transaction.GetManager<StorageManager>();
@@ -115,13 +115,26 @@ public static class Program
       StorageManager.Resource storage = await storageManager.GetByOwnerUser(transaction, userAuthenticationToken, cancellationToken);
       FileManager.Resource rootFolder = await storageManager.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
       FileManager.Resource testFolder = await fileManager.CreateFolder(transaction, storage, rootFolder, "Test Folder", userAuthenticationToken, cancellationToken);
-      FileAccessManager.Resource fileAccess = await server.ResourceService.GetManager<FileAccessManager>().Create(transaction, storage, testFolder, otherUser, FileAccessType.ManageShares, userAuthenticationToken, cancellationToken);
+      FileAccessManager.Resource fileAccess = await server.ResourceService.GetManager<FileAccessManager>().Create(transaction, storage, testFolder, otherUser, FileAccessType.Read, userAuthenticationToken, cancellationToken);
 
-      FileManager.Resource f = (await fileManager.GetById(transaction, fileAccess.TargetFileId, cancellationToken))!;
-
-      await storageManager.DecryptKey(transaction, storage, f, otherUserAuthenticationToken, FileAccessType.Read, cancellationToken);
-      // await fileManager.ScanFolder(transaction, storage, f, otherUserAuthenticationToken, cancellationToken).ToArrayAsync();
-      Console.WriteLine(f);
+      return (
+        storage,
+        testFolder,
+        userAuthenticationToken
+      );
     });
+
+    List<Task> tasks = [];
+
+    for (long i = 0; i < 100; i++)
+    {
+      long capturedI = i;
+      tasks.Add(server.ResourceService.Transact(async (transaction, cancellationToken) =>
+      {
+        await server.ResourceService.GetManager<FileManager>().CreateFolder(transaction, storage, folder, $"Test Folder {capturedI}", userAuthenticationToken, cancellationToken);
+      }));
+    }
+
+    await Task.WhenAll(tasks);
   });
 }

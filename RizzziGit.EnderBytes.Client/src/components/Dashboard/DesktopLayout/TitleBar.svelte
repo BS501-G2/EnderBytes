@@ -1,6 +1,7 @@
 <script lang="ts">
   import Account from "./TitleBar/Account.svelte";
   import AppTitle from "./TitleBar/AppTitle.svelte";
+    import Miscellaneous from "./TitleBar/Miscellaneous.svelte";
   import SearchBar from "./TitleBar/SearchBar.svelte";
 </script>
 
@@ -8,6 +9,7 @@
   <div class="top-bar">
     <AppTitle />
     <SearchBar />
+    <Miscellaneous />
     <Account />
   </div>
 </div>
@@ -27,8 +29,10 @@
       width: env(titlebar-area-width);
 
       height: 100%;
+      padding: 0px 8px 0px 8px;
 
       display: flex;
+      gap: 8px;
     }
   }
 </style>

@@ -153,6 +153,8 @@
     gap: 8px;
     text-align: start;
     align-items: center;
+
+    min-height: 2em;
   }
 
   button.share-button {

@@ -2,7 +2,7 @@
   import Awaiter from "../../../Bindings/Awaiter.svelte";
   import { fetchAndInterpret } from "../../../Bindings/Client.svelte";
   import type { FileBrowserSelection } from "../../../FileBrowser.svelte";
-    import LoadingSpinner from "../../../Widgets/LoadingSpinner.svelte";
+  import LoadingSpinner from "../../../Widgets/LoadingSpinner.svelte";
   import UserFullName from "../../../Widgets/UserFullName.svelte";
 
   export let selection: FileBrowserSelection;
@@ -44,9 +44,13 @@
                       fetchAndInterpret(`/user/:${file.authorUserId}`)}
                   >
                     <svelte:fragment slot="success" let:result={user}>
-                      <UserFullName {user} />
+                      <a class="user-link" href="/app/users/@{user.username}">
+                        <UserFullName {user} />
+                      </a>
                     </svelte:fragment>
-                    <svelte:fragment slot="loading"><LoadingSpinner size="12px"/></svelte:fragment>
+                    <svelte:fragment slot="loading"
+                      ><LoadingSpinner size="12px" /></svelte:fragment
+                    >
                   </Awaiter>
                 </p>
               </td>
@@ -103,9 +107,19 @@
 
       gap: 16px;
 
+      min-width: 0px;
+      max-width: 100%;
+
       > h2 {
         margin: 0px;
         text-align: center;
+
+        overflow-x: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        user-select: all;
+
+        min-width: 0px;
       }
 
       > table {
@@ -130,5 +144,14 @@
         }
       }
     }
+  }
+
+  a.user-link {
+    color: inherit;
+    text-decoration: inherit;
+  }
+
+  a.user-link:hover {
+    text-decoration: underline;
   }
 </style>

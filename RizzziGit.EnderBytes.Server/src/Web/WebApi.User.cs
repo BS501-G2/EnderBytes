@@ -2,14 +2,14 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace RizzziGit.EnderBytes.Web;
 
-using Services;
+using Core;
 using Resources;
 
 public sealed partial class WebApi
 {
-  [Route("/user/@{username}")]
+  [Route("~/user/@{username}")]
   [HttpGet]
-  public async Task<ActionResult<UserManager.Resource>> GetUser(string username)
+  public async Task<ActionResult<UserManager.Resource>> GetByUsername(string username)
   {
     if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
     {
@@ -25,9 +25,9 @@ public sealed partial class WebApi
     return Ok(user);
   }
 
-  [Route("/user/:{userId}")]
+  [Route("~/user/:{userId}")]
   [HttpGet]
-  public async Task<ActionResult<UserManager.Resource>> GetUserById(long userId)
+  public async Task<ActionResult<UserManager.Resource>> GetById(long userId)
   {
     if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
     {
@@ -43,7 +43,7 @@ public sealed partial class WebApi
     return Ok(user);
   }
 
-  [Route("/user/!me")]
+  [Route("~/user/!me")]
   [HttpGet]
   public ActionResult<UserManager.Resource> GetUserSelf()
   {
@@ -57,7 +57,7 @@ public sealed partial class WebApi
 
   public sealed record UpdateUserRequest(string Username, string LastName, string FirstName, string? MiddleName);
 
-  [Route("/user/:{userId}")]
+  [Route("~/user/:{userId}")]
   [HttpPost]
   public async Task<ActionResult<bool>> UpdateUserById(long userId, [FromBody] UpdateUserRequest request)
   {

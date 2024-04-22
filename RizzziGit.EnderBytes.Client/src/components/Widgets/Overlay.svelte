@@ -83,6 +83,7 @@
     position: absolute;
     left: 0px;
     top: 0px;
+        pointer-events: none;
 
     width: 100%;
     height: 100%;
@@ -99,9 +100,10 @@
         align-items: center;
 
         background-color: transparent;
-        pointer-events: none;
 
-        > * {
+        > button,
+        > div.custom-offset > div.main,
+        > div.main {
           pointer-events: auto;
         }
 

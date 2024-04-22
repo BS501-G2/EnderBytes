@@ -9,13 +9,14 @@
   import { enabled as logoutConfirmationDialog } from "../../LogoutConfirmationDialog.svelte";
   import { goto } from "$app/navigation";
 
-  let menuLocationPivot: HTMLElement;
-  let menu: HTMLElement;
+  let menuLocationAnchor: HTMLElement;
+  let menuX = 0;
   let menuY = 0;
   let menuOpen = false;
 
   function updateMenuLocation() {
-    menuY = menuLocationPivot.offsetTop + menuLocationPivot.clientHeight + 8;
+    menuX = (window.innerWidth - menuLocationAnchor.offsetLeft) - menuLocationAnchor.clientWidth - 16;
+    menuY = menuLocationAnchor.offsetTop + menuLocationAnchor.clientHeight + 8;
   }
 
   function onClick(func: () => void) {
@@ -24,12 +25,14 @@
   }
 </script>
 
+<svelte:window on:resize={updateMenuLocation} />
+
 {#if menuOpen}
   <Overlay
-    position={[OverlayPositionType.Offset, -8, menuY]}
+    position={[OverlayPositionType.Offset, - menuX, menuY]}
     onDismiss={() => (menuOpen = false)}
   >
-    <div class="account-menu" bind:this={menu}>
+    <div class="account-menu">
       <button on:click={() => onClick(() => goto("/app/users/!me"))}
         >View Profile</button
       >
@@ -51,7 +54,7 @@
   >
     <div class="container">
       <img
-        bind:this={menuLocationPivot}
+        bind:this={menuLocationAnchor}
         alt="User's Avatar"
         src="/favicon.svg"
       />

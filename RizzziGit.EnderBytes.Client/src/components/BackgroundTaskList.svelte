@@ -63,10 +63,16 @@
         ),
       );
     });
-  export const failedTasks: Readable<BackgroundTask<any>[]> = derived(
+  export const failedBackgroundTasks: Readable<BackgroundTask<any>[]> = derived(
     backgroundTasks,
     (value, set) => {
       set(value.filter((value) => value.status == BackgroundTaskStatus.Failed));
+    },
+  );
+  export const completedBackgroundTasks: Readable<BackgroundTask<any>[]> = derived(
+    backgroundTasks,
+    (value, set) => {
+      set(value.filter((value) => value.status == BackgroundTaskStatus.Done));
     },
   );
 
@@ -400,7 +406,7 @@
     display: flex;
     flex-direction: column;
 
-    min-height: 64px;
+    // min-height: 64px;
     overflow-y: auto;
 
     padding: 8px 0px 8px 0px;
@@ -415,7 +421,7 @@
       min-height: 1px;
       max-height: 1px;
 
-      background-color: var(--primary);
+      background-color: var(--onPrimary);
     }
 
     > div.background-task {
@@ -446,7 +452,7 @@
         > button {
           background-color: unset;
           border: unset;
-          color: var(--primary);
+          color: var(--onPrimary);
 
           cursor: pointer;
 

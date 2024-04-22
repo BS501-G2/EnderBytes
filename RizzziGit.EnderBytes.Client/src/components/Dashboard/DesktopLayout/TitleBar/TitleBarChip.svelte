@@ -1,9 +1,11 @@
 <div class="title-bar-chip">
-  <slot/>
+  <slot />
 </div>
 
 <style lang="scss">
   div.title-bar-chip {
+    -webkit-app-region: no-drag;
+
     user-select: none;
 
     margin: 8px 0px 8px 0px;
@@ -15,7 +17,7 @@
 
     display: flex;
 
-    align-items: center;
+    // align-items: center;
     gap: 4px;
 
     background-color: var(--primary);

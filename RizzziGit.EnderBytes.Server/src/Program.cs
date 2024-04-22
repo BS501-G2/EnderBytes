@@ -15,11 +15,11 @@ public static class Program
   public static readonly Server Server = new(new(
       DatabaseConnectionStringBuilder: new MySqlConnectionStringBuilder()
       {
-        Server = "25.20.99.238",
+        Server = "10.0.0.3",
         Database = "enderbytes",
 
-        UserID = "test",
-        Password = "test",
+        UserID = "enderbytes",
+        Password = "enderbytes",
 
         AllowBatch = true,
       },
@@ -126,7 +126,7 @@ public static class Program
 
     List<Task> tasks = [];
 
-    for (long i = 0; i < 100; i++)
+    for (long i = 0; i < 2; i++)
     {
       long capturedI = i;
       tasks.Add(server.ResourceService.Transact(async (transaction, cancellationToken) =>

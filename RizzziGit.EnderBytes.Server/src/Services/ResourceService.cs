@@ -44,10 +44,7 @@ public sealed partial class ResourceService : Server.SubService
   {
     Database = new MySQLDatabase(Server.Configuration.DatabaseConnectionStringBuilder);
 
-    foreach (ResourceManager resourceManager in ResourceManagers)
-    {
-      await resourceManager.Start(cancellationToken);
-    }
+    await Task.WhenAll(ResourceManagers.Select((resourceManager) => resourceManager.Start(cancellationToken)));
   }
 
   protected override async Task OnRun(CancellationToken cancellationToken)

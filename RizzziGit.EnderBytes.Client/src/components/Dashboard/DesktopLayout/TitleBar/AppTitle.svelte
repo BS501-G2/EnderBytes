@@ -28,9 +28,13 @@
     display: flex;
     gap: 4px;
 
+    align-items: center;
+
     img.title-image {
       height: 100%;
     }
+
+    -webkit-app-region: drag;
 
     p.title-text {
       margin: 0px;

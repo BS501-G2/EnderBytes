@@ -20,13 +20,13 @@ public sealed partial class WebService(Server server) : Server.SubService(server
       {
         setup.AddPolicy(corsPolicy, (policy) =>
         {
-          policy.WithOrigins("http://localhost:8083", "http://10.1.0.1:8081", "http://10.1.0.117:8081", "http://25.20.99.238:8081");
+          policy.WithOrigins("http://25.22.231.71:8081", "http://localhost:8081", "http://10.1.0.1:8081");
           policy.WithHeaders("*");
           policy.WithMethods("*");
         });
       })
       .AddSingleton(Server)
-      .AddScoped<MiscellaneousRequestContext>()
+      .AddScoped<WebApiContext>()
       .AddResponseCaching()
       .AddControllers();
 
@@ -57,7 +57,6 @@ public sealed partial class WebService(Server server) : Server.SubService(server
     {
       app.UseHttpsRedirection();
     }
-    // app.Use((context, next) => WebApi.CheckAdmin(Server, context, next));
     app.Use((context, next) => WebApi.UserAuthenticationTokenMiddleWare(Server, context, next));
     app.MapControllers();
 

@@ -15,7 +15,11 @@
   let menuOpen = false;
 
   function updateMenuLocation() {
-    menuX = (window.innerWidth - menuLocationAnchor.offsetLeft) - menuLocationAnchor.clientWidth - 16;
+    menuX =
+      window.innerWidth -
+      menuLocationAnchor.offsetLeft -
+      menuLocationAnchor.clientWidth -
+      16;
     menuY = menuLocationAnchor.offsetTop + menuLocationAnchor.clientHeight + 8;
   }
 
@@ -29,18 +33,25 @@
 
 {#if menuOpen}
   <Overlay
-    position={[OverlayPositionType.Offset, - menuX, menuY]}
+    position={[OverlayPositionType.Offset, -menuX, menuY]}
     onDismiss={() => (menuOpen = false)}
   >
+    <div class="account-info">
+
+    </div>
     <div class="account-menu">
-      <button on:click={() => onClick(() => goto("/app/users/!me"))}
-        >View Profile</button
-      >
-      <button on:click={() => onClick(() => ($accountSettingsDialog = true))}
-        >Account Settings</button
-      >
+      <a href="/app/users/!me" on:click={() => (menuOpen = false)}>
+        View Profile
+      </a>
+      <button on:click={() => onClick(() => ($accountSettingsDialog = true))}>
+        Account Settings
+      </button>
       <div class="divider" />
-      <button class="logout" on:click={() => onClick(() => $logoutConfirmationDialog = true)}>Logout</button>
+      <button
+        class="logout"
+        on:click={() => onClick(() => ($logoutConfirmationDialog = true))}
+        >Logout</button
+      >
     </div>
   </Overlay>
 {/if}
@@ -80,14 +91,17 @@
 
     border-radius: 8px;
 
-    > button {
+    > button,
+    a {
       padding: 8px;
 
       text-align: right;
 
       background-color: transparent;
       color: var(--onPrimary);
+      text-decoration: none;
       border: none;
+      font-size: small;
 
       cursor: pointer;
       user-select: none;
@@ -95,11 +109,13 @@
       border-radius: 8px;
     }
 
-    > button:hover {
+    > button:hover,
+    a:hover {
       background-color: #ffffff7f;
     }
 
-    > button:active {
+    > button:active,
+    a:active {
       background: var(--backgroundVariant);
       color: var(--onBackground);
     }

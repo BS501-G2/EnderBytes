@@ -13,7 +13,7 @@ public sealed record UserPair(UserManager.Resource User, UserAuthenticationToken
 
 public sealed partial class UserManager(ResourceService service) : ResourceManager<UserManager, UserManager.Resource, UserManager.Exception>(service, NAME, VERSION)
 {
-  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
 
   public sealed class UsernameNotFoundException(string Username) : Exception($"Username not found: {Username}.");
 

@@ -1,6 +1,7 @@
 <script>
 
-    import { ImageIcon, MoreHorizontalIcon, Trash2Icon, EditIcon, Share2Icon } from "svelte-feather-icons";
+    import { ImageIcon, MoreHorizontalIcon, Trash2Icon, EditIcon, Share2Icon,} from "svelte-feather-icons";
+   
 
 </script>
 
@@ -76,18 +77,52 @@
           margin: 2px;
           align-self: flex-end;
         }
-        .my-icon1{
-          font-size: 40px;
-          margin: auto;
-          width: 50%;
-          padding-right; 50px;
+        .my-trash{
+          position: fixed;
+          right: -170px;
+          bottom: 210px;
+          width: 25%;
+          padding: 25px;
+          
         }
-        .my-icon2{
+        .my-share{
+          position: fixed;
+          top: 625px;
+          bottom: 150px;
+          cursor: pointer;
+          padding: 25px;
+        }
 
+        .my-edit{
+          position: fixed;
+          padding: 25px;
+          top: 625px;
+          right: 25px;
+          width: 100px;
+          height: 100px;
+          cursor: pointer;
         }
-        .my-icon3{
+          
+        .add-note-button {
+          position: fixed;
+          bottom: 150px;
+          background-color: #0f3031;
+          border: none;
+          color: white;
+          padding: 10px 20px;
+          text-align: center;
+          text-decoration: none;
+          display: inline-block;
+          font-size: 16px;
+          margin: 4px 2px;
+          cursor: pointer;
+          border-radius: 5px;
+        }
 
+        .add-note-button:hover {
+          background-color: #0f3031;
         }
+
         .starred-preview{
             background-color: whitesmoke;
             border: solid;
@@ -801,9 +836,10 @@
                 <div class="previewfileType">fileTypePlaceholder</div>
                 <div class="previewFileSize">fileSizePlaceholder</div>
                 <div class="previewFileDate">00/00/0000</div>
-                <div class="my-icon1"><Trash2Icon/></div>
-                <div class="my-icon2"><Share2Icon/></div>
-                <div class="my-icon3"><EditIcon/></div>
+                <div class="my-trash"><Trash2Icon/></div>
+                <div class="my-edit"><EditIcon/></div>
+                <div class="my-share"><Share2Icon/></div>
+                <button class="add-note-button">Add a note</button>
               </div>
 
             </div>

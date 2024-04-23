@@ -1,3 +1,9 @@
+<script lang="ts" context="module">
+  import { writable, type Writable } from "svelte/store";
+
+  export let enabled: Writable<boolean> = writable(false);
+</script>
+
 <script lang="ts">
   import {
     AlertTriangleIcon,
@@ -37,7 +43,6 @@
   export let menuX: number;
   export let menuY: number;
 
-  let menuOpen = false;
   let update: number = 0;
 
   let unsubscribe: () => void;
@@ -70,15 +75,15 @@
   />
 {/if}
 
-{#if menuOpen || update > 0}
+{#if $enabled || update > 0}
   <Overlay
-    position={menuOpen
+    position={$enabled
       ? [OverlayPositionType.Offset, -menuX, menuY]
       : [OverlayPositionType.Offset, -16, -16]}
-    onDismiss={menuOpen ? () => (menuOpen = false) : null}
+    onDismiss={$enabled ? () => ($enabled = false) : null}
   >
     <div class="operations-menu">
-      {#if menuOpen}
+      {#if $enabled}
         <div class="menu-header">
           <h2>Operations</h2>
           {#if $failedBackgroundTasks.length > 0 || $runningBackgroundTasks.length > 0}
@@ -91,8 +96,10 @@
 
         <div class="divider" />
         <BackgroundTaskList />
-      {:else if update > 0}
-        <LoadingBar progress={(cooldownTime - update) / cooldownTime} />
+      {:else if update != 0}
+        {#if update != cooldownTime}
+          <LoadingBar progress={(cooldownTime - update) / cooldownTime} />
+        {/if}
         <BackgroundTaskList
           filter={[BackgroundTaskStatus.Running, BackgroundTaskStatus.Failed]}
         />
@@ -103,7 +110,7 @@
 
 <TitleBarChipButton
   onClick={() => {
-    menuOpen = true;
+    $enabled = true;
     updateMenuLocation();
   }}
 >

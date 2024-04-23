@@ -1,14 +1,14 @@
 <script lang="ts">
   import File from "../../File.svelte";
   import type {
-    FileBrowserInformation,
+    FileBrowserFolderInformation,
     FileBrowserSelection,
   } from "../../../FileBrowser.svelte";
   import LoadingSpinnerPage from "../../../Widgets/LoadingSpinnerPage.svelte";
   import { hasKeys } from "../../../Bindings/Keyboard.svelte";
 
   export let selection: FileBrowserSelection;
-  export let info: FileBrowserInformation | null;
+  export let info: FileBrowserFolderInformation | null;
 
   $: files = info?.files ?? [];
 </script>

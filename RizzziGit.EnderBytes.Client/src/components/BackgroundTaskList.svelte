@@ -1,4 +1,5 @@
 <script lang="ts" context="module">
+  import { session } from "./Bindings/Client.svelte";
   import {
     writable,
     get,
@@ -24,7 +25,9 @@
     retryable: boolean;
     status: BackgroundTaskStatus;
     cancelled: boolean;
+    autoDismiss: boolean;
     hidden: boolean;
+    lastUpdated: number;
 
     isDismissed: boolean;
 
@@ -48,8 +51,8 @@
   export enum BackgroundTaskStatus {
     Ready,
     Running,
-    Done,
     Failed,
+    Done,
   }
 
   export const backgroundTasks: Writable<BackgroundTask<any>[]> = writable([]);
@@ -63,18 +66,18 @@
         ),
       );
     });
+
   export const failedBackgroundTasks: Readable<BackgroundTask<any>[]> = derived(
     backgroundTasks,
     (value, set) => {
       set(value.filter((value) => value.status == BackgroundTaskStatus.Failed));
     },
   );
-  export const completedBackgroundTasks: Readable<BackgroundTask<any>[]> = derived(
-    backgroundTasks,
-    (value, set) => {
+
+  export const completedBackgroundTasks: Readable<BackgroundTask<any>[]> =
+    derived(backgroundTasks, (value, set) => {
       set(value.filter((value) => value.status == BackgroundTaskStatus.Done));
-    },
-  );
+    });
 
   export function dismissAll() {
     backgroundTasks.update((value) => {
@@ -171,6 +174,8 @@
       retryable,
       status: BackgroundTaskStatus.Ready,
       hidden,
+      autoDismiss,
+      lastUpdated: Date.now(),
 
       get isDismissed() {
         return get(backgroundTasks).indexOf(backgroundTask) === -1;
@@ -180,7 +185,10 @@
         return client;
       },
       get run() {
-        const refresh = () => backgroundTasks.update((e) => e);
+        const refresh = () => {
+          backgroundTask.lastUpdated = Date.now();
+          backgroundTasks.update((e) => e);
+        };
         const setStatus: BackgroundTaskSetStatusFunction = (
           message = backgroundTask.message,
           progress = backgroundTask.progress,
@@ -208,7 +216,7 @@
             backgroundTask.status = BackgroundTaskStatus.Done;
             refresh();
 
-            if (autoDismiss) {
+            if (backgroundTask.autoDismiss) {
               backgroundTask.dismiss();
             }
 
@@ -284,12 +292,22 @@
 
     return client;
   }
+
+  session.subscribe(() => {
+    for (const task of get(backgroundTasks)) {
+      task.cancel();
+    }
+
+    backgroundTasks.set([]);
+  });
 </script>
 
 <script lang="ts">
   import LoadingBar from "./Widgets/LoadingBar.svelte";
   import { RefreshCwIcon, XIcon, PlayIcon } from "svelte-feather-icons";
   import { onDestroy, onMount } from "svelte";
+
+  export let maxCount: number = -1;
 
   export let filter: BackgroundTaskStatus[] | null = [
     BackgroundTaskStatus.Running,
@@ -319,7 +337,10 @@
             return;
           }
 
-          cached = preCached;
+          cached = preCached.slice(
+            0,
+            maxCount < 0 ? preCached.length : maxCount,
+          );
           preCached = null;
           lastTime = Date.now();
 
@@ -340,7 +361,7 @@
   {#if cached.length == 0}
     <p>No pending operations.</p>
   {:else}
-    {#each cached as { name, progress, run, retryable, cancelled, cancel, message, status, dismiss }, index}
+    {#each cached.toSorted((a, b) => a.status - b.status) as { name, progress, run, retryable, cancelled, cancel, message, status, dismiss }, index}
       {#if filter == null || filter.includes(status)}
         {#if index != 0}
           <div class="divider" />
@@ -352,30 +373,30 @@
 
             {#if status == BackgroundTaskStatus.Running}
               {#if !cancelled}
-                <button on:click={() => cancel()} title="Cancel"
-                  ><XIcon size="16" /></button
-                >
+                <button on:click={() => cancel()} title="Cancel">
+                  <XIcon size="16" />
+                </button>
               {/if}
             {:else if status == BackgroundTaskStatus.Done}
-              <button on:click={() => dismiss()} title="Dismiss"
-                ><XIcon size="16" /></button
-              >
+              <button on:click={() => dismiss()} title="Dismiss">
+                <XIcon size="16" />
+              </button>
             {:else if status == BackgroundTaskStatus.Failed}
               {#if retryable}
-                <button on:click={() => run()} title="Run"
-                  ><RefreshCwIcon size="16" /></button
-                >
+                <button on:click={() => run()} title="Run">
+                  <RefreshCwIcon size="16" />
+                </button>
               {/if}
-              <button on:click={() => dismiss()} title="Dismiss"
-                ><XIcon size="16" /></button
-              >
+              <button on:click={() => dismiss()} title="Dismiss">
+                <XIcon size="16" />
+              </button>
             {:else if status == BackgroundTaskStatus.Ready}
-              <button on:click={() => run()} title="Run"
-                ><PlayIcon size="16" /></button
-              >
-              <button on:click={() => dismiss()} title="Dismiss"
-                ><XIcon size="16" /></button
-              >
+              <button on:click={() => run()} title="Run">
+                <PlayIcon size="16" />
+              </button>
+              <button on:click={() => dismiss()} title="Dismiss">
+                <XIcon size="16" />
+              </button>
             {/if}
           </div>
           {#if status == BackgroundTaskStatus.Running}

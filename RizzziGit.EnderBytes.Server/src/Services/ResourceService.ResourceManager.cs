@@ -12,6 +12,11 @@ public sealed partial class ResourceService
 {
   public abstract class ResourceManager(ResourceService service, string name, int version) : Service(name, service)
   {
+    public abstract class Exception(string? message = null) : System.Exception(message ?? "A resource error has been thrown.");
+    public sealed class NotFoundException(string name, long? id) : Exception($"\"{name}\" resource #{id} does not exist.");
+    public sealed class NoMatchException(string name) : Exception($"No \"{name}\" resource has matched the criteria.");
+    public sealed class ConstraintException(string name, string? message = null) : Exception(message ?? $"The \"{name}\" resource failed to pass constraint check.");
+
     protected const string COLUMN_ID = "Id";
     protected const string COLUMN_CREATE_TIME = "CreateTime";
     protected const string COLUMN_UPDATE_TIME = "UpdateTime";

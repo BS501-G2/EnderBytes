@@ -10,7 +10,7 @@ public sealed record DecryptedKeyInfo(KeyService.AesPair Key, FileAccessManager.
 
 public sealed class StorageManager : ResourceManager<StorageManager, StorageManager.Resource, StorageManager.Exception>
 {
-  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
 
   public sealed class StorageEncryptDeniedException() : Exception("Other users cannot encrypt using the storage key.");
   public sealed class StorageDecryptDeniedException() : Exception("The owner's authentication token is required to decrypt the storage key.");
@@ -184,7 +184,7 @@ public sealed class StorageManager : ResourceManager<StorageManager, StorageMana
 
   public async Task<Resource> GetByOwnerUser(ResourceService.Transaction transaction, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
   {
-    Resource? storage = await SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", userAuthenticationToken.UserId));
+    Resource? storage = await SelectOne(transaction, new WhereClause.CompareColumn(COLUMN_OWNER_USER_ID, "=", userAuthenticationToken.UserId), cancellationToken: cancellationToken);
 
     if (storage == null)
     {

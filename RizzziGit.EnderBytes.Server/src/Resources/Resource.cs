@@ -13,12 +13,9 @@ using System.Runtime.CompilerServices;
 public abstract partial class ResourceManager<M, R, E>(ResourceService service, string name, int version) : ResourceService.ResourceManager(service, name, version)
     where M : ResourceManager<M, R, E>
     where R : ResourceManager<M, R, E>.Resource
-    where E : ResourceService.Exception
+    where E : ResourceService.ResourceManager.Exception
 {
   public abstract partial record Resource(long Id, long CreateTime, long UpdateTime);
-  public sealed class NotFoundException(string name, long? id) : ResourceService.Exception($"\"{name}\" resource #{id} does not exist.");
-  public sealed class NoMatchException(string name) : ResourceService.Exception($"No \"{name}\" resource has matched the criteria.");
-  public sealed class ConstraintException(string name, string? message = null) : Exception(message ?? $"The \"{name}\" resource failed to pass constraint check.");
 
   public delegate Task ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, R oldResource, CancellationToken cancellationToken);
   public delegate Task ResourceDeleteHandler(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken);
@@ -157,7 +154,7 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
     cancellationToken.ThrowIfCancellationRequested();
 
     List<object?> parameterList = [];
-    set.Add(COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+    set.TryAdd(COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
     string whereClause = where.Apply(parameterList);
     string setClause = set.Apply(parameterList);

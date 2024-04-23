@@ -1,4 +1,7 @@
 <script lang="ts">
+  import "@fortawesome/fontawesome-free/css/all.min.css";
+  import "./reset.scss";
+
   import { onMount } from "svelte";
 
   import { Locale, LocaleKey } from "$lib/locale";
@@ -19,7 +22,7 @@
         ? ViewMode.Mobile
         : ViewMode.Desktop) |
       (window.matchMedia(
-        "(display-mode: standalone) or (display-mode: window-controls-overlay) or (display-modee: minimal-ui)",
+        "(display-mode: standalone) or (d1isplay-mode: window-controls-overlay) or (display-modee: minimal-ui)",
       ).matches
         ? ViewMode.Standalone
         : window.matchMedia("(display-mode: fullscreen)").matches
@@ -71,7 +74,7 @@
 {#if $rootState.viewMode != ViewMode.Unset || !$navigating}
   <slot />
 {:else}
-  <LoadingSpinnerPage></LoadingSpinnerPage>
+  <LoadingSpinnerPage />
 {/if}
 
 <style lang="scss">

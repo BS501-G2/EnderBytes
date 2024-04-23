@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 
 public sealed class FileSnapshotManager : ResourceManager<FileSnapshotManager, FileSnapshotManager.Resource, FileSnapshotManager.Exception>
 {
-  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
 
   public new sealed record Resource(
       long Id,

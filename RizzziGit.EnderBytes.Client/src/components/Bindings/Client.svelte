@@ -110,7 +110,9 @@
     } else if (response.status === 401) {
       sessionStore.set(null);
 
-      location.pathname = '/app/auth/login';
+      Object.assign(location, {
+        pathname: "/app/auth/login",
+      });
     }
 
     if (response.status >= 200 && response.status <= 300) {

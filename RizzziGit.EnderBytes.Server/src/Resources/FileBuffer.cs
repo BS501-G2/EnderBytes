@@ -7,7 +7,7 @@ using Services;
 
 public sealed class FileBufferManager : ResourceManager<FileBufferManager, FileBufferManager.Resource, FileBufferManager.Exception>
 {
-  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
 
   public new sealed record Resource(
     long Id,

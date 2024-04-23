@@ -19,7 +19,7 @@ public sealed record UserAuthenticationToken(KeyService service, UserManager.Res
 
 public sealed partial class UserAuthenticationManager : ResourceManager<UserAuthenticationManager, UserAuthenticationManager.Resource, UserAuthenticationManager.Exception>
 {
-  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
 
   public sealed class InvalidPayloadException() : Exception("Invalid payload specified.");
   public sealed class InvalidSessionTokenException() : Exception("Invalid session token specified.");

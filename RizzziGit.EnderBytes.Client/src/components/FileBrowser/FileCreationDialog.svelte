@@ -4,7 +4,9 @@
 
 <script lang="ts">
   import { executeBackgroundTask } from "../BackgroundTaskList.svelte";
-  import Awaiter from "../Bindings/Awaiter.svelte";
+  import Awaiter, {
+    type AwaiterResetFunction,
+  } from "../Bindings/Awaiter.svelte";
   import Button, { ButtonClass } from "../Widgets/Button.svelte";
   import Dialog from "../Widgets/Dialog.svelte";
   import { fetchAndInterpret } from "../Bindings/Client.svelte";
@@ -23,40 +25,39 @@
       throw new Error("No files selected");
     }
 
-    // const client = await executeBackgroundTaskSeries<any[]>('File Upload', true, Array.from((files ?? [])).map<BackgroundTaskCallback<any>>((file) => async (client, setStatus) => {
-    //   const bufferSize = 1024 * 1024
-    //   for (let offset = 0; offset < file.size; offset += bufferSize) {
-    //     const chunk = file.slice(offset, offset + bufferSize);
+    return await Promise.all(
+      Array.from(files ?? []).map(async (entry) => {
+        const formData = new FormData();
+        formData.append("offset", "0");
+        formData.append("content", entry, "content");
 
-    //     setStatus('Uploading...', offset / file.size);
-    //   }
-    // }), false)
+        const client = executeBackgroundTask<any>(
+          "File Upload",
+          true,
+          async (client, setStatus) => {
+            setStatus("Creating file...", null);
+            const file = await fetchAndInterpret(
+              `/file/${currentFileId != null ? `:${currentFileId}/files` : "!root"}`,
+              "POST",
+              { isFile: true, name: entry.name },
+            );
 
-    const client = executeBackgroundTask<any[]>(
-      "File Upload",
-      true,
-      async (client, setStatus) => {
-        setStatus("Getting folder info...", null);
+            setStatus("Creating file snapshot...", null);
 
-        for (const data of files ?? []) {
-          const formData = new FormData();
-          formData.append("offset", "0");
-          formData.append("content", data, "content");
+            const fileSnapshot = await fetchAndInterpret(
+              `/file/:${file.id}/snapshots`,
+              "POST",
+              { baseSnapshotId: null },
+            );
 
-          const file = await fetchAndInterpret(
-            `/file/${currentFileId != null ? `:${currentFileId}/files` : "!root"}`,
-            "POST",
-            { isFile: true, name: data.name },
-          );
-        }
+            setStatus("Uploading content...", null);
+          },
+          false,
+        );
 
-        return [""];
-      },
-      false,
+        return await client.run();
+      }),
     );
-
-    $enabled = false;
-    return await client.run();
   }
 </script>
 

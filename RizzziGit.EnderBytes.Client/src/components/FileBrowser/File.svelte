@@ -9,45 +9,61 @@
   export let onClick: () => void;
 
   let hovered: boolean = false;
+
+  let button: HTMLElement;
+  let link: HTMLAnchorElement;
 </script>
 
-<button
-  class="file-entry {selected ? 'selected' : ''}"
-  on:pointerenter={() => (hovered = true)}
-  on:pointerleave={() => (hovered = false)}
-  on:click={onClick}
-  on:dblclick={() => {
-    const path = "/app/files/" + file.id;
+<a
+  bind:this={link}
+  href="/app/files/{file.id}"
 
-    if (hasKeys("control")) {
-      window.open(path, "_blank");
-    } else {
-      goto(path);
-    }
-  }}
+  on:click|preventDefault={() => {}}
 >
-  <div class="overlay">
-    {#if selected || hovered}
-      <input type="checkbox" disabled checked={selected} on:click={onClick} />
-    {/if}
-  </div>
-  <div class="base">
-    <div class="file-preview">
-      {#if file.type === 1}
-        <FolderIcon size="100%" strokeWidth={0.5} />
-      {:else if file.type === 0}
-        <img class="file-preview" src="/favicon.svg" alt="asd" />
+  <button
+    bind:this={button}
+    class="file-entry {selected ? 'selected' : ''}"
+    on:pointerenter={() => (hovered = true)}
+    on:pointerleave={() => (hovered = false)}
+    on:click={onClick}
+    on:dblclick={() => {
+      const path = "/app/files/" + file.id;
+
+      if (hasKeys("control")) {
+        window.open(path, "_blank");
+      } else {
+        goto(path);
+      }
+    }}
+  >
+    <div class="overlay">
+      {#if selected || hovered}
+        <input type="checkbox" disabled checked={selected} on:click={onClick} />
       {/if}
     </div>
-    <div class="file-info">
-      <span class="file-name">
-        {file.name}
-      </span>
+    <div class="base">
+      <div class="file-preview">
+        {#if file.type === 1}
+          <FolderIcon size="100%" strokeWidth={0.5} />
+        {:else if file.type === 0}
+          <img class="file-preview" src="/favicon.svg" alt="asd" />
+        {/if}
+      </div>
+      <div class="file-info">
+        <span class="file-name">
+          {file.name}
+        </span>
+      </div>
     </div>
-  </div>
-</button>
+  </button>
+</a>
 
 <style lang="scss">
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+
   button.file-entry:hover {
     > div.base {
       > div.file-info {

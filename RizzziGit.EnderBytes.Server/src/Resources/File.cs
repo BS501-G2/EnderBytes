@@ -21,7 +21,7 @@ public enum FileHandleFlags : byte
 
 public sealed partial class FileManager : ResourceManager<FileManager, FileManager.Resource, FileManager.Exception>
 {
-  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
   public sealed class FileDontBelongToStorageException(StorageManager.Resource storage, Resource file) : Exception($"File #{file.Id} does not belong to storage #{storage.Id}.")
   {
     public readonly StorageManager.Resource Storage = storage;
@@ -152,6 +152,24 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
       (COLUMN_KEY, bytes)
     ), cancellationToken);
 
+    if (file.ParentId != null)
+    {
+      Resource? parent = await GetById(transaction, (long)file.ParentId, cancellationToken);
+      if (parent != null)
+      {
+        await Update(transaction, parent, new(
+          (COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+        ), cancellationToken);
+      }
+    }
+
+    if (newParent != null)
+    {
+      await Update(transaction, newParent, new(
+        (COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+      ), cancellationToken);
+    }
+
     return result;
   }
 
@@ -190,6 +208,13 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
       (COLUMN_AUTHOR_ID, userAuthenticationToken.UserId)
     ), cancellationToken);
 
+    if (parent != null)
+    {
+      await Update(transaction, parent, new(
+        (COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+      ), cancellationToken);
+    }
+
     return file;
   }
 
@@ -198,6 +223,17 @@ public sealed partial class FileManager : ResourceManager<FileManager, FileManag
     file.ThrowIfDoesNotBelongTo(storage);
 
     await Service.GetManager<StorageManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
+
+    if (file.ParentId != null)
+    {
+      Resource? parent = await GetById(transaction, (long)file.ParentId, cancellationToken);
+      if (parent != null)
+      {
+        await Update(transaction, parent, new(
+          (COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+        ), cancellationToken);
+      }
+    }
 
     return await base.Delete(transaction, file, cancellationToken);
   }

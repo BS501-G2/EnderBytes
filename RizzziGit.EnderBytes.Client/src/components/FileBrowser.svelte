@@ -1,10 +1,24 @@
 <script lang="ts" context="module">
-  export interface FileBrowserInformation {
+  export interface BaseFileBrowserInformation {
+    type: 0 | 1;
     current: any;
-
     pathChain: { isSharePoint: boolean; root: any; chain: any[] };
+  }
+
+  export interface FileBrowserFolderInformation
+    extends BaseFileBrowserInformation {
+    type: 1;
     files: any[];
   }
+
+  export interface FileBrowserFileInformation
+    extends BaseFileBrowserInformation {
+    type: 0;
+  }
+
+  export type FileBrowserInformation =
+    | FileBrowserFolderInformation
+    | FileBrowserFileInformation;
 
   export type FileBrowserSelection = Writable<any[]>;
 </script>
@@ -29,13 +43,15 @@
     // throw new Error();
 
     const id = currentFileId != null ? `:${currentFileId}` : "!root";
-    const [current, files, pathChain] = await Promise.all([
-      fetchAndInterpret(`/file/${id}`),
-      fetchAndInterpret(`/file/${id}/files`),
-      fetchAndInterpret(`/file/${id}/path-chain`),
-    ]);
+    const [current, pathChain] = await Promise.all([fetchAndInterpret(`/file/${id}`), fetchAndInterpret(`/file/${id}/path-chain`)]);
 
-    return { current, pathChain, files };
+    if (current.type == 1) {
+      const files = await fetchAndInterpret(`/file/${id}/files`);
+
+      return { type: 1, current, pathChain, files };
+    } else {
+      return { type: 0, current, pathChain };
+    }
   }
 
   let reset: AwaiterResetFunction;

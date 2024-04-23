@@ -6,7 +6,6 @@ using DatabaseWrappers;
 
 public sealed partial class ResourceService : Server.SubService
 {
-  public abstract class Exception(string? message = null) : System.Exception(message ?? "A resource error has been thrown.");
 
   public ResourceService(Server server) : base(server, "Resources")
   {

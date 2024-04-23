@@ -33,29 +33,31 @@
 
 <div class="controls">
   <div class="section left-section">
-    <Button
-      {buttonClass}
-      {outline}
-      {enabled}
-      onClick={() => ($fileCreationDialog = true)}
-    >
-      <div class="button">
-        <UploadIcon {size} />
-        <p class="button-label">Upload</p>
-      </div>
-    </Button>
-    <Button
-      {buttonClass}
-      {outline}
-      {enabled}
-      onClick={() => ($folderCreationDialog = true)}
-    >
-      <div class="button">
-        <FolderPlusIcon {size} />
-        <p class="button-label">New Folder</p>
-      </div>
-    </Button>
-    <div class="divider" />
+    {#if info?.type == 1}
+      <Button
+        {buttonClass}
+        {outline}
+        {enabled}
+        onClick={() => ($fileCreationDialog = true)}
+      >
+        <div class="button">
+          <UploadIcon {size} />
+          <p class="button-label">Upload</p>
+        </div>
+      </Button>
+      <Button
+        {buttonClass}
+        {outline}
+        {enabled}
+        onClick={() => ($folderCreationDialog = true)}
+      >
+        <div class="button">
+          <FolderPlusIcon {size} />
+          <p class="button-label">New Folder</p>
+        </div>
+      </Button>
+      <div class="divider" />
+    {/if}
     {#if $selection.length !== 0}
       <Button {buttonClass} {outline} onClick={() => {}} {enabled}>
         <div class="button">
@@ -103,10 +105,15 @@
         </div>
       </Button>
     {/if}
-    <Button {buttonClass} {outline} onClick={async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      console.log('asd')
-    }} {enabled}>
+    <Button
+      {buttonClass}
+      {outline}
+      onClick={async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        console.log("asd");
+      }}
+      {enabled}
+    >
       <div class="button">
         <BarChart2Icon {size} />
         <p class="button-label">Sort</p>

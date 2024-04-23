@@ -1,11 +1,13 @@
 <script lang="ts">
-  import Awaiter from "../../../Bindings/Awaiter.svelte";
+  import { FileIcon } from "svelte-feather-icons";
+import Awaiter from "../../../Bindings/Awaiter.svelte";
   import { fetchAndInterpret } from "../../../Bindings/Client.svelte";
-  import type { FileBrowserSelection } from "../../../FileBrowser.svelte";
+  import type { FileBrowserInformation, FileBrowserSelection } from "../../../FileBrowser.svelte";
   import LoadingSpinner from "../../../Widgets/LoadingSpinner.svelte";
   import UserFullName from "../../../Widgets/UserFullName.svelte";
 
   export let selection: FileBrowserSelection;
+  export let info: FileBrowserInformation | null
 </script>
 
 <div class="file-details">
@@ -59,6 +61,12 @@
         </table>
       </div>
     {/key}
+  {:else if info != null}
+    <div class="select-banner">
+      <FileIcon size="128em" strokeWidth={0.5} />
+
+      <h2>Click on any files to view details.</h2>
+    </div>
   {/if}
 </div>
 
@@ -82,6 +90,19 @@
     overflow-x: hidden;
 
     align-items: center;
+
+    > div.select-banner {
+      flex-grow: 1;
+
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+
+      gap: 32px;
+
+      text-align: center;
+    }
 
     > div.file-preview {
       display: flex;

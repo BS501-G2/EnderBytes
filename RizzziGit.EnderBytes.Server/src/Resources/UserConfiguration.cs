@@ -6,7 +6,7 @@ using Services;
 
 public sealed class UserConfigurationManager : ResourceManager<UserConfigurationManager, UserConfigurationManager.Resource, UserConfigurationManager.Exception>
 {
-  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
 
   public new sealed record Resource(
     long Id,
@@ -58,8 +58,8 @@ public sealed class UserConfigurationManager : ResourceManager<UserConfiguration
     }
 
     return await InsertAndGet(transaction, new(
-        (COLUMN_USER_ID, user.Id),
-        (COLUMN_ENABLE_FTP_ACCESS, false)
-      ));
+      (COLUMN_USER_ID, user.Id),
+      (COLUMN_ENABLE_FTP_ACCESS, false)
+    ));
   }
 }

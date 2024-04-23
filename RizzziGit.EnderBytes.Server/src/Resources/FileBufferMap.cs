@@ -2,13 +2,12 @@ using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-using System.Runtime.CompilerServices;
 using Commons.Memory;
 using Services;
 
 public sealed class FileBufferMapManager : ResourceManager<FileBufferMapManager, FileBufferMapManager.Resource, FileBufferMapManager.Exception>
 {
-  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
 
   public class SnapshotAlreadyInitializedException(FileManager.Resource file, FileSnapshotManager.Resource snapshot) : Exception("Snapshot is already initialized.")
   {

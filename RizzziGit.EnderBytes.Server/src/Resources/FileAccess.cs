@@ -12,7 +12,7 @@ public enum FileAccessType : byte { ManageShares, ReadWrite, Read, None }
 
 public sealed class FileAccessManager : ResourceManager<FileAccessManager, FileAccessManager.Resource, FileAccessManager.Exception>
 {
-  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
 
   public new sealed record Resource(
     long Id,
@@ -62,7 +62,7 @@ public sealed class FileAccessManager : ResourceManager<FileAccessManager, FileA
     if (oldVersion < 1)
     {
       await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_FILE_ID} bigint not null;");
-      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_ENTITY_ID} bigint not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_ENTITY_ID} bigint null;");
       await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_ENTITY_TYPE} tinyint not null;");
       await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_KEY} blob not null;");
       await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TYPE} tinyint not null;");
@@ -90,6 +90,20 @@ public sealed class FileAccessManager : ResourceManager<FileAccessManager, FileA
       (COLUMN_TARGET_ENTITY_ID, targetUser.Id),
       (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.User),
       (COLUMN_KEY, targetUser.Encrypt(Service.Server.KeyService, fileKey.Serialize())),
+      (COLUMN_TYPE, (byte)type)
+    ), cancellationToken);
+  }
+
+  public async Task<Resource> Create(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource targetFile, FileAccessType type, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+  {
+    targetFile.ThrowIfDoesNotBelongTo(storage);
+
+    KeyService.AesPair fileKey = (await transaction.ResourceService.GetManager<StorageManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken)).Key;
+
+    return await InsertAndGet(transaction, new(
+      (COLUMN_TARGET_FILE_ID, targetFile.Id),
+      (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.None),
+      (COLUMN_KEY, fileKey.Serialize()),
       (COLUMN_TYPE, (byte)type)
     ), cancellationToken);
   }

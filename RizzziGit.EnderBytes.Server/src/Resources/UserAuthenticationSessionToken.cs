@@ -6,7 +6,7 @@ using Services;
 
 public sealed class UserAuthenticationSessionTokenManager : ResourceManager<UserAuthenticationSessionTokenManager, UserAuthenticationSessionTokenManager.Resource, UserAuthenticationSessionTokenManager.Exception>
 {
-  public abstract class Exception(string? message = null) : ResourceService.Exception(message);
+  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
 
   public new sealed record Resource(
     long Id,

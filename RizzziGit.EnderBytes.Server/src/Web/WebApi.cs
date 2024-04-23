@@ -4,64 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace RizzziGit.EnderBytes.Web;
 
 using Core;
-using Newtonsoft.Json.Linq;
 using Resources;
 using Services;
-
-public sealed class WebApiContext
-{
-  public static implicit operator WebApiContext(WebApi instance) => instance.ApiContext;
-
-  public class InstanceHolder<T>
-  {
-    public static implicit operator T(InstanceHolder<T> instance) => instance.Required();
-
-    public InstanceHolder(WebApiContext context, string name, T? value = default)
-    {
-      Context = context;
-      Name = name;
-
-      if (value is not null)
-      {
-        context.SetInstance(name, value);
-      }
-    }
-
-    private readonly string Name;
-    private readonly WebApiContext Context;
-
-    public T Set(T value) => Context.SetInstance(Name, value);
-
-    public T Required() => Context.GetInstanceRequired<T>(Name);
-    public T? Optional() => Context.GetInstanceOptional<T>(Name);
-  }
-
-  public UserAuthenticationToken? Token = null;
-
-  private readonly Dictionary<string, object?> ContextInstances = [];
-
-  private static string InstanceKey<T>(string prefixKey)
-  {
-    return $"{prefixKey}_{typeof(T).FullName}";
-  }
-
-  public T SetInstance<T>(string name, T instance)
-  {
-    ContextInstances.Add(InstanceKey<T>(name), instance);
-    return instance;
-  }
-
-  public T GetInstanceRequired<T>(string name) => (T)ContextInstances[InstanceKey<T>(name)]!;
-  public T? GetInstanceOptional<T>(string name)
-  {
-    if (!ContextInstances.TryGetValue(InstanceKey<T>(name), out object? value))
-    {
-      return default;
-    }
-
-    return (T)value!;
-  }
-}
 
 [ApiController]
 [RequestSizeLimit(1024 * 1024 * 256)]
@@ -84,12 +28,21 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
     return Ok(new HeartBeatResponse(false));
   }
 
+  public WebApiContext.InstanceHolder<UserAuthenticationToken> CurrentUserAuthenticationToken => new(this, nameof(CurrentUserAuthenticationToken));
+
   [NonAction]
   public bool TryGetUserAuthenticationToken([NotNullWhen(true)] out UserAuthenticationToken? userAuthenticationToken)
   {
-    return (userAuthenticationToken = HttpContext.RequestServices.GetRequiredService<WebApiContext>().Token) != null;
+    if ((userAuthenticationToken = HttpContext.RequestServices.GetRequiredService<WebApiContext>().Token) != null)  {
+      CurrentUserAuthenticationToken.Set(userAuthenticationToken);
+
+      return true;
+    }
+
+    return false;
   }
 
+  [NonAction]
   public bool TryGetValueFromResult<T>(ActionResult<T> result, [NotNullWhen(true)] out T? value)
   {
     if (result.Result is OkObjectResult okObjectResult)
@@ -100,5 +53,36 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
 
     value = default;
     return false;
+  }
+
+  [NonAction]
+  public async Task<ActionResult> Wrap(Func<Task<ActionResult>> action)
+  {
+    try
+    {
+      return await action();
+    }
+    catch (ResourceService.ResourceManager.Exception exception)
+    {
+      return exception switch
+      {
+        ResourceService.ResourceManager.NotFoundException => NotFound(),
+
+        ResourceService.ResourceManager.ConstraintException or
+        FileManager.NotAFileException or
+        FileManager.NotAFolderException or
+        FileManager.NotSupportedException or
+        FileManager.InvalidFileTypeException or
+        FileManager.FileTreeException or
+        FileManager.FileDontBelongToStorageException or
+        ResourceService.ResourceManager.NoMatchException => BadRequest(),
+
+        StorageManager.AccessDeniedException or
+        StorageManager.StorageEncryptDeniedException or
+        StorageManager.StorageDecryptDeniedException => Forbid(),
+
+        _ => BadRequest(exception.Message),
+      };
+    }
   }
 }

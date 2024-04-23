@@ -8,6 +8,7 @@
     FileBrowserSelection,
   } from "../../FileBrowser.svelte";
   import ControlBar from "./ControlBar.svelte";
+    import { writable } from "svelte/store";
 
   export let selection: FileBrowserSelection;
   export let reset: AwaiterResetFunction;
@@ -20,20 +21,20 @@
       <ControlBar {selection} {reset} {info} />
       <FileList {selection} {info} />
     </div>
-    <FileDetails {selection} />
+    <FileDetails {selection} info={null} />
   {:else}
-    {@const file = info.current}
-    {#if file.type == 0}
+    {#if info.type == 0}
       <div class="column">
         <ControlBar {selection} {reset} {info} />
         <FileView {selection} {reset} {info} />
       </div>
-    {:else if file.type == 1}
+      <FileDetails selection={writable([info.current])} {info} />
+    {:else if info.type == 1}
       <div class="column">
         <ControlBar {selection} {reset} {info} />
         <FileList {selection} {info} />
       </div>
-      <FileDetails {selection} />
+      <FileDetails {selection} {info} />
     {/if}
   {/if}
 </div>

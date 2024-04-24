@@ -2,79 +2,92 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace RizzziGit.EnderBytes.Web;
 
-using Core;
 using Resources;
 
 public sealed partial class WebApi
 {
   [Route("~/user/@{username}")]
   [HttpGet]
-  public async Task<ActionResult<UserManager.Resource>> GetByUsername(string username)
+  public async Task<ActionResult> GetByUsername(string username)
   {
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+    return await Run(async () =>
     {
-      return Unauthorized();
-    }
+      if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+      {
+        return Error(401);
+      }
 
-    UserManager.Resource? user = null;
-    if ((user = await ResourceService.Transact((transaction, cancellationToken) => GetResourceManager<UserManager>().GetByUsername(transaction, username, cancellationToken))) == null)
-    {
-      return NotFound();
-    }
+      UserManager.Resource? user = null;
+      if ((user = await ResourceService.Transact((transaction, cancellationToken) => GetResourceManager<UserManager>().GetByUsername(transaction, username, cancellationToken))) == null)
+      {
+        return Error(404);
+      }
 
-    return Ok(user);
+      return Data(user);
+    });
   }
 
   [Route("~/user/:{userId}")]
   [HttpGet]
-  public async Task<ActionResult<UserManager.Resource>> GetById(long userId)
+  public async Task<ActionResult> GetById(long userId)
   {
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+    return await Run(async () =>
     {
-      return Unauthorized();
-    }
+      if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+      {
+        return Error(401);
+      }
 
-    UserManager.Resource? user = null;
-    if ((user = await ResourceService.Transact((transaction, cancellationToken) => GetResourceManager<UserManager>().GetById(transaction, userId, cancellationToken))) == null)
-    {
-      return NotFound();
-    }
+      UserManager.Resource? user = null;
+      if ((user = await ResourceService.Transact((transaction, cancellationToken) => GetResourceManager<UserManager>().GetById(transaction, userId, cancellationToken))) == null)
+      {
+        return Error(404);
+      }
 
-    return Ok(user);
+      return Data(user);
+    });
   }
 
   [Route("~/user/!me")]
   [HttpGet]
-  public ActionResult<UserManager.Resource> GetUserSelf()
+  public async Task<ActionResult> GetUserSelf()
   {
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+    return await Run(() =>
     {
-      return Unauthorized();
-    }
+      if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+      {
+        return Task.FromResult<Result>(Error(401));
+      }
 
-    return Ok(userAuthenticationToken.User);
+      return Task.FromResult<Result>(Data(userAuthenticationToken.User));
+    });
+
   }
 
   public sealed record UpdateUserRequest(string Username, string LastName, string FirstName, string? MiddleName);
 
   [Route("~/user/:{userId}")]
   [HttpPost]
-  public async Task<ActionResult<bool>> UpdateUserById(long userId, [FromBody] UpdateUserRequest request)
+  public async Task<ActionResult> UpdateUserById(long userId, [FromBody] UpdateUserRequest request)
   {
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+    return await Run(async () =>
     {
-      return Unauthorized();
-    }
-    else if (userAuthenticationToken.UserId != userId)
-    {
-      return Forbid();
-    }
+      if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+      {
+        return Error(401);
+      }
+      else if (userAuthenticationToken.UserId != userId)
+      {
+        return Error(403);
+      }
 
-    return Ok(await ResourceService.Transact((transaction, cancellationToken) =>
-    {
-      (string Username, string LastName, string FirstName, string? MiddleName) = request;
+      return await ResourceService.Transact<Result>(async (transaction, cancellationToken) =>
+      {
+        (string Username, string LastName, string FirstName, string? MiddleName) = request;
+        await GetResourceManager<UserManager>().Update(transaction, userAuthenticationToken.User, Username, LastName, FirstName, MiddleName);
 
-      return GetResourceManager<UserManager>().Update(transaction, userAuthenticationToken.User, Username, LastName, FirstName, MiddleName);
-    }));
+        return Data();
+      });
+    });
   }
 }

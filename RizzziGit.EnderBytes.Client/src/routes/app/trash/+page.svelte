@@ -21,7 +21,6 @@
         grid-template-columns: auto auto;
         margin: 5%;
         margin-left: 50px;
-
       }
       .title{
         font-weight: bold;
@@ -207,9 +206,6 @@
           width: 100%;
           padding: 10px;
         }
-
-
-
         body{
           background-color: rgb(32, 32, 32);
         }

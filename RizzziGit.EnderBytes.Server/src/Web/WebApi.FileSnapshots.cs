@@ -12,107 +12,121 @@ public sealed partial class WebApi
   [Route("/file/!root/snapshots")]
   [Route("/file/:{id}/snapshots")]
   [HttpGet]
-  public Task<ActionResult> GetFileSnapshots(long? id) => Wrap(async () =>
+  public async Task<ObjectResult> GetFileSnapshots(long? id)
   {
-    ActionResult getByIdResult = await GetFileById(id);
-
-    if (!TryGetValueFromResult(getByIdResult, out FileManager.Resource? file))
+    ObjectResult fileResult = await GetFileById(id);
+    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
     {
-      return getByIdResult;
+      return fileResult;
     }
 
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+    return await Run(async () =>
     {
-      return Unauthorized();
-    }
 
-    StorageManager.Resource storage = CurrentStorage;
+      StorageManager.Resource storage = CurrentStorage;
 
-    return await ResourceService.Transact<ActionResult>(async (transaction, cancellationToken) =>
-    {
-      return Ok(await transaction.GetManager<FileSnapshotManager>().List(transaction, storage, file, userAuthenticationToken, null, null, cancellationToken).ToArrayAsync(cancellationToken));
+      return await ResourceService.Transact<Result>(async (transaction, cancellationToken) =>
+      {
+        return Data(await transaction.GetManager<FileSnapshotManager>().List(transaction, storage, file, CurrentUserAuthenticationToken, null, null, cancellationToken).ToArrayAsync(cancellationToken));
+      });
     });
-  });
+  }
 
   public sealed record CreateFileSnapshotRequest(long? BaseSnapshotId);
 
   [Route("/file/:{id}/snapshots")]
   [HttpPost]
-  public Task<ActionResult> CreateFileSnapshot(long id, [FromBody] CreateFileSnapshotRequest request) => Wrap(async () =>
+  public async Task<ObjectResult> CreateFileSnapshot(long id, [FromBody] CreateFileSnapshotRequest request)
   {
-    ActionResult getByIdResult = await GetFileById(id);
-
-    if (!TryGetValueFromResult(getByIdResult, out FileManager.Resource? file))
+    ObjectResult fileResult = await GetFileById(id);
+    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
     {
-      return getByIdResult;
+      return fileResult;
     }
 
-    return await ResourceService.Transact<ActionResult>(async (transaction, cancellationToken) =>
+    return await Run(async () =>
     {
-      FileSnapshotManager.Resource? baseFileSnapshot = null;
-
-      if (
-        request.BaseSnapshotId != null &&
-        (baseFileSnapshot = await transaction.GetManager<FileSnapshotManager>().GetById(transaction, (long)request.BaseSnapshotId, cancellationToken)) != null
-      )
+      return await ResourceService.Transact<Result>(async (transaction, cancellationToken) =>
       {
-        return NotFound();
-      }
+        FileSnapshotManager.Resource? baseFileSnapshot = null;
 
-      return Ok(await transaction.GetManager<FileSnapshotManager>().Create(transaction, CurrentStorage, file, baseFileSnapshot, CurrentUserAuthenticationToken, cancellationToken));
+        if (
+          request.BaseSnapshotId != null &&
+          (baseFileSnapshot = await transaction.GetManager<FileSnapshotManager>().GetById(transaction, (long)request.BaseSnapshotId, cancellationToken)) != null
+        )
+        {
+          return Error(404);
+        }
+
+        return Data(await transaction.GetManager<FileSnapshotManager>().Create(transaction, CurrentStorage, file, baseFileSnapshot, CurrentUserAuthenticationToken, cancellationToken));
+      });
     });
-  });
+  }
 
   public WebApiContext.InstanceHolder<FileSnapshotManager.Resource> CurrentFileSnapshot => new(this, nameof(CurrentFileSnapshot));
 
   [Route("/file/{fileId}/snapshots/:{fileSnapshotId}")]
   [HttpGet]
-  public Task<ActionResult> UpdateFileSnapshot(long fileId, long fileSnapshotId) => Wrap(async () =>
+  public async Task<ObjectResult> UpdateFileSnapshot(long fileId, long fileSnapshotId)
   {
-    ActionResult getByIdResult = await GetFileById(fileId);
-
-    if (!TryGetValueFromResult(getByIdResult, out FileManager.Resource? file))
+    ObjectResult fileResult = await GetFileById(fileId);
+    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
     {
-      return getByIdResult;
+      return fileResult;
     }
 
-    return await ResourceService.Transact<ActionResult>(async (transaction, cancellationToken) =>
+    return await Run(async () =>
     {
-      FileSnapshotManager.Resource? fileSnapshot;
-      if ((fileSnapshot = await transaction.GetManager<FileSnapshotManager>().GetById(transaction, fileSnapshotId, cancellationToken)) == null)
+      return await ResourceService.Transact<Result>(async (transaction, cancellationToken) =>
       {
-        return NotFound();
-      }
+        FileSnapshotManager.Resource? fileSnapshot;
+        if ((fileSnapshot = await transaction.GetManager<FileSnapshotManager>().GetById(transaction, fileSnapshotId, cancellationToken)) == null)
+        {
+          return Error(404);
+        }
 
-      return Ok(CurrentFileSnapshot.Set(fileSnapshot));
+        return Data(CurrentFileSnapshot.Set(fileSnapshot));
+      });
     });
-  });
+  }
 
-  [Route("/file/{fileId}/snapshots/:{fileSnapshotId}/content")]
-  [HttpGet]
-  public Task<ActionResult> GetFileSnapshotContent(long fileId, long fileSnapshotId) => Wrap(async () =>
-  {
-    ActionResult getFileResult = await GetFileById(fileId);
-    if (!TryGetValueFromResult(getFileResult, out FileManager.Resource? file))
-    {
-      return getFileResult;
-    }
+  // [Route("/file/{fileId}/snapshots/:{fileSnapshotId}/content")]
+  // [HttpGet]
+  // public Task<Result> GetFileSnapshotContent(long fileId, long fileSnapshotId) => Wrap(async () =>
+  // {
+  //   Result fileResult = await GetFileById(fileId);
+  //   if (!fileResult.TryGetValueFromResult(out FileManager.Resource? file))
+  //   {
+  //     return fileResult;
+  //   }
 
-    ActionResult getFileSnapshotResult = await UpdateFileSnapshot(fileId, fileSnapshotId);
-    if (!TryGetValueFromResult(getFileSnapshotResult, out FileSnapshotManager.Resource? fileSnapshot))
-    {
-      return getFileSnapshotResult;
-    }
+  //   Result fileSnapshotResult = await UpdateFileSnapshot(fileId, fileSnapshotId);
+  //   if (!fileSnapshotResult.TryGetValueFromResult(out FileSnapshotManager.Resource? fileSnapshot))
+  //   {
+  //     return fileSnapshotResult;
+  //   }
 
-    return File(new FileSnapshotContentReadStream(ResourceService, CurrentStorage, file, fileSnapshot, CurrentUserAuthenticationToken), "application/octet-stream", file.Name, true);
-  });
+  //   return File(new FileSnapshotContentReadStream(ResourceService, CurrentStorage, file, fileSnapshot, CurrentUserAuthenticationToken), "application/octet-stream", file.Name, true);
+  // });
 
-  [Route("/file/{fileId}/snapshots/:{fileSnapshotId}/content")]
-  [HttpPost]
-  public Task<ActionResult> UploadFileSnapshotContent(long fileId, long fileSnapshotId) => Wrap(async () =>
-  {
-    
-  });
+  // public sealed record UploadFileSnapshotContentRequest(long Offset, IFormFile Content);
+
+  // [Route("/file/{fileId}/snapshots/:{fileSnapshotId}/content")]
+  // [HttpPost]
+  // public Task<ActionResult> UploadFileSnapshotContent(long fileId, long fileSnapshotId, [FromBody] UploadFileSnapshotContentRequest request) => Wrap(async () =>
+  // {
+  //   ActionResult getFileResult = await GetFileById(fileId);
+  //   if (!TryGetValueFromResult(getFileResult, out FileManager.Resource? file))
+  //   {
+  //     return getFileResult;
+  //   }
+
+  //   ActionResult getFileSnapshotResult = await UpdateFileSnapshot(fileId, fileSnapshotId);
+  //   if (!TryGetValueFromResult(getFileSnapshotResult, out FileSnapshotManager.Resource? fileSnapshot))
+  //   {
+  //     return getFileSnapshotResult;
+  //   }
+  // });
 
   public sealed class FileSnapshotContentReadStream(ResourceService service, StorageManager.Resource storage, FileManager.Resource file, FileSnapshotManager.Resource fileSnapshot, UserAuthenticationToken userAuthenticationToken) : Stream
   {

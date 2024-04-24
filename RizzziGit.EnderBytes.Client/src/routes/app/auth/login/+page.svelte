@@ -5,7 +5,7 @@
 
   import SiteBanner from "./SiteBanner.svelte";
   import Banner from "./Banner.svelte";
-  import { fetchAndInterpret } from "../../../../components/Bindings/Client.svelte";
+  import { apiFetch } from "../../../../components/Bindings/Client.svelte";
 </script>
 
 <script lang="ts">
@@ -32,7 +32,7 @@
     try {
       errorMessage = null;
 
-      await fetchAndInterpret("/auth/password-login", "POST", {
+      await apiFetch("/auth/password-login", "POST", {
         username,
         password,
       });

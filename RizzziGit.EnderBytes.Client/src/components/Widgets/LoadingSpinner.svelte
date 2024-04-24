@@ -51,13 +51,15 @@
   function disconnect() {
     activeCount--;
   }
+
+  export type Size = `${number}${"px" | "em"}`;
 </script>
 
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
 
   export let degrees: number = 0;
-  export let size: `${number}${'px' | 'em'}` | null = null;
+  export let size: Size | null = null;
 
   onMount(() => {
     connect();

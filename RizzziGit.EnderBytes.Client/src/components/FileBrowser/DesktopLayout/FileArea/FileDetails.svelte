@@ -1,7 +1,7 @@
 <script lang="ts">
   import { FileIcon } from "svelte-feather-icons";
 import Awaiter from "../../../Bindings/Awaiter.svelte";
-  import { fetchAndInterpret } from "../../../Bindings/Client.svelte";
+  import { apiFetch } from "../../../Bindings/Client.svelte";
   import type { FileBrowserInformation, FileBrowserSelection } from "../../../FileBrowser.svelte";
   import LoadingSpinner from "../../../Widgets/LoadingSpinner.svelte";
   import UserFullName from "../../../Widgets/UserFullName.svelte";
@@ -43,7 +43,7 @@ import Awaiter from "../../../Bindings/Awaiter.svelte";
                 <p>
                   <Awaiter
                     callback={() =>
-                      fetchAndInterpret(`/user/:${file.authorUserId}`)}
+                      apiFetch(`/user/:${file.authorUserId}`)}
                   >
                     <svelte:fragment slot="success" let:result={user}>
                       <a class="user-link" href="/app/users/@{user.username}">

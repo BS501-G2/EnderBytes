@@ -7,7 +7,7 @@
   import { writable, type Writable } from "svelte/store";
   import { executeBackgroundTask } from "../BackgroundTaskList.svelte";
   import Awaiter from "../Bindings/Awaiter.svelte";
-  import { fetchAndInterpret } from "../Bindings/Client.svelte";
+  import { apiFetch } from "../Bindings/Client.svelte";
   import Button, { ButtonClass } from "../Widgets/Button.svelte";
   import Dialog from "../Widgets/Dialog.svelte";
   import Input from "../Widgets/Input.svelte";
@@ -21,7 +21,7 @@
       true,
       async (_, setStatus) => {
         setStatus(`Creating folder "${name}"...`);
-        const folder = await fetchAndInterpret(
+        const folder = await apiFetch(
           `/file/${currentFileId != null ? `:${currentFileId}` : "!root"}/files`,
           "POST",
           {

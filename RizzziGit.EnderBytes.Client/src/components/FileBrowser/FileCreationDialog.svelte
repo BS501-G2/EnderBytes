@@ -4,12 +4,10 @@
 
 <script lang="ts">
   import { executeBackgroundTask } from "../BackgroundTaskList.svelte";
-  import Awaiter, {
-    type AwaiterResetFunction,
-  } from "../Bindings/Awaiter.svelte";
+  import Awaiter from "../Bindings/Awaiter.svelte";
   import Button, { ButtonClass } from "../Widgets/Button.svelte";
   import Dialog from "../Widgets/Dialog.svelte";
-  import { fetchAndInterpret } from "../Bindings/Client.svelte";
+  import { apiFetch } from "../Bindings/Client.svelte";
   import { writable, type Writable } from "svelte/store";
 
   export let currentFileId: number | null;
@@ -36,7 +34,7 @@
           true,
           async (client, setStatus) => {
             setStatus("Creating file...", null);
-            const file = await fetchAndInterpret(
+            const file = await apiFetch(
               `/file/${currentFileId != null ? `:${currentFileId}/files` : "!root"}`,
               "POST",
               { isFile: true, name: entry.name },
@@ -44,7 +42,7 @@
 
             setStatus("Creating file snapshot...", null);
 
-            const fileSnapshot = await fetchAndInterpret(
+            const fileSnapshot = await apiFetch(
               `/file/:${file.id}/snapshots`,
               "POST",
               { baseSnapshotId: null },

@@ -3,7 +3,6 @@
   import {
     FolderIcon,
     ChevronRightIcon,
-    Share2Icon,
     UsersIcon,
   } from "svelte-feather-icons";
   import Awaiter from "../../../Bindings/Awaiter.svelte";
@@ -11,7 +10,7 @@
     OverlayPositionType,
   } from "../../../Widgets/Overlay.svelte";
   import LoadingSpinner from "../../../Widgets/LoadingSpinner.svelte";
-  import { fetchAndInterpret } from "../../../Bindings/Client.svelte";
+  import { apiFetch } from "../../../Bindings/Client.svelte";
 
   export let files: any[];
   export let index: number;
@@ -85,7 +84,7 @@
     <div class="menu">
       <Awaiter
         callback={() =>
-          fetchAndInterpret(
+          apiFetch(
             `/file/${file != null ? `:${file.id}` : "!root"}/files`,
           )}
       >

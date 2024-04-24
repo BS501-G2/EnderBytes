@@ -13,11 +13,11 @@
 {#if $enabled}
   <Dialog dialogClass={DialogClass.Normal} onDismiss={() => ($enabled = false)}>
     <svelte:fragment slot="actions">
-      <Client let:fetch>
+      <Client let:apiFetch>
         <Button
           onClick={() => {
             $enabled = false;
-            return fetch("/auth/logout", "POST");
+            return apiFetch("/auth/logout", "POST");
           }}
           buttonClass={ButtonClass.Primary}
         >

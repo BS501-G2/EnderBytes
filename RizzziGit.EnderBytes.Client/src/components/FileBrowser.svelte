@@ -32,7 +32,7 @@
   import Awaiter, {
     type AwaiterResetFunction,
   } from "./Bindings/Awaiter.svelte";
-  import { fetchAndInterpret } from "./Bindings/Client.svelte";
+  import { apiFetch } from "./Bindings/Client.svelte";
 
   export let currentFileId: number | null;
 
@@ -43,10 +43,10 @@
     // throw new Error();
 
     const id = currentFileId != null ? `:${currentFileId}` : "!root";
-    const [current, pathChain] = await Promise.all([fetchAndInterpret(`/file/${id}`), fetchAndInterpret(`/file/${id}/path-chain`)]);
+    const [current, pathChain] = await Promise.all([apiFetch(`/file/${id}`), apiFetch(`/file/${id}/path-chain`)]);
 
     if (current.type == 1) {
-      const files = await fetchAndInterpret(`/file/${id}/files`);
+      const files = await apiFetch(`/file/${id}/files`);
 
       return { type: 1, current, pathChain, files };
     } else {

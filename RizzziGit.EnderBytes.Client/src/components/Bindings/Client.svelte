@@ -17,6 +17,10 @@
     ...args: Parameters<FetchFunction>
   ) => Promise<Blob | any>;
 
+  export type ApiFetchFunction = (
+    ...args: Parameters<FetchAndInterpretFunction>
+  ) => Promise<Blob | any>;
+
   function getUrl() {
     let url = localStorage.getItem("client-url");
 
@@ -63,6 +67,7 @@
     }
   }
 
+  const oldFetch = window.fetch;
   export const fetch: FetchFunction = async function fetch(
     pathname: string,
     method: string = "GET",
@@ -93,11 +98,11 @@
       pathname: pathname,
     });
 
-    const response = await window.fetch(url, request);
+    const response = await oldFetch(url, request);
 
     if (response.status === 200) {
       if (pathname === "/auth/password-login" && request.method === "POST") {
-        const session: Session = await response.json();
+        const session: Session = (await response.json()).data;
 
         Object.assign(response, { json: () => session });
 
@@ -125,7 +130,22 @@
   export const fetchAndInterpret: FetchAndInterpretFunction = async (...args) =>
     interpretResponse(await fetch(...args));
 
+  export const apiFetch: ApiFetchFunction = async (...args) => {
+    const response = await fetchAndInterpret(...args);
+
+    if (response instanceof Blob) {
+      return response;
+    } else {
+      return response.data;
+    }
+  };
+
   export { sessionStore as session };
+
+  Object.assign(window, {
+    fetch,
+    fetchAndInterpret,
+  });
 </script>
 
 <script lang="ts">
@@ -133,9 +153,10 @@
     default: {
       fetch: FetchFunction;
       fetchAndInterpret: FetchAndInterpretFunction;
+      apiFetch: ApiFetchFunction;
       session: Session | null;
     };
   }
 </script>
 
-<slot {fetch} {fetchAndInterpret} session={$sessionStore} />
+<slot {fetch} {fetchAndInterpret} {apiFetch} session={$sessionStore} />

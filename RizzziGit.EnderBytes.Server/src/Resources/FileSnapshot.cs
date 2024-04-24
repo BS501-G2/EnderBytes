@@ -76,6 +76,11 @@ public sealed class FileSnapshotManager : ResourceManager<FileSnapshotManager, F
 
   public async IAsyncEnumerable<Resource> List(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, UserAuthenticationToken userAuthenticationToken, LimitClause? limit = null, OrderByClause? orderBy = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
   {
+    if (file.Type != FileType.File)
+    {
+      throw new FileManager.NotAFileException(file);
+    }
+
     file.ThrowIfDoesNotBelongTo(storage);
     _ = await Service.GetManager<StorageManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.Read, cancellationToken);
 

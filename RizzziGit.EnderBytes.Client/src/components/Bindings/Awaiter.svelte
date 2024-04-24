@@ -12,6 +12,8 @@
 </script>
 
 <script lang="ts" generics="T extends any">
+  import type { Size } from "../Widgets/LoadingSpinner.svelte";
+
   import { onMount } from "svelte";
 
   import LoadingPage from "../Widgets/LoadingSpinnerPage.svelte";
@@ -20,7 +22,7 @@
 
   export let callback: AwaiterCallback<T>;
   export let autoLoad = true;
-  export let loadingSize: number | null = null;
+  export let loadingSize: Size | null = null;
 
   let promise: Promise<T>;
   let message: string | null = null;

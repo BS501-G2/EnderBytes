@@ -41,7 +41,13 @@ public sealed class WebApiContext
 
   public T SetInstance<T>(string name, T instance)
   {
-    ContextInstances.Add(InstanceKey<T>(name), instance);
+    string instanceKey = InstanceKey<T>(name);
+
+    if (!ContextInstances.TryAdd(instanceKey, instance))
+    {
+      ContextInstances.Remove(instanceKey);
+      ContextInstances.TryAdd(instanceKey, instance);
+    }
     return instance;
   }
 

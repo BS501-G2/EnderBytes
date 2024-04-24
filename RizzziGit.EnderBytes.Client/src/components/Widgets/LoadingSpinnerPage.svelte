@@ -1,7 +1,7 @@
 <script lang="ts">
-  import Loading from "./LoadingSpinner.svelte";
+  import Loading, { type Size } from "./LoadingSpinner.svelte";
 
-  export let loadingSize: number | null = null
+  export let loadingSize: Size | null = null;
 
   interface $$Slots {
     default: {};
@@ -13,7 +13,12 @@
   {#if $$slots["without-spinner"]}
     <slot name="without-spinner" />
   {:else}
-    <div class="loading-icon {loadingSize == null ? 'nosize' : ''}" style="{loadingSize == null ? '' : `width: ${loadingSize}px; height: ${loadingSize}px;`}">
+    <div
+      class="loading-icon {loadingSize == null ? 'nosize' : ''}"
+      style={loadingSize == null
+        ? ""
+        : `width: ${loadingSize}px; height: ${loadingSize}px;`}
+    >
       <Loading size={loadingSize} />
     </div>
     {#if $$slots.default}

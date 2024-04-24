@@ -94,11 +94,11 @@ public sealed partial class WebApi
 
   [Route("~/auth/password-login")]
   [HttpPost]
-  public Task<ActionResult<PasswordLoginResponse>> Login([FromBody] PasswordLoginRequest request) => ResourceService.Transact<ActionResult<PasswordLoginResponse>>(async (transaction, cancellationToken) =>
+  public Task<ObjectResult> Login([FromBody] PasswordLoginRequest request) => Run(() => ResourceService.Transact<Result>(async (transaction, cancellationToken) =>
   {
     if (TryGetUserAuthenticationToken(out _))
     {
-      return Conflict();
+      return Error(409);
     }
 
     (string Username, string Password) = request;
@@ -111,21 +111,21 @@ public sealed partial class WebApi
       ((userAuthenticationToken = await GetResourceManager<UserAuthenticationManager>().GetByPayload(transaction, user, Encoding.UTF8.GetBytes(Password), UserAuthenticationType.Password)) == null)
     )
     {
-      return Unauthorized();
+      return Error(401);
     }
 
     string token = await GetResourceManager<UserAuthenticationManager>().CreateSessionToken(transaction, user, userAuthenticationToken, cancellationToken);
     await Server.ResourceService.GetManager<UserAuthenticationManager>().TruncateSessionToken(transaction, user, cancellationToken);
 
-    return Ok(new PasswordLoginResponse(user.Id, token));
-  });
+    return Data(new PasswordLoginResponse(user.Id, token));
+  }));
 
   [Route("~/auth/logout")]
-  public async Task<ActionResult> Logout()
+  public Task<ObjectResult> Logout() => Run(async () =>
   {
     if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
     {
-      return Unauthorized(401);
+      return Error(401);
     }
 
     await ResourceService.Transact(async (transaction, cancellationToken) =>
@@ -133,6 +133,6 @@ public sealed partial class WebApi
       await GetResourceManager<UserAuthenticationManager>().Delete(transaction, userAuthenticationToken.UserAuthentication, cancellationToken);
     });
 
-    return Ok();
-  }
+    return Data();
+  });
 }

@@ -27,8 +27,8 @@
 {#if $page.url.pathname.startsWith("/app/auth")}
   <slot />
 {:else}
-  <Client let:fetch>
-    <Awaiter callback={() => fetch("/user/!me")}>
+  <Client let:apiFetch>
+    <Awaiter callback={() => apiFetch("/user/!me")}>
       <svelte:fragment slot="success" let:result={user}>
         <ResponsiveLayout>
           <svelte:fragment slot="desktop">

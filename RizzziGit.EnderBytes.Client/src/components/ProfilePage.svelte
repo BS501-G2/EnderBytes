@@ -12,7 +12,7 @@
   import { enabled as accountSettingsDialog } from "./Dashboard/AccountSettingsDialog.svelte";
 
   import Awaiter from "./Bindings/Awaiter.svelte";
-  import { fetchAndInterpret } from "./Bindings/Client.svelte";
+  import { apiFetch } from "./Bindings/Client.svelte";
   import Button, { ButtonClass } from "./Widgets/Button.svelte";
 
   export let identifier: UserResolve;
@@ -20,9 +20,9 @@
 
   async function resolve(): Promise<any | null> {
     if (identifier.type == UserResolveType.Username) {
-      return await fetchAndInterpret(`/user/@${identifier.username}`)
+      return await apiFetch(`/user/@${identifier.username}`)
     } else {
-      return await fetchAndInterpret(`/user/:${identifier.userId}`)
+      return await apiFetch(`/user/:${identifier.userId}`)
     }
   }
 </script>

@@ -15,11 +15,11 @@ public sealed partial class WebApi
   [Route("~/file/!root")]
   [Route("~/file/:{fileId}")]
   [HttpGet]
-  public Task<ActionResult> GetFileById(long? fileId) => Wrap(async () =>
+  public Task<ObjectResult> GetFileById(long? fileId) => Run(async () =>
   {
     if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
     {
-      return Unauthorized();
+      return Error(401);
     }
 
     StorageManager storageManager = ResourceService.GetManager<StorageManager>();
@@ -28,7 +28,7 @@ public sealed partial class WebApi
     FileManager.Resource? file;
     StorageManager.Resource? storage;
 
-    return await ResourceService.Transact<ActionResult>(async (transaction, cancellationToken) =>
+    return await ResourceService.Transact<Result>(async (transaction, cancellationToken) =>
     {
       if (fileId == null)
       {
@@ -40,7 +40,7 @@ public sealed partial class WebApi
         ((storage = await storageManager.GetById(transaction, file.StorageId, cancellationToken)) == null)
       )
       {
-        return NotFound();
+        return Error(404);
       }
 
       DecryptedKeyInfo decryptedKeyInfo = await storageManager.DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.Read, cancellationToken);
@@ -51,14 +51,14 @@ public sealed partial class WebApi
 
         if (!await fileManager.IsEqualToOrInsideOf(transaction, storage, rootFolder, file, cancellationToken))
         {
-          return Forbid();
+          return Error(403);
         }
       }
 
       CurrentStorage.Set(storage);
       CurrentFile.Set(file);
 
-      return Ok(file);
+      return Data(file);
     });
   });
 
@@ -67,102 +67,109 @@ public sealed partial class WebApi
   [Route("~/file/!root/path-chain")]
   [Route("~/file/:{id}/path-chain")]
   [HttpGet]
-  public Task<ActionResult> GetPathChain(long? id) => Wrap(async () =>
+  public async Task<ObjectResult> GetPathChain(long? id)
   {
-    ActionResult getByIdResult = await GetFileById(id);
-
-    if (!TryGetValueFromResult(getByIdResult, out FileManager.Resource? file))
+    ObjectResult fileResult = await GetFileById(id);
+    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
     {
-      return getByIdResult;
+      return fileResult;
     }
 
-    return await ResourceService.Transact<ActionResult>(async (transaction, cancellationToken) =>
+    return await Run(async () =>
     {
-      FileManager fileManager = ResourceService.GetManager<FileManager>();
-      StorageManager storageManager = ResourceService.GetManager<StorageManager>();
-
-      DecryptedKeyInfo decryptedKeyInfo = await storageManager.DecryptKey(transaction, CurrentStorage, file, CurrentUserAuthenticationToken, FileAccessType.Read, cancellationToken);
-      FileManager.Resource? rootFolder;
-      bool isSharePoint;
-
-      if (decryptedKeyInfo.FileAccess == null)
+      return await ResourceService.Transact<Result>(async (transaction, cancellationToken) =>
       {
-        rootFolder = await storageManager.GetRootFolder(transaction, CurrentStorage, CurrentUserAuthenticationToken, cancellationToken);
-        isSharePoint = false;
-      }
-      else
-      {
-        if ((rootFolder = await fileManager.GetById(transaction, decryptedKeyInfo.FileAccess.TargetFileId, cancellationToken)) == null)
+        FileManager fileManager = ResourceService.GetManager<FileManager>();
+        StorageManager storageManager = ResourceService.GetManager<StorageManager>();
+
+        DecryptedKeyInfo decryptedKeyInfo = await storageManager.DecryptKey(transaction, CurrentStorage, file, CurrentUserAuthenticationToken, FileAccessType.Read, cancellationToken);
+        FileManager.Resource? rootFolder;
+        bool isSharePoint;
+
+        if (decryptedKeyInfo.FileAccess == null)
         {
-          return Forbid();
+          rootFolder = await storageManager.GetRootFolder(transaction, CurrentStorage, CurrentUserAuthenticationToken, cancellationToken);
+          isSharePoint = false;
+        }
+        else
+        {
+          if ((rootFolder = await fileManager.GetById(transaction, decryptedKeyInfo.FileAccess.TargetFileId, cancellationToken)) == null)
+          {
+            return Error(403);
+          }
+
+          isSharePoint = true;
         }
 
-        isSharePoint = true;
-      }
+        List<FileManager.Resource> tree = [];
 
-      List<FileManager.Resource> tree = [];
+        FileManager.Resource? current = file;
+        while (current?.ParentId != null && current.Id != rootFolder.Id)
+        {
+          tree.Insert(0, current);
 
-      FileManager.Resource? current = file;
-      while (current?.ParentId != null && current.Id != rootFolder.Id)
-      {
-        tree.Insert(0, current);
+          Console.WriteLine(current);
 
-        Console.WriteLine(current);
+          current = await fileManager.GetById(transaction, (long)current.ParentId, cancellationToken);
+        }
 
-        current = await fileManager.GetById(transaction, (long)current.ParentId, cancellationToken);
-      }
-
-      return Ok(new GetPathChainResponse(rootFolder, [.. tree], isSharePoint));
+        return Data(new GetPathChainResponse(rootFolder, [.. tree], isSharePoint));
+      });
     });
-  });
+  }
 
   [Route("~/file/!root/files")]
   [Route("~/file/:{id}/files")]
   [HttpGet]
-  public Task<ActionResult> ScanFolder(long? id) => Wrap(async () =>
+  public async Task<ObjectResult> ScanFolder(long? id)
   {
-    ActionResult getByIdResult = await GetFileById(id);
-
-    if (!TryGetValueFromResult(getByIdResult, out FileManager.Resource? file))
+    ObjectResult fileResult = await GetFileById(id);
+    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
     {
-      return getByIdResult;
+      return fileResult;
     }
 
-    if (file.Type != FileType.Folder)
+    return await Run(async () =>
     {
-      return BadRequest();
-    }
+      if (file.Type != FileType.Folder)
+      {
+        return Error(400);
+      }
 
-    FileManager fileManager = ResourceService.GetManager<FileManager>();
+      FileManager fileManager = ResourceService.GetManager<FileManager>();
 
-    return await ResourceService.Transact<ActionResult>(async (transaction, cancellationToken) =>
-    {
-      return Ok(await fileManager.ScanFolder(transaction, CurrentStorage, file, CurrentUserAuthenticationToken, cancellationToken).ToArrayAsync(cancellationToken));
+      return await ResourceService.Transact<Result>(async (transaction, cancellationToken) =>
+      {
+        return Data(await fileManager.ScanFolder(transaction, CurrentStorage, file, CurrentUserAuthenticationToken, cancellationToken).ToArrayAsync(cancellationToken));
+      });
     });
-  });
+  }
 
   public sealed record CreateFileRequest(bool IsFile, string Name);
 
   [Route("~/file/!root/files")]
   [Route("~/file/:{id}/files")]
   [HttpPost]
-  public Task<ActionResult> CreateFile(long? id, [FromBody] CreateFileRequest request) => Wrap(async () =>
+  public async Task<ActionResult> CreateFile(long? id, [FromBody] CreateFileRequest request)
   {
-    ActionResult getByIdResult = await GetFileById(id);
-    if (!TryGetValueFromResult(getByIdResult, out FileManager.Resource? file))
+    ObjectResult fileResult = await GetFileById(id);
+    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
     {
-      return getByIdResult;
+      return fileResult;
     }
 
-    return await ResourceService.Transact<ActionResult>(async (transaction, cancellationToken) =>
+    return await Run(async () =>
     {
-      FileManager fileManager = ResourceService.GetManager<FileManager>();
+      return await ResourceService.Transact<Result>(async (transaction, cancellationToken) =>
+      {
+        FileManager fileManager = ResourceService.GetManager<FileManager>();
 
-      FileManager.Resource newFile = request.IsFile
-        ? await fileManager.CreateFile(transaction, CurrentStorage, file, request.Name, CurrentUserAuthenticationToken, cancellationToken)
-        : await fileManager.CreateFolder(transaction, CurrentStorage, file, request.Name, CurrentUserAuthenticationToken, cancellationToken);
+        FileManager.Resource newFile = request.IsFile
+          ? await fileManager.CreateFile(transaction, CurrentStorage, file, request.Name, CurrentUserAuthenticationToken, cancellationToken)
+          : await fileManager.CreateFolder(transaction, CurrentStorage, file, request.Name, CurrentUserAuthenticationToken, cancellationToken);
 
-      return Ok(newFile);
+        return Data(newFile);
+      });
     });
-  });
+  }
 }

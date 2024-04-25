@@ -67,22 +67,27 @@ public sealed partial class ResourceService
 
     public delegate Task<T> SqlQueryTransformer<T>(DbDataReader reader);
 
-    protected async IAsyncEnumerable<T> SqlQuery<T>(Transaction transaction, SqlQueryTransformer<T> dataHandler, string sqlQuery, params object?[] parameters)
+    protected async Task<IEnumerable<T>> SqlQuery<T>(Transaction transaction, SqlQueryTransformer<T> dataHandler, string sqlQuery, params object?[] parameters)
     {
-      using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      await using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
       LogSql(transaction, "Query", sqlQuery, parameters);
-      using DbDataReader reader = await command.ExecuteReaderAsync(System.Data.CommandBehavior.SingleResult);
+      List<T> items = [];
 
-      while (reader.Read())
       {
-        yield return await dataHandler(reader);
+        await using DbDataReader reader = await command.ExecuteReaderAsync(System.Data.CommandBehavior.SingleResult);
+        while (reader.Read())
+        {
+          items.Add(await dataHandler(reader));
+        }
       }
+
+      return [.. items];
     }
 
     protected async Task<int> SqlNonQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
-      using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      await using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
       LogSql(transaction, "Non-query", sqlQuery, parameters);
       return await command.ExecuteNonQueryAsync();
@@ -90,7 +95,7 @@ public sealed partial class ResourceService
 
     protected async Task<object?> SqlScalar(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
-      using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
+      await using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
       LogSql(transaction, "Scalar", sqlQuery, parameters);
       return await command.ExecuteScalarAsync();
@@ -106,7 +111,7 @@ public sealed partial class ResourceService
         int? version = null;
 
         {
-          version = await SqlQuery(transaction, (reader) => Task.FromResult(reader.GetInt32Optional(reader.GetOrdinal("Version"))), "select Version from __VERSIONS where Name = {0} limit 1;", Name).FirstOrDefaultAsync(cancellationToken);
+          version = (await SqlQuery(transaction, (reader) => Task.FromResult(reader.GetInt32Optional(reader.GetOrdinal("Version"))), "select Version from __VERSIONS where Name = {0} limit 1;", Name)).FirstOrDefault();
         }
 
         if (version != Version)

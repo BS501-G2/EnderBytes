@@ -378,7 +378,5 @@
   </div>
 
   <div class="shared-preview">
-    <p>bruh</p>
-    <p>sarap mo chard</p>
   </div>
 </div>

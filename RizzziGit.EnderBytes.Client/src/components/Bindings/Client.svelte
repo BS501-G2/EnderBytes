@@ -21,14 +21,16 @@
     ...args: Parameters<FetchAndInterpretFunction>
   ) => Promise<Blob | any>;
 
-  function getUrl() {
+  export function getApiUrl(path: string = "/"): URL {
     let url = localStorage.getItem("client-url");
 
     if (url == null) {
       localStorage.setItem("client-url", (url = "http://25.22.231.71:8083/"));
     }
 
-    return new URL(url);
+    return Object.assign(new URL(url), {
+      pathname: path,
+    });
   }
 
   const sessionStore: Writable<Session | null> = writable(
@@ -39,8 +41,8 @@
   );
 
   export class ClientError extends Error {
-    public constructor(response: Response) {
-      super("Server response: " + response.statusText);
+    public constructor(response: Response, message?: string) {
+      super(message ?? `Server Response: ${response.status} ${response.statusText}`);
 
       this.#response = response;
     }
@@ -94,7 +96,7 @@
     }
     request.method = method;
 
-    const url = Object.assign(getUrl(), {
+    const url = Object.assign(getApiUrl(), {
       pathname: pathname,
     });
 
@@ -123,7 +125,18 @@
     if (response.status >= 200 && response.status <= 300) {
       return response;
     } else {
-      throw new ClientError(response);
+      let responseData: any;
+      try {
+        responseData = await response.json();
+      } catch {}
+
+      if (responseData != null && "error" in responseData) {
+        const { error } = responseData;
+
+        throw new ClientError(error, `${error.name}: ${error.message}`);
+      } else {
+        throw new ClientError(response);
+      }
     }
   };
 

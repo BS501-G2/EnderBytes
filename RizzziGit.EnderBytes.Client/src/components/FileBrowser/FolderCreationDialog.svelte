@@ -22,7 +22,7 @@
       async (_, setStatus) => {
         setStatus(`Creating folder "${name}"...`);
         const folder = await apiFetch(
-          `/file/${currentFileId != null ? `:${currentFileId}` : "!root"}/files`,
+          `/file/${currentFileId != null ? `:${currentFileId}` : "!root"}/files/new-folder`,
           "POST",
           {
             name: name,

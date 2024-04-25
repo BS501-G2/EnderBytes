@@ -84,7 +84,7 @@ public sealed class FileBufferManager : ResourceManager<FileBufferManager, FileB
       return;
     }
 
-    string otherTable = NAME;
+    string otherTable = FileBufferMapManager.NAME;
     string otherColumn = FileBufferMapManager.COLUMN_FILE_BUFFER_ID;
 
     await SqlNonQuery(transaction, $"delete from {NAME} where ({COLUMN_ID} = {{0}}) and ({COLUMN_ID} not in (select {otherColumn} from {otherTable} where {otherColumn} is not null));", fileBufferId);

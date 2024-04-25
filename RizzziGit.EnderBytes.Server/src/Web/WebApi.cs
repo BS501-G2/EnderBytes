@@ -1,11 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace RizzziGit.EnderBytes.Web;
 
 using Core;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Resources;
 using Services;
 
@@ -83,26 +83,57 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
   public bool TryGetUserAuthenticationToken([NotNullWhen(true)] out UserAuthenticationToken? userAuthenticationToken) => (userAuthenticationToken = HttpContext.RequestServices.GetRequiredService<WebApiContext>().Token) != null;
 
   [NonAction]
-  public bool TryGetValueFromResult<T>(ObjectResult result, [NotNullWhen(true)] out T? value) where T : class
+  public bool TryGetValueFromResult<T>(ActionResult result, [NotNullWhen(true)] out T? value) where T : class
   {
-    if (result.Value is T value2)
+    if (result is ObjectResult objectResult)
     {
-      value = value2;
+      if (objectResult.Value is T value2)
+      {
+        value = value2;
 
-      return true;
+        return true;
+      }
+
+      if (objectResult.Value is Result apiResult && apiResult.TryGetValueFromResult(out value))
+      {
+        return true;
+      }
     }
 
-    if (result.Value is Result apiResult && apiResult.TryGetValueFromResult(out value))
-    {
-      return true;
-    }
 
     value = default;
     return false;
   }
 
-  private long RunFlag = 0;
+  [NonAction]
+  public async Task<ObjectResult> Run(Func<Task<ObjectResult>> action)
+  {
+    RunFlag++;
+    try
+    {
+      if (TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+      {
+        CurrentUserAuthenticationToken.Set(userAuthenticationToken);
+      }
 
+      try
+      {
+        return await action();
+      }
+      catch (Exception exception)
+      {
+        Result result = SerializeError(exception);
+
+        return StatusCode(result.Status, result);
+      }
+    }
+    finally
+    {
+      RunFlag--;
+    }
+  }
+
+  private long RunFlag = 0;
   [NonAction]
   public async Task<ObjectResult> Run(Func<Task<Result>> action)
   {
@@ -128,25 +159,7 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
         }
         catch (Exception exception)
         {
-          return exception switch
-          {
-            ResourceService.ResourceManager.NotFoundException => Error(404, exception),
-
-            ResourceService.ResourceManager.ConstraintException or
-            FileManager.NotAFileException or
-            FileManager.NotAFolderException or
-            FileManager.NotSupportedException or
-            FileManager.InvalidFileTypeException or
-            FileManager.FileTreeException or
-            FileManager.FileDontBelongToStorageException or
-            ResourceService.ResourceManager.NoMatchException => Error(400, exception),
-
-            StorageManager.AccessDeniedException or
-            StorageManager.StorageEncryptDeniedException or
-            StorageManager.StorageDecryptDeniedException => Error(400, exception),
-
-            _ => Error(exception),
-          };
+          return SerializeError(exception);
         }
       }
       finally
@@ -155,4 +168,25 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
       }
     }
   }
+
+  [NonAction]
+  private ErrorResult<SerializableErrorDetails> SerializeError(Exception exception) => exception switch
+  {
+    ResourceService.ResourceManager.NotFoundException => Error(404, exception),
+
+    ResourceService.ResourceManager.ConstraintException or
+    FileManager.NotAFileException or
+    FileManager.NotAFolderException or
+    FileManager.NotSupportedException or
+    FileManager.InvalidFileTypeException or
+    FileManager.FileTreeException or
+    FileManager.FileDontBelongToStorageException or
+    ResourceService.ResourceManager.NoMatchException => Error(400, exception),
+
+    StorageManager.AccessDeniedException or
+    StorageManager.StorageEncryptDeniedException or
+    StorageManager.StorageDecryptDeniedException => Error(400, exception),
+
+    _ => Error(exception),
+  };
 }

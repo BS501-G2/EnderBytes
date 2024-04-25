@@ -33,7 +33,7 @@ public sealed class FileBufferMapManager : ResourceManager<FileBufferMapManager,
   public const string NAME = "FileBufferMap";
   public const int VERSION = 1;
 
-  public const int BUFFER_SIZE = 1024 * 1024;
+  public const int BUFFER_SIZE = 1024 * 1024 * 8;
 
   public const string COLUMN_FILE_ID = "FileId";
   public const string COLUMN_FILE_SNAPSHOT_ID = "FileSnapshotId";

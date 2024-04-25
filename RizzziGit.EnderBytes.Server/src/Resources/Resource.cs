@@ -80,7 +80,7 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
   {
     cancellationToken.ThrowIfCancellationRequested();
     List<object?> parameterList = [];
-    await foreach (R resource in SqlQuery(
+    foreach (R resource in await SqlQuery(
       transaction,
       (reader) => Task.FromResult(ToResource(reader)),
       $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")}{(order != null ? $" order by {order.Apply()}" : "")};",
@@ -117,7 +117,7 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
     string whereClause = where.Apply(parameterList);
 
     void log(long id) => Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{id}");
-    foreach (Func<Task> callback in await SqlQuery(
+    foreach (Func<Task> callback in (await SqlQuery(
       transaction,
       (reader) =>
       {
@@ -141,7 +141,7 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
       },
       $"select * from {Name} where {whereClause};",
       [.. parameterList]
-    ).ToListAsync(cancellationToken))
+    )).ToList())
     {
       await callback();
     }
@@ -164,12 +164,12 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
     void log(long id) => Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Updated {Name} resource: #{id}");
 
     long count = 0;
-    foreach (Func<Task> callback in await SqlQuery(
+    foreach (Func<Task> callback in (await SqlQuery(
       transaction,
       (reader) =>
       {
         R oldResource = ToResource(reader);
-        async Task<R> getNewResource() => await SqlQuery(transaction, (reader) => Task.FromResult(ToResource(reader)), $"select * from {Name} where {COLUMN_ID} = {{0}};", oldResource.Id).FirstAsync(cancellationToken);
+        async Task<R> getNewResource() => (await SqlQuery(transaction, (reader) => Task.FromResult(ToResource(reader)), $"select * from {Name} where {COLUMN_ID} = {{0}};", oldResource.Id)).First();
 
         count++;
 
@@ -197,7 +197,7 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
       $"select * from {temporaryTableName}; " +
       $"drop table {temporaryTableName};",
       [.. parameterList]
-    ).ToListAsync(cancellationToken))
+    )).ToList())
     {
       await callback();
     }

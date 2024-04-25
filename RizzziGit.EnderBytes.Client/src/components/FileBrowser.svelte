@@ -27,12 +27,13 @@
   import DesktopLayout from "./FileBrowser/DesktopLayout.svelte";
   import ResponsiveLayout from "./Bindings/ResponsiveLayout.svelte";
   import FolderCreationDialog from "./FileBrowser/FolderCreationDialog.svelte";
-  import FileCreationDialog from "./FileBrowser/FileCreationDialog.svelte";
+  import FileCreationDialog, { onUploadCompleteListeners } from "./FileBrowser/FileCreationDialog.svelte";
   import { writable, type Writable } from "svelte/store";
   import Awaiter, {
     type AwaiterResetFunction,
   } from "./Bindings/Awaiter.svelte";
   import { apiFetch } from "./Bindings/Client.svelte";
+  import { onDestroy, onMount } from "svelte";
 
   export let currentFileId: number | null;
 
@@ -43,7 +44,10 @@
     // throw new Error();
 
     const id = currentFileId != null ? `:${currentFileId}` : "!root";
-    const [current, pathChain] = await Promise.all([apiFetch(`/file/${id}`), apiFetch(`/file/${id}/path-chain`)]);
+    const [current, pathChain] = await Promise.all([
+      apiFetch(`/file/${id}`),
+      apiFetch(`/file/${id}/path-chain`),
+    ]);
 
     if (current.type == 1) {
       const files = await apiFetch(`/file/${id}/files`);
@@ -61,6 +65,18 @@
 
     $selection = [];
   }
+
+  onMount(() => {
+    $onUploadCompleteListeners.push(reset)
+  });
+
+  onDestroy(() => {
+    const index = $onUploadCompleteListeners.indexOf(reset)
+
+    if (index >= 0) {
+      $onUploadCompleteListeners.splice(index, 1)
+    }
+  });
 </script>
 
 {#key currentFileId}

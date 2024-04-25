@@ -57,6 +57,7 @@ public sealed partial class WebService(Server server) : Server.SubService(server
     {
       app.UseHttpsRedirection();
     }
+    app.UseExceptionHandler("/error");
     app.Use((context, next) => WebApi.UserAuthenticationTokenMiddleWare(Server, context, next));
     app.MapControllers();
 

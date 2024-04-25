@@ -1,5 +1,6 @@
 <script lang="ts" context="module">
   export const enabled: Writable<boolean> = writable(false);
+  export let onUploadCompleteListeners: Writable<Array<() => void>> = writable([])
 </script>
 
 <script lang="ts">
@@ -7,8 +8,9 @@
   import Awaiter from "../Bindings/Awaiter.svelte";
   import Button, { ButtonClass } from "../Widgets/Button.svelte";
   import Dialog from "../Widgets/Dialog.svelte";
-  import { apiFetch } from "../Bindings/Client.svelte";
+  import { apiFetch, getApiUrl } from "../Bindings/Client.svelte";
   import { writable, type Writable } from "svelte/store";
+  import { session } from "../Bindings/Client.svelte";
 
   export let currentFileId: number | null;
 
@@ -33,27 +35,63 @@
           "File Upload",
           true,
           async (client, setStatus) => {
-            setStatus("Creating file...", null);
-            const file = await apiFetch(
-              `/file/${currentFileId != null ? `:${currentFileId}/files` : "!root"}`,
-              "POST",
-              { isFile: true, name: entry.name },
-            );
+            const formData = new FormData();
 
-            setStatus("Creating file snapshot...", null);
+            formData.append("name", entry.name);
+            formData.append("content", entry, "content");
 
-            const fileSnapshot = await apiFetch(
-              `/file/:${file.id}/snapshots`,
-              "POST",
-              { baseSnapshotId: null },
-            );
+            await new Promise<void>((resolve, reject) => {
+              const request = new XMLHttpRequest();
 
-            setStatus("Uploading content...", null);
+              request.upload.onprogress = (e) => {
+                setStatus(null, e.loaded / e.total);
+              };
+
+              request.onreadystatechange = () => {
+                if (request.readyState == 4) {
+                  if (request.status == 200) {
+                    setStatus("Upload complete", 100);
+                    resolve();
+                  } else {
+                    setStatus("Upload failed", null);
+                    const { error } = JSON.parse(request.responseText);
+                    console.log(JSON.parse(request.responseText));
+                    reject(new Error(`${error.name}: ${error.message}`));
+                  }
+                }
+              };
+
+              request.open(
+                "POST",
+                getApiUrl(
+                  `/file/${currentFileId != null ? `:${currentFileId}` : "!root"}/files/new-file`,
+                ),
+              );
+
+              request.setRequestHeader(
+                "Authorization",
+                `Basic ${btoa(JSON.stringify($session))}`,
+              );
+
+              setStatus(`Uploading content...`, null);
+              request.send(formData);
+            });
           },
           false,
         );
 
-        return await client.run();
+        void (async () => {
+          try {
+            await client.run();
+          } catch {}
+
+          for (const listener of $onUploadCompleteListeners) {
+            listener();
+          }
+        })();
+
+        files = null;
+        $enabled = false;
       }),
     );
   }
@@ -73,7 +111,13 @@
       <!-- <Input name="File name" bind:text={name} onSubmit={load} /> -->
     </div>
     <svelte:fragment slot="actions">
-      <Awaiter callback={() => createFile()} autoLoad={false} bind:load>
+      <Awaiter
+        callback={async () => {
+          await createFile();
+        }}
+        autoLoad={false}
+        bind:load
+      >
         <svelte:fragment slot="not-loaded">
           <div class="button">
             <Button

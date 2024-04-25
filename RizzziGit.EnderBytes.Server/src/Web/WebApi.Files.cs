@@ -4,6 +4,7 @@ namespace RizzziGit.EnderBytes.Web;
 
 using Core;
 using Resources;
+using RizzziGit.Commons.Memory;
 
 public sealed partial class WebApi
 {
@@ -145,12 +146,57 @@ public sealed partial class WebApi
     });
   }
 
-  public sealed record CreateFileRequest(bool IsFile, string Name);
+  public sealed record CreateFileRequest(string Name, IFormFile Content);
+  public sealed record CreateFileResponse(FileManager.Resource File, FileSnapshotManager.Resource FileSnapshot);
 
-  [Route("~/file/!root/files")]
-  [Route("~/file/:{id}/files")]
+  [Route("~/file/!root/files/new-file")]
+  [Route("~/file/:{id}/files/new-file")]
   [HttpPost]
-  public async Task<ActionResult> CreateFile(long? id, [FromBody] CreateFileRequest request)
+  public async Task<ActionResult> CreateFile(long? id, [FromForm] CreateFileRequest request)
+  {
+    ObjectResult fileResult = await GetFileById(id);
+    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
+    {
+      return fileResult;
+    }
+
+    CompositeBuffer content = [];
+    using Stream stream = request.Content.OpenReadStream();
+    while (stream.Position < stream.Length)
+    {
+      long offset = stream.Position;
+
+      {
+        byte[] bytes = new byte[1024 * 32];
+        int byteLength = await stream.ReadAsync(bytes);
+
+        content.Append(bytes, 0, byteLength);
+      }
+    }
+
+    return await Run(async () =>
+    {
+      return await ResourceService.Transact<Result>(async (transaction, cancellationToken) =>
+      {
+        FileManager fileManager = ResourceService.GetManager<FileManager>();
+        FileBufferMapManager fileBufferMapManager = ResourceService.GetManager<FileBufferMapManager>();
+        FileSnapshotManager fileSnapshotManager = ResourceService.GetManager<FileSnapshotManager>();
+
+        FileManager.Resource newFile = await fileManager.CreateFile(transaction, CurrentStorage, file, request.Name, CurrentUserAuthenticationToken, cancellationToken);
+        FileSnapshotManager.Resource fileSnapshot = await fileSnapshotManager.Create(transaction, CurrentStorage, newFile, null, CurrentUserAuthenticationToken, cancellationToken);
+
+        await fileBufferMapManager.Write(transaction, CurrentStorage, newFile, fileSnapshot, 0, content, CurrentUserAuthenticationToken, cancellationToken);
+        return Data(new CreateFileResponse(file, fileSnapshot));
+      });
+    });
+  }
+
+  public sealed record CreateFolderRequest(string Name);
+
+  [Route("~/file/!root/files/new-folder")]
+  [Route("~/file/:{id}/files/new-folder")]
+  [HttpPost]
+  public async Task<ActionResult> CreateFolder(long? id, [FromBody] CreateFolderRequest request)
   {
     ObjectResult fileResult = await GetFileById(id);
     if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
@@ -164,11 +210,7 @@ public sealed partial class WebApi
       {
         FileManager fileManager = ResourceService.GetManager<FileManager>();
 
-        FileManager.Resource newFile = request.IsFile
-          ? await fileManager.CreateFile(transaction, CurrentStorage, file, request.Name, CurrentUserAuthenticationToken, cancellationToken)
-          : await fileManager.CreateFolder(transaction, CurrentStorage, file, request.Name, CurrentUserAuthenticationToken, cancellationToken);
-
-        return Data(newFile);
+        return Data(await fileManager.CreateFolder(transaction, CurrentStorage, file, request.Name, CurrentUserAuthenticationToken, cancellationToken));
       });
     });
   }

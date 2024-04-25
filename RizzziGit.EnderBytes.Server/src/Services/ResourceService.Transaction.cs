@@ -85,7 +85,7 @@ public sealed partial class ResourceService
     await Database!.Run(Logger, transactionId, async (connection, cancellationToken) =>
     {
       using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(GetCancellationToken(), cancellationToken);
-      await using DbTransaction dbTransaction = await connection.BeginTransactionAsync(cancellationToken);
+      await using DbTransaction dbTransaction = await connection.BeginTransactionAsync(CancellationToken.None);
 
       Transaction transaction = new(connection, transactionId, this, linkedCancellationTokenSource.Token);
       Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");
@@ -101,7 +101,7 @@ public sealed partial class ResourceService
       {
         Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
 
-        await dbTransaction.RollbackAsync(linkedCancellationTokenSource.Token);
+        await dbTransaction.RollbackAsync(CancellationToken.None);
         throw;
       }
     }, cancellationToken);

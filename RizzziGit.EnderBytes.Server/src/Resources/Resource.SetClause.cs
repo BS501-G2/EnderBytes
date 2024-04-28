@@ -2,15 +2,20 @@ using System.Text;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-public abstract partial class ResourceManager<M, R, E>
+public abstract partial class ResourceManager<M, R>
 {
   protected sealed class SetClause() : Dictionary<string, object?>
   {
-    public SetClause(params (string Column, object? Value)[] values) : this()
+    public SetClause(params (string Column, object? Value)?[] values) : this()
     {
-      foreach (var (column, value) in values)
+      foreach (var entry in values)
       {
-        Add(column, value);
+        if (entry == null)
+        {
+          continue;
+        }
+
+        Add(entry.Value.Column, entry.Value.Column);
       }
     }
 

@@ -27,11 +27,11 @@ public sealed partial class ResourceService
 
     protected Database DatabaseWrapper => Service.Database!;
 
-    protected abstract Task Upgrade(Transaction transaction, int oldVersion = default, CancellationToken cancellationToken = default);
+    protected abstract Task Upgrade(Transaction transaction, int oldVersion = default);
 
-    protected Task<T> Transact<T>(TransactionHandler<T> handler, CancellationToken cancellationToken = default) => Service.Transact(handler, cancellationToken);
-    protected Task Transact(TransactionHandler handler, CancellationToken cancellationToken = default) => Service.Transact(handler, cancellationToken);
-    protected IAsyncEnumerable<T> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler, CancellationToken cancellationToken = default) => Service.EnumeratedTransact(handler, cancellationToken);
+    protected Task<T> Transact<T>(TransactionHandler<T> handler) => Service.Transact(handler);
+    protected Task Transact(TransactionHandler handler) => Service.Transact(handler);
+    protected IAsyncEnumerable<T> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler) => Service.EnumeratedTransact(handler);
 
     private DbCommand CreateCommand(Transaction transaction, string sql, object?[] parameters)
     {
@@ -93,6 +93,11 @@ public sealed partial class ResourceService
       return await command.ExecuteNonQueryAsync();
     }
 
+    protected async Task<T> SqlScalar<T>(Transaction transaction, string sqlQuery, params object?[] parameters)
+    {
+      return (T)(await SqlScalar(transaction,  sqlQuery, parameters))!;
+    }
+
     protected async Task<object?> SqlScalar(Transaction transaction, string sqlQuery, params object?[] parameters)
     {
       await using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
@@ -101,11 +106,9 @@ public sealed partial class ResourceService
       return await command.ExecuteScalarAsync();
     }
 
-    protected sealed override Task OnStop(System.Exception? exception) => base.OnStop(exception);
-    protected sealed override Task OnRun(CancellationToken cancellationToken) => base.OnRun(cancellationToken);
     protected sealed override async Task OnStart(CancellationToken cancellationToken)
     {
-      await Transact(async (transaction, cancellationToken) =>
+      await Transact(async (transaction) =>
       {
         await SqlNonQuery(transaction, $"create table if not exists __VERSIONS(Name varchar(128) primary key not null, Version bigint not null);");
         int? version = null;
@@ -119,11 +122,11 @@ public sealed partial class ResourceService
           if (version == null)
           {
             await SqlNonQuery(transaction, $"create table {Name}({COLUMN_ID} bigint primary key auto_increment, {COLUMN_CREATE_TIME} bigint not null, {COLUMN_UPDATE_TIME} bigint not null);");
-            await Upgrade(transaction, cancellationToken: cancellationToken);
+            await Upgrade(transaction);
           }
           else
           {
-            await Upgrade(transaction, (int)version, cancellationToken);
+            await Upgrade(transaction, (int)version);
           }
 
           if (await SqlNonQuery(transaction, $"update __VERSIONS set Version = {{0}} where Name = {{1}};", Version, Name) == 0)
@@ -131,7 +134,7 @@ public sealed partial class ResourceService
             await SqlNonQuery(transaction, $"insert into __VERSIONS (Name, Version) values ({{0}}, {{1}});", Name, Version);
           }
         }
-      }, cancellationToken);
+      });
     }
   }
 }

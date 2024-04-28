@@ -1,6 +1,5 @@
 using System.Data.Common;
 using System.Security.Cryptography;
-using System.Diagnostics.CodeAnalysis;
 
 namespace RizzziGit.EnderBytes.Resources;
 
@@ -8,17 +7,17 @@ using Commons.Memory;
 using Commons.Logging;
 
 using Services;
-using System.Runtime.CompilerServices;
 
-public abstract partial class ResourceManager<M, R, E>(ResourceService service, string name, int version) : ResourceService.ResourceManager(service, name, version)
-    where M : ResourceManager<M, R, E>
-    where R : ResourceManager<M, R, E>.Resource
-    where E : ResourceService.ResourceManager.Exception
+public abstract partial class ResourceManager<M, R>(ResourceService service, string name, int version) : ResourceService.ResourceManager(service, name, version)
+    where M : ResourceManager<M, R>
+    where R : ResourceManager<M, R>.Resource
 {
   public abstract partial record Resource(long Id, long CreateTime, long UpdateTime);
 
-  public delegate Task ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, R oldResource, CancellationToken cancellationToken);
-  public delegate Task ResourceDeleteHandler(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken);
+  public delegate Task ResourceUpdateHandler(ResourceService.Transaction transaction, R resource, R oldResource);
+  public delegate Task ResourceDeleteHandler(ResourceService.Transaction transaction, R resource);
+
+  public T GetManager<T>() where T : ResourceService.ResourceManager => Service.GetManager<T>();
 
   private readonly List<ResourceUpdateHandler> ResourceUpdatedCallbacks = [];
   private readonly List<ResourceDeleteHandler> ResourceDeletedCallbacks = [];
@@ -46,11 +45,9 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
   );
   protected abstract R ToResource(DbDataReader reader, long id, long createTime, long updateTime);
 
-  protected async Task<R> InsertAndGet(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default) => (await GetById(transaction, await Insert(transaction, values, cancellationToken), cancellationToken))!;
-  protected async Task<long> Insert(ResourceService.Transaction transaction, ValueClause values, CancellationToken cancellationToken = default)
+  protected async Task<R> InsertAndGet(ResourceService.Transaction transaction, ValueClause values) => (await GetById(transaction, await Insert(transaction, values)))!;
+  protected async Task<long> Insert(ResourceService.Transaction transaction, ValueClause values)
   {
-    cancellationToken.ThrowIfCancellationRequested();
-
     long insertTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     values.Add(COLUMN_CREATE_TIME, insertTimestamp);
@@ -66,39 +63,39 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
     )) ?? 0);
   }
 
-  protected async Task<R?> SelectFirst(ResourceService.Transaction transaction, WhereClause? where = null, OrderByClause? order = null, CancellationToken cancellationToken = default) => await SelectOne(transaction, where, 0, order, cancellationToken);
-  protected async Task<R?> SelectOne(ResourceService.Transaction transaction, WhereClause? where = null, int? offset = null, OrderByClause? order = null, CancellationToken cancellationToken = default)
+  protected async Task<R?> SelectFirst(ResourceService.Transaction transaction, WhereClause? where = null, OrderByClause? order = null) => await SelectOne(transaction, where, 0, order);
+  protected async Task<R?> SelectOne(ResourceService.Transaction transaction, WhereClause? where = null, int? offset = null, OrderByClause? order = null)
   {
-    await foreach (R resource in Select(transaction, where, new(1, offset), order, cancellationToken))
+    foreach (R resource in await Select(transaction, where, new(1, offset), order))
     {
       return resource;
     }
 
     return null;
   }
-  protected async IAsyncEnumerable<R> Select(ResourceService.Transaction transaction, WhereClause? where = null, LimitClause? limit = null, OrderByClause? order = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+
+  protected async Task<R[]> Select(ResourceService.Transaction transaction, WhereClause? where = null, LimitClause? limit = null, OrderByClause? order = null)
   {
-    cancellationToken.ThrowIfCancellationRequested();
+
     List<object?> parameterList = [];
-    foreach (R resource in await SqlQuery(
+
+    return (await SqlQuery(
       transaction,
       (reader) => Task.FromResult(ToResource(reader)),
       $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")}{(order != null ? $" order by {order.Apply()}" : "")};",
       [.. parameterList]
-    ))
+    )).Select((resource) =>
     {
-      cancellationToken.ThrowIfCancellationRequested();
       Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Enumerated {Name} resource: #{resource.Id}");
-      yield return resource;
-    }
 
-    yield break;
+      return resource;
+    }).ToArray();
   }
 
-  protected async Task<bool> Exists(ResourceService.Transaction transaction, WhereClause? where = null, CancellationToken cancellationToken = default) => await Count(transaction, where, cancellationToken) > 0;
-  protected async Task<long> Count(ResourceService.Transaction transaction, WhereClause? where = null, CancellationToken cancellationToken = default)
+  protected async Task<bool> Exists(ResourceService.Transaction transaction, WhereClause? where = null) => await Count(transaction, where) > 0;
+  protected async Task<long> Count(ResourceService.Transaction transaction, WhereClause? where = null)
   {
-    cancellationToken.ThrowIfCancellationRequested();
+
     List<object?> parameterList = [];
 
     return (long)(await SqlScalar(
@@ -108,10 +105,8 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
     ))!;
   }
 
-  protected async Task<long> Delete(ResourceService.Transaction transaction, WhereClause where, CancellationToken cancellationToken = default)
+  protected async Task<long> Delete(ResourceService.Transaction transaction, WhereClause where)
   {
-    cancellationToken.ThrowIfCancellationRequested();
-
     List<object?> parameterList = [];
 
     string whereClause = where.Apply(parameterList);
@@ -135,7 +130,7 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
 
           foreach (ResourceDeleteHandler callback in handlers)
           {
-            await callback(transaction, resource, cancellationToken);
+            await callback(transaction, resource);
           }
         });
       },
@@ -149,9 +144,8 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
     return await SqlNonQuery(transaction, $"delete from {Name} where {whereClause};", [.. parameterList]);
   }
 
-  protected async Task<long> Update(ResourceService.Transaction transaction, WhereClause where, SetClause set, CancellationToken cancellationToken = default)
+  protected async Task<long> Update(ResourceService.Transaction transaction, WhereClause where, SetClause set)
   {
-    cancellationToken.ThrowIfCancellationRequested();
 
     List<object?> parameterList = [];
     set.TryAdd(COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
@@ -188,7 +182,7 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
 
           foreach (ResourceUpdateHandler callback in handlers)
           {
-            await callback(transaction, oldResource, newResource, cancellationToken);
+            await callback(transaction, oldResource, newResource);
           }
         });
       },
@@ -205,23 +199,23 @@ public abstract partial class ResourceManager<M, R, E>(ResourceService service, 
     return count;
   }
 
-  protected async Task<bool> Update(ResourceService.Transaction transaction, R resource, SetClause set, CancellationToken cancellationToken = default)
+  protected async Task<bool> Update(ResourceService.Transaction transaction, R resource, SetClause set)
   {
-    return await Update(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), set, cancellationToken) != 0;
+    return await Update(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), set) != 0;
   }
 
-  public virtual async Task<R?> GetById(ResourceService.Transaction transaction, long Id, CancellationToken cancellationToken = default)
+  public virtual async Task<R?> GetById(ResourceService.Transaction transaction, long Id)
   {
-    return await SelectFirst(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id), cancellationToken: cancellationToken);
+    return await SelectFirst(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id));
   }
 
-  public virtual async Task<R> GetByRequiredId(ResourceService.Transaction transaction, long Id, CancellationToken cancellationToken = default)
+  public virtual async Task<R> GetByRequiredId(ResourceService.Transaction transaction, long Id)
   {
-    return await SelectFirst(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id), cancellationToken: cancellationToken) ?? throw new NotFoundException(Name, Id);
+    return await SelectFirst(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", Id)) ?? throw new NotFoundException(Name, Id);
   }
 
-  public virtual async Task<bool> Delete(ResourceService.Transaction transaction, R resource, CancellationToken cancellationToken = default)
+  public virtual async Task<bool> Delete(ResourceService.Transaction transaction, R resource)
   {
-    return await Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id), cancellationToken) != 0;
+    return await Delete(transaction, new WhereClause.CompareColumn(COLUMN_ID, "=", resource.Id)) != 0;
   }
 }

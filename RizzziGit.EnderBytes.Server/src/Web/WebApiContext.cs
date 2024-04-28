@@ -25,6 +25,7 @@ public sealed class WebApiContext
     private readonly WebApiContext Context;
 
     public T Set(T value) => Context.SetInstance(Name, value);
+    public void Clear() => Context.ClearInstance<T>(Name);
 
     public T Required() => Context.GetInstanceRequired<T>(Name);
     public T? Optional() => Context.GetInstanceOptional<T>(Name);
@@ -49,6 +50,11 @@ public sealed class WebApiContext
       ContextInstances.TryAdd(instanceKey, instance);
     }
     return instance;
+  }
+
+  public void ClearInstance<T>(string name)
+  {
+    ContextInstances.Remove(InstanceKey<T>(name));
   }
 
   public T GetInstanceRequired<T>(string name) => (T)ContextInstances[InstanceKey<T>(name)]!;

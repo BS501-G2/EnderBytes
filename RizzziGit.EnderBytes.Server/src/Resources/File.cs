@@ -3,296 +3,261 @@ using Newtonsoft.Json;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-using System.Runtime.CompilerServices;
-using Services;
 using Utilities;
+using Services;
 
-public enum FileType : byte { File, Folder }
+using ResourceManager = ResourceManager<FileManager, FileManager.Resource>;
 
-[Flags]
-public enum FileHandleFlags : byte
+public sealed partial class FileManager : ResourceManager
 {
-  Read = 1 << 0,
-  Modify = 1 << 1,
-  Exclusive = 1 << 2,
-
-  ReadModify = Read | Modify
-}
-
-public sealed partial class FileManager : ResourceManager<FileManager, FileManager.Resource, FileManager.Exception>
-{
-  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
-  public sealed class FileDontBelongToStorageException(StorageManager.Resource storage, Resource file) : Exception($"File #{file.Id} does not belong to storage #{storage.Id}.")
-  {
-    public readonly StorageManager.Resource Storage = storage;
-    public readonly Resource File = file;
-  }
-  public sealed class FileTreeException(Resource file, Resource destination) : Exception($"Moving file #{file.Id} to #{destination.Id} may close the loop.")
-  {
-    public readonly Resource File = file;
-    public readonly Resource Destination = destination;
-  }
-  public sealed class NotAFolderException(Resource file) : Exception($"Resource #{file.Id} a folder.")
-  {
-    public readonly Resource File = file;
-  }
-  public sealed class NotAFileException(Resource file) : Exception($"Resource #{file.Id} a file.")
-  {
-    public readonly Resource File = file;
-  }
-  public sealed class InvalidFileTypeException(FileType type) : Exception($"Invalid file type: {(byte)type}.")
-  {
-    public readonly FileType Type = type;
-  }
-  public sealed class NotSupportedException(string? message) : Exception(message ?? "This operation is not supported.");
-
-  public sealed new partial record Resource(
-    long Id,
-    long CreateTime,
-    long UpdateTime,
-    long StorageId,
-    byte[] Key,
-    long? ParentId,
-    FileType Type,
-    string Name,
-    long AuthorUserId
-  ) : ResourceManager<FileManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
-  {
-    [JsonIgnore]
-    public byte[] Key = Key;
-
-    public bool BelongsTo(StorageManager.Resource storage)
-    {
-      return storage.Id == StorageId;
-    }
-
-    public void ThrowIfDoesNotBelongTo(StorageManager.Resource storage)
-    {
-      if (!BelongsTo(storage))
-      {
-        throw new FileDontBelongToStorageException(storage, this);
-      }
-    }
-  }
-
   public const string NAME = "File";
   public const int VERSION = 1;
 
-  public const string COLUMN_STORAGE_ID = "StorageId";
-  public const string COLUMN_KEY = "AesKey";
-  public const string COLUMN_PARENT_FILE_ID = "ParentFileId";
-  public const string COLUMN_TYPE = "Type";
-  public const string COLUMN_NAME = "Name";
-  public const string COLUMN_AUTHOR_ID = "AuthorUserId";
+  private const string COLUMN_TRASH_TIME = "TrashTime";
+  private const string COLUMN_DOMAIN_USER_ID = "DomainUserId";
+  private const string COLUMN_AUTHOR_USER_ID = "AuthorUserId";
+  private const string COLUMN_PARENT_ID = "ParentId";
+  private const string COLUMN_NAME = "Name";
+  private const string COLUMN_IS_FOLDER = "IsFolder";
+  private const string COLUMN_AES_KEY = "EncryptedPassword";
 
-  public const string UNIQUE_INDEX_NAME = $"Index_{NAME}_{COLUMN_NAME}";
+  public new sealed record Resource(
+    long Id,
+    long CreateTime,
+    long UpdateTime,
+
+    long? TrashTime,
+
+    long DomainUserId,
+    long AuthorUserId,
+
+    long? ParentId,
+    string Name,
+
+    bool IsFolder,
+
+    string EncryptedPassword
+  ) : ResourceManager.Resource(Id, CreateTime, UpdateTime)
+  {
+    [JsonIgnore]
+    public readonly string EncryptedPassword = EncryptedPassword;
+  }
+
+  public sealed class NotAFolderException(Resource file) : Exception($"#{file.Id} is not a folder.")
+  {
+    public readonly Resource File = file;
+  }
+
+  public sealed class NotAFileException(Resource file) : Exception($"#{file.Id} is not a file.")
+  {
+    public readonly Resource File = file;
+  }
+
+  public sealed class InvalidTrashOperationException(Resource file) : Exception($"#{file.Id} is a root folder and cannot be moved to trash.");
+  public sealed class InvalidMoveException(Resource file, Resource newParent) : Exception($"#{file.Id} cannot be moved to #{newParent.Id} because the file is already in that folder.");
 
   public FileManager(ResourceService service) : base(service, NAME, VERSION)
   {
-    Service.GetManager<StorageManager>().RegisterDeleteHandler((transaction, storage, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storage.Id), cancellationToken));
-    RegisterDeleteHandler((transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", file.Id), cancellationToken));
+    GetManager<UserManager>().RegisterDeleteHandler((transaction, user) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_AUTHOR_USER_ID, "=", user.Id)));
+    RegisterDeleteHandler((transaction, resource) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", resource.Id)));
   }
 
   protected override Resource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
     id, createTime, updateTime,
 
-    reader.GetInt64(reader.GetOrdinal(COLUMN_STORAGE_ID)),
-    reader.GetBytes(reader.GetOrdinal(COLUMN_KEY)),
-    reader.GetInt64Optional(reader.GetOrdinal(COLUMN_PARENT_FILE_ID)),
-    (FileType)reader.GetByte(reader.GetOrdinal(COLUMN_TYPE)),
+    reader.GetInt64Optional(reader.GetOrdinal(COLUMN_TRASH_TIME)),
+
+    reader.GetInt64(reader.GetOrdinal(COLUMN_DOMAIN_USER_ID)),
+    reader.GetInt64(reader.GetOrdinal(COLUMN_AUTHOR_USER_ID)),
+    reader.GetInt64Optional(reader.GetOrdinal(COLUMN_PARENT_ID)),
     reader.GetString(reader.GetOrdinal(COLUMN_NAME)),
-    reader.GetInt64(reader.GetOrdinal(COLUMN_AUTHOR_ID))
+    reader.GetBoolean(reader.GetOrdinal(COLUMN_IS_FOLDER)),
+    reader.GetString(reader.GetOrdinal(COLUMN_AES_KEY))
   );
 
-  protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
+  protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0)
   {
     if (oldVersion < 1)
     {
-      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_STORAGE_ID} bigint not null;");
-      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_KEY} blob not null;");
-      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_PARENT_FILE_ID} bigint null;");
-      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TYPE} tinyint not null;");
-      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_NAME} varchar(128) not null;");
-      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_AUTHOR_ID} bigint not null;");
-
-      await SqlNonQuery(transaction, $"create unique index {UNIQUE_INDEX_NAME} on {NAME}({COLUMN_STORAGE_ID},{COLUMN_PARENT_FILE_ID},{COLUMN_NAME});");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TRASH_TIME} bigint null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_DOMAIN_USER_ID} bigint not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_AUTHOR_USER_ID} bigint not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_PARENT_ID} bigint null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_NAME} varchar(128) not null collate utf8mb4_unicode_ci;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_IS_FOLDER} tinyint(1) not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_AES_KEY} varchar(128) not null;");
     }
   }
 
-  public async Task<bool> Move(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource file, Resource? newParent, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<Resource> GetRootFromUser(ResourceService.Transaction transaction, UserAuthenticationToken userAuthenticationToken)
   {
-    cancellationToken.ThrowIfCancellationRequested();
-    file.ThrowIfDoesNotBelongTo(storage);
+    Resource? resource;
 
-    if (newParent != null)
+    if ((resource = await SelectFirst
+    (transaction, new WhereClause.CompareColumn(COLUMN_AUTHOR_USER_ID, "=", userAuthenticationToken.UserId))) == null)
     {
-      newParent.ThrowIfDoesNotBelongTo(storage);
+      KeyService.AesPair newKey = Service.Server.KeyService.GetNewAesPair();
 
-      if (
-        await IsEqualToOrInsideOf(transaction, storage, newParent, file, cancellationToken) ||
-        await IsEqualToOrInsideOf(transaction, storage, file, newParent, cancellationToken)
-      )
-      {
-        throw new FileTreeException(file, newParent);
-      }
+      resource = await InsertAndGet(transaction, new(
+        (COLUMN_DOMAIN_USER_ID, userAuthenticationToken.UserId),
+        (COLUMN_AUTHOR_USER_ID, userAuthenticationToken.UserId),
+        (COLUMN_PARENT_ID, null),
+        (COLUMN_NAME, "/"),
+        (COLUMN_IS_FOLDER, true),
+        (COLUMN_AES_KEY, userAuthenticationToken.Encrypt(newKey.Serialize()))
+      ));
     }
 
-    cancellationToken.ThrowIfCancellationRequested();
-
-    if ((newParent != null) && (newParent.Type != FileType.Folder))
-    {
-      throw new NotAFolderException(file);
-    }
-
-    DecryptedKeyInfo decryptedKeyInfo = await Service.GetManager<StorageManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
-    byte[] bytes = await Service.GetManager<StorageManager>().EncryptFileKey(transaction, storage, decryptedKeyInfo.Key, newParent, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
-
-    bool result = await Update(transaction, file, new(
-      (COLUMN_PARENT_FILE_ID, newParent?.Id),
-      (COLUMN_KEY, bytes)
-    ), cancellationToken);
-
-    if (file.ParentId != null)
-    {
-      Resource? parent = await GetById(transaction, (long)file.ParentId, cancellationToken);
-      if (parent != null)
-      {
-        await Update(transaction, parent, new(
-          (COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-        ), cancellationToken);
-      }
-    }
-
-    if (newParent != null)
-    {
-      await Update(transaction, newParent, new(
-        (COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-      ), cancellationToken);
-    }
-
-    return result;
+    return resource;
   }
 
-  public async Task<Resource> CreateFile(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource? parent, string name, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<Resource[]> PathChain(ResourceService.Transaction transaction, Resource file)
   {
-    return await Create(transaction, storage, parent, FileType.File, name, userAuthenticationToken, cancellationToken);
-  }
+    List<Resource> files = [];
 
-  public async Task<Resource> CreateFolder(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource? parent, string name, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
-  {
-    return await Create(transaction, storage, parent, FileType.Folder, name, userAuthenticationToken, cancellationToken);
-  }
-
-  private async Task<Resource> Create(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource? parent, FileType type, string name, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
-  {
-    cancellationToken.ThrowIfCancellationRequested();
-    parent?.ThrowIfDoesNotBelongTo(storage);
-
-    if (!Enum.IsDefined(type))
+    Resource? resource = file;
+    while (resource.ParentId != null)
     {
-      throw new InvalidFileTypeException(type);
-    }
-    else if ((parent != null) && (parent.Type != FileType.Folder))
-    {
-      throw new NotAFolderException(parent);
-    }
-
-    KeyService.AesPair fileKey = Service.Server.KeyService.GetNewAesPair();
-
-    Resource file = await InsertAndGet(transaction, new(
-      (COLUMN_STORAGE_ID, storage.Id),
-      (COLUMN_KEY, await Service.GetManager<StorageManager>().EncryptFileKey(transaction, storage, fileKey, parent, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken)),
-      (COLUMN_PARENT_FILE_ID, parent?.Id),
-      (COLUMN_NAME, name),
-      (COLUMN_TYPE, (byte)type),
-      (COLUMN_AUTHOR_ID, userAuthenticationToken.UserId)
-    ), cancellationToken);
-
-    if (parent != null)
-    {
-      await Update(transaction, parent, new(
-        (COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-      ), cancellationToken);
-    }
-
-    return file;
-  }
-
-  public async Task<bool> Delete(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource file, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
-  {
-    file.ThrowIfDoesNotBelongTo(storage);
-
-    await Service.GetManager<StorageManager>().DecryptKey(transaction, storage, file, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken);
-
-    if (file.ParentId != null)
-    {
-      Resource? parent = await GetById(transaction, (long)file.ParentId, cancellationToken);
-      if (parent != null)
-      {
-        await Update(transaction, parent, new(
-          (COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-        ), cancellationToken);
-      }
-    }
-
-    return await base.Delete(transaction, file, cancellationToken);
-  }
-
-  public override Task<bool> Delete(ResourceService.Transaction transaction, Resource file, CancellationToken cancellationToken = default)
-  {
-    throw new NotSupportedException("Deleting a file without providing user token is not supported.");
-  }
-
-  public async IAsyncEnumerable<Resource> ScanFolder(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource? folder, UserAuthenticationToken userAuthenticationToken, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-  {
-    if (folder != null)
-    {
-      _ = await Service.GetManager<StorageManager>().DecryptKey(transaction, storage, folder, userAuthenticationToken, FileAccessType.Read, cancellationToken);
-    }
-
-    await foreach (Resource file in Select(transaction, new WhereClause.Nested("and",
-      new WhereClause.CompareColumn(COLUMN_STORAGE_ID, "=", storage.Id),
-      new WhereClause.CompareColumn(COLUMN_PARENT_FILE_ID, "=", folder?.Id)
-    ), null, null, cancellationToken))
-    {
-      yield return file;
-    }
-
-    yield break;
-  }
-
-  public async Task<bool> IsEqualToOrInsideOf(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource haystack, Resource needle, CancellationToken cancellationToken = default)
-  {
-    return await IsInsideOf(transaction, storage, haystack, needle, cancellationToken) || needle.Id == haystack.Id;
-  }
-
-  public async Task ThrowIfIsEqualToOrInsideOf(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource haystack, Resource needle, CancellationToken cancellationToken = default)
-  {
-    if (await IsEqualToOrInsideOf(transaction, storage, haystack, needle, cancellationToken))
-    {
-      throw new ConstraintException(NAME, "The resource is equal to or inside of the specified resource.");
-    }
-  }
-
-  public async Task<bool> IsInsideOf(ResourceService.Transaction transaction, StorageManager.Resource storage, Resource haystack, Resource needle, CancellationToken cancellationToken = default)
-  {
-    haystack.ThrowIfDoesNotBelongTo(storage);
-    needle.ThrowIfDoesNotBelongTo(storage);
-
-    Resource? current = needle;
-    while (true)
-    {
-      if (current.ParentId == haystack.ParentId || current.ParentId == haystack.Id)
-      {
-        return true;
-      }
-
-      if (current.ParentId == null || (current = await GetById(transaction, (long)current.ParentId, cancellationToken)) == null)
+      if ((resource = await GetById(transaction, (long)resource.ParentId)) == null)
       {
         break;
       }
+
+      files.Add(resource);
     }
 
-    return false;
+    return [.. files];
+  }
+
+  public async Task<Resource> Create(ResourceService.Transaction transaction, Resource parentFolder, string name, bool isFolder, UserAuthenticationToken userAuthenticationToken)
+  {
+    if (!parentFolder.IsFolder)
+    {
+      throw new NotAFolderException(parentFolder);
+    }
+
+    KeyService.AesPair newKey = Service.Server.KeyService.GetNewAesPair();
+    return await InsertAndGet(transaction, new(
+      (COLUMN_AUTHOR_USER_ID, userAuthenticationToken.UserId),
+      (COLUMN_PARENT_ID, parentFolder.Id),
+      (COLUMN_NAME, await ThrowIfInvalidName(transaction, parentFolder, name)),
+      (COLUMN_IS_FOLDER, isFolder),
+      (COLUMN_AES_KEY, userAuthenticationToken.Encrypt(newKey.Serialize()))
+    ));
+  }
+
+  public async Task<bool> Move(ResourceService.Transaction transaction, Resource file, Resource newParent, string? newName = null)
+  {
+    if (!newParent.IsFolder)
+    {
+      throw new NotAFolderException(newParent);
+    }
+
+    Resource[] pathChain = await PathChain(transaction, newParent);
+
+    if (file.Id == newParent.Id || pathChain.Any((fileTest) => fileTest.Id == file.Id))
+    {
+      throw new InvalidMoveException(file, newParent);
+    }
+
+    if (await Count(transaction, new WhereClause.Nested("and",
+      new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", file.Id),
+      new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "is", null),
+      new WhereClause.CompareColumn(COLUMN_NAME, "=", newName ?? file.Name)
+    )) > 0)
+    {
+      int currentNameIter = 1;
+      string currentName() => $"{file.Name} ({currentNameIter})";
+
+      while (await Count(transaction, new WhereClause.Nested("and",
+        new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", file.Id),
+        new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "is", null),
+        new WhereClause.CompareColumn(COLUMN_NAME, "=", currentName())
+      )) > 0)
+      {
+        currentNameIter++;
+      }
+
+      return await Update(transaction, file, new(
+        (COLUMN_TRASH_TIME, null),
+        (COLUMN_NAME, newName ?? currentName())
+      ));
+    }
+
+    return await Update(transaction, file, new(
+      (COLUMN_PARENT_ID, newParent.Id),
+      (COLUMN_NAME, newName ?? file.Name)
+    ));
+  }
+
+  public async Task<Resource[]> List(ResourceService.Transaction transaction, Resource folder, LimitClause? limitClause = null, OrderByClause? orderByClause = null)
+  {
+    if (!folder.IsFolder)
+    {
+      throw new NotAFolderException(folder);
+    }
+
+    return await Select(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", folder.Id), limitClause, orderByClause);
+  }
+
+  public async Task<bool> ListTrashed(ResourceService.Transaction transaction, UserManager.Resource user, LimitClause? limitClause = null, OrderByClause? orderByClause = null)
+  {
+    return (await Select(transaction, new WhereClause.Nested("and",
+      new WhereClause.CompareColumn(COLUMN_DOMAIN_USER_ID, "=", user.Id),
+      new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "is not", null)
+    ), limitClause, orderByClause)).Length != 0;
+  }
+
+  public async Task<bool> Restore(ResourceService.Transaction transaction, Resource file)
+  {
+    if (file.TrashTime == null)
+    {
+      return false;
+    }
+
+    if (await Count(transaction, new WhereClause.Nested("and",
+      new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", file.Id),
+      new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "is", null),
+      new WhereClause.CompareColumn(COLUMN_NAME, "=", file.Name)
+    )) > 0)
+    {
+      int currentNameIter = 1;
+      string currentName() => $"{file.Name} ({currentNameIter})";
+
+      while (await Count(transaction, new WhereClause.Nested("and",
+        new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", file.Id),
+        new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "is", null),
+        new WhereClause.CompareColumn(COLUMN_NAME, "=", currentName())
+      )) > 0)
+      {
+        currentNameIter++;
+      }
+
+      return await Update(transaction, file, new(
+        (COLUMN_TRASH_TIME, null),
+        (COLUMN_NAME, currentName())
+      ));
+    }
+
+    return await Update(transaction, file, new(
+      (COLUMN_TRASH_TIME, null)
+    ));
+
+  }
+
+  public async Task<bool> Trash(ResourceService.Transaction transaction, Resource file)
+  {
+    if (file.TrashTime != null)
+    {
+      return false;
+    }
+    else if (file.ParentId == null)
+    {
+      throw new InvalidTrashOperationException(file);
+    }
+
+    return await Update(transaction, file, new(
+      (COLUMN_TRASH_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+    ));
   }
 }

@@ -2,7 +2,7 @@ using System.Text;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-public abstract partial class ResourceManager<M, R, E>
+public abstract partial class ResourceManager<M, R>
 {
   protected abstract record WhereClause
   {
@@ -38,7 +38,7 @@ public abstract partial class ResourceManager<M, R, E>
       }
     }
 
-    public sealed record Nested(string Connector, params WhereClause[] Expressions) : WhereClause
+    public sealed record Nested(string Connector, params WhereClause?[] Expressions) : WhereClause
     {
       public override string Apply(List<object?> parameterList)
       {
@@ -51,8 +51,11 @@ public abstract partial class ResourceManager<M, R, E>
             builder.Append($" {Connector} ");
           }
 
-          WhereClause clause = Expressions[index];
-          builder.Append(clause.Apply(parameterList));
+          WhereClause? clause = Expressions[index];
+          if (clause != null)
+          {
+            builder.Append(clause.Apply(parameterList));
+          }
         }
 
         builder.Append(')');

@@ -2,7 +2,7 @@ using System.Text;
 
 namespace RizzziGit.EnderBytes.Resources;
 
-public abstract partial class ResourceManager<M, R, E>
+public abstract partial class ResourceManager<M, R>
 {
   protected sealed class ValueClause() : Dictionary<string, object?>
   {

@@ -4,10 +4,8 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Services;
 
-public sealed class UserConfigurationManager : ResourceManager<UserConfigurationManager, UserConfigurationManager.Resource, UserConfigurationManager.Exception>
+public sealed class UserConfigurationManager : ResourceManager<UserConfigurationManager, UserConfigurationManager.Resource>
 {
-  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
-
   public new sealed record Resource(
     long Id,
     long CreateTime,
@@ -15,7 +13,7 @@ public sealed class UserConfigurationManager : ResourceManager<UserConfiguration
 
     long UserId,
     bool EnableFtpAccess
-  ) : ResourceManager<UserConfigurationManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
+  ) : ResourceManager<UserConfigurationManager, Resource>.Resource(Id, CreateTime, UpdateTime)
   {
   }
 
@@ -29,7 +27,7 @@ public sealed class UserConfigurationManager : ResourceManager<UserConfiguration
 
   public UserConfigurationManager(ResourceService service) : base(service, NAME, VERSION)
   {
-    service.GetManager<UserManager>().RegisterDeleteHandler((transaction, user, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), cancellationToken));
+    service.GetManager<UserManager>().RegisterDeleteHandler((transaction, user) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)));
   }
 
   protected override Resource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
@@ -39,7 +37,7 @@ public sealed class UserConfigurationManager : ResourceManager<UserConfiguration
     reader.GetBoolean(reader.GetOrdinal(COLUMN_ENABLE_FTP_ACCESS))
   );
 
-  protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
+  protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0)
   {
     if (oldVersion < 1)
     {
@@ -52,7 +50,7 @@ public sealed class UserConfigurationManager : ResourceManager<UserConfiguration
 
   public async Task<Resource> Get(ResourceService.Transaction transaction, UserManager.Resource user)
   {
-    await foreach (Resource configuration in Select(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)))
+    foreach (Resource configuration in await Select(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)))
     {
       return configuration;
     }

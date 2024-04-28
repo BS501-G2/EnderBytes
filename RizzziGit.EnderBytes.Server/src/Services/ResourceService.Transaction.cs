@@ -12,30 +12,30 @@ using System.Runtime.ExceptionServices;
 
 public sealed partial class ResourceService
 {
-  public delegate Task TransactionHandler(Transaction transaction, CancellationToken cancellationToken);
-  public delegate Task<T> TransactionHandler<T>(Transaction transaction, CancellationToken cancellationToken);
-  public delegate IAsyncEnumerable<T> TransactionEnumeratorHandler<T>(Transaction transaction, CancellationToken cancellationToken);
+  public delegate Task TransactionHandler(Transaction transaction);
+  public delegate Task<T> TransactionHandler<T>(Transaction transaction);
+  public delegate IAsyncEnumerable<T> TransactionEnumeratorHandler<T>(Transaction transaction);
 
   private long NextTransactionId;
-  public sealed record Transaction(DbConnection Connection, long Id, ResourceService ResourceService, CancellationToken CancellationToken)
+  public sealed record Transaction(DbConnection Connection, long Id, ResourceService ResourceService)
   {
     public Server Server => ResourceService.Server;
 
     public T GetManager<T>() where T : ResourceManager => ResourceService.GetManager<T>();
   }
 
-  public async IAsyncEnumerable<T> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler, [EnumeratorCancellation] CancellationToken cancellationToken)
+  public async IAsyncEnumerable<T> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler)
   {
     WaitQueue<StrongBox<T>?> waitQueue = new(0);
     ExceptionDispatchInfo? exceptionDispatchInfo = null;
 
-    _ = Transact(async (transaction, cancellationToken) =>
+    _ = Transact(async (transaction) =>
     {
       try
       {
-        await foreach (T item in handler(transaction, cancellationToken))
+        await foreach (T item in handler(transaction))
         {
-          await waitQueue.Enqueue(new(item), cancellationToken);
+          await waitQueue.Enqueue(new(item));
         }
       }
       catch (Exception exception)
@@ -43,8 +43,8 @@ public sealed partial class ResourceService
         exceptionDispatchInfo = ExceptionDispatchInfo.Capture(exception);
       }
 
-      await waitQueue.Enqueue(null, cancellationToken);
-    }, cancellationToken);
+      await waitQueue.Enqueue(null);
+    });
 
     await foreach (StrongBox<T>? item in waitQueue)
     {
@@ -62,13 +62,13 @@ public sealed partial class ResourceService
     }
   }
 
-  public async Task<T> Transact<T>(TransactionHandler<T> handler, CancellationToken cancellationToken = default)
+  public async Task<T> Transact<T>(TransactionHandler<T> handler)
   {
     TaskCompletionSource<T> source = new();
 
     try
     {
-      await Transact(async (transaction, cancellationToken) => source.SetResult(await handler(transaction, cancellationToken)), cancellationToken);
+      await Transact(async (transaction) => source.SetResult(await handler(transaction)));
     }
     catch (Exception exception)
     {
@@ -78,24 +78,25 @@ public sealed partial class ResourceService
     return await source.Task;
   }
 
-  public async Task Transact(TransactionHandler handler, CancellationToken cancellationToken = default)
+  public async Task Transact(TransactionHandler handler)
   {
     long transactionId = NextTransactionId++;
 
-    await Database!.Run(Logger, transactionId, async (connection, cancellationToken) =>
-    {
-      using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(GetCancellationToken(), cancellationToken);
-      await using DbTransaction dbTransaction = await connection.BeginTransactionAsync(CancellationToken.None);
+    GetCancellationToken().ThrowIfCancellationRequested();
 
-      Transaction transaction = new(connection, transactionId, this, linkedCancellationTokenSource.Token);
+    await Database!.Run(Logger, transactionId, async (connection) =>
+    {
+      await using DbTransaction dbTransaction = await connection.BeginTransactionAsync();
+
+      Transaction transaction = new(connection, transactionId, this);
       Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");
 
       try
       {
-        await handler(transaction, linkedCancellationTokenSource.Token);
+        await handler(transaction);
         Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");
 
-        await dbTransaction.CommitAsync(linkedCancellationTokenSource.Token);
+        await dbTransaction.CommitAsync();
       }
       catch (Exception exception)
       {
@@ -104,6 +105,6 @@ public sealed partial class ResourceService
         await dbTransaction.RollbackAsync(CancellationToken.None);
         throw;
       }
-    }, cancellationToken);
+    });
   }
 }

@@ -11,10 +11,8 @@ using Newtonsoft.Json;
 
 public sealed record UserPair(UserManager.Resource User, UserAuthenticationToken AuthenticationToken);
 
-public sealed partial class UserManager(ResourceService service) : ResourceManager<UserManager, UserManager.Resource, UserManager.Exception>(service, NAME, VERSION)
+public sealed partial class UserManager(ResourceService service) : ResourceManager<UserManager, UserManager.Resource>(service, NAME, VERSION)
 {
-  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
-
   public sealed class UsernameNotFoundException(string Username) : Exception($"Username not found: {Username}.");
 
   public new sealed partial record Resource(
@@ -26,7 +24,7 @@ public sealed partial class UserManager(ResourceService service) : ResourceManag
     string FirstName,
     string? MiddleName,
     byte[] PublicKey
-  ) : ResourceManager<UserManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
+  ) : ResourceManager<UserManager, Resource>.Resource(Id, CreateTime, UpdateTime)
   {
     [JsonIgnore]
     public byte[] PublicKey = PublicKey;
@@ -68,7 +66,7 @@ public sealed partial class UserManager(ResourceService service) : ResourceManag
     reader.GetBytes(reader.GetOrdinal(COLUMN_PUBLIC_KEY))
   );
 
-  protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
+  protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0)
   {
     if (oldVersion < 1)
     {
@@ -86,7 +84,7 @@ public sealed partial class UserManager(ResourceService service) : ResourceManag
     }
   }
 
-  public async Task<UserPair> Create(ResourceService.Transaction transaction, string username, string lastName, string firstName, string? middleName, string password, CancellationToken cancellationToken = default)
+  public async Task<UserPair> Create(ResourceService.Transaction transaction, string username, string lastName, string firstName, string? middleName, string password)
   {
     (byte[] privateKey, byte[] publicKey) = Service.Server.KeyService.GetNewRsaKeyPair();
 
@@ -96,7 +94,7 @@ public sealed partial class UserManager(ResourceService service) : ResourceManag
       (COLUMN_LAST_NAME, lastName),
       (COLUMN_FIRST_NAME, firstName),
       (COLUMN_MIDDLE_NAME, middleName)
-    ), cancellationToken);
+    ));
 
     return new(user, await Service.GetManager<UserAuthenticationManager>().CreatePassword(transaction, user, password, privateKey, publicKey));
   }
@@ -111,14 +109,14 @@ public sealed partial class UserManager(ResourceService service) : ResourceManag
     ));
   }
 
-  public async Task<Resource?> GetByUsername(ResourceService.Transaction transaction, string username, CancellationToken cancellationToken = default)
+  public async Task<Resource?> GetByUsername(ResourceService.Transaction transaction, string username)
   {
     if (ValidateUsername(username) != UsernameValidationFlag.NoErrors)
     {
       return null;
     }
 
-    return await SelectFirst(transaction, new WhereClause.CompareColumn(COLUMN_USERNAME, "=", username), cancellationToken: cancellationToken);
+    return await SelectFirst(transaction, new WhereClause.CompareColumn(COLUMN_USERNAME, "=", username));
   }
 
   public async Task<long> CountUsers(ResourceService.Transaction transaction) => (long)(await SqlScalar(transaction, $"select count(*) from {NAME};"))!;

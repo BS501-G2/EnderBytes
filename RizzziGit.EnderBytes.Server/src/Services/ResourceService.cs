@@ -6,7 +6,6 @@ using DatabaseWrappers;
 
 public sealed partial class ResourceService : Server.SubService
 {
-
   public ResourceService(Server server) : base(server, "Resources")
   {
     ResourceManagers = [];
@@ -15,12 +14,6 @@ public sealed partial class ResourceService : Server.SubService
     ResourceManagers.Add(new UserAuthenticationManager(this));
     ResourceManagers.Add(new UserAuthenticationSessionTokenManager(this));
     ResourceManagers.Add(new UserConfigurationManager(this));
-    ResourceManagers.Add(new StorageManager(this));
-    ResourceManagers.Add(new FileManager(this));
-    ResourceManagers.Add(new FileAccessManager(this));
-    ResourceManagers.Add(new FileSnapshotManager(this));
-    ResourceManagers.Add(new FileBufferManager(this));
-    ResourceManagers.Add(new FileBufferMapManager(this));
   }
 
   private Database? Database;

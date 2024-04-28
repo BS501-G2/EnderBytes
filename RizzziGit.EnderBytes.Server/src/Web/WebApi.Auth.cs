@@ -94,7 +94,7 @@ public sealed partial class WebApi
 
   [Route("~/auth/password-login")]
   [HttpPost]
-  public Task<ObjectResult> Login([FromBody] PasswordLoginRequest request) => Run(() => ResourceService.Transact<Result>(async (transaction, cancellationToken) =>
+  public Task<ObjectResult> Login([FromBody] PasswordLoginRequest request) => Run(async () =>
   {
     if (TryGetUserAuthenticationToken(out _))
     {
@@ -107,18 +107,18 @@ public sealed partial class WebApi
     UserAuthenticationToken? userAuthenticationToken;
 
     if (
-      ((user = await GetResourceManager<UserManager>().GetByUsername(transaction, Username, cancellationToken)) == null) ||
-      ((userAuthenticationToken = await GetResourceManager<UserAuthenticationManager>().GetByPayload(transaction, user, Encoding.UTF8.GetBytes(Password), UserAuthenticationType.Password)) == null)
+      ((user = await GetResourceManager<UserManager>().GetByUsername(CurrentTransaction, Username)) == null) ||
+      ((userAuthenticationToken = await GetResourceManager<UserAuthenticationManager>().GetByPayload(CurrentTransaction, user, Encoding.UTF8.GetBytes(Password), UserAuthenticationType.Password)) == null)
     )
     {
       return Error(401);
     }
 
-    string token = await GetResourceManager<UserAuthenticationManager>().CreateSessionToken(transaction, user, userAuthenticationToken, cancellationToken);
-    await Server.ResourceService.GetManager<UserAuthenticationManager>().TruncateSessionToken(transaction, user, cancellationToken);
+    string token = await GetResourceManager<UserAuthenticationManager>().CreateSessionToken(CurrentTransaction, user, userAuthenticationToken);
+    await Server.ResourceService.GetManager<UserAuthenticationManager>().TruncateSessionToken(CurrentTransaction, user);
 
     return Data(new PasswordLoginResponse(user.Id, token));
-  }));
+  });
 
   [Route("~/auth/logout")]
   public Task<ObjectResult> Logout() => Run(async () =>
@@ -128,11 +128,7 @@ public sealed partial class WebApi
       return Error(401);
     }
 
-    await ResourceService.Transact(async (transaction, cancellationToken) =>
-    {
-      await GetResourceManager<UserAuthenticationManager>().Delete(transaction, userAuthenticationToken.UserAuthentication, cancellationToken);
-    });
-
+    await GetResourceManager<UserAuthenticationManager>().Delete(CurrentTransaction, userAuthenticationToken.UserAuthentication);
     return Data();
   });
 }

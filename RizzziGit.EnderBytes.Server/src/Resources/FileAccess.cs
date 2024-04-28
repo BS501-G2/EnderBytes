@@ -4,107 +4,134 @@ namespace RizzziGit.EnderBytes.Resources;
 
 using Utilities;
 using Services;
-using Newtonsoft.Json;
-using System.Runtime.CompilerServices;
 
-public enum FileAccessTargetEntityType : byte { None, User }
-public enum FileAccessType : byte { ManageShares, ReadWrite, Read, None }
+using ResourceManager = ResourceManager<FileAccessManager, FileAccessManager.Resource>;
 
-public sealed class FileAccessManager : ResourceManager<FileAccessManager, FileAccessManager.Resource, FileAccessManager.Exception>
+public enum FileAccessTargetEntityType
 {
-  public new abstract class Exception(string? message = null) : ResourceService.ResourceManager.Exception(message);
+  User, None
+}
 
+public enum FileAccessExtent
+{
+  None, ReadOnly, ReadWrite, ManageAccess, Full
+}
+
+public sealed class FileAccessManager : ResourceManager
+{
   public new sealed record Resource(
     long Id,
     long CreateTime,
     long UpdateTime,
-    long TargetFileId,
-    long TargetEntityId,
+
     FileAccessTargetEntityType TargetEntityType,
-    byte[] AesKey,
-    FileAccessType Type
-  ) : ResourceManager<FileAccessManager, Resource, Exception>.Resource(Id, CreateTime, UpdateTime)
-  {
-    [JsonIgnore]
-    public byte[] AesKey = AesKey;
-  }
+    long? TargetEntityId,
+    long TargetFileId,
 
-  private const string NAME = "FileAccess";
-  private const int VERSION = 1;
+    byte[] TargetFileAesKey,
+    FileAccessExtent FileAccessExtent
+  ) : ResourceManager.Resource(Id, CreateTime, UpdateTime);
 
-  public const string COLUMN_TARGET_FILE_ID = "TargetFileId";
-  public const string COLUMN_TARGET_ENTITY_ID = "TargetEntityId";
-  public const string COLUMN_TARGET_ENTITY_TYPE = "TargetEntityType";
-  public const string COLUMN_KEY = "AesKey";
-  public const string COLUMN_TYPE = "Type";
+  public const string NAME = "FileAccess";
+  public const int VERSION = 1;
+
+  private const string COLUMN_TARGET_ENTITY_TYPE = "TargetEntityType";
+  private const string COLUMN_TARGET_ENTITY_ID = "TargetEntityId";
+  private const string COLUMN_TARGET_FILE_ID = "TargetFileId";
+  private const string COLUMN_TARGET_FILE_AES_KEY = "TargetFileAesKey";
+  private const string COLUMN_EXTENT = "Extent";
 
   public FileAccessManager(ResourceService service) : base(service, NAME, VERSION)
   {
-    Service.GetManager<FileManager>().RegisterDeleteHandler((transaction, file, cancellationToken) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), cancellationToken));
-    Service.GetManager<UserManager>().RegisterDeleteHandler((transaction, user, cancellationToken) => Delete(transaction, new WhereClause.Nested("and",
-      new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", (byte)FileAccessTargetEntityType.User),
-      new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id)
-    ), cancellationToken));
+    GetManager<UserManager>().RegisterDeleteHandler((transaction, user) => Delete(transaction, new WhereClause.Nested("and",
+      new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id),
+      new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", FileAccessTargetEntityType.User)
+    )));
+
+    GetManager<FileManager>().RegisterDeleteHandler((transaction, file) => Delete(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id)));
   }
+
+  public KeyService KeyService => Service.Server.KeyService;
 
   protected override Resource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
     id, createTime, updateTime,
 
-    reader.GetInt64(reader.GetOrdinal(COLUMN_TARGET_FILE_ID)),
-    reader.GetInt64(reader.GetOrdinal(COLUMN_TARGET_ENTITY_ID)),
     (FileAccessTargetEntityType)reader.GetByte(reader.GetOrdinal(COLUMN_TARGET_ENTITY_TYPE)),
-    reader.GetBytes(reader.GetOrdinal(COLUMN_KEY)),
-    (FileAccessType)reader.GetByte(reader.GetOrdinal(COLUMN_TYPE))
+    reader.GetInt64Optional(reader.GetOrdinal(COLUMN_TARGET_ENTITY_ID)),
+    reader.GetInt64(reader.GetOrdinal(COLUMN_TARGET_FILE_ID)),
+    reader.GetBytes(reader.GetOrdinal(COLUMN_TARGET_FILE_AES_KEY)),
+    (FileAccessExtent)reader.GetByte(reader.GetOrdinal(COLUMN_EXTENT))
   );
 
-  protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0, CancellationToken cancellationToken = default)
+  protected override async Task Upgrade(ResourceService.Transaction transaction, int oldVersion = 0)
   {
     if (oldVersion < 1)
     {
-      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_FILE_ID} bigint not null;");
-      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_ENTITY_ID} bigint null;");
       await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_ENTITY_TYPE} tinyint not null;");
-      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_KEY} blob not null;");
-      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TYPE} tinyint not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_ENTITY_ID} bigint null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_FILE_ID} bigint not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_TARGET_FILE_AES_KEY} blob not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_EXTENT} tinyint not null;");
     }
   }
 
-  public async IAsyncEnumerable<Resource> List(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource file, LimitClause? limit = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+  public async Task<Resource> GrantUser(ResourceService.Transaction transaction, FileManager.Resource file, UserManager.Resource user, KeyService.AesPair fileKey, FileAccessExtent extent = FileAccessExtent.ReadOnly)
   {
-    file.ThrowIfDoesNotBelongTo(storage);
-
-    await foreach (var fileAccess in Select(transaction, new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id), limit, new OrderByClause(COLUMN_TYPE, OrderByClause.OrderBy.Ascending), cancellationToken))
-    {
-      yield return fileAccess;
-    }
-  }
-
-  public async Task<Resource> Create(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource targetFile, UserManager.Resource targetUser, FileAccessType type, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
-  {
-    targetFile.ThrowIfDoesNotBelongTo(storage);
-
-    KeyService.AesPair fileKey = (await transaction.ResourceService.GetManager<StorageManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken)).Key;
-
     return await InsertAndGet(transaction, new(
-      (COLUMN_TARGET_FILE_ID, targetFile.Id),
-      (COLUMN_TARGET_ENTITY_ID, targetUser.Id),
       (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.User),
-      (COLUMN_KEY, targetUser.Encrypt(Service.Server.KeyService, fileKey.Serialize())),
-      (COLUMN_TYPE, (byte)type)
-    ), cancellationToken);
+      (COLUMN_TARGET_ENTITY_ID, user.Id),
+      (COLUMN_TARGET_FILE_ID, file.Id),
+      (COLUMN_TARGET_FILE_AES_KEY, user.Encrypt(KeyService, fileKey.Serialize())),
+      (COLUMN_EXTENT, (byte)extent)
+    ));
   }
 
-  public async Task<Resource> Create(ResourceService.Transaction transaction, StorageManager.Resource storage, FileManager.Resource targetFile, FileAccessType type, UserAuthenticationToken userAuthenticationToken, CancellationToken cancellationToken = default)
+  public async Task<bool> RevokeUser(ResourceService.Transaction transaction, FileManager.Resource file, UserManager.Resource user, FileAccessExtent? extent = null)
   {
-    targetFile.ThrowIfDoesNotBelongTo(storage);
+    return await Delete(transaction, new WhereClause.Nested("and",
+      new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", FileAccessTargetEntityType.User),
+      new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id),
+      new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id),
+      extent == null ? null : new WhereClause.CompareColumn(COLUMN_EXTENT, ">=", (byte)extent)
+    )) != 0;
+  }
 
-    KeyService.AesPair fileKey = (await transaction.ResourceService.GetManager<StorageManager>().DecryptKey(transaction, storage, targetFile, userAuthenticationToken, FileAccessType.ReadWrite, cancellationToken)).Key;
+  public async Task<Resource[]> ListByFile(ResourceService.Transaction transaction, FileManager.Resource file, FileAccessExtent? extent = null)
+  {
+    return await Select(transaction, new WhereClause.Nested("and",
+      new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id),
+      extent == null ? null : new WhereClause.CompareColumn(COLUMN_EXTENT, ">=", (byte)extent)
+    ));
+  }
 
-    return await InsertAndGet(transaction, new(
-      (COLUMN_TARGET_FILE_ID, targetFile.Id),
-      (COLUMN_TARGET_ENTITY_TYPE, (byte)FileAccessTargetEntityType.None),
-      (COLUMN_KEY, fileKey.Serialize()),
-      (COLUMN_TYPE, (byte)type)
-    ), cancellationToken);
+  public async Task<Resource[]> ListByUser(ResourceService.Transaction transaction, UserManager.Resource user, FileAccessExtent? extent = null)
+  {
+    return await Select(transaction, new WhereClause.Nested("and",
+      new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", FileAccessTargetEntityType.User),
+      new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id),
+      extent == null ? null : new WhereClause.CompareColumn(COLUMN_EXTENT, ">=", (byte)extent)
+    ));
+  }
+
+  public async Task<Resource?> GetAccessPoint(ResourceService.Transaction transaction, UserManager.Resource user, FileManager.Resource file, FileAccessExtent? extent = null)
+  {
+    FileManager.Resource[] pathChain = await GetManager<FileManager>().PathChain(transaction, file);
+
+    foreach (FileManager.Resource entry in pathChain)
+    {
+      Resource? accessPoint = await SelectFirst(transaction, new WhereClause.Nested("and",
+        new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", FileAccessTargetEntityType.User),
+        new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id),
+        new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", entry.Id),
+        extent == null ? null : new WhereClause.CompareColumn(COLUMN_EXTENT, ">=", (byte)extent)
+      ));
+
+      if (accessPoint != null)
+      {
+        return accessPoint;
+      }
+    }
+
+    return null;
   }
 }

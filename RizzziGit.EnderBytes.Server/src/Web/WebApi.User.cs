@@ -18,7 +18,7 @@ public sealed partial class WebApi
       }
 
       UserManager.Resource? user = null;
-      if ((user = await ResourceService.Transact((transaction, cancellationToken) => GetResourceManager<UserManager>().GetByUsername(transaction, username, cancellationToken))) == null)
+      if ((user = await GetResourceManager<UserManager>().GetByUsername(CurrentTransaction, username)) == null)
       {
         return Error(404);
       }
@@ -39,7 +39,7 @@ public sealed partial class WebApi
       }
 
       UserManager.Resource? user = null;
-      if ((user = await ResourceService.Transact((transaction, cancellationToken) => GetResourceManager<UserManager>().GetById(transaction, userId, cancellationToken))) == null)
+      if ((user = await GetResourceManager<UserManager>().GetById(CurrentTransaction, userId)) == null)
       {
         return Error(404);
       }
@@ -81,13 +81,10 @@ public sealed partial class WebApi
         return Error(403);
       }
 
-      return await ResourceService.Transact<Result>(async (transaction, cancellationToken) =>
-      {
-        (string Username, string LastName, string FirstName, string? MiddleName) = request;
-        await GetResourceManager<UserManager>().Update(transaction, userAuthenticationToken.User, Username, LastName, FirstName, MiddleName);
+      (string Username, string LastName, string FirstName, string? MiddleName) = request;
+      await GetResourceManager<UserManager>().Update(CurrentTransaction, userAuthenticationToken.User, Username, LastName, FirstName, MiddleName);
 
-        return Data();
-      });
+      return Data();
     });
   }
 }

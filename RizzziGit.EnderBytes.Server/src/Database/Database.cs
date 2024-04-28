@@ -6,7 +6,7 @@ using Commons.Logging;
 
 public abstract class Database(DbConnectionStringBuilder connectionStringBuilder) : IDisposable
 {
-  public delegate Task DatabaseConnectionHandler(DbConnection connection, CancellationToken cancellationToken = default);
+  public delegate Task DatabaseConnectionHandler(DbConnection connection);
 
   private readonly string ConnectionString = connectionStringBuilder.ToString();
   private bool Disposed = false;
@@ -17,7 +17,7 @@ public abstract class Database(DbConnectionStringBuilder connectionStringBuilder
   public DbParameter CreateParameter(string name, object? value) => InternalCreateParameter(ToParameterName(name), value);
   public abstract string ToParameterName(string name);
 
-  public async Task Run(Logger logger, long transactionId, DatabaseConnectionHandler handler, CancellationToken cancellationToken = default)
+  public async Task Run(Logger logger, long transactionId, DatabaseConnectionHandler handler)
   {
     await using DbConnection connection = InternalCreateConnection(ConnectionString);
 
@@ -27,8 +27,8 @@ public abstract class Database(DbConnectionStringBuilder connectionStringBuilder
       {
         try
         {
-          await connection.OpenAsync(cancellationToken);
-          await handler(connection, cancellationToken);
+          await connection.OpenAsync();
+          await handler(connection);
         }
         finally
         {

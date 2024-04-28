@@ -1,6 +1,6 @@
 namespace RizzziGit.EnderBytes.Resources;
 
-public abstract partial class ResourceManager<M, R, E>
+public abstract partial class ResourceManager<M, R>
 {
   public sealed record OrderByClause(string Column, OrderByClause.OrderBy Order = OrderByClause.OrderBy.Ascending)
   {

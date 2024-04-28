@@ -78,6 +78,7 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
   }
 
   public WebApiContext.InstanceHolder<UserAuthenticationToken> CurrentUserAuthenticationToken => new(this, nameof(CurrentUserAuthenticationToken));
+  public WebApiContext.InstanceHolder<ResourceService.Transaction> CurrentTransaction => new(this, nameof(CurrentTransaction));
 
   [NonAction]
   public bool TryGetUserAuthenticationToken([NotNullWhen(true)] out UserAuthenticationToken? userAuthenticationToken) => (userAuthenticationToken = HttpContext.RequestServices.GetRequiredService<WebApiContext>().Token) != null;
@@ -155,7 +156,26 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
         RunFlag++;
         try
         {
-          return await action();
+          if (CurrentTransaction.Optional() != null)
+          {
+            return await ResourceService.Transact(async (transaction, _) =>
+            {
+              CurrentTransaction.Set(transaction);
+
+              try
+              {
+                return await action();
+              }
+              finally
+              {
+                CurrentTransaction.Clear();
+              }
+            });
+          }
+          else
+          {
+            return await action();
+          }
         }
         catch (Exception exception)
         {
@@ -175,17 +195,7 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
     ResourceService.ResourceManager.NotFoundException => Error(404, exception),
 
     ResourceService.ResourceManager.ConstraintException or
-    FileManager.NotAFileException or
-    FileManager.NotAFolderException or
-    FileManager.NotSupportedException or
-    FileManager.InvalidFileTypeException or
-    FileManager.FileTreeException or
-    FileManager.FileDontBelongToStorageException or
     ResourceService.ResourceManager.NoMatchException => Error(400, exception),
-
-    StorageManager.AccessDeniedException or
-    StorageManager.StorageEncryptDeniedException or
-    StorageManager.StorageDecryptDeniedException => Error(400, exception),
 
     _ => Error(exception),
   };

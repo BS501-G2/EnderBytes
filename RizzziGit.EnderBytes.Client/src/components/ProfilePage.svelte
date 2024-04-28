@@ -45,7 +45,7 @@
       <div>
         <div
           class="top w-50"
-          style="height:400px; background-color: var(--onPrimary); border-radius: 15px; margin:20px;"
+          style="height:450px; background-color: var(--onPrimary); border-radius: 15px; margin:20px;"
         >
           <div class="EditProfile" style="position: absolute; top: 70px; right: 0; margin: 20px; margin-right: 50px;">
             <Button buttonClass={ButtonClass.PrimaryContainer} onClick={() => $accountSettingsDialog = true}>Edit Profile</Button>
@@ -177,7 +177,7 @@
 
         <div
           class="bottom w-50"
-          style="height:250px; background-color: var(--onPrimary); border-radius: 15px; margin:20px;"
+          style="height:450px; background-color: var(--onPrimary); border-radius: 15px; margin:20px;"
         >
         <div class="botTitle" style="padding-top: 30px;display: flex; justify-content: space-between;">
           <p style="font-weight: bold; font-size: large;padding-left: 80px;">Recent Shared Files</p>
@@ -187,9 +187,9 @@
 
 
 
-        <div class="file-container" style="display:flex">
+        <div class="file-container" style="display:flex;">
 
-          <div class="file1" style="position: relative;">
+          <div class="file1" style="position: relative; width:40%; ">
             <div class="picture" style="display: flex; align-items: center; margin-left:80px; margin-top:10px">
               <img src="https://img.freepik.com/free-vector/cute-hamster-holding-cheek-cartoon-illustration_138676-2773.jpg?size=338&ext=jpg&ga=GA1.1.1700460183.1712793600&semt=sph"
                 class="mx-auto d-block" alt="..." style="border-radius: 160px; height: 50px; width: 50px; margin-right: 10px;">
@@ -200,8 +200,8 @@
             </div>
             <div class="filebox-container" style="position: relative; margin-left: 50px;">
               <div style="position: absolute; top: -10px; left: 330px;">
-                <button class="downloadbutton" style="background-color: none; color: white; border: 1px solid var(--onPrimaryContainerVariant); padding: 15px 17px; border-radius: 5px; cursor: pointer;">
-                  <i class="fas fa-download"></i>
+                <button class="downloadbutton" style="background-color: none; color: black; border: 1px solid var(--onPrimaryContainerVariant); padding: 15px 17px; border-radius: 5px; cursor: pointer;">
+                  <i class="fas fa-download" style="font-size: 18px;"></i>
                 </button>
               </div>
               <div class="filebox" style="border-radius: 25px; background: var(--background); padding: 20px; width: 250px; height: auto; margin-left: 70px; display: flex; align-items: center;margin-top: -10px;">
@@ -216,7 +216,7 @@
             </div>
           </div>
 
-          <div class="file2" style="position: relative;">
+          <div class="file2" style="position: relative;width:40%; ">
             <div class="picture" style="display: flex; align-items: center; margin-left:70px; margin-top:10px">
               <img src="https://img.freepik.com/free-vector/cute-hamster-holding-cheek-cartoon-illustration_138676-2773.jpg?size=338&ext=jpg&ga=GA1.1.1700460183.1712793600&semt=sph"
                 class="mx-auto d-block" alt="..." style="border-radius: 160px; height: 50px; width: 50px; margin-right: 10px;">
@@ -227,8 +227,8 @@
             </div>
             <div class="filebox-container" style="position: relative; margin-left: 45px;">
               <div style="position: absolute; top: -10px; left: 330px;">
-                <button class="downloadbutton" style="background-color: none; color: white; border: 1px solid var(--onPrimaryContainerVariant); padding: 15px 17px; border-radius: 5px; cursor: pointer;">
-                  <i class="fas fa-download"></i>
+                <button class="downloadbutton" style="background-color: none; color: black; border: 1px solid var(--onPrimaryContainerVariant); padding: 15px 17px; border-radius: 5px; cursor: pointer;">
+                  <i class="fas fa-download" style="font-size: 18px;"></i>
                 </button>
               </div>
               <div class="filebox" style="border-radius: 25px; background: var(--background); padding: 20px; width: 250px; height: auto; margin-left: 70px; display: flex; align-items: center;margin-top: -10px;">
@@ -242,8 +242,130 @@
               </div>
             </div>
           </div>
-        </div>
 
+          <div class="file3" style="position: relative; width:40%; ">
+            <div class="picture" style="display: flex; align-items: center; margin-left:80px; margin-top:10px">
+              <img src="https://img.freepik.com/free-vector/cute-hamster-holding-cheek-cartoon-illustration_138676-2773.jpg?size=338&ext=jpg&ga=GA1.1.1700460183.1712793600&semt=sph"
+                class="mx-auto d-block" alt="..." style="border-radius: 160px; height: 50px; width: 50px; margin-right: 10px;">
+              <div style="margin-bottom: 1px;">
+                <p style="margin: 0; font-weight: bold; display:inline-block">Arvin</p>
+                <p style="margin: 0; font-weight: lighter; font-size: small; display:inline-block">Today at 8:08 PM</p>
+              </div>
+            </div>
+            <div class="filebox-container" style="position: relative; margin-left: 50px;">
+              <div style="position: absolute; top: -10px; left: 330px;">
+                <button class="downloadbutton" style="background-color: none; color: black; border: 1px solid var(--onPrimaryContainerVariant); padding: 15px 17px; border-radius: 5px; cursor: pointer;">
+                  <i class="fas fa-download" style="font-size: 18px;"></i>
+                </button>
+              </div>
+              <div class="filebox" style="border-radius: 25px; background: var(--background); padding: 20px; width: 250px; height: auto; margin-left: 70px; display: flex; align-items: center;margin-top: -10px;">
+                <img src="https://www.iconpacks.net/icons/2/free-file-icon-1453-thumb.png" alt="File Logo" style="height: 50px; width: 50px; margin-right: 15px;">
+                <div style="flex-grow: 1; max-width: calc(100% - 80px);">
+                  <p style="margin: 0; font-size: small; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+                    <a href="file_url">Vlcsnap-2024-04-14xcdarvincute.xcf</a>
+                  </p>
+                  <p style="margin: 0; font-size: small;">3.14 MB</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+         
+        
+        </div>
+        
+        <div class="file-container" style="display:flex;">
+
+          <div class="file1" style="position: relative; width:40%; ">
+            <div class="picture" style="display: flex; align-items: center; margin-left:80px; margin-top:10px">
+              <img src="https://img.freepik.com/free-vector/cute-hamster-holding-cheek-cartoon-illustration_138676-2773.jpg?size=338&ext=jpg&ga=GA1.1.1700460183.1712793600&semt=sph"
+                class="mx-auto d-block" alt="..." style="border-radius: 160px; height: 50px; width: 50px; margin-right: 10px;">
+              <div style="margin-bottom: 1px;">
+                <p style="margin: 0; font-weight: bold; display:inline-block">Arvin</p>
+                <p style="margin: 0; font-weight: lighter; font-size: small; display:inline-block">Today at 8:08 PM</p>
+              </div>
+            </div>
+            <div class="filebox-container" style="position: relative; margin-left: 50px;">
+              <div style="position: absolute; top: -10px; left: 330px;">
+                <button class="downloadbutton" style="background-color: none; color: black; border: 1px solid var(--onPrimaryContainerVariant); padding: 15px 17px; border-radius: 5px; cursor: pointer;">
+                  <i class="fas fa-download" style="font-size: 18px;"></i>
+                </button>
+              </div>
+              <div class="filebox" style="border-radius: 25px; background: var(--background); padding: 20px; width: 250px; height: auto; margin-left: 70px; display: flex; align-items: center;margin-top: -10px;">
+                <img src="https://www.iconpacks.net/icons/2/free-file-icon-1453-thumb.png" alt="File Logo" style="height: 50px; width: 50px; margin-right: 15px;">
+                <div style="flex-grow: 1; max-width: calc(100% - 80px);">
+                  <p style="margin: 0; font-size: small; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+                    <a href="file_url">Vlcsnap-2024-04-14xcdarvincute.xcf</a>
+                  </p>
+                  <p style="margin: 0; font-size: small;">3.14 MB</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="file2" style="position: relative;width:40%; ">
+            <div class="picture" style="display: flex; align-items: center; margin-left:70px; margin-top:10px">
+              <img src="https://img.freepik.com/free-vector/cute-hamster-holding-cheek-cartoon-illustration_138676-2773.jpg?size=338&ext=jpg&ga=GA1.1.1700460183.1712793600&semt=sph"
+                class="mx-auto d-block" alt="..." style="border-radius: 160px; height: 50px; width: 50px; margin-right: 10px;">
+              <div style="margin-bottom: 1px;">
+                <p style="margin: 0; font-weight: bold; display:inline-block">John</p>
+                <p style="margin: 0; font-weight: lighter; font-size: small; display:inline-block">Yesterday at 3:08 AM</p>
+              </div>
+            </div>
+            <div class="filebox-container" style="position: relative; margin-left: 45px;">
+              <div style="position: absolute; top: -10px; left: 330px;">
+                <button class="downloadbutton" style="background-color: none; color: black; border: 1px solid var(--onPrimaryContainerVariant); padding: 15px 17px; border-radius: 5px; cursor: pointer;">
+                  <i class="fas fa-download" style="font-size: 18px;"></i>
+                </button>
+              </div>
+              <div class="filebox" style="border-radius: 25px; background: var(--background); padding: 20px; width: 250px; height: auto; margin-left: 70px; display: flex; align-items: center;margin-top: -10px;">
+                <img src="https://www.iconpacks.net/icons/2/free-file-icon-1453-thumb.png" alt="File Logo" style="height: 50px; width: 50px; margin-right: 15px;">
+                <div style="flex-grow: 1; max-width: calc(100% - 80px);">
+                  <p style="margin: 0; font-size: small; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+                    <a href="file_url">Wiwo-2024-04-13xcdarvincute.jpg</a>
+                  </p>
+                  <p style="margin: 0; font-size: small;">4.14 GB</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="file3" style="position: relative; width:40%; ">
+            <div class="picture" style="display: flex; align-items: center; margin-left:80px; margin-top:10px">
+              <img src="https://img.freepik.com/free-vector/cute-hamster-holding-cheek-cartoon-illustration_138676-2773.jpg?size=338&ext=jpg&ga=GA1.1.1700460183.1712793600&semt=sph"
+                class="mx-auto d-block" alt="..." style="border-radius: 160px; height: 50px; width: 50px; margin-right: 10px;">
+              <div style="margin-bottom: 1px;">
+                <p style="margin: 0; font-weight: bold; display:inline-block">Arvin</p>
+                <p style="margin: 0; font-weight: lighter; font-size: small; display:inline-block">Today at 8:08 PM</p>
+              </div>
+            </div>
+            <div class="filebox-container" style="position: relative; margin-left: 50px;">
+              <div style="position: absolute; top: -10px; left: 330px;">
+                <button class="downloadbutton" style="background-color: none; color: black; border: 1px solid var(--onPrimaryContainerVariant); padding: 15px 17px; border-radius: 5px; cursor: pointer;">
+                  <i class="fas fa-download" style="font-size: 18px;"></i>
+                </button>
+              </div>
+              <div class="filebox" style="border-radius: 25px; background: var(--background); padding: 20px; width: 250px; height: auto; margin-left: 70px; display: flex; align-items: center;margin-top: -10px;">
+                <img src="https://www.iconpacks.net/icons/2/free-file-icon-1453-thumb.png" alt="File Logo" style="height: 50px; width: 50px; margin-right: 15px;">
+                <div style="flex-grow: 1; max-width: calc(100% - 80px);">
+                  <p style="margin: 0; font-size: small; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+                    <a href="file_url">Vlcsnap-2024-04-14xcdarvincute.xcf</a>
+                  </p>
+                  <p style="margin: 0; font-size: small;">3.14 MB</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+         
+        
+        </div>
+        
+        
+
+        
+        
+        
 
         </div>
       </div>

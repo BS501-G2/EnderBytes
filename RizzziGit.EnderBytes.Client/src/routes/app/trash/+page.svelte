@@ -18,7 +18,7 @@
       }
       .recycle-section{
         display: grid;
-        grid-template-columns: auto auto;
+        grid-template-columns: 70% 30%;
         margin: 5%;
         margin-left: 50px;
       }
@@ -29,8 +29,8 @@
         margin-left: 50px;
       }
       .recycle-column{
-        width: 60vw;
-        height: 630px;
+        width: 100%;
+        height: 70vh;
         overflow: auto;
         display: flex;
         justify-content: space-evenly;
@@ -49,8 +49,7 @@
         width: 250px;
         align-items: center;
         overflow: auto;
-        margin-top: 20px;
-        flex-shrink: 10;
+        margin-bottom: 20px;
       }
       .fileIcon{
         display: flex;
@@ -64,6 +63,8 @@
         margin: 2px;
         overflow: hidden;
         text-overflow: ellipsis;
+        font-weight:bold;
+        max-width: 90%;
       }
       .fileType{
         margin: 2px;
@@ -81,13 +82,14 @@
           border-color: black;
           grid-column: 2;
           max-height: fit-content;
-          width: clamp(100px, 400px, 500px);
+          width: 70%;
           display: flex;
           justify-content: flex-start;
           border-radius: 30px;
           flex-direction: column;
           opacity: 0;
           transition: opacity .5s;
+          justify-self: center;
       }
       .recycle-preview-info{
           display: flex;

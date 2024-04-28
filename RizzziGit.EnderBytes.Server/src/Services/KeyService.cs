@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 
 namespace RizzziGit.EnderBytes.Services;
 
+using Commons.Memory;
 using Commons.Collections;
 using Commons.Logging;
 

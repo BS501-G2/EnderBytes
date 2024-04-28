@@ -15,10 +15,10 @@
         }
         .starred-section{
           display: grid;
-          grid-template-columns: auto auto;
+          grid-template-columns: 70% 30%;
           margin: 5%;
           margin-left: 50px;
-          width: 85vw;
+
 
         }
         .title{
@@ -150,9 +150,9 @@
         }
         .previewFileName{
           margin-top: 7px;
-          font-size: 2rem;
+          font-size: 1.5rem;
           font-weight: bold;
-          max-width: 100%;
+          max-width: 90%;
           overflow: hidden;
           text-overflow: ellipsis;
         }
@@ -162,7 +162,7 @@
         }
         .previewFileSize{
           margin-top: 7px;
-          font-size:1rem;
+          font-size: 1rem;
         }
         .previewFileDate{
           margin-top: 7px;

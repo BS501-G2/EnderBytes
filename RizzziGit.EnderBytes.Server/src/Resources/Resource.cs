@@ -64,7 +64,7 @@ public abstract partial class ResourceManager<M, R>(ResourceService service, str
   }
 
   protected async Task<R?> SelectFirst(ResourceService.Transaction transaction, WhereClause? where = null, OrderByClause? order = null) => await SelectOne(transaction, where, 0, order);
-  protected async Task<R?> SelectOne(ResourceService.Transaction transaction, WhereClause? where = null, int? offset = null, OrderByClause? order = null)
+  protected async Task<R?> SelectOne(ResourceService.Transaction transaction, WhereClause? where = null, long? offset = null, OrderByClause? order = null)
   {
     foreach (R resource in await Select(transaction, where, new(1, offset), order))
     {

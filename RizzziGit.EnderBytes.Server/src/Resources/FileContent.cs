@@ -2,6 +2,7 @@ using System.Data.Common;
 
 namespace RizzziGit.EnderBytes.Resources;
 
+using RizzziGit.Commons.Memory;
 using Services;
 
 using ResourceManager = ResourceManager<FileContentManager, FileContentManager.Resource>;
@@ -60,11 +61,8 @@ public sealed class FileContentManager : ResourceManager
     );
   }
 
-  public async Task<Resource> CreateRootFileMetadata(ResourceService.Transaction transaction, long fileId)
-  {
-    return await InsertAndGet(transaction, new(
-      (COLUMN_FILE_ID, fileId),
-      (COLUMN_IS_ROOT, false)
-    ));
-  }
+  public Task<Resource> Create(ResourceService.Transaction transaction, long fileId) => InsertAndGet(transaction, new(
+    (COLUMN_FILE_ID, fileId),
+    (COLUMN_IS_ROOT, false)
+  ));
 }

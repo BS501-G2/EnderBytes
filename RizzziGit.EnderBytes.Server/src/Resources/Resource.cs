@@ -9,8 +9,8 @@ using Commons.Logging;
 using Services;
 
 public abstract partial class ResourceManager<M, R>(ResourceService service, string name, int version) : ResourceService.ResourceManager(service, name, version)
-    where M : ResourceManager<M, R>
-    where R : ResourceManager<M, R>.Resource
+  where M : ResourceManager<M, R>
+  where R : ResourceManager<M, R>.Resource
 {
   public abstract partial record Resource(long Id, long CreateTime, long UpdateTime);
 

@@ -14,6 +14,11 @@ public sealed partial class ResourceService : Server.SubService
     ResourceManagers.Add(new UserAuthenticationManager(this));
     ResourceManagers.Add(new UserAuthenticationSessionTokenManager(this));
     ResourceManagers.Add(new UserConfigurationManager(this));
+    ResourceManagers.Add(new FileManager(this));
+    ResourceManagers.Add(new FileAccessManager(this));
+    ResourceManagers.Add(new FileContentManager(this));
+    ResourceManagers.Add(new FileContentDataManager(this));
+    ResourceManagers.Add(new FileContentDataBlobManager(this));
   }
 
   private Database? Database;

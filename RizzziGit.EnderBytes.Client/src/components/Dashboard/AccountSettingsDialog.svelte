@@ -16,7 +16,7 @@
   <Dialog onDismiss={() => $enabled = false}>
     <h2 slot="head" style="margin-left: 20px; margin-top:20px;">Basic Info</h2>
 
-    <div class="account-settings" slot="body" style="height: 700px; width:800px; overflow: hidden;">
+    <div class="account-settings" slot="body" style="min-height: 700px; min-width:800px; overflow: hidden;">
 
       <div><hr style="width: 100%; border: none; border-top: 1px solid var(--onPrimaryContainerVariant);"></div>
 
@@ -65,7 +65,7 @@
                   <input type="text" id="LnameInput" style="width: 100%; padding: 17px 20px; margin: 8px 0; box-sizing: border-box;" required>
                   <span style="position: absolute; top: 0; left: 0; padding: 10px; color: gray; font-size: 12px;">Last name</span>
                 </div>
-                
+
               </div>
               <div style="display:flex; justify-content:center; padding-top:10px; padding-bottom:10px">
                 <button style="
@@ -82,7 +82,7 @@
                 font-weight: bold;
                 ">Apply</button>
               </div>
-              
+
             </div>
           </fragment>
         </Expandable>
@@ -105,7 +105,7 @@
           <fragment slot='body'>
             <div>
               <div style="display:flex; justify-content:center">
-                <div style="position: relative;">
+                <div style="position: relative; width:30%;">
                   <input type="date" id="dateInput" style="width: 100%; padding: 17px 30px; margin: 8px 0; box-sizing: border-box;" required>
                 </div>
               </div>
@@ -124,7 +124,7 @@
                 font-weight: bold;
                 ">Apply</button>
               </div>
-              
+
             </div>
           </fragment>
         </Expandable>
@@ -176,7 +176,7 @@
                   ">Apply</button>
               </div>
             </div>
-            
+
           </fragment>
         </Expandable>
 
@@ -220,7 +220,7 @@
                 font-weight: bold;
                 ">Apply</button>
               </div>
-              
+
             </div>
           </fragment>
         </Expandable>
@@ -240,7 +240,32 @@
             </div>
           </fragment>
           <fragment slot='body'>
-            <p>Expanded</p>
+            <div>
+              <div style="display:flex; justify-content:center">
+                  <div style="position: relative; width:40%;">
+                      <input type="tel" id="phoneInput" style="width: 100%; padding: 17px 20px; margin: 8px 0; box-sizing: border-box;" required pattern="[0-9]+">
+                      <span style="position: absolute; top: 0; left: 0; padding: 10px; color: gray; font-size: 12px;">Phone</span>
+                  </div>
+              </div>
+              <div style="display:flex; justify-content:center; padding-top:10px; padding-bottom:10px">
+                  <button style="
+                      background-color: var(--primaryContainer);
+                      cursor: pointer;
+                      border-color: var(--onPrimaryContainerVariant);
+                      color: white;
+                      padding: 10px 23px;
+                      text-align: center;
+                      text-decoration: none;
+                      display: inline-block;
+                      font-size: 16px;
+                      border-radius:10px;
+                      font-weight: bold;
+                      ">Apply</button>
+              </div>
+          </div>
+
+
+
           </fragment>
         </Expandable>
 

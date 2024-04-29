@@ -9,6 +9,7 @@
   import ResponsiveLayout from "./Bindings/ResponsiveLayout.svelte";
   import AccountSettingsDialog from "./Dashboard/AccountSettingsDialog.svelte";
   import LogoutConfirmationDialog from "./Dashboard/LogoutConfirmationDialog.svelte";
+  import AppSettingsDialog from "./Dashboard/AppSettingsDialog.svelte";
   import Awaiter from "./Bindings/Awaiter.svelte";
   import Client from "./Bindings/Client.svelte";
   import LoadingSpinnerPage from "./Widgets/LoadingSpinnerPage.svelte";
@@ -44,6 +45,7 @@
         </ResponsiveLayout>
         <LogoutConfirmationDialog />
         <AccountSettingsDialog />
+        <AppSettingsDialog />
       </svelte:fragment>
       <svelte:fragment slot="loading">
         <div

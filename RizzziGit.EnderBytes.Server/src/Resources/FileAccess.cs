@@ -17,6 +17,8 @@ public enum FileAccessExtent
   None, ReadOnly, ReadWrite, ManageAccess, Full
 }
 
+public sealed record FileAccessPoint(FileAccessManager.Resource AccessPoint, FileManager.Resource[] PathChain);
+
 public sealed class FileAccessManager : ResourceManager
 {
   public new sealed record Resource(
@@ -113,7 +115,7 @@ public sealed class FileAccessManager : ResourceManager
     ));
   }
 
-  public async Task<Resource?> GetAccessPoint(ResourceService.Transaction transaction, UserManager.Resource user, FileManager.Resource file, FileAccessExtent? extent = null)
+  public async Task<FileAccessPoint?> GetAccessPoint(ResourceService.Transaction transaction, UserManager.Resource user, FileManager.Resource file, FileAccessExtent? extent)
   {
     FileManager.Resource[] pathChain = await GetManager<FileManager>().PathChain(transaction, file);
 
@@ -128,7 +130,7 @@ public sealed class FileAccessManager : ResourceManager
 
       if (accessPoint != null)
       {
-        return accessPoint;
+        return new(accessPoint, pathChain);
       }
     }
 

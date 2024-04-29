@@ -19,12 +19,12 @@ public abstract class Database(DbConnectionStringBuilder connectionStringBuilder
 
   public async Task Run(Logger logger, long transactionId, DatabaseConnectionHandler handler)
   {
-    await using DbConnection connection = InternalCreateConnection(ConnectionString);
-
     while (true)
     {
       try
       {
+        await using DbConnection connection = InternalCreateConnection(ConnectionString);
+
         try
         {
           await connection.OpenAsync();

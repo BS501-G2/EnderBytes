@@ -4,7 +4,7 @@
   export const enabled: Writable<boolean> = writable(false);
 </script>
 
-<script>
+<script lang="ts">
   import Client from "../Bindings/Client.svelte";
   import Button, { ButtonClass } from "../Widgets/Button.svelte";
   import Dialog, { DialogClass } from "../Widgets/Dialog.svelte";

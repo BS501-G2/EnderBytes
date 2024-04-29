@@ -1,17 +1,7 @@
 <script lang="ts">
-  import { tweened } from "svelte/motion";
-  import { cubicOut } from "svelte/easing";
+  import { slide } from "svelte/transition";
 
   export let expanded: boolean = false;
-
-  const height = tweened(0, {
-    duration: 500,
-    easing: cubicOut,
-  });
-
-  let contentHeight: number;
-
-  $: $height = expanded ? contentHeight : 0;
 </script>
 
 <div class="expandable-header">
@@ -23,17 +13,8 @@
     }}
   />
 </div>
-<div
-  class="expandable-body"
-  style={$height == contentHeight ? "" : `max-height: ${$height}px;`}
->
-  <div class="content" bind:clientHeight={contentHeight}>
+{#if expanded}
+  <div class="expandable-body" transition:slide|global={{ duration: 200 }}>
     <slot name="body" />
   </div>
-</div>
-
-<style lang="scss">
-  div.expandable-body {
-    overflow-y: hidden;
-  }
-</style>
+{/if}

@@ -26,6 +26,7 @@
   import { onDestroy, onMount } from "svelte";
   import LoadingBar from "../../../../Widgets/LoadingBar.svelte";
   import Button, { ButtonClass } from "../../../../Widgets/Button.svelte";
+    import { scale } from "svelte/transition";
 
   const operationsIcon: FrameCallback<number> = (p, t, value = 0) => {
     value += 2;
@@ -66,7 +67,7 @@
     callback={(previous, current) => {
       if ($runningBackgroundTasks.length > 0) {
         update = cooldownTime;
-      } else if ($failedBackgroundTasks.length > 0) {
+      } else if ($failedBackgroundTasks.length > 0 || $completedBackgroundTasks.length > 0) {
         update -= current - (previous ?? Date.now());
       } else {
         update = 0;
@@ -82,7 +83,7 @@
       : [OverlayPositionType.Offset, -16, -16]}
     onDismiss={$enabled ? () => ($enabled = false) : null}
   >
-    <div class="operations-menu">
+    <div class="operations-menu" transition:scale|global={{ duration: 200, start: 0.95 }}>
       {#if $enabled}
         <div class="menu-header">
           <h2>Operations</h2>
@@ -101,7 +102,7 @@
           <LoadingBar progress={(cooldownTime - update) / cooldownTime} />
         {/if}
         <BackgroundTaskList
-          filter={[BackgroundTaskStatus.Running, BackgroundTaskStatus.Failed]}
+          filter={[BackgroundTaskStatus.Running, BackgroundTaskStatus.Done, BackgroundTaskStatus.Failed]}
         />
       {/if}
     </div>

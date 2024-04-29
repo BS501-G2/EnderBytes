@@ -35,17 +35,16 @@ public static class Program
       StringBuilder buffer = new();
       Server.Logger.Logged += (level, scope, message, timestamp) => Console.Error.WriteLine($"-> [{DateTimeOffset.FromUnixTimeMilliseconds((long)timestamp).ToLocalTime()} / {level.ToString().ToUpper()}] [{scope}] {message}");
 
-      ConsoleCancelEventHandler? onCancel = null;
-      onCancel = (_, _) =>
+      static void onCancel(object? _, ConsoleCancelEventArgs s)
       {
-        Console.CancelKeyPress -= onCancel!;
+        Console.CancelKeyPress -= onCancel;
         Console.CancelKeyPress += (_, _) => Environment.Exit(0);
 
         Console.Error.WriteLine("\rSERVER IS SHUTTING DOWN. PLEASE DO NOT PRESS CANCEL KEY ONE MORE TIME.");
         StopTest(Server).WaitSync();
-      };
+      }
 
-      Console.CancelKeyPress += onCancel!;
+      Console.CancelKeyPress += onCancel;
     }
 
     Logger testLogger = new("Test");
@@ -94,47 +93,25 @@ public static class Program
 
   public static Task RunTest(Logger logger, Server server) => Task.Run(async () =>
   {
-    var (storage, folder, userAuthenticationToken) = await server.ResourceService.Transact(async (transaction, cancellationToken) =>
+    await server.ResourceService.Transact(async (transaction) =>
     {
       UserManager userManager = transaction.GetManager<UserManager>();
-      StorageManager storageManager = transaction.GetManager<StorageManager>();
       FileManager fileManager = transaction.GetManager<FileManager>();
+      FileContentManager fileContentManager = transaction.GetManager<FileContentManager>();
+      FileContentDataManager fileContentDataManager = transaction.GetManager<FileContentDataManager>();
 
-      (UserManager.Resource user, UserAuthenticationToken userAuthenticationToken) = await userManager.Create(transaction, "Testuser", "LastName", "FirstName", "MiddleName", "TestTest123;", cancellationToken);
-      Handlers.Add(async (transaction, cancellationToken) =>
-      {
-        await server.ResourceService.GetManager<UserManager>().Delete(transaction, user, cancellationToken);
-      });
+      (UserManager.Resource user, UserAuthenticationToken userAuthentication) = await userManager.Create(transaction, "testuser", "User", "Test", "Middle", "TestTest123;");
 
-      (UserManager.Resource otherUser, UserAuthenticationToken otherUserAuthenticationToken) = await userManager.Create(transaction, "Testuser2", "LastName", "FirstName", "MiddleName", "TestTest123;", cancellationToken);
-      Handlers.Add(async (transaction, cancellationToken) =>
-      {
-        await server.ResourceService.GetManager<UserManager>().Delete(transaction, otherUser, cancellationToken);
-      });
+      FileManager.Resource root = await fileManager.GetRootFromUser(transaction, userAuthentication);
+      FileManager.Resource file = await fileManager.Create(transaction, root, "Test", false, userAuthentication);
 
-      StorageManager.Resource storage = await storageManager.GetByOwnerUser(transaction, userAuthenticationToken, cancellationToken);
-      FileManager.Resource rootFolder = await storageManager.GetRootFolder(transaction, storage, userAuthenticationToken, cancellationToken);
-      FileManager.Resource testFolder = await fileManager.CreateFolder(transaction, storage, rootFolder, "Test Folder", userAuthenticationToken, cancellationToken);
-      FileAccessManager.Resource fileAccess = await server.ResourceService.GetManager<FileAccessManager>().Create(transaction, storage, testFolder, otherUser, FileAccessType.Read, userAuthenticationToken, cancellationToken);
+      FileContentManager.Resource fileContent = await fileContentManager.GetRootFileMetadata(transaction, file);
 
-      return (
-        storage,
-        testFolder,
-        userAuthenticationToken
-      );
+      KeyService.AesPair key = await fileManager.GetKey(transaction, file, FileAccessExtent.ReadWrite, userAuthentication);
+
+      await fileContentDataManager.Write(transaction, file, key, fileContent, Encoding.UTF8.GetBytes("Hello World!"));
+
+      Console.WriteLine((await fileContentDataManager.Read(transaction, file, fileContent)).ToString());
     });
-
-    List<Task> tasks = [];
-
-    for (long i = 0; i < 2; i++)
-    {
-      long capturedI = i;
-      tasks.Add(server.ResourceService.Transact(async (transaction, cancellationToken) =>
-      {
-        await server.ResourceService.GetManager<FileManager>().CreateFolder(transaction, storage, folder, $"Test Folder {capturedI}", userAuthenticationToken, cancellationToken);
-      }));
-    }
-
-    await Task.WhenAll(tasks);
   });
 }

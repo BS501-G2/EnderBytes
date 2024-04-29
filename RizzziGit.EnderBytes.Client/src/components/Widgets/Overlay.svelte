@@ -11,6 +11,7 @@
 
 <script lang="ts">
   import type { MouseEventHandler } from "svelte/elements";
+  import { fade, scale } from "svelte/transition";
 
   const onClick: MouseEventHandler<HTMLButtonElement> = (event) => {
     if (element.contains(<HTMLElement>event.target)) {
@@ -29,16 +30,16 @@
 </script>
 
 <div class="content">
-  {#if onDismiss != null}
-    <div class="layer">
-      <div class="view">
+  <div class="layer">
+    <div class="view" transition:fade={{ duration: 200 }}>
+      {#if onDismiss != null}
         <button
           on:click={onClick}
           style={dim ? "background-color: #0000003f" : ""}
         />
-      </div>
+      {/if}
     </div>
-  {/if}
+  </div>
   <div class="layer">
     <div class="view">
       {#if position[0] === OverlayPositionType.Offset}
@@ -58,7 +59,7 @@
               ? 'bottom'
               : 'top'}: {overlayPositionY}px; margin-{position[1] < 0
               ? 'right'
-              : 'left'}: {overlayPositionX}px;"
+              : 'left'}: {overlayPositionX}px; z-index: 2;"
             class="main"
             bind:this={element}
           >
@@ -66,7 +67,7 @@
           </div>
         </div>
       {:else if position[0] === OverlayPositionType.Center}
-        <div class="main" bind:this={element}>
+        <div class="main" style="z-index: 2;" bind:this={element}>
           <slot />
         </div>
       {/if}
@@ -83,7 +84,7 @@
     position: absolute;
     left: 0px;
     top: 0px;
-        pointer-events: none;
+    pointer-events: none;
 
     width: 100%;
     height: 100%;

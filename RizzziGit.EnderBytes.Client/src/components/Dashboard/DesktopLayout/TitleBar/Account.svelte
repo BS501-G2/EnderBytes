@@ -7,6 +7,7 @@
   } from "../../../Widgets/Overlay.svelte";
   import { enabled as accountSettingsDialog } from "../../AccountSettingsDialog.svelte";
   import { enabled as logoutConfirmationDialog } from "../../LogoutConfirmationDialog.svelte";
+  import { enabled as appSettingsDialog } from "../../AppSettingsDialog.svelte";
   import { goto } from "$app/navigation";
 
   let menuLocationAnchor: HTMLElement;
@@ -36,15 +37,16 @@
     position={[OverlayPositionType.Offset, -menuX, menuY]}
     onDismiss={() => (menuOpen = false)}
   >
-    <div class="account-info">
-
-    </div>
+    <div class="account-info"></div>
     <div class="account-menu">
       <a href="/app/users/!me" on:click={() => (menuOpen = false)}>
         View Profile
       </a>
       <button on:click={() => onClick(() => ($accountSettingsDialog = true))}>
         Account Settings
+      </button>
+      <button on:click={() => onClick(() => ($appSettingsDialog = true))}>
+        App Settings
       </button>
       <div class="divider" />
       <button

@@ -158,7 +158,7 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
         {
           if (CurrentTransaction.Optional() != null)
           {
-            return await ResourceService.Transact(async (transaction, _) =>
+            return await ResourceService.Transact(async (transaction) =>
             {
               CurrentTransaction.Set(transaction);
 

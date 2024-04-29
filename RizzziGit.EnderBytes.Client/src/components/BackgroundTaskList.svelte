@@ -217,6 +217,7 @@
             refresh();
 
             if (backgroundTask.autoDismiss) {
+              console.log('auto dismiss')
               backgroundTask.dismiss();
             }
 
@@ -358,7 +359,7 @@
 </script>
 
 <div class="background-tasks">
-  {#if cached.length == 0}
+  {#if cached.filter((e) => filter == null || filter.includes(e.status)).length == 0}
     <p>No pending operations.</p>
   {:else}
     {#each cached.toSorted((a, b) => a.status - b.status) as { name, progress, run, retryable, cancelled, cancel, message, status, dismiss }, index}

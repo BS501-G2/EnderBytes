@@ -83,11 +83,11 @@
           bottom: 210px;
           width: 25%;
           padding: 25px;
-          
         }
         .my-share{
           position: fixed;
-          top: 625px;
+          top: 575px;
+          right: 285px;
           bottom: 150px;
           cursor: pointer;
           padding: 25px;
@@ -96,8 +96,8 @@
         .my-edit{
           position: fixed;
           padding: 25px;
-          top: 625px;
-          right: 25px;
+          top: 575px;
+          right: 135px;
           width: 100px;
           height: 100px;
           cursor: pointer;

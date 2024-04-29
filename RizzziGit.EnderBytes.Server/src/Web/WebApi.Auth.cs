@@ -56,20 +56,20 @@ public sealed partial class WebApi
         return;
       }
 
-      if (!await server.ResourceService.Transact(async (transaction, cancellationToken) =>
+      if (!await server.ResourceService.Transact(async (transaction) =>
       {
         UserManager.Resource? user;
         UserAuthenticationToken? userAuthenticationToken;
         if (
-          ((user = await server.ResourceService.GetManager<UserManager>().GetById(transaction, userId, cancellationToken)) != null) &&
-          ((userAuthenticationToken = await server.ResourceService.GetManager<UserAuthenticationManager>().GetSessionToken(transaction, user, token, cancellationToken)) != null)
+          ((user = await server.ResourceService.GetManager<UserManager>().GetById(transaction, userId)) != null) &&
+          ((userAuthenticationToken = await server.ResourceService.GetManager<UserAuthenticationManager>().GetSessionToken(transaction, user, token)) != null)
         )
         {
           context.RequestServices.GetRequiredService<WebApiContext>().Token = userAuthenticationToken;
 
-          UserAuthenticationSessionTokenManager.Resource userAuthenticationSessionTokenResource = await server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().GetByUserAuthentication(transaction, userAuthenticationToken.UserAuthentication, cancellationToken);
+          UserAuthenticationSessionTokenManager.Resource userAuthenticationSessionTokenResource = await server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().GetByUserAuthentication(transaction, userAuthenticationToken.UserAuthentication);
 
-          await server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().ResetExpiryTime(transaction, userAuthenticationSessionTokenResource, 36000 * 1000 * 24, cancellationToken);
+          await server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().ResetExpiryTime(transaction, userAuthenticationSessionTokenResource, 36000 * 1000 * 24);
           return true;
         }
 

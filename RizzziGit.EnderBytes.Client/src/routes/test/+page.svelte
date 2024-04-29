@@ -1,60 +1,79 @@
 <script lang="ts">
-  import AnimationFrame from "../../components/Bindings/AnimationFrame.svelte";
-  import ResponsiveLayout from "../../components/Bindings/ResponsiveLayout.svelte";
-  import Button from "../../components/Widgets/Button.svelte";
-  import Expandable from "../../components/Widgets/Expandable.svelte";
+	import { tweened } from "svelte/motion";
+	import { type Writable, writable } from "svelte/store";
+	import { cubicOut, bounceOut, quintOut, quintInOut } from "svelte/easing";
 
-  let a: number = 0;
+	const xT = tweened(0, { easing: cubicOut, duration: 500 });
+	const yT = tweened(0, { easing: cubicOut, duration: 500 });
 
-  function onFrame() {
-    a += 1;
-  }
+	const trails: Writable<[x: number, y: number, message: string | null][]> =
+		writable([]);
+
+	let race: [x: number | null, y: number | null] = [null, null];
+	let lastRace = $trails[$trails.length - 1] ?? [0, 0];
+
+	function update(x: number | null = race[0], y: number | null = race[1]) {
+		race = [x, y];
+
+		if (x != null && y != null) {
+			if (lastRace[0] - x > 50 || Math.abs(lastRace[1] - y) > 50) {
+				$trails.push([x, y, `x: ${Math.round(x)} y: ${Math.round(y)}`]);
+
+				lastRace = <any>[x, y];
+			} else {
+				$trails.push([x, y, null]);
+			}
+			$trails.splice(0, Math.max($trails.length - 100, 0));
+			$trails = $trails;
+
+			race = [null, null];
+		}
+	}
+
+	xT.subscribe((value) => {
+		update(value, undefined);
+	});
+
+	yT.subscribe((value) => {
+		update(undefined, value);
+	});
 </script>
 
-<Expandable>
-  <svelte:fragment slot="header" let:toggle>
-    <Button onClick={toggle}>Click me</Button>
-  </svelte:fragment>
-  <svelte:fragment slot="body">
-    <p>Expand me</p>
-  </svelte:fragment>
-</Expandable>
+<svelte:window
+	on:mousemove={(event) => {
+		const x = event.clientX - 50;
+		const y = event.clientY - 50;
 
-<ResponsiveLayout>
-  <svelte:fragment slot="desktop">
-    <h1>This is desktop.</h1>
-  </svelte:fragment>
-  <svelte:fragment slot="mobile">
-    <h1>This is mobile.</h1>
-  </svelte:fragment>
-</ResponsiveLayout>
+		$xT = x;
+		$yT = y;
+	}}
+/>
 
-<AnimationFrame callback={onFrame} />
+{#each $trails as [x, y, message]}
+	<div class="a trail" style="left: {x}px; top: {y}px;">
+		{message ?? ""}
+	</div>
+{/each}
 
-<div class="container">
-  <div
-    class="cube"
-    style="transform: rotateX({a}deg) rotateY({Math.sin(a * 0.1) *
-      10}deg) translateZ(90px);"
-  />
-</div>
+<div class="a" style="left: {$xT}px; top: {$yT}px;"></div>
 
 <style lang="scss">
-  div.container {
-    width: 100vw;
-    height: 100vh;
+	div.a {
+		position: fixed;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+		background-color: black;
 
-    filter: drop-shadow(rgba(0, 0, 0, 0.5) 8px 8px 8px);
+		width: 100px;
+		height: 100px;
 
-    > div.cube {
-      width: 100px;
-      height: 100px;
+		border-radius: 50%;
+	}
 
-      background-color: var(--primary);
-    }
-  }
+	div.a.trail {
+		background-color: rgba(0, 0, 0, 0.01);
+
+		text-wrap: nowrap;
+
+		// box-shadow: 0px 0px 50px rgba(0, 0, 0, 0.25);
+	}
 </style>

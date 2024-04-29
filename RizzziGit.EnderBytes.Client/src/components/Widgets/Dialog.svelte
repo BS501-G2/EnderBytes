@@ -10,9 +10,10 @@
   import { RootState } from "$lib/states/root-state";
   import { XIcon } from "svelte-feather-icons";
 
-  import ResponsiveLayout from "../Bindings/ResponsiveLayout.svelte";
   import Button, { ButtonClass } from "./Button.svelte";
-  import Modal from "./Modal.svelte";
+  import { scale, fade } from "svelte/transition";
+  import ResponsiveLayout from "../Bindings/ResponsiveLayout.svelte";
+  import Overlay from "./Overlay.svelte";
 
   const rootState = RootState.state;
 
@@ -20,24 +21,32 @@
   export let dialogClass: DialogClass = DialogClass.Normal;
 </script>
 
-<Modal {onDismiss}>
-  <div class="dialog {dialogClass} {$rootState.isMobile ? 'mobile' : ''}">
+<Overlay {onDismiss} dim={true}>
+  <div
+    class="dialog {dialogClass} {$rootState.isMobile ? 'mobile' : ''}"
+     transition:scale|global={{ duration: 200, start: 0.95 }}
+  >
     {#if $$slots.head}
-      {#if $rootState.isDesktop}
-        <div class="head">
-          <slot name="head" />
-        </div>
-      {:else if $rootState.isMobile}
-        <div class="head-mobile">
-          <div class="head-element">
+      <ResponsiveLayout>
+        <svelte:fragment slot="desktop">
+          <div class="head">
             <slot name="head" />
           </div>
-          <Button
-            buttonClass={ButtonClass.Background}
-            onClick={() => onDismiss()}><XIcon /></Button
-          >
-        </div>
-      {/if}
+        </svelte:fragment>
+        <svelte:fragment slot="mobile">
+          <div class="head-mobile">
+            <div class="head-element">
+              <slot name="head" />
+            </div>
+            <Button
+              buttonClass={ButtonClass.Background}
+              onClick={() => onDismiss()}
+            >
+              <XIcon />
+            </Button>
+          </div>
+        </svelte:fragment>
+      </ResponsiveLayout>
     {/if}
     {#if $$slots.body}
       <div
@@ -55,7 +64,7 @@
       </div>
     {/if}
   </div>
-</Modal>
+</Overlay>
 
 <style lang="scss">
   div.dialog {

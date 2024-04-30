@@ -64,27 +64,40 @@ public sealed class FileDataManager : ResourceManager
     }
   }
 
+  public async Task<long> GetExclusiveMaxIndex(ResourceService.Transaction transaction, FileManager.Resource file, FileContentManager.Resource fileContent, FileContentVersionManager.Resource fileContentVersion)
+  {
+    return (await SqlScalar<long>(transaction, $"select max({COLUMN_INDEX}) from {NAME} where {COLUMN_FILE_ID} = {{0}} and {COLUMN_FILE_CONTENT_ID} = {{1}} and {COLUMN_FILE_CONTENT_VERSION_ID} = {{2}};", file.Id, fileContent.Id, fileContentVersion.Id)) + 1;
+  }
+
   public async Task<long> GetSize(ResourceService.Transaction transaction, FileManager.Resource file, FileContentManager.Resource fileContent, FileContentVersionManager.Resource fileContentVersion)
   {
-    return (long)(await SqlScalar<double>(transaction, $"select sum({COLUMN_SIZE}) from {NAME} where {COLUMN_FILE_ID} = {{0}} and {COLUMN_FILE_CONTENT_ID} = {{1}} and {COLUMN_FILE_CONTENT_VERSION_ID} = {{2}};", file.Id, fileContent.Id, fileContentVersion.Id))!;
+    long maxIndex = await GetExclusiveMaxIndex(transaction, file, fileContent, fileContentVersion);
+
+    Resource fileData = (await SelectFirst(transaction, new WhereClause.Nested("and",
+      new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
+      new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_ID, "=", fileContent.Id),
+      new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_VERSION_ID, "=", fileContentVersion.Id),
+      new WhereClause.CompareColumn(COLUMN_INDEX, "=", maxIndex - 1)
+    )))!;
+
+    return (fileData.Index * BUFFER_SIZE) + fileData.Size;
   }
 
   public async Task<CompositeBuffer> Read(ResourceService.Transaction transaction, FileManager.Resource file, KeyService.AesPair fileKey, FileContentManager.Resource fileContent, FileContentVersionManager.Resource fileContentVersion, long position, long length)
   {
-    long maxIndex = (long)(await SqlScalar(transaction, $"select max({COLUMN_INDEX}) from {NAME} where {COLUMN_FILE_ID} = {{0}} and {COLUMN_FILE_CONTENT_ID} = {{1}} and {COLUMN_FILE_CONTENT_VERSION_ID} = {{2}};", file.Id, fileContent.Id, fileContentVersion.Id))!;
-    long size = await GetSize(transaction, file, fileContent, fileContentVersion);
+  }
 
+  public async Task Write(ResourceService.Transaction transaction, FileManager.Resource file, KeyService.AesPair fileKey, FileContentManager.Resource fileContent, FileContentVersionManager.Resource fileContentVersion, long position, CompositeBuffer bytes)
+  {
     ArgumentOutOfRangeException.ThrowIfLessThan(position, 0, nameof(position));
-    ArgumentOutOfRangeException.ThrowIfGreaterThan(position, size, nameof(position));
-    ArgumentOutOfRangeException.ThrowIfLessThan(length, 0, nameof(length));
-    ArgumentOutOfRangeException.ThrowIfGreaterThan(position + length, size, nameof(length));
+
+    bytes = bytes.Clone();
+    bytes.CopyOnWrite = true;
 
     long startIndex = position / BUFFER_SIZE;
-    long endIndex = startIndex + ((length + BUFFER_SIZE - 1) / BUFFER_SIZE);
+    long endIndex = (position + bytes.Length + BUFFER_SIZE - 1) / BUFFER_SIZE;
 
-    CompositeBuffer bytes = [];
-    long toRead = length;
-    for (long index = startIndex; index <= endIndex; index++)
+    for (long index = startIndex; index < endIndex; index++)
     {
       Resource? fileData = await SelectFirst(transaction, new WhereClause.Nested("and",
         new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
@@ -97,57 +110,29 @@ public sealed class FileDataManager : ResourceManager
         ? CompositeBuffer.Allocate(BUFFER_SIZE)
         : await GetManager<FileBlobManager>().Retrieve(transaction, fileKey, fileData.BlobId);
 
-      buffer = buffer.Splice(index == startIndex ? position % BUFFER_SIZE : 0, long.Min(toRead, fileData?.Size ?? BUFFER_SIZE));
-      bytes.Append(buffer);
-      toRead -= buffer.Length;
-    }
+      long bufferStart = index == startIndex ? startIndex : 0;
 
-    return bytes;
-  }
+      CompositeBuffer toWrite = bytes.SpliceStart(long.Min(buffer.Length - bufferStart, bytes.Length));
+      buffer.Write(bufferStart, toWrite);
 
-  public async Task Write(ResourceService.Transaction transaction, FileManager.Resource file, KeyService.AesPair fileKey, FileContentManager.Resource fileContent, FileContentVersionManager.Resource fileContentVersion, long position, CompositeBuffer bytes)
-  {
-    long startIndex = position / BUFFER_SIZE;
-    long endIndex = startIndex + ((bytes.Length + BUFFER_SIZE - 1) / BUFFER_SIZE);
+      long newBlobId = await GetManager<FileBlobManager>().Store(transaction, fileKey, buffer.ToByteArray());
 
-    ArgumentOutOfRangeException.ThrowIfLessThan(startIndex, 0, nameof(position));
-    ArgumentOutOfRangeException.ThrowIfGreaterThan(startIndex, endIndex, nameof(position));
-
-    for (long index = startIndex; index <= endIndex; index++)
-    {
-      Resource? fileData = await SelectFirst(transaction, new WhereClause.Nested("and",
-        new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
-        new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_ID, "=", fileContent.Id),
-        new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_VERSION_ID, "=", fileContentVersion.Id),
-        new WhereClause.CompareColumn(COLUMN_INDEX, "=", index)
-      ));
-
-      CompositeBuffer buffer = fileData == null
-        ? CompositeBuffer.Allocate(BUFFER_SIZE)
-        : await GetManager<FileBlobManager>().Retrieve(transaction, fileKey, index);
-
-      long bufferOffset = index == startIndex ? position % BUFFER_SIZE : 0;
-      CompositeBuffer toWrite = bytes.SpliceStart(long.Max(buffer.Length - bufferOffset, bytes.Length));
-
-      buffer.Write(bufferOffset, toWrite);
-
-      if (fileData == null)
+      if (fileData != null)
       {
-        await InsertAndGet(transaction, new(
-          (COLUMN_FILE_ID, file.Id),
-          (COLUMN_FILE_CONTENT_ID, fileContent.Id),
-          (COLUMN_FILE_CONTENT_VERSION_ID, fileContentVersion.Id),
-          (COLUMN_FILE_BLOB_ID, await GetManager<FileBlobManager>().Store(transaction, fileKey, buffer.ToByteArray())),
-          (COLUMN_INDEX, index),
-          (COLUMN_SIZE, toWrite.Length)
+        await Update(transaction, fileData, new(
+          (COLUMN_SIZE, long.Max(bufferStart + toWrite.Length, fileData.Size)),
+          (COLUMN_FILE_BLOB_ID, newBlobId)
         ));
       }
       else
       {
-        await Update(transaction, fileData, new(
-          (COLUMN_FILE_BLOB_ID, await GetManager<FileBlobManager>().Store(transaction, fileKey, buffer.ToByteArray())),
+        await Insert(transaction, new(
+          (COLUMN_FILE_ID, file.Id),
+          (COLUMN_FILE_CONTENT_ID, fileContent.Id),
+          (COLUMN_FILE_CONTENT_VERSION_ID, fileContentVersion.Id),
           (COLUMN_INDEX, index),
-          (COLUMN_SIZE, long.Max(toWrite.Length, fileData.Size))
+          (COLUMN_SIZE, bufferStart + toWrite.Length),
+          (COLUMN_FILE_BLOB_ID, newBlobId)
         ));
       }
     }

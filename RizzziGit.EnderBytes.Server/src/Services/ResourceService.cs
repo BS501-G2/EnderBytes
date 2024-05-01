@@ -17,8 +17,9 @@ public sealed partial class ResourceService : Server.SubService
     ResourceManagers.Add(new FileManager(this));
     ResourceManagers.Add(new FileAccessManager(this));
     ResourceManagers.Add(new FileContentManager(this));
-    ResourceManagers.Add(new FileContentDataManager(this));
-    ResourceManagers.Add(new FileContentDataBlobManager(this));
+    ResourceManagers.Add(new FileContentVersionManager(this));
+    ResourceManagers.Add(new FileDataManager(this));
+    ResourceManagers.Add(new FileBlobManager(this));
   }
 
   private Database? Database;

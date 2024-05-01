@@ -9,22 +9,24 @@ using Core;
 using Utilities;
 using Services;
 using RizzziGit.EnderBytes.Resources;
+using RizzziGit.Commons.Memory;
+using Microsoft.Win32.SafeHandles;
 
 public static class Program
 {
   public static readonly Server Server = new(new(
       DatabaseConnectionStringBuilder: new MySqlConnectionStringBuilder()
       {
-        Server = "10.0.0.3",
+        Server = "10.1.0.117",
         Database = "enderbytes",
 
-        UserID = "enderbytes",
-        Password = "enderbytes",
+        UserID = "test",
+        Password = "test",
 
         AllowBatch = true,
       },
 
-      HttpClientPort: 8083,
+      HttpClientPort: 8084,
 
       KeyGeneratorThreads: 8
     ));
@@ -98,20 +100,56 @@ public static class Program
       UserManager userManager = transaction.GetManager<UserManager>();
       FileManager fileManager = transaction.GetManager<FileManager>();
       FileContentManager fileContentManager = transaction.GetManager<FileContentManager>();
-      FileContentDataManager fileContentDataManager = transaction.GetManager<FileContentDataManager>();
+      FileContentVersionManager fileContentVersionManager = transaction.GetManager<FileContentVersionManager>();
+      FileDataManager fileDataManager = transaction.GetManager<FileDataManager>();
 
-      (UserManager.Resource user, UserAuthenticationToken userAuthentication) = await userManager.Create(transaction, "testuser", "User", "Test", "Middle", "TestTest123;");
+      (UserManager.Resource user, UserAuthenticationToken userAuthenticationToken) = await userManager.Create(transaction, "testuser", "Rection", "Hugh", "G", "TestTest123;");
+      Handlers.Add(async (transaction) => await userManager.Delete(transaction, user));
 
-      FileManager.Resource root = await fileManager.GetRootFromUser(transaction, userAuthentication);
-      FileManager.Resource file = await fileManager.Create(transaction, root, "Test", false, userAuthentication);
+      FileManager.Resource rootFolder = await fileManager.GetRootFromUser(transaction, userAuthenticationToken);
 
-      FileContentManager.Resource fileContent = await fileContentManager.GetRootFileMetadata(transaction, file);
+      FileManager.Resource testFile = await fileManager.Create(transaction, rootFolder, "test.txt", false, userAuthenticationToken);
 
-      KeyService.AesPair key = await fileManager.GetKey(transaction, file, FileAccessExtent.ReadWrite, userAuthentication);
+      FileContentManager.Resource testFileContent = await fileContentManager.GetMainContent(transaction, testFile);
 
-      await fileContentDataManager.Write(transaction, file, key, fileContent, Encoding.UTF8.GetBytes("Hello World!"));
+      FileContentVersionManager.Resource[] testFileVersions = await fileContentVersionManager.List(transaction, testFileContent);
 
-      Console.WriteLine((await fileContentDataManager.Read(transaction, file, fileContent)).ToString());
+      FileContentVersionManager.Resource testFileVersion = testFileVersions[0];
+
+      KeyService.AesPair testFileKey = await fileManager.GetKey(transaction, testFile, FileAccessExtent.Full, userAuthenticationToken);
+
+      CompositeBuffer bytes = "Hello, World!";
+
+      // await fileDataManager.Write(transaction, testFile, testFileKey, testFileContent, testFileVersion, bytes);
+      // await fileDataManager.Write(transaction, testFile, testFileKey, testFileContent, testFileVersion, bytes, 1024 * 1024);
+
+      // Console.WriteLine(await fileDataManager.Read(transaction, testFile, testFileKey, testFileContent, testFileVersion, 0, bytes.Length + 1024 * 1024));
+
+      {
+        using SafeFileHandle fileHandle = File.OpenHandle("/run/media/cool/AC233/Downloads/IVE 아이브 '해야 (HEYA)' MV [07EzMbVH3QE].webm", FileMode.Open);
+        using FileStream fileStream = new(fileHandle, FileAccess.Read);
+
+        while (fileStream.Position < fileStream.Length)
+        {
+          byte[] buffer = new byte[1024 * 1024];
+          int bufferLength = await fileStream.ReadAsync(buffer);
+
+          await fileDataManager.Write(transaction, testFile, testFileKey, testFileContent, testFileVersion, CompositeBuffer.From(buffer, 0, bufferLength), fileStream.Position - bufferLength);
+        }
+      }
+
+      {
+        using SafeFileHandle fileHandle = File.OpenHandle("/run/media/cool/AC233/TEST.webm", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.RandomAccess);
+        using FileStream fileStream = new(fileHandle, FileAccess.Write);
+
+        long size = await fileDataManager.GetSize(transaction, testFile, testFileContent, testFileVersion);
+        while (fileStream.Position < size)
+        {
+          CompositeBuffer buffer = await fileDataManager.Read(transaction, testFile, testFileKey, testFileContent, testFileVersion, fileStream.Position, long.Min(1024 * 1024, size - fileStream.Position));
+
+          await fileStream.WriteAsync(buffer.ToByteArray());
+        }
+      }
     });
   });
 }

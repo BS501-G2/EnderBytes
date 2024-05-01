@@ -25,8 +25,19 @@ public sealed class FileBlobManager : ResourceManager
 
   public const string COLUMN_BUFFER = "Buffer";
 
-  public FileBlobManager(ResourceService service, string name, int version) : base(service, name, version)
+  public FileBlobManager(ResourceService service) : base(service, NAME, VERSION)
   {
+    GetManager<FileDataManager>().RegisterDeleteHandler(handler);
+    GetManager<FileDataManager>().RegisterUpdateHandler((transaction, _, old) => handler(transaction, old));
+
+    async Task handler(ResourceService.Transaction transaction, FileDataManager.Resource fileData)
+    {
+      long referenceCount = await GetManager<FileDataManager>().GetReferenceCount(transaction, fileData.BlobId);
+      if (referenceCount == 0)
+      {
+        await SqlNonQuery(transaction, $"delete from {NAME} where {COLUMN_ID} = {fileData.Id}");
+      }
+    }
   }
 
   protected override Resource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
@@ -39,7 +50,7 @@ public sealed class FileBlobManager : ResourceManager
   {
     if (oldVersion < 1)
     {
-      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_BUFFER} blob not null;");
+      await SqlNonQuery(transaction, $"alter table {NAME} add column {COLUMN_BUFFER} mediumblob not null;");
     }
   }
 

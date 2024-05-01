@@ -174,7 +174,7 @@ public sealed partial class FileManager : ResourceManager
 
     if (await Count(transaction, new WhereClause.Nested("and",
       new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", file.ParentId),
-      new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "is", null),
+      new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "=", null),
       new WhereClause.CompareColumn(COLUMN_NAME, "=", newName ?? file.Name)
     )) > 0)
     {
@@ -183,7 +183,7 @@ public sealed partial class FileManager : ResourceManager
 
       while (await Count(transaction, new WhereClause.Nested("and",
         new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", file.ParentId),
-        new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "is", null),
+        new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "=", null),
         new WhereClause.CompareColumn(COLUMN_NAME, "=", currentName())
       )) > 0)
       {
@@ -231,7 +231,7 @@ public sealed partial class FileManager : ResourceManager
 
     if (await Count(transaction, new WhereClause.Nested("and",
       new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", file.ParentId),
-      new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "is", null),
+      new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "=", null),
       new WhereClause.CompareColumn(COLUMN_NAME, "=", file.Name)
     )) > 0)
     {
@@ -240,7 +240,7 @@ public sealed partial class FileManager : ResourceManager
 
       while (await Count(transaction, new WhereClause.Nested("and",
         new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", file.ParentId),
-        new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "is", null),
+        new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "=", null),
         new WhereClause.CompareColumn(COLUMN_NAME, "=", currentName())
       )) > 0)
       {

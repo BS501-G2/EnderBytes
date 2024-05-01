@@ -15,7 +15,7 @@ public abstract partial class ResourceManager<M, R>
           continue;
         }
 
-        Add(entry.Value.Column, entry.Value.Column);
+        Add(entry.Value.Column, entry.Value.Value);
       }
     }
 

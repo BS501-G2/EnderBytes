@@ -38,6 +38,12 @@ public sealed class FileDataManager : ResourceManager
 
   public FileDataManager(ResourceService service) : base(service, NAME, VERSION)
   {
+    GetManager<FileContentVersionManager>().RegisterDeleteHandler(async (transaction, fileContentVersion) =>
+    {
+      await Delete(transaction, new WhereClause.Nested("and",
+        new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_VERSION_ID, "=", fileContentVersion.Id)
+      ));
+    });
   }
 
   protected override Resource ToResource(DbDataReader reader, long id, long createTime, long updateTime) => new(
@@ -83,11 +89,42 @@ public sealed class FileDataManager : ResourceManager
     return (fileData.Index * BUFFER_SIZE) + fileData.Size;
   }
 
-  public async Task<CompositeBuffer> Read(ResourceService.Transaction transaction, FileManager.Resource file, KeyService.AesPair fileKey, FileContentManager.Resource fileContent, FileContentVersionManager.Resource fileContentVersion, long position, long length)
+  public async Task<CompositeBuffer> Read(ResourceService.Transaction transaction, FileManager.Resource file, KeyService.AesPair fileKey, FileContentManager.Resource fileContent, FileContentVersionManager.Resource fileContentVersion, long position = 0, long? length = null)
   {
+    long maxSize = await GetSize(transaction, file, fileContent, fileContentVersion);
+    length ??= maxSize;
+
+    ArgumentOutOfRangeException.ThrowIfLessThan(position, 0, nameof(position));
+    ArgumentOutOfRangeException.ThrowIfLessThan((long)length, 0, nameof(length));
+    ArgumentOutOfRangeException.ThrowIfGreaterThan(position, maxSize, nameof(position));
+    ArgumentOutOfRangeException.ThrowIfGreaterThan(position + (long)length, maxSize, nameof(length));
+
+    long startIndex = position / BUFFER_SIZE;
+    long startIndexOffset = position % BUFFER_SIZE;
+    long endIndex = (position + (long)length + BUFFER_SIZE - 1) / BUFFER_SIZE;
+
+    CompositeBuffer bytes = [];
+
+    for (long index = startIndex; index < endIndex; index++)
+    {
+      Resource? fileData = await SelectFirst(transaction, new WhereClause.Nested("and",
+        new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
+        new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_ID, "=", fileContent.Id),
+        new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_VERSION_ID, "=", fileContentVersion.Id),
+        new WhereClause.CompareColumn(COLUMN_INDEX, "=", index)
+      ));
+
+      CompositeBuffer buffer = fileData == null
+        ? CompositeBuffer.Allocate(BUFFER_SIZE)
+        : await GetManager<FileBlobManager>().Retrieve(transaction, fileKey, fileData.BlobId);
+
+      bytes.Append(buffer);
+    }
+
+    return bytes.Slice(startIndexOffset, startIndexOffset + (long)length);
   }
 
-  public async Task Write(ResourceService.Transaction transaction, FileManager.Resource file, KeyService.AesPair fileKey, FileContentManager.Resource fileContent, FileContentVersionManager.Resource fileContentVersion, long position, CompositeBuffer bytes)
+  public async Task Write(ResourceService.Transaction transaction, FileManager.Resource file, KeyService.AesPair fileKey, FileContentManager.Resource fileContent, FileContentVersionManager.Resource fileContentVersion, CompositeBuffer bytes, long position = 0)
   {
     ArgumentOutOfRangeException.ThrowIfLessThan(position, 0, nameof(position));
 
@@ -95,6 +132,8 @@ public sealed class FileDataManager : ResourceManager
     bytes.CopyOnWrite = true;
 
     long startIndex = position / BUFFER_SIZE;
+    long startIndexOffset = position % BUFFER_SIZE;
+
     long endIndex = (position + bytes.Length + BUFFER_SIZE - 1) / BUFFER_SIZE;
 
     for (long index = startIndex; index < endIndex; index++)
@@ -110,7 +149,7 @@ public sealed class FileDataManager : ResourceManager
         ? CompositeBuffer.Allocate(BUFFER_SIZE)
         : await GetManager<FileBlobManager>().Retrieve(transaction, fileKey, fileData.BlobId);
 
-      long bufferStart = index == startIndex ? startIndex : 0;
+      long bufferStart = startIndex == index ? startIndexOffset : 0;
 
       CompositeBuffer toWrite = bytes.SpliceStart(long.Min(buffer.Length - bufferStart, bytes.Length));
       buffer.Write(bufferStart, toWrite);
@@ -136,5 +175,10 @@ public sealed class FileDataManager : ResourceManager
         ));
       }
     }
+  }
+
+  public async Task<long> GetReferenceCount(ResourceService.Transaction transaction, long blobId)
+  {
+    return await Count(transaction, new WhereClause.CompareColumn(COLUMN_FILE_BLOB_ID, "=", blobId));
   }
 }

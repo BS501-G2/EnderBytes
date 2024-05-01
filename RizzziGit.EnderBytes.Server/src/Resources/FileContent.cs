@@ -61,6 +61,8 @@ public sealed class FileContentManager : ResourceManager
         (COLUMN_FILE_ID, file.Id),
         (COLUMN_IS_MAIN, true)
       ));
+
+      await GetManager<FileContentVersionManager>().GetBaseVersion(transaction, fileContent);
     }
 
     return fileContent;
@@ -68,10 +70,14 @@ public sealed class FileContentManager : ResourceManager
 
   public async Task<Resource> Create(ResourceService.Transaction transaction, FileManager.Resource file)
   {
-    return await InsertAndGet(transaction, new(
+    Resource fileContent = await InsertAndGet(transaction, new(
       (COLUMN_FILE_ID, file.Id),
       (COLUMN_IS_MAIN, false)
     ));
+
+    await GetManager<FileContentVersionManager>().GetBaseVersion(transaction, fileContent);
+
+    return fileContent;
   }
 
   public async Task<Resource[]> List(ResourceService.Transaction transaction, FileManager.Resource file)

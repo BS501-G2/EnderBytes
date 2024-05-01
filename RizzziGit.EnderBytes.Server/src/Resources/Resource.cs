@@ -112,6 +112,7 @@ public abstract partial class ResourceManager<M, R>(ResourceService service, str
     string whereClause = where.Apply(parameterList);
 
     void log(long id) => Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{id}");
+    long count = 0;
     foreach (Func<Task> callback in (await SqlQuery(
       transaction,
       (reader) =>
@@ -134,14 +135,16 @@ public abstract partial class ResourceManager<M, R>(ResourceService service, str
           }
         });
       },
-      $"select * from {Name} where {whereClause};",
+      $"select * from {Name} where {whereClause};" +
+      $"delete from {Name} where {whereClause};",
       [.. parameterList]
     )).ToList())
     {
       await callback();
+      count++;
     }
 
-    return await SqlNonQuery(transaction, $"delete from {Name} where {whereClause};", [.. parameterList]);
+    return count;
   }
 
   protected async Task<long> Update(ResourceService.Transaction transaction, WhereClause where, SetClause set)

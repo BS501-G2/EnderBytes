@@ -4,6 +4,8 @@
 </script>
 
 <script lang="ts">
+  import Axios from 'axios'
+
   import { executeBackgroundTask } from "../BackgroundTaskList.svelte";
   import Awaiter from "../Bindings/Awaiter.svelte";
   import Button, { ButtonClass } from "../Widgets/Button.svelte";
@@ -32,7 +34,7 @@
         formData.append("content", entry, "content");
 
         const client = executeBackgroundTask<any>(
-          "File Upload",
+          `File upload: ${entry.name}`,
           true,
           async (client, setStatus) => {
             const formData = new FormData();
@@ -40,41 +42,10 @@
             formData.append("name", entry.name);
             formData.append("content", entry, "content");
 
-            await new Promise<void>((resolve, reject) => {
-              const request = new XMLHttpRequest();
+            client.dismiss()
 
-              request.upload.onprogress = (e) => {
-                setStatus(null, e.loaded / e.total);
-              };
-
-              request.onreadystatechange = () => {
-                if (request.readyState == 4) {
-                  if (request.status == 200) {
-                    setStatus("Upload complete", 100);
-                    resolve();
-                  } else {
-                    setStatus("Upload failed", null);
-                    const { error } = JSON.parse(request.responseText);
-                    console.log(JSON.parse(request.responseText));
-                    reject(new Error(`${error.name}: ${error.message}`));
-                  }
-                }
-              };
-
-              request.open(
-                "POST",
-                getApiUrl(
-                  `/file/${currentFileId != null ? `:${currentFileId}` : "!root"}/files/new-file`,
-                ),
-              );
-
-              request.setRequestHeader(
-                "Authorization",
-                `Basic ${btoa(JSON.stringify($session))}`,
-              );
-
-              setStatus(`Uploading content...`, null);
-              request.send(formData);
+            await apiFetch(`/file/${currentFileId != null ? `:${currentFileId}` : "!root"}/files/new-file`, 'POST', formData, {}, {
+              uploadProgress: (progress, total) => setStatus("Uploading file...", progress / total),
             });
           },
           false,

@@ -23,13 +23,13 @@
     </div>
     <FileDetails {selection} info={null} />
   {:else}
-    {#if info.type == 0}
+    {#if !info.isFolder}
       <div class="column">
         <ControlBar {selection} {reset} {info} />
         <FileView {selection} {reset} {info} />
       </div>
       <FileDetails selection={writable([info.current])} {info} />
-    {:else if info.type == 1}
+    {:else}
       <div class="column">
         <ControlBar {selection} {reset} {info} />
         <FileList {selection} {info} />

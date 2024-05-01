@@ -1,19 +1,19 @@
 <script lang="ts" context="module">
   export interface BaseFileBrowserInformation {
-    type: 0 | 1;
+    isFolder: boolean;
     current: any;
     pathChain: { isSharePoint: boolean; root: any; chain: any[] };
   }
 
   export interface FileBrowserFolderInformation
     extends BaseFileBrowserInformation {
-    type: 1;
+    isFolder: true;
     files: any[];
   }
 
   export interface FileBrowserFileInformation
     extends BaseFileBrowserInformation {
-    type: 0;
+    isFolder: false;
   }
 
   export type FileBrowserInformation =
@@ -27,7 +27,9 @@
   import DesktopLayout from "./FileBrowser/DesktopLayout.svelte";
   import ResponsiveLayout from "./Bindings/ResponsiveLayout.svelte";
   import FolderCreationDialog from "./FileBrowser/FolderCreationDialog.svelte";
-  import FileCreationDialog, { onUploadCompleteListeners } from "./FileBrowser/FileCreationDialog.svelte";
+  import FileCreationDialog, {
+    onUploadCompleteListeners,
+  } from "./FileBrowser/FileCreationDialog.svelte";
   import { writable, type Writable } from "svelte/store";
   import Awaiter, {
     type AwaiterResetFunction,
@@ -49,12 +51,12 @@
       apiFetch(`/file/${id}/path-chain`),
     ]);
 
-    if (current.type == 1) {
+    if (current.isFolder) {
       const files = await apiFetch(`/file/${id}/files`);
 
-      return { type: 1, current, pathChain, files };
+      return { isFolder: true, current, pathChain, files };
     } else {
-      return { type: 0, current, pathChain };
+      return { isFolder: false, current, pathChain };
     }
   }
 
@@ -67,14 +69,14 @@
   }
 
   onMount(() => {
-    $onUploadCompleteListeners.push(reset)
+    $onUploadCompleteListeners.push(reset);
   });
 
   onDestroy(() => {
-    const index = $onUploadCompleteListeners.indexOf(reset)
+    const index = $onUploadCompleteListeners.indexOf(reset);
 
     if (index >= 0) {
-      $onUploadCompleteListeners.splice(index, 1)
+      $onUploadCompleteListeners.splice(index, 1);
     }
   });
 </script>

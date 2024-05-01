@@ -60,7 +60,7 @@ public sealed class FileContentVersionManager : ResourceManager
   {
     return await SelectFirst(transaction, new WhereClause.Nested("and",
       new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_ID, "=", fileContent.Id),
-      new WhereClause.CompareColumn(COLUMN_BASE_VERSION_ID, "=", null)
+      new WhereClause.Raw($"{COLUMN_BASE_VERSION_ID} is null")
     ))  ?? await InsertAndGet(transaction, new(
       (COLUMN_FILE_CONTENT_ID, fileContent.Id),
       (COLUMN_BASE_VERSION_ID, null)

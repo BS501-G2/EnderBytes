@@ -170,6 +170,7 @@
 
           > form {
             width: 100%;
+            min-width: 0px;
             max-width: 420px;
 
             display: flex;
@@ -188,6 +189,9 @@
 
               min-width: 100%;
               max-width: 100%;
+
+              overflow-x: hidden;
+              text-wrap: nowrap;
 
               box-sizing: border-box;
 

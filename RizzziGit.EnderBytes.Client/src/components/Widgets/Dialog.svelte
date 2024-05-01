@@ -4,6 +4,8 @@
     Warning = "warning",
     Error = "error",
   }
+
+  let dialogs: object[] = [];
 </script>
 
 <script lang="ts">
@@ -14,17 +16,33 @@
   import { scale, fade } from "svelte/transition";
   import ResponsiveLayout from "../Bindings/ResponsiveLayout.svelte";
   import Overlay from "./Overlay.svelte";
+  import { onDestroy, onMount } from "svelte";
 
   const rootState = RootState.state;
 
   export let onDismiss: () => void;
   export let dialogClass: DialogClass = DialogClass.Normal;
+
+  const a = {};
+
+  onMount(() => {
+    dialogs.unshift(a);
+    dialogs = dialogs;
+  });
+
+  onDestroy(() => {
+    const index = dialogs.indexOf(a)
+    if (index > -1) {
+      dialogs.splice(index, 1)
+      dialogs = dialogs
+    }
+  });
 </script>
 
 <Overlay {onDismiss} dim={true}>
   <div
     class="dialog {dialogClass} {$rootState.isMobile ? 'mobile' : ''}"
-     transition:scale|global={{ duration: 200, start: 0.95 }}
+    transition:scale|global={{ duration: 200, start: 0.95 }}
   >
     {#if $$slots.head}
       <ResponsiveLayout>

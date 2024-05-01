@@ -218,7 +218,7 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
     foreach (Resource userAuthentication in (await Select(transaction, new WhereClause.Nested("and",
       new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)UserAuthenticationType.SessionToken),
       new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)
-    ), order: new OrderByClause(COLUMN_CREATE_TIME, OrderByClause.OrderBy.Descending))).Skip(10).ToList())
+    ), order: [new OrderByClause(COLUMN_CREATE_TIME, OrderByClause.OrderBy.Descending)])).Skip(10).ToList())
     {
       await Delete(transaction, userAuthentication);
     }
@@ -342,7 +342,7 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
     )), payloadHash);
   }
 
-  public Task<Resource[]> List(ResourceService.Transaction transaction, UserManager.Resource user, LimitClause? limitClause = null, OrderByClause? orderByClause = null) => Select(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), limitClause, orderByClause);
+  public Task<Resource[]> List(ResourceService.Transaction transaction, UserManager.Resource user, LimitClause? limitClause = null, OrderByClause[]? orderByClause = null) => Select(transaction, new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id), limitClause, orderByClause);
 
   public async Task<UserAuthenticationToken?> GetByPayload(ResourceService.Transaction transaction, UserManager.Resource user, byte[] payload, UserAuthenticationType type)
   {

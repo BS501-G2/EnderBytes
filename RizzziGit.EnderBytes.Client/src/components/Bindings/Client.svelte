@@ -1,4 +1,9 @@
 <script lang="ts" context="module">
+  import Axios, {
+    AxiosError,
+    type AxiosRequestConfig,
+    type AxiosResponse,
+  } from "axios";
   import { get, writable, type Writable } from "svelte/store";
 
   export interface Session {
@@ -11,7 +16,11 @@
     method?: string,
     data?: Blob | any,
     headers?: Record<string, string>,
-  ) => Promise<Response>;
+    options?: Partial<{
+      uploadProgress: (progress: number, total: number) => void;
+      downloadProgress: (progress: number, total: number) => void;
+    }>,
+  ) => Promise<AxiosResponse>;
 
   export type FetchAndInterpretFunction = (
     ...args: Parameters<FetchFunction>
@@ -41,13 +50,15 @@
   );
 
   export class ClientError extends Error {
-    public constructor(response: Response, message?: string) {
-      super(message ?? `Server Response: ${response.status} ${response.statusText}`);
+    public constructor(response: AxiosResponse, message?: string) {
+      super(
+        message ?? `Server Response: ${response.status} ${response.statusText}`,
+      );
 
       this.#response = response;
     }
 
-    #response: Response;
+    #response: AxiosResponse;
     public get response() {
       return this.#response;
     }
@@ -58,58 +69,86 @@
   }
 
   export async function interpretResponse(
-    response: Response,
+    response: AxiosResponse,
   ): Promise<Blob | any> {
-    const responseType = response.headers.get("Content-Type");
+    // const responseType = `${response.headers["Content-Type"]}`;
 
-    if (responseType != null && responseType.startsWith("application/json")) {
-      return await response.json();
-    } else {
-      return await response.blob();
-    }
+    // if (responseType != null && responseType.startsWith("application/json")) {
+    //   return response.data;
+    // } else {
+    //   return response.data;
+    // }
+
+    return response.data;
   }
 
-  const oldFetch = window.fetch;
   export const fetch: FetchFunction = async function fetch(
     pathname: string,
     method: string = "GET",
     data?: Blob | any,
     headers?: Record<string, string>,
-  ): Promise<Response> {
+    options?: Partial<{
+      uploadProgress: (progress: number, total: number) => void;
+      downloadProgress: (progress: number, total: number) => void;
+    }>,
+  ): Promise<AxiosResponse> {
     const session = get(sessionStore);
-    const request: RequestInit = {};
-
+    const request: AxiosRequestConfig = {};
     request.headers = structuredClone(headers ?? {});
+
     if (session != null) {
       request.headers["Authorization"] =
         `Basic ${btoa(JSON.stringify(session))}`;
     }
 
+    request.onUploadProgress = (progressEvent) => {
+      if (options?.uploadProgress != null) {
+        options.uploadProgress(progressEvent.loaded, progressEvent.total ?? 0);
+      }
+    };
+
+    request.onDownloadProgress = (progressEvent) => {
+      if (options?.downloadProgress != null) {
+        options.downloadProgress(
+          progressEvent.loaded,
+          progressEvent.total ?? 0,
+        );
+      }
+    };
+
     if (data != null) {
       if (data instanceof Blob) {
-        request.body = new Blob([data], { type: "application/octet-stream" });
+        request.headers["Content-Type"] = "application/octet-stream"
+        request.data = new Blob([data], { type: "application/octet-stream" });
       } else {
-        request.body = new Blob([JSON.stringify(data)], {
-          type: "application/json",
-        });
+        request.data = data
       }
     }
     request.method = method;
-
     const url = Object.assign(getApiUrl(), {
-      pathname: pathname,
+      pathname,
     });
 
-    const response = await oldFetch(url, request);
+    request.url = `${url}`
+
+    const response = await (async (): Promise<AxiosResponse> => {
+      try {
+        return await Axios.request(request);
+      } catch (error: any) {
+        if (error instanceof AxiosError && error.response != null) {
+          return error.response;
+        }
+
+        throw error;
+      }
+    })();
+
+    console.log(response)
 
     if (response.status === 200) {
-      if (pathname === "/auth/password-login" && request.method === "POST") {
-        const session: Session = (await response.json()).data;
-
-        Object.assign(response, { json: () => session });
-
-        sessionStore.set(session);
-      } else if (pathname === "/auth/logout" && request.method === "POST") {
+      if (url.pathname === "/auth/password-login" && request.method === "POST") {
+        sessionStore.set(response.data.data);
+      } else if (url.pathname === "/auth/logout" && request.method === "POST") {
         sessionStore.set(null);
       } else {
         return response;
@@ -127,7 +166,7 @@
     } else {
       let responseData: any;
       try {
-        responseData = await response.json();
+        responseData = response.data;
       } catch {}
 
       if (responseData != null && "error" in responseData) {

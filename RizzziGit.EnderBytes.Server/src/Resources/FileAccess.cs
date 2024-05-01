@@ -126,7 +126,7 @@ public sealed class FileAccessManager : ResourceManager
         new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id),
         new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", entry.Id),
         extent == null ? null : new WhereClause.CompareColumn(COLUMN_EXTENT, ">=", (byte)extent)
-      ), new OrderByClause(COLUMN_EXTENT, OrderByClause.OrderBy.Descending));
+      ), [new OrderByClause(COLUMN_EXTENT, OrderByClause.OrderBy.Descending)]);
 
       if (accessPoint != null)
       {

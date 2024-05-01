@@ -16,6 +16,7 @@
 		"@sveltejs/kit": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^3.0.0",
 		"@types/node": "^20.11.30",
+		"axios": "^1.6.8",
 		"flowbite-svelte": "^0.46.1",
 		"sass": "^1.70.0",
 		"svelte": "^4.2.7",

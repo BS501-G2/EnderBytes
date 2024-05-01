@@ -33,7 +33,7 @@
 
 <div class="controls">
   <div class="section left-section">
-    {#if info?.type == 1}
+    {#if info?.isFolder}
       <Button
         {buttonClass}
         {outline}
@@ -97,7 +97,7 @@
   </div>
   <div class="divider" />
   <div class="section right-section">
-    {#if file == null || file?.type === 1}
+    {#if file == null || file?.isFolder}
       <Button {buttonClass} {outline} onClick={reset} {enabled}>
         <div class="button">
           <RefreshCwIcon {size} />

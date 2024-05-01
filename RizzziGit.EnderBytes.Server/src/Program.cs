@@ -26,7 +26,7 @@ public static class Program
         AllowBatch = true,
       },
 
-      HttpClientPort: 8084,
+      HttpClientPort: 8083,
 
       KeyGeneratorThreads: 8
     ));
@@ -116,40 +116,14 @@ public static class Program
 
       FileContentVersionManager.Resource testFileVersion = testFileVersions[0];
 
-      KeyService.AesPair testFileKey = await fileManager.GetKey(transaction, testFile, FileAccessExtent.Full, userAuthenticationToken);
+      KeyService.AesPair testFileKey = await fileManager.GetKeyRequired(transaction, testFile, FileAccessExtent.Full, userAuthenticationToken);
 
       CompositeBuffer bytes = "Hello, World!";
 
-      // await fileDataManager.Write(transaction, testFile, testFileKey, testFileContent, testFileVersion, bytes);
-      // await fileDataManager.Write(transaction, testFile, testFileKey, testFileContent, testFileVersion, bytes, 1024 * 1024);
+      await fileDataManager.Write(transaction, testFile, testFileKey, testFileContent, testFileVersion, bytes);
+      await fileDataManager.Write(transaction, testFile, testFileKey, testFileContent, testFileVersion, bytes, 1024 * 1024);
 
-      // Console.WriteLine(await fileDataManager.Read(transaction, testFile, testFileKey, testFileContent, testFileVersion, 0, bytes.Length + 1024 * 1024));
-
-      {
-        using SafeFileHandle fileHandle = File.OpenHandle("/run/media/cool/AC233/Downloads/IVE 아이브 '해야 (HEYA)' MV [07EzMbVH3QE].webm", FileMode.Open);
-        using FileStream fileStream = new(fileHandle, FileAccess.Read);
-
-        while (fileStream.Position < fileStream.Length)
-        {
-          byte[] buffer = new byte[1024 * 1024];
-          int bufferLength = await fileStream.ReadAsync(buffer);
-
-          await fileDataManager.Write(transaction, testFile, testFileKey, testFileContent, testFileVersion, CompositeBuffer.From(buffer, 0, bufferLength), fileStream.Position - bufferLength);
-        }
-      }
-
-      {
-        using SafeFileHandle fileHandle = File.OpenHandle("/run/media/cool/AC233/TEST.webm", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.RandomAccess);
-        using FileStream fileStream = new(fileHandle, FileAccess.Write);
-
-        long size = await fileDataManager.GetSize(transaction, testFile, testFileContent, testFileVersion);
-        while (fileStream.Position < size)
-        {
-          CompositeBuffer buffer = await fileDataManager.Read(transaction, testFile, testFileKey, testFileContent, testFileVersion, fileStream.Position, long.Min(1024 * 1024, size - fileStream.Position));
-
-          await fileStream.WriteAsync(buffer.ToByteArray());
-        }
-      }
+      Console.WriteLine(await fileDataManager.Read(transaction, testFile, testFileKey, testFileContent, testFileVersion, 0, bytes.Length + 1024 * 1024));
     });
   });
 }

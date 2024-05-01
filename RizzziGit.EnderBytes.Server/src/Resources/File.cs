@@ -14,13 +14,13 @@ public sealed partial class FileManager : ResourceManager
   public const string NAME = "File";
   public const int VERSION = 1;
 
-  private const string COLUMN_TRASH_TIME = "TrashTime";
-  private const string COLUMN_DOMAIN_USER_ID = "DomainUserId";
-  private const string COLUMN_AUTHOR_USER_ID = "AuthorUserId";
-  private const string COLUMN_PARENT_ID = "ParentId";
-  private const string COLUMN_NAME = "Name";
-  private const string COLUMN_IS_FOLDER = "IsFolder";
-  private const string COLUMN_AES_KEY = "AesKey";
+  public const string COLUMN_TRASH_TIME = "TrashTime";
+  public const string COLUMN_DOMAIN_USER_ID = "DomainUserId";
+  public const string COLUMN_AUTHOR_USER_ID = "AuthorUserId";
+  public const string COLUMN_PARENT_ID = "ParentId";
+  public const string COLUMN_NAME = "Name";
+  public const string COLUMN_IS_FOLDER = "IsFolder";
+  public const string COLUMN_AES_KEY = "AesKey";
 
   public new sealed record Resource(
     long Id,
@@ -151,7 +151,7 @@ public sealed partial class FileManager : ResourceManager
       (COLUMN_PARENT_ID, parentFolder.Id),
       (COLUMN_NAME, await ThrowIfInvalidName(transaction, parentFolder, name)),
       (COLUMN_IS_FOLDER, isFolder),
-      (COLUMN_AES_KEY, (await GetKey(transaction, parentFolder, FileAccessExtent.ReadWrite, userAuthenticationToken)).Encrypt(newKey.Serialize()))
+      (COLUMN_AES_KEY, (await GetKeyRequired(transaction, parentFolder, FileAccessExtent.ReadWrite, userAuthenticationToken)).Encrypt(newKey.Serialize()))
     ));
   }
 
@@ -164,8 +164,8 @@ public sealed partial class FileManager : ResourceManager
 
     Resource[] pathChain = await PathChain(transaction, newParent);
     Resource oldParent = pathChain[^1];
-    KeyService.AesPair oldParentKey = await GetKey(transaction, file, FileAccessExtent.ReadWrite, userAuthenticationToken);
-    KeyService.AesPair newParentKey = await GetKey(transaction, newParent, FileAccessExtent.ReadWrite, userAuthenticationToken);
+    KeyService.AesPair oldParentKey = await GetKeyRequired(transaction, file, FileAccessExtent.ReadWrite, userAuthenticationToken);
+    KeyService.AesPair newParentKey = await GetKeyRequired(transaction, newParent, FileAccessExtent.ReadWrite, userAuthenticationToken);
 
     if (file.Id == newParent.Id || pathChain.Any((fileTest) => fileTest.Id == file.Id))
     {
@@ -174,7 +174,7 @@ public sealed partial class FileManager : ResourceManager
 
     if (await Count(transaction, new WhereClause.Nested("and",
       new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", file.ParentId),
-      new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "=", null),
+      new WhereClause.Raw($"{COLUMN_TRASH_TIME} is null"),
       new WhereClause.CompareColumn(COLUMN_NAME, "=", newName ?? file.Name)
     )) > 0)
     {
@@ -183,7 +183,7 @@ public sealed partial class FileManager : ResourceManager
 
       while (await Count(transaction, new WhereClause.Nested("and",
         new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", file.ParentId),
-        new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "=", null),
+      new WhereClause.Raw($"{COLUMN_TRASH_TIME} is null"),
         new WhereClause.CompareColumn(COLUMN_NAME, "=", currentName())
       )) > 0)
       {
@@ -204,17 +204,7 @@ public sealed partial class FileManager : ResourceManager
     ));
   }
 
-  public async Task<Resource[]> List(ResourceService.Transaction transaction, Resource folder, LimitClause? limitClause = null, OrderByClause? orderByClause = null)
-  {
-    if (!folder.IsFolder)
-    {
-      throw new NotAFolderException(folder);
-    }
-
-    return await Select(transaction, new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", folder.Id), limitClause, orderByClause);
-  }
-
-  public async Task<bool> ListTrashed(ResourceService.Transaction transaction, UserManager.Resource user, LimitClause? limitClause = null, OrderByClause? orderByClause = null)
+  public async Task<bool> ListTrashed(ResourceService.Transaction transaction, UserManager.Resource user, LimitClause? limitClause = null, OrderByClause[]? orderByClause = null)
   {
     return (await Select(transaction, new WhereClause.Nested("and",
       new WhereClause.CompareColumn(COLUMN_DOMAIN_USER_ID, "=", user.Id),
@@ -231,7 +221,7 @@ public sealed partial class FileManager : ResourceManager
 
     if (await Count(transaction, new WhereClause.Nested("and",
       new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", file.ParentId),
-      new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "=", null),
+      new WhereClause.Raw($"{COLUMN_TRASH_TIME} is null"),
       new WhereClause.CompareColumn(COLUMN_NAME, "=", file.Name)
     )) > 0)
     {
@@ -240,7 +230,7 @@ public sealed partial class FileManager : ResourceManager
 
       while (await Count(transaction, new WhereClause.Nested("and",
         new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", file.ParentId),
-        new WhereClause.CompareColumn(COLUMN_TRASH_TIME, "=", null),
+      new WhereClause.Raw($"{COLUMN_TRASH_TIME} is null"),
         new WhereClause.CompareColumn(COLUMN_NAME, "=", currentName())
       )) > 0)
       {
@@ -275,7 +265,41 @@ public sealed partial class FileManager : ResourceManager
     ));
   }
 
-  public async Task<KeyService.AesPair> GetKey(ResourceService.Transaction transaction, Resource file, FileAccessExtent fileAccessExtent, UserAuthenticationToken userAuthenticationToken)
+  public async Task<bool> TestAccess(ResourceService.Transaction transaction, Resource file, FileAccessExtent fileAccessExtent, UserAuthenticationToken userAuthenticationToken)
+  {
+    try
+    {
+      await GetKey(transaction, file, fileAccessExtent, userAuthenticationToken);
+      return true;
+    }
+    catch
+    {
+      return false;
+    }
+  }
+
+  public async Task<KeyService.AesPair> GetKeyRequired(ResourceService.Transaction transaction, Resource file, FileAccessExtent fileAccessExtent, UserAuthenticationToken userAuthenticationToken)
+  {
+    return await GetKey(transaction, file, fileAccessExtent, userAuthenticationToken) ?? throw new InvalidAccessException(file, userAuthenticationToken.User);
+  }
+
+  public async Task<Resource[]> ScanFolder(ResourceService.Transaction transaction, Resource folder, UserAuthenticationToken userAuthenticationToken, LimitClause? limitClause = null, OrderByClause[]? orderByClause = null)
+  {
+    if (!folder.IsFolder)
+    {
+      throw new NotAFolderException(folder);
+    }
+
+    await GetKey(transaction, folder, FileAccessExtent.ReadOnly, userAuthenticationToken);
+
+    return await Select(transaction, new WhereClause.Nested("and",
+      new WhereClause.CompareColumn(COLUMN_DOMAIN_USER_ID, "=", userAuthenticationToken.UserId),
+      new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", folder.Id),
+      new WhereClause.Raw($"{COLUMN_TRASH_TIME} is null")
+    ), limitClause, orderByClause);
+  }
+
+  public async Task<KeyService.AesPair?> GetKey(ResourceService.Transaction transaction, Resource file, FileAccessExtent fileAccessExtent, UserAuthenticationToken userAuthenticationToken)
   {
     if (file.DomainUserId == userAuthenticationToken.UserId)
     {
@@ -323,7 +347,7 @@ public sealed partial class FileManager : ResourceManager
         }
       }
 
-      throw new InvalidAccessException(file, userAuthenticationToken.User);
+      return null;
     }
   }
 }

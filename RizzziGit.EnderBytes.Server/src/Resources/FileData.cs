@@ -24,7 +24,7 @@ public sealed class FileDataManager : ResourceManager
     long Size
   ) : ResourceManager.Resource(Id, CreateTime, UpdateTime);
 
-  public const int BUFFER_SIZE = 1024 * 1024;
+  public const int BUFFER_SIZE = 1024 * 32;
 
   public const string NAME = "FileData";
   public const int VERSION = 1;
@@ -136,30 +136,48 @@ public sealed class FileDataManager : ResourceManager
 
     long endIndex = (position + bytes.Length + BUFFER_SIZE - 1) / BUFFER_SIZE;
 
-    for (long index = startIndex; index < endIndex; index++)
+    List<(long BlobId, long Index, Resource? FileData, long BufferStart, long ToWriteLength)> fileBlobMap = [];
+
     {
-      Resource? fileData = await SelectFirst(transaction, new WhereClause.Nested("and",
-        new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
-        new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_ID, "=", fileContent.Id),
-        new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_VERSION_ID, "=", fileContentVersion.Id),
-        new WhereClause.CompareColumn(COLUMN_INDEX, "=", index)
-      ));
+      List<(Resource? FileData, long Index)> fileDataMap = [];
 
-      CompositeBuffer buffer = fileData == null
-        ? CompositeBuffer.Allocate(BUFFER_SIZE)
-        : await GetManager<FileBlobManager>().Retrieve(transaction, fileKey, fileData.BlobId);
+      for (long index = startIndex; index < endIndex; index++)
+      {
+        Resource? fileData = await SelectFirst(transaction, new WhereClause.Nested("and",
+          new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id),
+          new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_ID, "=", fileContent.Id),
+          new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_VERSION_ID, "=", fileContentVersion.Id),
+          new WhereClause.CompareColumn(COLUMN_INDEX, "=", index)
+        ));
 
-      long bufferStart = startIndex == index ? startIndexOffset : 0;
+        fileDataMap.Add((fileData, index));
+      }
 
-      CompositeBuffer toWrite = bytes.SpliceStart(long.Min(buffer.Length - bufferStart, bytes.Length));
-      buffer.Write(bufferStart, toWrite);
+      for (long index = startIndex; index < endIndex; index++)
+      {
+        Resource? fileData = fileDataMap.Where((mapEntry) => mapEntry.Index == index).Select((e) => e.FileData).FirstOrDefault();
 
-      long newBlobId = await GetManager<FileBlobManager>().Store(transaction, fileKey, buffer.ToByteArray());
+        CompositeBuffer buffer = fileData == null
+          ? CompositeBuffer.Allocate(BUFFER_SIZE)
+          : await GetManager<FileBlobManager>().Retrieve(transaction, fileKey, fileData.BlobId);
 
+        long bufferStart = startIndex == index ? startIndexOffset : 0;
+
+        CompositeBuffer toWrite = bytes.SpliceStart(long.Min(buffer.Length - bufferStart, bytes.Length));
+        buffer.Write(bufferStart, toWrite);
+
+        long newBlobId = await GetManager<FileBlobManager>().Store(transaction, fileKey, buffer.ToByteArray());
+
+        fileBlobMap.Add((newBlobId, index, fileData, bufferStart, toWrite.Length));
+      }
+    }
+
+    foreach ((long newBlobId, long index, Resource? fileData, long bufferStart, long toWriteLength) in fileBlobMap)
+    {
       if (fileData != null)
       {
         await Update(transaction, fileData, new(
-          (COLUMN_SIZE, long.Max(bufferStart + toWrite.Length, fileData.Size)),
+          (COLUMN_SIZE, long.Max(bufferStart + toWriteLength, fileData.Size)),
           (COLUMN_FILE_BLOB_ID, newBlobId)
         ));
       }
@@ -170,7 +188,7 @@ public sealed class FileDataManager : ResourceManager
           (COLUMN_FILE_CONTENT_ID, fileContent.Id),
           (COLUMN_FILE_CONTENT_VERSION_ID, fileContentVersion.Id),
           (COLUMN_INDEX, index),
-          (COLUMN_SIZE, bufferStart + toWrite.Length),
+          (COLUMN_SIZE, bufferStart + toWriteLength),
           (COLUMN_FILE_BLOB_ID, newBlobId)
         ));
       }

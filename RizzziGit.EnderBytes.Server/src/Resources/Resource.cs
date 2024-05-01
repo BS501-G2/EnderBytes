@@ -63,8 +63,8 @@ public abstract partial class ResourceManager<M, R>(ResourceService service, str
     )) ?? 0);
   }
 
-  protected async Task<R?> SelectFirst(ResourceService.Transaction transaction, WhereClause? where = null, OrderByClause? order = null) => await SelectOne(transaction, where, 0, order);
-  protected async Task<R?> SelectOne(ResourceService.Transaction transaction, WhereClause? where = null, long? offset = null, OrderByClause? order = null)
+  protected async Task<R?> SelectFirst(ResourceService.Transaction transaction, WhereClause? where = null, OrderByClause[]? order = null) => await SelectOne(transaction, where, 0, order);
+  protected async Task<R?> SelectOne(ResourceService.Transaction transaction, WhereClause? where = null, long? offset = null, OrderByClause[]? order = null)
   {
     foreach (R resource in await Select(transaction, where, new(1, offset), order))
     {
@@ -74,7 +74,7 @@ public abstract partial class ResourceManager<M, R>(ResourceService service, str
     return null;
   }
 
-  protected async Task<R[]> Select(ResourceService.Transaction transaction, WhereClause? where = null, LimitClause? limit = null, OrderByClause? order = null)
+  protected async Task<R[]> Select(ResourceService.Transaction transaction, WhereClause? where = null, LimitClause? limit = null, OrderByClause[]? order = null)
   {
 
     List<object?> parameterList = [];
@@ -82,7 +82,7 @@ public abstract partial class ResourceManager<M, R>(ResourceService service, str
     return (await SqlQuery(
       transaction,
       (reader) => Task.FromResult(ToResource(reader)),
-      $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")}{(order != null ? $" order by {order.Apply()}" : "")};",
+      $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")}{(order != null ? $" order by {string.Join(", ", order.Select((clause) => clause.Apply()))}" : "")};",
       [.. parameterList]
     )).Select((resource) =>
     {

@@ -43,9 +43,9 @@
     </div>
     <div class="base">
       <div class="file-preview">
-        {#if file.type === 1}
+        {#if file.isFolder}
           <FolderIcon size="100%" strokeWidth={0.5} />
-        {:else if file.type === 0}
+        {:else}
           <img class="file-preview" src="/favicon.svg" alt="asd" />
         {/if}
       </div>

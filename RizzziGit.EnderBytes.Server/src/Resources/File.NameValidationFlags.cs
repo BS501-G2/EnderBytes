@@ -14,7 +14,7 @@ public enum FileNameVaildationFlag
 
 public sealed partial class FileManager
 {
-  public sealed class InvalidNameException(Resource folder, string name, FileNameVaildationFlag flag) : Exception($"Invalid name: {name}. Flag {flag}")
+  public sealed class InvalidNameException(Resource folder, string name, FileNameVaildationFlag flag) : Exception($"Invalid name: '{name}'. Flag {flag}")
   {
     public readonly Resource Folder = folder;
     public readonly string Name = name;
@@ -32,7 +32,9 @@ public sealed partial class FileManager
 
     if (await Count(transaction, new WhereClause.Nested("and",
       new WhereClause.CompareColumn(COLUMN_DOMAIN_USER_ID, "=", parentFolder.AuthorUserId),
-      new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", parentFolder.Id)
+      new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", parentFolder.Id),
+      new WhereClause.CompareColumn(COLUMN_NAME, "=", name),
+      new WhereClause.Raw($"{COLUMN_TRASH_TIME} is null")
     )) > 0)
     {
       flag |= FileNameVaildationFlag.NameInUse;

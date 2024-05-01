@@ -6,11 +6,25 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 namespace RizzziGit.EnderBytes.Web;
 
 using Core;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Resources;
 using Services;
 
+public sealed class A : ResultFilterAttribute
+{
+  public override void OnResultExecuting(ResultExecutingContext context)
+  {
+    if (context.Result is BadRequestResult badRequestResult && context.Controller is WebApi webApi)
+    {
+      context.Result = webApi.StatusCode(badRequestResult.StatusCode, webApi.Error(webApi.HttpContext.RequestServices.GetRequiredService<IHostEnvironment>()));
+    }
+  }
+}
+
+[A]
 [ApiController]
-[RequestSizeLimit(1024 * 1024 * 256)]
+[RequestSizeLimit(1024 * 1024 * 512)]
+[RequestFormLimits(ValueLengthLimit = 1024 * 1024 * 512, MultipartBodyLengthLimit = 1024 * 1024 * 512)]
 [Route("/[controller]")]
 public sealed partial class WebApi(WebApiContext context, Server server) : ControllerBase
 {
@@ -34,7 +48,7 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
         Type = type,
       };
 
-    return StatusCode(500, Error(500, problemDetails));
+    return StatusCode(statusCode ?? 500, Error((ushort)(statusCode ?? 500), problemDetails));
   }
 
   public override ActionResult ValidationProblem(string? detail = null, string? instance = null, int? statusCode = null, string? title = null, string? type = null, [ActionResultObjectValue] ModelStateDictionary? modelStateDictionary = null)
@@ -58,7 +72,7 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
         Type = type,
       };
 
-    return StatusCode(400, Error(400, validationProblemDetails));
+    return StatusCode(statusCode ?? 500, Error((ushort)(statusCode ?? 500), validationProblemDetails));
   }
 
   public readonly WebApiContext ApiContext = context;
@@ -156,7 +170,7 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
         RunFlag++;
         try
         {
-          if (CurrentTransaction.Optional() != null)
+          if (CurrentTransaction.Optional() == null)
           {
             return await ResourceService.Transact(async (transaction) =>
             {
@@ -196,6 +210,8 @@ public sealed partial class WebApi(WebApiContext context, Server server) : Contr
 
     ResourceService.ResourceManager.ConstraintException or
     ResourceService.ResourceManager.NoMatchException => Error(400, exception),
+
+    FileManager.InvalidAccessException => Error(403, exception),
 
     _ => Error(exception),
   };

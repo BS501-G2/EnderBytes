@@ -25,7 +25,7 @@
           : ''}"
       >
         <NavigationBar />
-        <div class="divider" />
+          <div class="divider"></div>
       </div>
 
       <div

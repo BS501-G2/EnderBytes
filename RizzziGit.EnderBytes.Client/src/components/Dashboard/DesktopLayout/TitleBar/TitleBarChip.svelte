@@ -11,7 +11,7 @@
     margin: 8px 0px 8px 0px;
 
     border-style: none;
-    border-radius: 0.5em;
+    border-radius: 8px;
 
     color: var(--onPrimaryContainer);
 

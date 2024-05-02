@@ -19,7 +19,7 @@
   {#if info == null}
     <div class="column">
       <ControlBar {selection} {reset} {info} />
-      <FileList {selection} {info} />
+      <FileList {selection} {reset} {info} />
     </div>
     <FileDetails {selection} info={null} />
   {:else}
@@ -31,7 +31,7 @@
     {:else}
       <div class="column">
         <ControlBar {selection} {reset} {info} />
-        <FileList {selection} {info} />
+        <FileList {selection} {reset} {info} />
       </div>
       <FileDetails {selection} {info} />
     {/if}

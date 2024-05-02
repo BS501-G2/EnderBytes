@@ -76,13 +76,12 @@ public abstract partial class ResourceManager<M, R>(ResourceService service, str
 
   protected async Task<R[]> Select(ResourceService.Transaction transaction, WhereClause? where = null, LimitClause? limit = null, OrderByClause[]? order = null)
   {
-
     List<object?> parameterList = [];
 
     return (await SqlQuery(
       transaction,
       (reader) => Task.FromResult(ToResource(reader)),
-      $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")}{(order != null ? $" order by {string.Join(", ", order.Select((clause) => clause.Apply()))}" : "")};",
+      $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(order != null ? $" order by {string.Join(", ", order.Select((clause) => clause.Apply()))}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")};",
       [.. parameterList]
     )).Select((resource) =>
     {
@@ -95,14 +94,13 @@ public abstract partial class ResourceManager<M, R>(ResourceService service, str
   protected async Task<bool> Exists(ResourceService.Transaction transaction, WhereClause? where = null) => await Count(transaction, where) > 0;
   protected async Task<long> Count(ResourceService.Transaction transaction, WhereClause? where = null)
   {
-
     List<object?> parameterList = [];
 
-    return (long)(await SqlScalar(
+    return (long?)await SqlScalar(
       transaction,
       $"select count(*) from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")};",
       [.. parameterList]
-    ))!;
+    ) ?? 0;
   }
 
   protected async Task<long> Delete(ResourceService.Transaction transaction, WhereClause where)

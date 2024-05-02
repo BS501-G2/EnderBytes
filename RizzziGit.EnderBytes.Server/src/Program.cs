@@ -102,28 +102,21 @@ public static class Program
       FileContentManager fileContentManager = transaction.GetManager<FileContentManager>();
       FileContentVersionManager fileContentVersionManager = transaction.GetManager<FileContentVersionManager>();
       FileDataManager fileDataManager = transaction.GetManager<FileDataManager>();
+      FileAccessManager fileAccessManager = transaction.GetManager<FileAccessManager>();
 
       (UserManager.Resource user, UserAuthenticationToken userAuthenticationToken) = await userManager.Create(transaction, "testuser", "Rection", "Hugh", "G", "TestTest123;");
       Handlers.Add(async (transaction) => await userManager.Delete(transaction, user));
 
+      (UserManager.Resource otherUser, UserAuthenticationToken otherUserAuthenticationToken) = await userManager.Create(transaction, "testuser2", "Rection", "Hugh", "G", "TestTest123;");
+      Handlers.Add(async (transaction) => await userManager.Delete(transaction, otherUser));
+
       FileManager.Resource rootFolder = await fileManager.GetRootFromUser(transaction, userAuthenticationToken);
 
-      FileManager.Resource testFile = await fileManager.Create(transaction, rootFolder, "test.txt", false, userAuthenticationToken);
+      (FileManager.Resource readWriteFolder, KeyService.AesPair readWriteFolderKey) = await fileManager.Create(transaction, rootFolder, "Read-Write Folder", true, userAuthenticationToken);
+      (FileManager.Resource readOnlyFolder, KeyService.AesPair readOnlyFolderKey) = await fileManager.Create(transaction, rootFolder, "Read-Only Folder", true, userAuthenticationToken);
 
-      FileContentManager.Resource testFileContent = await fileContentManager.GetMainContent(transaction, testFile);
-
-      FileContentVersionManager.Resource[] testFileVersions = await fileContentVersionManager.List(transaction, testFileContent);
-
-      FileContentVersionManager.Resource testFileVersion = testFileVersions[0];
-
-      KeyService.AesPair testFileKey = await fileManager.GetKeyRequired(transaction, testFile, FileAccessExtent.Full, userAuthenticationToken);
-
-      CompositeBuffer bytes = "Hello, World!";
-
-      await fileDataManager.Write(transaction, testFile, testFileKey, testFileContent, testFileVersion, bytes);
-      await fileDataManager.Write(transaction, testFile, testFileKey, testFileContent, testFileVersion, bytes, 1024 * 1024);
-
-      Console.WriteLine(await fileDataManager.Read(transaction, testFile, testFileKey, testFileContent, testFileVersion, 0, bytes.Length + 1024 * 1024));
+      await fileAccessManager.GrantUser(transaction, readWriteFolder, otherUser, readOnlyFolderKey, FileAccessExtent.ReadWrite);
+      await fileAccessManager.GrantUser(transaction, readOnlyFolder, otherUser, readOnlyFolderKey, FileAccessExtent.ReadOnly);
     });
   });
 }

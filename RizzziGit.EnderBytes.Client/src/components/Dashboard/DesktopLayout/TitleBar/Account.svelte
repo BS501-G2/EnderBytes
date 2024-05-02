@@ -48,7 +48,7 @@
       <button on:click={() => onClick(() => ($appSettingsDialog = true))}>
         App Settings
       </button>
-      <div class="divider" />
+          <div class="divider"></div>
       <button
         class="logout"
         on:click={() => onClick(() => ($logoutConfirmationDialog = true))}

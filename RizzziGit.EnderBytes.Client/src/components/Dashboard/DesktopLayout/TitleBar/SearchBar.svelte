@@ -98,10 +98,6 @@
       height: 100%;
       box-sizing: border-box;
 
-      // @media only screen and (max-width: 960px) {
-      //   max-width: 100%;
-      // }
-
       margin: 0px auto 0px auto;
 
       background-color: white;
@@ -150,13 +146,6 @@
           color: var(--primary);
 
           font-style: italic;
-        }
-
-        > input:focus,
-        > input:active {
-          div.search {
-            border-color: white;
-          }
         }
       }
     }

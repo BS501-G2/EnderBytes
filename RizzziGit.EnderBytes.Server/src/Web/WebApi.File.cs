@@ -70,7 +70,6 @@ public partial class WebApi
         }
 
         FileManager.Resource fileAccessPointRoot = await fileManager.GetByRequiredId(CurrentTransaction, fileAccessPoint.AccessPoint.TargetFileId);
-
         return Data(new GetPathChainResponse(fileAccessPointRoot, fileAccessPoint.PathChain, true));
       }
 
@@ -105,6 +104,8 @@ public partial class WebApi
     });
   }
 
+  public sealed record NewFileNameValidationRequest(string Name);
+
   public sealed record NewFileNameValidationResponse(
     bool HasIllegalCharacters,
     bool HasIllegalLength,
@@ -113,7 +114,8 @@ public partial class WebApi
 
   [Route("~/file/!root/files/new-name-validation")]
   [Route("~/file/:{fileId}/files/new-name-validation")]
-  public async Task<ObjectResult> NewFileNameValidation(long? fileId, string name)
+  [HttpPost]
+  public async Task<ObjectResult> NewFileNameValidation(long? fileId, [FromBody] NewFileNameValidationRequest request)
   {
     ObjectResult fileResult = await GetFileById(fileId);
     if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
@@ -123,7 +125,7 @@ public partial class WebApi
 
     return await Run(async () =>
     {
-      FileNameVaildationFlag fileNameVaildationFlag = await GetResourceManager<FileManager>().ValidateName(CurrentTransaction, file, name);
+      FileNameVaildationFlag fileNameVaildationFlag = await GetResourceManager<FileManager>().ValidateName(CurrentTransaction, file, request.Name);
 
       return Data<NewFileNameValidationResponse>(new(
         fileNameVaildationFlag.HasFlag(FileNameVaildationFlag.HasIllegalCharacters),
@@ -163,8 +165,7 @@ public partial class WebApi
         return Error(403);
       }
 
-      FileManager.Resource file = await fileManager.Create(CurrentTransaction, parentFolder, request.Name, false, CurrentUserAuthenticationToken);
-      KeyService.AesPair fileKey = await fileManager.GetKeyRequired(CurrentTransaction, file, FileAccessExtent.ReadWrite, CurrentUserAuthenticationToken);
+      (FileManager.Resource file, KeyService.AesPair fileKey) = await fileManager.Create(CurrentTransaction, parentFolder, request.Name, false, CurrentUserAuthenticationToken);
       FileContentManager.Resource fileContent = await fileContentManager.GetMainContent(CurrentTransaction, file);
       FileContentVersionManager.Resource fileContentVersion = await fileContentVersionManager.GetBaseVersion(CurrentTransaction,  fileContent);
 
@@ -173,7 +174,7 @@ public partial class WebApi
         while (fileStream.Position < fileStream.Length)
         {
           byte[] buffer = new byte[1024 * 32];
-          int bufferLength = await fileStream.ReadAsync(buffer, 0, buffer.Length);
+          int bufferLength = await fileStream.ReadAsync(buffer);
 
           await fileDataManager.Write(CurrentTransaction, file, fileKey, fileContent, fileContentVersion, CompositeBuffer.From(buffer, 0, bufferLength), fileStream.Position - bufferLength);
         }

@@ -1,14 +1,12 @@
 <script>
-
-  import { ImageIcon, MoreHorizontalIcon } from "svelte-feather-icons";
-
+	import { ImageIcon, MoreHorizontalIcon } from 'svelte-feather-icons';
 </script>
 
 <svelte:head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width">
-  <title>Recycle Bin</title>
-  <style>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width" />
+	<title>Recycle Bin</title>
+	<style>
       body{
         background-color: --onPrimary;
         margin:0px;23
@@ -129,7 +127,7 @@
       .fileIconImg,.moreIconImg{
         width: 30px;
       }
-      
+
       @media only screen and (max-width: 1024){
         body,html{
           width: 100%;
@@ -278,294 +276,294 @@
           width: 25px;
         }
       }
-    </style>
+	</style>
 </svelte:head>
-<body>
-  <div class="recycle-browser">
 
-      <div class="searchBarTitle">
+<div class="recycle-browser">
+	<div class="searchBarTitle">
+		<div class="titleContainer">
+			<p class="title">Recycle Files</p>
+		</div>
+	</div>
+	<div class="recycle-section">
+		<div class="recycle-column">
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+			<div class="files">
+				<div class="fileIcon"><ImageIcon size="90%" /></div>
+				<div class="fileName">fileNamePlaceholder</div>
+				<div class="fileType">fileTypePlaceholder</div>
+				<div class="fileSize">fileSizePlaceholder</div>
+				<div class="moreIcon"><MoreHorizontalIcon /></div>
+			</div>
+		</div>
 
-        <div class="titleContainer">
-          <p class="title">Recycle Files</p>
-        </div>
-      </div>
-        <div class="recycle-section">
-          <div class="recycle-column">
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-            <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-              <div class="files">
-              <div class="fileIcon"><ImageIcon size="90%"/></div>
-              <div class="fileName">fileNamePlaceholder</div>
-              <div class="fileType">fileTypePlaceholder</div>
-              <div class="fileSize">fileSizePlaceholder</div>
-              <div class="moreIcon"><MoreHorizontalIcon/></div>
-            </div>
-          </div>
-
-          <div class="recycle-preview">
-              <div class="recycle-preview-icon">
-                  <div class="previewIcon"><img src="https://cdn4.iconfinder.com/data/icons/ionicons/512/icon-image-512.png" width="80%"></div>
-              </div>
-            <div class="recycle-preview-info">
-              <div class="previewFileName">fileNamePlaceholder</div>
-              <div class="previewfileType">fileTypePlaceholder</div>
-              <div class="previewFileSize">fileSizePlaceholder</div>
-              <div class="previewFileDate">00/00/0000</div>
-            </div>
-
-          </div>
-
-        </div>
-
-    </div>
-</body>
+		<div class="recycle-preview">
+			<div class="recycle-preview-icon">
+				<div class="previewIcon">
+					<img
+						src="https://cdn4.iconfinder.com/data/icons/ionicons/512/icon-image-512.png"
+						width="80%"
+						alt="Test"
+					/>
+				</div>
+			</div>
+			<div class="recycle-preview-info">
+				<div class="previewFileName">fileNamePlaceholder</div>
+				<div class="previewfileType">fileTypePlaceholder</div>
+				<div class="previewFileSize">fileSizePlaceholder</div>
+				<div class="previewFileDate">00/00/0000</div>
+			</div>
+		</div>
+	</div>
+</div>

@@ -7,7 +7,8 @@ using Utilities;
 using Services;
 
 using ResourceManager = ResourceManager<FileManager, FileManager.Resource>;
-using MongoDB.Driver.Linq;
+
+public sealed record FileCreationResult(FileManager.Resource File, KeyService.AesPair FileKey);
 
 public sealed partial class FileManager : ResourceManager
 {
@@ -136,7 +137,7 @@ public sealed partial class FileManager : ResourceManager
     return [.. files];
   }
 
-  public async Task<Resource> Create(ResourceService.Transaction transaction, Resource parentFolder, string name, bool isFolder, UserAuthenticationToken userAuthenticationToken)
+  public async Task<FileCreationResult> Create(ResourceService.Transaction transaction, Resource parentFolder, string name, bool isFolder, UserAuthenticationToken userAuthenticationToken)
   {
     if (!parentFolder.IsFolder)
     {
@@ -144,15 +145,16 @@ public sealed partial class FileManager : ResourceManager
     }
 
     KeyService.AesPair newKey = Service.Server.KeyService.GetNewAesPair();
-
-    return await InsertAndGet(transaction, new(
-      (COLUMN_DOMAIN_USER_ID, userAuthenticationToken.UserId),
+    Resource file = await InsertAndGet(transaction, new(
+      (COLUMN_DOMAIN_USER_ID, parentFolder.DomainUserId),
       (COLUMN_AUTHOR_USER_ID, userAuthenticationToken.UserId),
       (COLUMN_PARENT_ID, parentFolder.Id),
       (COLUMN_NAME, await ThrowIfInvalidName(transaction, parentFolder, name)),
       (COLUMN_IS_FOLDER, isFolder),
       (COLUMN_AES_KEY, (await GetKeyRequired(transaction, parentFolder, FileAccessExtent.ReadWrite, userAuthenticationToken)).Encrypt(newKey.Serialize()))
     ));
+
+    return new(file, newKey);
   }
 
   public async Task<bool> Move(ResourceService.Transaction transaction, Resource file, Resource newParent, string? newName, UserAuthenticationToken userAuthenticationToken)
@@ -267,15 +269,7 @@ public sealed partial class FileManager : ResourceManager
 
   public async Task<bool> TestAccess(ResourceService.Transaction transaction, Resource file, FileAccessExtent fileAccessExtent, UserAuthenticationToken userAuthenticationToken)
   {
-    try
-    {
-      await GetKey(transaction, file, fileAccessExtent, userAuthenticationToken);
-      return true;
-    }
-    catch
-    {
-      return false;
-    }
+    return await GetKey(transaction, file, fileAccessExtent, userAuthenticationToken) != null;
   }
 
   public async Task<KeyService.AesPair> GetKeyRequired(ResourceService.Transaction transaction, Resource file, FileAccessExtent fileAccessExtent, UserAuthenticationToken userAuthenticationToken)
@@ -293,7 +287,7 @@ public sealed partial class FileManager : ResourceManager
     await GetKey(transaction, folder, FileAccessExtent.ReadOnly, userAuthenticationToken);
 
     return await Select(transaction, new WhereClause.Nested("and",
-      new WhereClause.CompareColumn(COLUMN_DOMAIN_USER_ID, "=", userAuthenticationToken.UserId),
+      new WhereClause.CompareColumn(COLUMN_DOMAIN_USER_ID, "=", folder.DomainUserId),
       new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", folder.Id),
       new WhereClause.Raw($"{COLUMN_TRASH_TIME} is null")
     ), limitClause, orderByClause);
@@ -321,30 +315,13 @@ public sealed partial class FileManager : ResourceManager
 
       if (accessPoint != null)
       {
-        bool toDecrypt = false;
-
         KeyService.AesPair pathChainEntryKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(accessPoint.AccessPoint.TargetFileAesKey));
         foreach (Resource pathChainEntry in accessPoint.PathChain)
         {
-          if (pathChainEntry.Id != accessPoint.AccessPoint.TargetEntityId)
-          {
-            if (!toDecrypt)
-            {
-              continue;
-            }
-
-            pathChainEntryKey = KeyService.AesPair.Deserialize(pathChainEntryKey.Decrypt(pathChainEntry.AesKey));
-          }
-          else
-          {
-            toDecrypt = true;
-          }
+          pathChainEntryKey = KeyService.AesPair.Deserialize(pathChainEntryKey.Decrypt(pathChainEntry.AesKey));
         }
 
-        if (toDecrypt)
-        {
-          return pathChainEntryKey;
-        }
+        return pathChainEntryKey;
       }
 
       return null;

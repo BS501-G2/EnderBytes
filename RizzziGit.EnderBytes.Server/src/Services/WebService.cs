@@ -30,6 +30,7 @@ public sealed partial class WebService(Server server) : Server.SubService(server
       .AddResponseCaching()
       .AddControllers();
 
+    builder.Logging.SetMinimumLevel(LogLevel.None);
     builder.WebHost.ConfigureKestrel((kestrelConfiguration) =>
     {
       kestrelConfiguration.AllowAlternateSchemes = true;

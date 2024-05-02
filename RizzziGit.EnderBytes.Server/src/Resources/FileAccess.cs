@@ -1,4 +1,5 @@
 using System.Data.Common;
+using Newtonsoft.Json;
 
 namespace RizzziGit.EnderBytes.Resources;
 
@@ -32,7 +33,11 @@ public sealed class FileAccessManager : ResourceManager
 
     byte[] TargetFileAesKey,
     FileAccessExtent FileAccessExtent
-  ) : ResourceManager.Resource(Id, CreateTime, UpdateTime);
+  ) : ResourceManager.Resource(Id, CreateTime, UpdateTime)
+  {
+    [JsonIgnore]
+    public byte[] TargetFileAesKey = TargetFileAesKey;
+  }
 
   public const string NAME = "FileAccess";
   public const int VERSION = 1;
@@ -88,52 +93,45 @@ public sealed class FileAccessManager : ResourceManager
     ));
   }
 
-  public async Task<bool> RevokeUser(ResourceService.Transaction transaction, FileManager.Resource file, UserManager.Resource user, FileAccessExtent? extent = null)
-  {
-    return await Delete(transaction, new WhereClause.Nested("and",
-      new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", FileAccessTargetEntityType.User),
-      new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id),
-      new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id),
-      extent == null ? null : new WhereClause.CompareColumn(COLUMN_EXTENT, ">=", (byte)extent)
-    )) != 0;
-  }
-
-  public async Task<Resource[]> ListByFile(ResourceService.Transaction transaction, FileManager.Resource file, FileAccessExtent? extent = null)
+  public async Task<Resource[]> List(ResourceService.Transaction transaction, FileManager.Resource? file, UserManager.Resource? user, FileAccessExtent? extent, LimitClause? limit = null)
   {
     return await Select(transaction, new WhereClause.Nested("and",
-      new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id),
+      file != null ? new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id) : null,
+
+      user != null ? new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id) : null,
+      user != null ? new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", FileAccessTargetEntityType.User) : null,
+
       extent == null ? null : new WhereClause.CompareColumn(COLUMN_EXTENT, ">=", (byte)extent)
-    ));
+    ), limit, [new OrderByClause(COLUMN_EXTENT, OrderByClause.OrderBy.Descending)]);
   }
 
-  public async Task<Resource[]> ListByUser(ResourceService.Transaction transaction, UserManager.Resource user, FileAccessExtent? extent = null)
+  public async Task<FileAccessPoint?> GetAccessPoint(ResourceService.Transaction transaction, UserManager.Resource user, FileManager.Resource file, FileAccessExtent extent)
   {
-    return await Select(transaction, new WhereClause.Nested("and",
-      new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", FileAccessTargetEntityType.User),
-      new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id),
-      extent == null ? null : new WhereClause.CompareColumn(COLUMN_EXTENT, ">=", (byte)extent)
-    ));
-  }
+    List<FileManager.Resource> pathChain = [];
 
-  public async Task<FileAccessPoint?> GetAccessPoint(ResourceService.Transaction transaction, UserManager.Resource user, FileManager.Resource file, FileAccessExtent? extent)
-  {
-    FileManager.Resource[] pathChain = await GetManager<FileManager>().PathChain(transaction, file);
-
-    foreach (FileManager.Resource entry in pathChain)
+    async Task<FileAccessPoint?> getAccessPoint(FileManager.Resource file)
     {
       Resource? accessPoint = await SelectFirst(transaction, new WhereClause.Nested("and",
-        new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", FileAccessTargetEntityType.User),
+        new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", (byte)FileAccessTargetEntityType.User),
         new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", user.Id),
-        new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", entry.Id),
-        extent == null ? null : new WhereClause.CompareColumn(COLUMN_EXTENT, ">=", (byte)extent)
+        new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id),
+        new WhereClause.CompareColumn(COLUMN_EXTENT, ">=", (byte)extent)
       ), [new OrderByClause(COLUMN_EXTENT, OrderByClause.OrderBy.Descending)]);
 
       if (accessPoint != null)
       {
-        return new(accessPoint, pathChain);
+        return new(accessPoint, [.. pathChain]);
       }
+      else if (file.ParentId != null)
+      {
+        pathChain.Insert(0, file);
+
+        return await getAccessPoint(await GetManager<FileManager>().GetByRequiredId(transaction, (long)file.ParentId));
+      }
+
+      return null;
     }
 
-    return null;
+    return await getAccessPoint(file);
   }
 }

@@ -46,14 +46,14 @@ public abstract partial class ResourceManager<M, R>
 
         for (int index = 0; index < Expressions.Length; index++)
         {
-          if (index != 0)
-          {
-            builder.Append($" {Connector} ");
-          }
-
           WhereClause? clause = Expressions[index];
           if (clause != null)
           {
+            if (index != 0)
+            {
+              builder.Append($" {Connector} ");
+            }
+
             builder.Append(clause.Apply(parameterList));
           }
         }

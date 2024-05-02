@@ -4,6 +4,6 @@ public abstract partial class ResourceManager<M, R>
 {
   public sealed record LimitClause(long Limit, long? Skip = null)
   {
-    public string Apply() => $"{(Skip != null ? $"{Skip}, " : "")}{Limit}";
+    public string Apply() => Skip != null ? $"{Limit} offset {Skip}" : $"{Limit}";
   }
 }

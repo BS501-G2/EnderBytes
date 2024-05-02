@@ -14,7 +14,7 @@
 
 {#if filter.includes($backgroundTask.status)}
   {#if index != 0}
-    <div class="divider" />
+          <div class="divider"></div>
   {/if}
 
   <div class="background-task">

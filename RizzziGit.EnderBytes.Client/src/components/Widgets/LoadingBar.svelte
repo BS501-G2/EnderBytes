@@ -38,7 +38,7 @@
       class="loading-thumb"
       bind:clientWidth={thumbWidth}
       style="min-width: {barWidth * Math.max(Math.min(progress, 1), 0)}px;"
-    />
+    ></div>
   </div>
 {/if}
 

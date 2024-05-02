@@ -126,7 +126,7 @@
 
   button {
     background-color: transparent;
-    color: var(--primary);
+    color: var(--onBackgroundVariant);
     // margin: 4px 0px 4px 0px;
 
     height: calc(100% - 4px);

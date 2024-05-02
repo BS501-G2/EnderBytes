@@ -32,6 +32,6 @@ export const colors = (): ColorValues => {
     [ColorKey.InfoBackground]: baseColors[ColorKey.InfoBackground],
     [ColorKey.OnInfo]: baseColors[ColorKey.OnInfo],
 
-    [ColorKey.Shadow]: 0x000000ff
+  [ColorKey.Shadow]: 0x0000007f
   })
 }

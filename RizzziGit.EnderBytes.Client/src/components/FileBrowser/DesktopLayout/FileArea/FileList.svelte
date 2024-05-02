@@ -115,6 +115,7 @@
 
         > i.empty-icon {
           font-size: 4em;
+          font-weight: 100;
         }
       }
     }

@@ -76,6 +76,7 @@
 
   button.file-entry {
     background-color: var(--backgroundVariant);
+    color: var(--onBackgroundVariant);
     border: solid 1px transparent;
     cursor: pointer;
 
@@ -84,7 +85,7 @@
     display: flex;
     flex-direction: column;
 
-    border-radius: 8px;
+    border-radius: 0.5em;
 
     > div.overlay {
       width: 100%;

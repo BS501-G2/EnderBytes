@@ -19,8 +19,8 @@
     role="none"
     on:click={(event) => {
       if (event.target == event.currentTarget) {
-        if (hasKeys('shift') || hasKeys('control')) {
-          return
+        if (hasKeys("shift") || hasKeys("control")) {
+          return;
         }
 
         $selection = [];
@@ -29,6 +29,11 @@
   >
     {#if info == null}
       <LoadingSpinnerPage />
+    {:else if files.length === 0}
+      <div class="empty-banner">
+        <i class="fa-regular fa-folder-open empty-icon"></i>
+        <p>This folder seems empty.</p>
+      </div>
     {:else}
       {#each files as file, index}
         <File
@@ -73,7 +78,7 @@
     flex-grow: 1;
     align-items: center;
     background-color: var(--backgroundVariant);
-    border-radius: 8px;
+    border-radius: 0.5em;
 
     padding: 8px;
     flex-basis: 0px;
@@ -98,6 +103,20 @@
 
       overflow-y: auto;
       overflow-x: hidden;
+
+      > div.empty-banner {
+        width: 100%;
+        height: 100%;
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+
+        > i.empty-icon {
+          font-size: 4em;
+        }
+      }
     }
   }
 </style>

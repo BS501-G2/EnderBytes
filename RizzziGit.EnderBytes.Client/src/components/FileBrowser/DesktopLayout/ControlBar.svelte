@@ -15,13 +15,13 @@
   import { enabled as fileCreationDialog } from "../FileCreationDialog.svelte";
   import { enabled as folderCreationDialog } from "../FolderCreationDialog.svelte";
   import type {
-    FileBrowserInformation,
+    FileBrowserFolderInformation,
     FileBrowserSelection,
   } from "../../FileBrowser.svelte";
 
   export let selection: FileBrowserSelection;
   export let reset: AwaiterResetFunction;
-  export let info: FileBrowserInformation | null;
+  export let info: FileBrowserFolderInformation | null;
 
   $: enabled = info != null;
   $: file = info?.current;
@@ -33,31 +33,29 @@
 
 <div class="controls">
   <div class="section left-section">
-    {#if info?.isFolder}
-      <Button
-        {buttonClass}
-        {outline}
-        {enabled}
-        onClick={() => ($fileCreationDialog = true)}
-      >
-        <div class="button">
-          <UploadIcon {size} />
-          <p class="button-label">Upload</p>
-        </div>
-      </Button>
-      <Button
-        {buttonClass}
-        {outline}
-        {enabled}
-        onClick={() => ($folderCreationDialog = true)}
-      >
-        <div class="button">
-          <FolderPlusIcon {size} />
-          <p class="button-label">New Folder</p>
-        </div>
-      </Button>
-      <div class="divider" />
-    {/if}
+    <Button
+      {buttonClass}
+      {outline}
+      {enabled}
+      onClick={() => ($fileCreationDialog = true)}
+    >
+      <div class="button">
+        <UploadIcon {size} />
+        <p class="button-label">Upload</p>
+      </div>
+    </Button>
+    <Button
+      {buttonClass}
+      {outline}
+      {enabled}
+      onClick={() => ($folderCreationDialog = true)}
+    >
+      <div class="button">
+        <FolderPlusIcon {size} />
+        <p class="button-label">New Folder</p>
+      </div>
+    </Button>
+    <div class="divider" />
     {#if $selection.length !== 0}
       <Button {buttonClass} {outline} onClick={() => {}} {enabled}>
         <div class="button">
@@ -125,7 +123,7 @@
 <style lang="scss">
   div.controls {
     background-color: var(--backgroundVariant);
-    border-radius: 8px;
+    border-radius: 0.5em;
 
     user-select: none;
 
@@ -134,6 +132,8 @@
     // gap: 8px;
 
     box-sizing: border-box;
+
+    min-height: calc(1.75em);
 
     overflow-x: auto;
     overflow-y: hidden;

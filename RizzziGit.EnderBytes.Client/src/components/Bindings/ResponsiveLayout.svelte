@@ -1,12 +1,9 @@
 <script lang="ts">
-  import { RootState } from "$lib/states/root-state";
-  import { ViewMode } from "$lib/view-mode";
-
-  const rootState = RootState.state;
+  import { ViewMode, viewMode } from "./ResponsiveLayoutRoot.svelte";
 </script>
 
-{#if $rootState.viewMode & ViewMode.Desktop}
+{#if $viewMode & ViewMode.Desktop}
   <slot name="desktop" />
-{:else if $rootState.viewMode & ViewMode.Mobile}
+{:else if $viewMode & ViewMode.Mobile}
   <slot name="mobile" />
 {/if}

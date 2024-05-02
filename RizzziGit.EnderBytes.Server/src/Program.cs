@@ -17,11 +17,11 @@ public static class Program
   public static readonly Server Server = new(new(
       DatabaseConnectionStringBuilder: new MySqlConnectionStringBuilder()
       {
-        Server = "10.1.0.117",
+        Server = "10.3",
         Database = "enderbytes",
 
-        UserID = "test",
-        Password = "test",
+        UserID = "enderbytes",
+        Password = "enderbytes",
 
         AllowBatch = true,
       },

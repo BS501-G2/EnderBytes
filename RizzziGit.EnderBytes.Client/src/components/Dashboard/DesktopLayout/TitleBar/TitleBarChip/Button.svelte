@@ -17,7 +17,7 @@
 
     cursor: pointer;
 
-    border-radius: 8px;
+    border-radius: 0.5em;
 
     background-color: transparent;
     color: var(--onPrimary);

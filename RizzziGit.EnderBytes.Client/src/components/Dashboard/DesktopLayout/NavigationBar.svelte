@@ -69,11 +69,10 @@
 
         gap: 8px;
 
-        background-color: var(--primaryContainer);
         color: var(--onPrimaryContainer);
 
         padding: 8px;
-        border-radius: 8px;
+        border-radius: 0.5em;
 
         user-select: none;
         cursor: pointer;

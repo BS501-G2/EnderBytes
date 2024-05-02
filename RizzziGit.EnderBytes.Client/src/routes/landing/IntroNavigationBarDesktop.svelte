@@ -39,11 +39,9 @@
           <a
             class={homeNavigationEntry.path == hash ? "active" : ""}
             href={homeNavigationEntry.path}
-            ><li>
+            ><li class="nav-entry">
               {#if !homeNavigationEntry.path.startsWith("#")}
-                <div class="external-link-icon">
-                  <ExternalLinkIcon size="16px" />
-                </div>
+                <ExternalLinkIcon size="20em" />
               {/if}
               <p>{homeNavigationEntry.name}</p>
             </li></a
@@ -141,7 +139,7 @@
             padding: 0px 16px 0px 16px;
 
             margin: 0px 8px 0px 8px;
-            border-radius: 32px 32px 32px 32px;
+            border-radius: 2em;
 
             color: inherit;
             text-decoration: unset;
@@ -150,11 +148,6 @@
               display: flex;
 
               align-items: center;
-
-              > div.external-link-icon {
-                height: 16px;
-                width: 16px;
-              }
 
               > p {
                 margin: 12px;
@@ -179,7 +172,7 @@
 
             border-style: solid;
             border-color: #00000000;
-            border-radius: 8px;
+            border-radius: 0.5em;
 
             font-size: 14px;
             padding: 0px 16px 0px 16px;

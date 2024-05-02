@@ -102,7 +102,7 @@
                   goto(`/app/files/${fileEntry.id}`);
                 }}
               >
-                <FolderIcon size="18em" />
+                <FolderIcon size="20em" />
                 <p>
                   {fileEntry.name}
                 </p>
@@ -136,7 +136,7 @@
     border-style: solid;
     border-width: 1px;
     border-color: transparent;
-    border-radius: 8px;
+    border-radius: 0.5em;
     user-select: none;
 
     display: flex;
@@ -179,7 +179,7 @@
     background-color: var(--backgroundVariant);
 
     padding: 4px;
-    border-radius: 8px;
+    border-radius: 0.5em;
     // border-style: solid;
     // border-width: 1px;
     // border-color: var(--primary);

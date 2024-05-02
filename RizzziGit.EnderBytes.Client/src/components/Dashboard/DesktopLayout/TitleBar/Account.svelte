@@ -91,7 +91,7 @@
 
     box-shadow: 2px 2px 8px #0000007f;
 
-    border-radius: 8px;
+    border-radius: 0.5em;
 
     > button,
     a {
@@ -108,7 +108,7 @@
       cursor: pointer;
       user-select: none;
 
-      border-radius: 8px;
+      border-radius: 0.5em;
     }
 
     > button:hover,

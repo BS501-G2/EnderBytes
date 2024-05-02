@@ -6,33 +6,16 @@
 
   import { Locale, LocaleKey } from "$lib/locale";
   import { RootState } from "$lib/states/root-state";
-  import { ViewMode } from "$lib/view-mode";
   import {
     ColorScheme,
     serializeThemeColorsIntoInlineStyle,
   } from "$lib/color-schemes";
-  import { navigating } from "$app/stores";
-  import LoadingSpinnerPage from "../components/Widgets/LoadingSpinnerPage.svelte";
+  import ResponsiveLayoutRoot, {
+    viewMode,
+    ViewMode,
+  } from "../components/Bindings/ResponsiveLayoutRoot.svelte";
 
   const rootState = RootState.state;
-
-  function onResize() {
-    const newViewMode =
-      (window.matchMedia("(max-width: 768px)").matches
-        ? ViewMode.Mobile
-        : ViewMode.Desktop) |
-      (window.matchMedia(
-        "(display-mode: standalone) or (d1isplay-mode: window-controls-overlay) or (display-modee: minimal-ui)",
-      ).matches
-        ? ViewMode.Standalone
-        : window.matchMedia("(display-mode: fullscreen)").matches
-          ? ViewMode.Fullscreen
-          : ViewMode.Browser);
-
-    if (newViewMode != $rootState.viewMode) {
-      $rootState.viewMode = newViewMode;
-    }
-  }
 
   function loadSettings() {
     $rootState.theme =
@@ -54,9 +37,9 @@
 
       saveSettings();
     });
-
-    onResize();
   });
+
+  $: rootCss = `:root { ${serializeThemeColorsIntoInlineStyle($rootState.theme)} } body { margin: unset; min-height: 100vh; background-color: var(--background); }`;
 </script>
 
 <svelte:head>
@@ -66,16 +49,22 @@
     )}
   </title>
 
-  {@html `<style>:root { ${serializeThemeColorsIntoInlineStyle($rootState.theme)} } body { margin: unset; min-height: 100vh; }</style>`}
+  {@html `<style>
+    :root {
+      ${serializeThemeColorsIntoInlineStyle($rootState.theme)}
+    }
+
+    body {
+      margin: unset;
+      min-height: 100vh;
+      background-color: var(--background);
+    }
+  </style>`}
 </svelte:head>
 
-<svelte:window on:resize={onResize} />
+<slot />
 
-{#if $rootState.viewMode != ViewMode.Unset || !$navigating}
-  <slot />
-{:else}
-  <LoadingSpinnerPage />
-{/if}
+<ResponsiveLayoutRoot />
 
 <style lang="scss">
   :root {

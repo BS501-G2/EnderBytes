@@ -75,7 +75,7 @@ import Awaiter from "../../../Bindings/Awaiter.svelte";
     background-color: var(--backgroundVariant);
     color: var(--onBackgroundVariant);
 
-    border-radius: 8px;
+    border-radius: 0.5em;
 
     display: flex;
     flex-direction: column;

@@ -25,7 +25,6 @@
   {:else}
     {#if !info.isFolder}
       <div class="column">
-        <ControlBar {selection} {reset} {info} />
         <FileView {selection} {reset} {info} />
       </div>
       <FileDetails selection={writable([info.current])} {info} />

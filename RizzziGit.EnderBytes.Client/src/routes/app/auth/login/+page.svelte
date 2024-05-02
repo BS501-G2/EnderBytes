@@ -160,7 +160,7 @@
 
         > div.form-content {
           background-color: var(--backgroundVariant);
-          border-radius: 16px;
+          border-radius: 1em;
           flex-grow: 1;
 
           display: flex;

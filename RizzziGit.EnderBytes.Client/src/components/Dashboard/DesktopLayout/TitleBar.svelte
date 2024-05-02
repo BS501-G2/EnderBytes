@@ -4,9 +4,11 @@
   import History from "./TitleBar/History.svelte";
   import Miscellaneous from "./TitleBar/Miscellaneous.svelte";
   import SearchBar from "./TitleBar/SearchBar.svelte";
+
+  import { ViewMode, viewMode } from '../../Bindings/ResponsiveLayoutRoot.svelte';
 </script>
 
-<div class="top-bar-container">
+<div class="top-bar-container {$viewMode & ViewMode.OverlayControls ? 'pwa' : ''}">
   <div class="top-bar">
     <History />
     <AppTitle />
@@ -23,7 +25,8 @@
     min-height: 48px;
     max-height: 48px;
 
-    background-color: var(--primaryContainer);
+    // background-color: var(--background);
+    // color: var(--onBackground);
 
     > div.top-bar {
       margin-left: env(titlebar-area-x);
@@ -38,5 +41,10 @@
       display: flex;
       gap: 8px;
     }
+  }
+
+  div.top-bar-container.pwa {
+    background-color: var(--primaryContainer);
+    color: var(--onPrimaryContainer);
   }
 </style>

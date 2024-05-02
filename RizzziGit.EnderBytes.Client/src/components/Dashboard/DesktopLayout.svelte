@@ -9,64 +9,102 @@
   import NavigationBar from "./DesktopLayout/NavigationBar.svelte";
   import TitleBar from "./DesktopLayout/TitleBar.svelte";
   import Keyboard from "../Bindings/Keyboard.svelte";
+  import { ViewMode, viewMode } from "../Bindings/ResponsiveLayoutRoot.svelte";
 </script>
 
 <Keyboard />
 
-<div class="viewport">
-  <TitleBar></TitleBar>
+<div class="backdrop">
+  <div class="viewport">
+    <TitleBar />
 
-  <div class="panel-container">
-    <div class="panel left-panel">
-      <NavigationBar />
-      <div class="divider" />
-    </div>
+    <div class="panel-container">
+      <div
+        class="panel left-panel {!($viewMode & ViewMode.OverlayControls)
+          ? 'non-pwa'
+          : ''}"
+      >
+        <NavigationBar />
+        <div class="divider" />
+      </div>
 
-    <div class="panel right-panel">
-      <slot />
+      <div
+        class="panel right-panel {!($viewMode & ViewMode.OverlayControls)
+          ? 'non-pwa'
+          : ''}"
+      >
+        <slot />
+      </div>
     </div>
   </div>
 </div>
 
 <style lang="scss">
-  div.viewport {
-    width: 100vw;
-    height: 100vh;
+  div.backdrop {
+    min-width: 100vw;
+    min-height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
 
     display: flex;
 
     position: fixed;
     flex-direction: column;
 
+    // background-image: url("/background.png");
+    background-color: var(--primaryContainer);
+
     left: 0px;
     top: 0px;
+
+    > div.viewport {
+      flex-grow: 1;
+
+      min-width: 100vw;
+      min-height: 100vh;
+      max-width: 100vw;
+      max-height: 100vh;
+
+      display: flex;
+
+      position: fixed;
+      flex-direction: column;
+
+      backdrop-filter: blur(8px);
+    }
   }
 
   div.panel-container {
     flex-grow: 1;
 
-    width: 100%;
-
     display: flex;
+    flex-direction: row;
+
+    min-width: 100vw;
+    max-width: 100vw;
     min-height: 0px;
 
-    background-color: var(--primaryContainer);
+    box-sizing: border-box;
 
     > div.panel {
       box-sizing: border-box;
+
+      min-height: 100%;
+      max-height: 100%;
+
+      margin: 8px;
+    }
+
+    > div.panel.non-pwa {
+      margin-top: 0px;
     }
 
     > div.left-panel {
       min-width: 256px;
       max-width: 256px;
-      height: 100%;
 
       display: flex;
       flex-direction: column;
-
-      min-height: 0px;
-
-      padding: 0px 16px 0px 16px;
 
       > div.divider {
         min-height: 1px;
@@ -76,13 +114,11 @@
     }
 
     > div.right-panel {
+      min-width: 0px;
       flex-grow: 1;
 
-      min-width: 0px;
-
-      border-radius: 16px;
-
-      margin: 0px 8px 8px 8px;
+      border-radius: 1em;
+      overflow: hidden;
 
       background-color: var(--background);
       color: var(--onBackground);

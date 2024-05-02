@@ -45,7 +45,7 @@
       <div>
         <div
           class="top w-50"
-          style="height:450px; background-color: var(--onPrimary); border-radius: 15px; margin:20px;"
+          style="height:450px; background-color: var(--backgroundVariant); border-radius: 15px; margin:20px;"
         >
           <div class="EditProfile" style="position: absolute; top: 70px; right: 0; margin: 20px; margin-right: 50px;">
             <Button buttonClass={ButtonClass.PrimaryContainer} onClick={() => $accountSettingsDialog = true}>Edit Profile</Button>
@@ -270,10 +270,10 @@
             </div>
           </div>
 
-         
-        
+
+
         </div>
-        
+
         <div class="file-container" style="display:flex;">
 
           <div class="file1" style="position: relative; width:40%; ">
@@ -357,15 +357,15 @@
             </div>
           </div>
 
-         
-        
-        </div>
-        
-        
 
-        
-        
-        
+
+        </div>
+
+
+
+
+
+
 
         </div>
       </div>

@@ -19,13 +19,9 @@
   export let info: FileBrowserInformation | null;
 </script>
 
-<div class="container">
-  <div class="bezel">
-    <div class="content">
-      <AddressBar {info} />
-      <FileArea {selection} {reset} {info} />
-    </div>
-  </div>
+<div class="content">
+  <AddressBar {info} />
+  <FileArea {selection} {reset} {info} />
 </div>
 
 <svelte:window
@@ -42,9 +38,9 @@
 />
 
 <style lang="scss">
-  div.container {
-    background-color: var(--primaryContainer);
-    color: var(--onPrimaryContainer);
+  div.content {
+    background-color: var(--background);
+    color: var(--onBackground);
 
     width: 100%;
     height: 100%;
@@ -52,34 +48,17 @@
     display: flex;
     flex-direction: column;
 
-    > div.bezel {
-      flex-grow: 1;
+    border-radius: 1em;
+    flex-grow: 1;
 
-      display: flex;
-      flex-direction: column;
+    display: flex;
+    flex-direction: column;
 
-      padding: 16px;
-      box-sizing: border-box;
+    padding: 16px;
+    box-sizing: border-box;
 
-      gap: 16px;
+    gap: 16px;
 
-      min-height: 0px;
-
-      border-radius: 16px;
-
-      background-color: var(--background);
-      color: var(--onBackground);
-
-      > div.content {
-        display: flex;
-        flex-direction: column;
-
-        gap: 16px;
-
-        flex-grow: 1;
-
-        overflow: auto;
-      }
-    }
+    min-height: 0px;
   }
 </style>

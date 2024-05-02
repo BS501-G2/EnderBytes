@@ -82,7 +82,7 @@
 
     padding: 4px 8px 4px 8px;
 
-    border-radius: 8px;
+    border-radius: 0.5em;
 
     > button {
       background-color: unset;
@@ -110,7 +110,7 @@
       outline: none;
 
       font-size: 14px;
-      border-radius: 8px;
+      border-radius: 0.5em;
     }
   }
 

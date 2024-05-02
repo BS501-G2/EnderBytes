@@ -10,55 +10,51 @@
 
 <div class="address">
   <div class="address-content">
-    <div class="address-icon">
-      <FolderIcon size="100%" />
+    <div class="icon">
+      <FolderIcon size="20em" />
     </div>
     {#if info == null}
-      <LoadingSpinner size="18px" />
+      <LoadingSpinner size="1em" />
     {:else}
       {@const { isSharePoint, root, chain } = info.pathChain}
       {@const files = [isSharePoint ? root : null, ...chain]}
-      {#each files as _, index}
-        <AddressBarEntry {files} {index} />
-      {/each}
+
+      <div class="path-chain">
+        {#each files as _, index}
+          <AddressBarEntry {files} {index} />
+        {/each}
+      </div>
     {/if}
   </div>
 </div>
 
 <style lang="scss">
   div.address {
-    // background-color: var(--primaryContainer);
-    // color: var(--primary);
-
-    min-height: 32px;
-    max-height: 32px;
+    background-color: var(--backgroundVariant);
+    color: var(--onBackgroundVariant);
 
     display: flex;
     align-items: center;
 
+    border-radius: 0.5em;
+    padding: 0.25em 0.5em 0.25em 0.5em;
+
+    min-height: calc(1.75em);
+
     > div.address-content {
-      > div.address-icon {
-        min-width: calc(32px - 16px);
-        min-height: calc(32px - 16px);
-        max-width: calc(32px - 16px);
-        max-height: calc(32px - 16px);
+      > div.icon,
+      div.path-chain {
+        display: flex;
 
-        margin-right: 8px;
+        align-items: center;
       }
-
-      background-color: var(--backgroundVariant);
-      border-radius: 8px;
 
       flex-grow: 1;
 
       display: flex;
+
+      gap: 8px;
       align-items: center;
-      padding: 0px 8px 0px 8px;
-      height: calc(32px);
-
-      // max-width: max(75%, 640px);
-
-      margin: auto;
 
       overflow-x: auto;
       overflow-y: hidden;

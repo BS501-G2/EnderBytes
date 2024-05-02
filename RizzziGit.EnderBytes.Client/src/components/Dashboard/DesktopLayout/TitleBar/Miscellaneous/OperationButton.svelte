@@ -1,7 +1,7 @@
 <script lang="ts" context="module">
   import { writable, type Writable } from "svelte/store";
 
-  export let enabled: Writable<boolean> = writable(false);
+  export const enabled: Writable<boolean> = writable(false);
 </script>
 
 <script lang="ts">
@@ -152,7 +152,7 @@
 
     box-shadow: 2px 2px 8px #0000007f;
 
-    border-radius: 8px;
+    border-radius: 0.5em;
 
     > div.menu-header {
       display: flex;

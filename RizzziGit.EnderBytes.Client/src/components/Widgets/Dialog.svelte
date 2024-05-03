@@ -17,6 +17,7 @@
 	import ResponsiveLayout from '../Bindings/ResponsiveLayout.svelte';
 	import Overlay from './Overlay.svelte';
 	import { onDestroy, onMount } from 'svelte';
+	import { ViewMode, viewMode } from '../Bindings/ResponsiveLayoutRoot.svelte';
 
 	const rootState = RootState.state;
 
@@ -41,7 +42,7 @@
 
 <Overlay {onDismiss} dim={true}>
 	<div
-		class="dialog {dialogClass} {$rootState.isMobile ? 'mobile' : ''}"
+		class="dialog {dialogClass} {$viewMode & ViewMode.Mobile ? 'mobile' : ''}"
 		transition:scale|global={{ duration: 200, start: 0.9 }}
 	>
 		{#if $$slots.head}

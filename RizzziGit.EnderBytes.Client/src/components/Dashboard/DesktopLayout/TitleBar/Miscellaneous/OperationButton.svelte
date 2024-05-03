@@ -93,11 +93,9 @@
 					<LoadingBar progress={(cooldownTime - update) / cooldownTime} />
 				{/if}
 				<BackgroundTaskList
-					filter={[
-						BackgroundTaskStatus.Running,
-						BackgroundTaskStatus.Done,
-						BackgroundTaskStatus.Failed
-					]}
+					filter={(list) => {
+						return list.filter((e) => e.status != BackgroundTaskStatus.Done || (e.lastUpdated + 10000) >= Date.now());
+					}}
 				/>
 			{/if}
 		</div>

@@ -8,9 +8,20 @@
   }
 </script>
 
-<div class="navigation-bar"></div>
+<div class="navigation-bar">
+  <button><HomeIcon /></button>
+</div>
 
 <style lang="scss">
-  // div.navigation-bar {
-  // }
+  div.navigation-bar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+
+    gap: 3em;
+
+    > button {
+      flex-grow: 1;
+    }
+  }
 </style>

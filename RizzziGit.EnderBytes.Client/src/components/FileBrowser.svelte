@@ -42,53 +42,100 @@
 		return name;
 	}
 
-	export async function createFile(parentFolderId: number | null, files: File[]): Promise<any[]> {
-		return await Promise.all(
-			files.map(async (entry) => {
+	export async function autoIncrementName(
+		parentFolderId: number | null,
+		name: string
+	): Promise<string> {
+		let count = 1;
+
+		const currentName = () => `${name}${count > 1 ? ` (${count})` : ''}`;
+
+		while (true) {
+			const result = await apiFetch(
+				`/file/${parentFolderId != null ? `:${parentFolderId}` : '!root'}/files/new-name-validation`,
+				'POST',
+				{
+					name: currentName()
+				}
+			);
+
+			if (result.hasIllegalCharacters || result.hasIllegalLength || result.nameInUse) {
+				count++;
+			} else {
+				break;
+			}
+		}
+
+		return currentName();
+	}
+
+	export async function createFolder(parentFolderId: number | null, name: string): Promise<any> {
+		name = await valdiateFileName(parentFolderId, name);
+
+		const result = <number>await executeBackgroundTask(
+			`Folder Creation: ${name}`,
+			true,
+			async (_, setStatus) => {
+				setStatus(`Creating...`);
+				const result = await apiFetch(
+					`/file/${parentFolderId != null ? `:${parentFolderId}` : '!root'}/files/new-folder`,
+					'POST',
+					{
+						name,
+						isFolder: true
+					}
+				);
+				setStatus(`Folder successfully created`);
+
+				return result.file;
+			},
+			false
+		).run();
+		return result;
+	}
+
+	export async function createFile(parentFolderId: number | null, file: File): Promise<any> {
+		const formData = new FormData();
+
+		formData.append('offset', '0');
+		formData.append('content', file, 'content');
+
+		const name = await autoIncrementName(parentFolderId, file.name);
+
+		// if (file.)
+
+		const client = executeBackgroundTask<any>(
+			`File upload: ${name}`,
+			true,
+			async (client, setStatus) => {
 				const formData = new FormData();
 
-				formData.append('offset', '0');
-				formData.append('content', entry, 'content');
+				formData.append('name', name);
+				formData.append('content', file, 'content');
 
-				const client = executeBackgroundTask<any>(
-					`File upload: ${entry.name}`,
-					true,
-					async (client, setStatus) => {
-						const formData = new FormData();
-
-						formData.append('name', await valdiateFileName(parentFolderId, entry.name));
-						formData.append('content', entry, 'content');
-
-						client.dismiss();
-
-						await apiFetch(
-							`/file/${parentFolderId != null ? `:${parentFolderId}` : '!root'}/files/new-file`,
-							'POST',
-							formData,
-							{},
-							{
-								uploadProgress: (progress, total) => {
-									if (progress == total) {
-										setStatus('Uploading file...', progress / total);
-									} else {
-										setStatus('Processing...', null);
-									}
-								}
+				const result = await apiFetch(
+					`/file/${parentFolderId != null ? `:${parentFolderId}` : '!root'}/files/new-file`,
+					'POST',
+					formData,
+					{},
+					{
+						uploadProgress: (progress, total) => {
+							if (progress == total) {
+								setStatus('Uploading...', progress / total);
+							} else {
+								setStatus('Processing...', null);
 							}
-						);
-
-						setStatus('File successfully uploaded');
-					},
-					false
+						}
+					}
 				);
 
-				await (async () => {
-					try {
-						await client.run();
-					} catch {}
-				})();
-			})
+				setStatus('File successfully uploaded');
+				return result.file;
+			},
+			false
 		);
+
+		await client.run();
 	}
 </script>
 

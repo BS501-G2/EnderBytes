@@ -40,7 +40,7 @@
       menuButton.offsetLeft +
       menuButton.clientWidth -
       (menuButton.parentElement?.parentElement?.scrollLeft ?? 0);
-    menuOffsetY = menuButton.offsetTop - 4;
+    menuOffsetY = menuButton.offsetTop - 6;
   }
 
   $: file = files[index];

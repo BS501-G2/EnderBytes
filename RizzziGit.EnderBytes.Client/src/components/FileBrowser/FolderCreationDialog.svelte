@@ -12,33 +12,9 @@
 	import Dialog from '../Widgets/Dialog.svelte';
 	import Input from '../Widgets/Input.svelte';
 	import LoadingSpinner from '../Widgets/LoadingSpinner.svelte';
-	import { valdiateFileName } from '../FileBrowser.svelte';
+	import { createFolder, valdiateFileName } from '../FileBrowser.svelte';
 
 	export let currentFileId: number | null;
-
-	async function createFolder(name: string): Promise<number> {
-		const result = <number>await executeBackgroundTask(
-			'Folder Creation',
-			true,
-			async (_, setStatus) => {
-				setStatus(`Folder creation: "${name}"`);
-				const folder = await apiFetch(
-					`/file/${currentFileId != null ? `:${currentFileId}` : '!root'}/files/new-folder`,
-					'POST',
-					{
-						name: await valdiateFileName(currentFileId, name),
-						isFolder: true
-					}
-				);
-				setStatus(`Folder "${name}" created.`);
-
-				goto(`/app/files/${folder.file.id}`);
-			},
-			false
-		).run();
-		$enabled = false;
-		return result;
-	}
 
 	let name: string = '';
 
@@ -54,7 +30,16 @@
 		</div>
 		<svelte:fragment slot="actions">
 			<div class="actions">
-				<Awaiter callback={() => createFolder(name)} autoLoad={false} bind:load>
+				<Awaiter
+					callback={async () => {
+						const result = await createFolder(currentFileId, name);
+
+						goto(`/app/files/${result.id}`);
+						$enabled = false;
+					}}
+					autoLoad={false}
+					bind:load
+				>
 					<svelte:fragment slot="not-loaded">
 						<Button onClick={load}>Create</Button>
 						<Button buttonClass={ButtonClass.Background} onClick={() => ($enabled = false)}>

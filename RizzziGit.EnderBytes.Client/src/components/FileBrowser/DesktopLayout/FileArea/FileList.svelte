@@ -7,9 +7,7 @@
 	} from '../../../FileBrowser.svelte';
 	import LoadingSpinnerPage from '../../../Widgets/LoadingSpinnerPage.svelte';
 	import { hasKeys } from '../../../Bindings/Keyboard.svelte';
-	import { onUploadCompleteListeners } from '../../FileCreationDialog.svelte';
 	import type { AwaiterResetFunction } from '../../../Bindings/Awaiter.svelte';
-	import Overlay from '../../../Widgets/Overlay.svelte';
 
 	export let selection: FileBrowserSelection;
 	export let info: FileBrowserFolderInformation | null;
@@ -17,7 +15,7 @@
 
 	$: files = info?.files ?? [];
 
-	let dnd: File[] | null = null;
+	let dnd: boolean = false;
 	let container: HTMLDivElement;
 
 	let cursorX: number = 0;
@@ -29,11 +27,9 @@
 	}
 </script>
 
-<svelte:window on:mousemove={(event) => updateDndLocation(event.clientX, event.clientY)} />
-
-{#if dnd != null}
+{#if dnd}
 	<div class="dnd" style="left: {cursorX}px; top: {cursorY}px; ">
-    <p>Drag and Drop Files Here</p>
+		<p>Drop files here</p>
 	</div>
 {/if}
 
@@ -41,17 +37,28 @@
 	class="file-list-container"
 	bind:this={container}
 	on:dragleave|preventDefault={() => {
-		dnd = null;
+		dnd = false;
 	}}
 	on:dragover|preventDefault={(event) => {
-		dnd = event.dataTransfer?.files != null ? Array.from(event.dataTransfer?.files) : null;
-    console.log(event.dataTransfer?.files)
-    updateDndLocation(event.clientX, event.clientY);
+		dnd = true;
+		updateDndLocation(event.clientX, event.clientY);
 	}}
 	on:drop|preventDefault={async (event) => {
-    dnd = null
-		await createFile(info?.current.id, Array.from(event.dataTransfer?.files ?? []));
-		await reset();
+		if (event.dataTransfer == null) {
+			return;
+		}
+
+		dnd = false;
+		const files = Array.from(event.dataTransfer.files);
+
+		if (files.length != 0) {
+			await Promise.all(
+				Array.from(files).map(async (file) => {
+					await createFile(info?.current.id, file);
+				})
+			);
+			await reset();
+		}
 	}}
 	role="region"
 >
@@ -165,11 +172,11 @@
 	div.dnd {
 		position: fixed;
 		background-color: var(--backgroundVariant);
-    color: var(--onBackgroundVariant);
-    box-shadow: 2px 2px 8px var(--shadow);
+		color: var(--onBackgroundVariant);
+		box-shadow: 2px 2px 8px var(--shadow);
 
-    padding: 0.5em;
-    border-radius: 0.5em;
+		padding: 0.5em;
+		border-radius: 0.5em;
 		pointer-events: none;
 	}
 </style>

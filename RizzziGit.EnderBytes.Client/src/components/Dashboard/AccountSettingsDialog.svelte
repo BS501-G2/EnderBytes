@@ -16,7 +16,7 @@
   <Dialog onDismiss={() => $enabled = false}>
     <h2 slot="head" style="margin-left: 20px; margin-top:20px;">Basic Info</h2>
 
-    <div class="account-settings" slot="body" style="min-height: 700px; min-width:800px; overflow: hidden;">
+    <div class="account-settings" slot="body" style="min-height: 400px; min-width:800px; overflow: hidden;">
 
       <div><hr style="width: 100%; border: none; border-top: 1px solid var(--onPrimaryContainerVariant);"></div>
 
@@ -42,7 +42,7 @@
       <div class="Name" style="margin-top:20px; margin-left:20px; margin-right:20px;">
        <Expandable>
           <fragment slot='header' let:toggle>
-            <div style="display:flex; justify-content:space-between;">
+            <div style="display:flex; justify-content:space-between;overflow: hidden;">
               <p style="font-weight: 500; font-size:large; color:black">Name</p>
               <p style="font-weight: 300; font-size:large; color:black">First name, Middle name, Last name</p>
               <button on:click={toggle} style="background-color: transparent; border:none; cursor:pointer;">
@@ -52,7 +52,7 @@
           </fragment>
           <fragment slot='body'>
             <div>
-              <div style="display:flex; justify-content:space-between">
+              <div style="display:flex; justify-content:space-between;overflow: hidden;">
                 <div style="position: relative;">
                   <input type="text" id="FnameInput" style="width: 100%; padding: 17px 20px; margin: 8px 0; box-sizing: border-box;" required>
                   <span style="position: absolute; top: 0; left: 0; padding: 10px; color: gray; font-size: 12px;">First name</span>
@@ -104,7 +104,7 @@
           </fragment>
           <fragment slot='body'>
             <div>
-              <div style="display:flex; justify-content:center">
+              <div style="display:flex; justify-content:center;overflow: hidden;">
                 <div style="position: relative; width:30%;">
                   <input type="date" id="dateInput" style="width: 100%; padding: 17px 30px; margin: 8px 0; box-sizing: border-box;" required>
                 </div>
@@ -182,94 +182,9 @@
 
 
       </div>
-      <h2 style="margin-left: 20px; margin-top:20px;">Contact Info</h2>
+      
 
-      <div><hr style="width: 100%; border: none; border-top: 1px solid var(--onPrimaryContainerVariant);"></div>
-
-      <div class="Email" style="margin-top:20px; margin-left:20px; margin-right:20px;">
-        <Expandable>
-          <fragment slot='header' let:toggle>
-            <div style="display:flex; justify-content:space-between;">
-              <p style="font-weight: 500; font-size:large; color:black">Email</p>
-              <p style="font-weight: 300; font-size:large; color:black">UserTest@EnderDrive.com</p>
-              <button on:click={toggle} style="background-color: transparent; border:none; cursor:pointer;">
-              <i class="fas fa-chevron-right" style="font-size:40px; color:black"></i>
-              </button>
-            </div>
-          </fragment>
-          <fragment slot='body'>
-            <div>
-              <div style="display:flex; justify-content:center">
-                <div style="position: relative; width:40%;">
-                  <input type="email" id="emailInput" style="width: 100%; padding: 17px 20px; margin: 8px 0; box-sizing: border-box;" required>
-                  <span style="position: absolute; top: 0; left: 0; padding: 10px; color: gray; font-size: 12px;">Email</span>
-                </div>
-              </div>
-              <div style="display:flex; justify-content:center; padding-top:10px; padding-bottom:10px">
-                <button style="
-                background-color: var(--primaryContainer);
-                cursor: pointer;
-                border-color: var(--onPrimaryContainerVariant);
-                color: white;
-                padding: 10px 23px;
-                text-align: center;
-                text-decoration: none;
-                display: inline-block;
-                font-size: 16px;
-                border-radius:10px;
-                font-weight: bold;
-                ">Apply</button>
-              </div>
-
-            </div>
-          </fragment>
-        </Expandable>
-      </div>
-
-      <div><hr style="width: 100%; border: none; border-top: 1px solid var(--onPrimaryContainerVariant);"></div>
-
-      <div class="Phone" style="margin-top:20px; margin-left:20px; margin-right:20px;">
-        <Expandable>
-          <fragment slot='header' let:toggle>
-            <div style="display:flex; justify-content:space-between;">
-              <p style="font-weight: 500; font-size:large; color:black">Phone</p>
-              <p style="font-weight: 300; font-size:large; color:black">09291293299</p>
-              <button on:click={toggle} style="background-color: transparent; border:none; cursor:pointer;">
-              <i class="fas fa-chevron-right" style="font-size:40px; color:black"></i>
-              </button>
-            </div>
-          </fragment>
-          <fragment slot='body'>
-            <div>
-              <div style="display:flex; justify-content:center">
-                  <div style="position: relative; width:40%;">
-                      <input type="tel" id="phoneInput" style="width: 100%; padding: 17px 20px; margin: 8px 0; box-sizing: border-box;" required pattern="[0-9]+">
-                      <span style="position: absolute; top: 0; left: 0; padding: 10px; color: gray; font-size: 12px;">Phone</span>
-                  </div>
-              </div>
-              <div style="display:flex; justify-content:center; padding-top:10px; padding-bottom:10px">
-                  <button style="
-                      background-color: var(--primaryContainer);
-                      cursor: pointer;
-                      border-color: var(--onPrimaryContainerVariant);
-                      color: white;
-                      padding: 10px 23px;
-                      text-align: center;
-                      text-decoration: none;
-                      display: inline-block;
-                      font-size: 16px;
-                      border-radius:10px;
-                      font-weight: bold;
-                      ">Apply</button>
-              </div>
-          </div>
-
-
-
-          </fragment>
-        </Expandable>
-
-      </div>
+      
       <div class="buttonDiscardSave" style="Display:flex; margin-top:125px; margin-left:575px">
         <button style="
         background-color: var(--error);

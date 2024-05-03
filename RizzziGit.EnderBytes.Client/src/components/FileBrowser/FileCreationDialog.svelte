@@ -39,12 +39,12 @@
 						throw new Error('No files selected');
 					}
 
-					const promise = createFile(currentFileId, Array.from(files));
+					const promises = Array.from(files).map(async (file) => createFile(currentFileId, file));
 
 					files = null;
 					$enabled = false;
 
-					await promise;
+					await Promise.all(promises);
 					$onUploadCompleteListeners.forEach((callback) => callback());
 				}}
 				autoLoad={false}
@@ -58,15 +58,13 @@
 							}}
 							buttonClass={ButtonClass.Background}
 						>
-							<p>
-								{#if files?.length === 1}
-									{files[0].name}
-								{:else if files?.length ?? 0 > 1}
-									{files?.length} Files
-								{:else}
-									Cilck here to select files.
-								{/if}
-							</p>
+							{#if (files?.length ?? 0) >= 1}
+								{Array.from(files ?? [])
+									.map((file) => file.name)
+									.join(', ')}
+							{:else}
+								<p>Cilck here to select files.</p>
+							{/if}
 						</Button>
 					</div>
 

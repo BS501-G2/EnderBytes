@@ -290,11 +290,7 @@
 
 	export let maxCount: number = -1;
 
-	export let filter: BackgroundTaskStatus[] | null = [
-		BackgroundTaskStatus.Running,
-		BackgroundTaskStatus.Failed,
-		BackgroundTaskStatus.Ready
-	];
+	export let filter: (list: BackgroundTask<any>[]) => BackgroundTask<any>[] = (value) => value;
 
 	let cached: BackgroundTask<any>[] = [];
 
@@ -307,7 +303,7 @@
 		let lastTime: number = 0;
 
 		unsubscriber = backgroundTasks.subscribe((value) => {
-			preCached = value;
+			preCached = filter(value);
 
 			if (!running) {
 				running = true;
@@ -336,66 +332,64 @@
 </script>
 
 <div class="background-tasks">
-	{#if cached.filter((e) => filter == null || filter.includes(e.status)).length == 0}
+	{#if cached.length == 0}
 		<p>No pending operations.</p>
 	{:else}
 		{#each cached.toSorted((a, b) => a.status - b.status) as { name, progress, run, retryable, cancelled, cancel, message, status, dismiss }, index}
-			{#if filter == null || filter.includes(status)}
-				{#if index != 0}
-					<div class="divider"></div>
-				{/if}
-
-				<div class="background-task">
-					<div class="name">
-						<p><b>{name}</b></p>
-
-						{#if status == BackgroundTaskStatus.Running}
-							{#if !cancelled}
-								<button on:click={() => cancel()} title="Cancel">
-									<XIcon size="16" />
-								</button>
-							{/if}
-						{:else if status == BackgroundTaskStatus.Done}
-							<button on:click={() => dismiss()} title="Dismiss">
-								<XIcon size="16" />
-							</button>
-						{:else if status == BackgroundTaskStatus.Failed}
-							{#if retryable}
-								<button on:click={() => run()} title="Run">
-									<RefreshCwIcon size="16" />
-								</button>
-							{/if}
-							<button on:click={() => dismiss()} title="Dismiss">
-								<XIcon size="16" />
-							</button>
-						{:else if status == BackgroundTaskStatus.Ready}
-							<button on:click={() => run()} title="Run">
-								<PlayIcon size="16" />
-							</button>
-							<button on:click={() => dismiss()} title="Dismiss">
-								<XIcon size="16" />
-							</button>
-						{/if}
-					</div>
-					{#if status == BackgroundTaskStatus.Running}
-						<div class="progress">
-							<LoadingBar bind:progress />
-						</div>
-					{/if}
-					<div class="message">
-						{#if status == BackgroundTaskStatus.Failed}
-							<p>Failed: {message}</p>
-						{:else}
-							{#if message != null}
-								<p>{message}</p>
-							{/if}
-							{#if progress != null}
-								<p>{Math.round(progress * 1000) / 10}%</p>
-							{/if}
-						{/if}
-					</div>
-				</div>
+			{#if index != 0}
+				<div class="divider"></div>
 			{/if}
+
+			<div class="background-task">
+				<div class="name">
+					<p><b>{name}</b></p>
+
+					{#if status == BackgroundTaskStatus.Running}
+						{#if !cancelled}
+							<button on:click={() => cancel()} title="Cancel">
+								<XIcon size="16" />
+							</button>
+						{/if}
+					{:else if status == BackgroundTaskStatus.Done}
+						<button on:click={() => dismiss()} title="Dismiss">
+							<XIcon size="16" />
+						</button>
+					{:else if status == BackgroundTaskStatus.Failed}
+						{#if retryable}
+							<button on:click={() => run()} title="Run">
+								<RefreshCwIcon size="16" />
+							</button>
+						{/if}
+						<button on:click={() => dismiss()} title="Dismiss">
+							<XIcon size="16" />
+						</button>
+					{:else if status == BackgroundTaskStatus.Ready}
+						<button on:click={() => run()} title="Run">
+							<PlayIcon size="16" />
+						</button>
+						<button on:click={() => dismiss()} title="Dismiss">
+							<XIcon size="16" />
+						</button>
+					{/if}
+				</div>
+				{#if status == BackgroundTaskStatus.Running}
+					<div class="progress">
+						<LoadingBar bind:progress />
+					</div>
+				{/if}
+				<div class="message">
+					{#if status == BackgroundTaskStatus.Failed}
+						<p>Failed: {message}</p>
+					{:else}
+						{#if message != null}
+							<p>{message}</p>
+						{/if}
+						{#if progress != null}
+							<p>{Math.round(progress * 1000) / 10}%</p>
+						{/if}
+					{/if}
+				</div>
+			</div>
 		{/each}
 	{/if}
 </div>

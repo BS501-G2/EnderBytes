@@ -1,4 +1,10 @@
 <script>
+	import SharedPage from '../../../components/SharedPage.svelte';
+</script>
+
+<SharedPage />
+
+<!-- <script>
   import {
     UserIcon,
     ImageIcon,
@@ -379,4 +385,4 @@
 
   <div class="shared-preview">
   </div>
-</div>
+</div> -->

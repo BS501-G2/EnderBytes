@@ -20,9 +20,9 @@
 
   async function resolve(): Promise<any | null> {
     if (identifier.type == UserResolveType.Username) {
-      return await apiFetch(`/user/@${identifier.username}`)
+      return await apiFetch({path: `/user/@${identifier.username}`})
     } else {
-      return await apiFetch(`/user/:${identifier.userId}`)
+      return await apiFetch({path: `/user/:${identifier.userId}`})
     }
   }
 </script>

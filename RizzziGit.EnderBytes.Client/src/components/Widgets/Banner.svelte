@@ -24,7 +24,7 @@
       padding: 16px;
       box-sizing: border-box;
 
-      border-radius: 0.5em;
+      border-radius: 8px;
 
       color: var(--onError);
     }

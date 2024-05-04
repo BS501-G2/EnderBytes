@@ -92,7 +92,7 @@
 
 		padding: 16px;
 		// border: solid 1px var(--primary);
-		border-radius: 0.5em;
+		border-radius: 8px;
 		box-shadow: gray 2px 2px 8px;
 
 		display: flex;

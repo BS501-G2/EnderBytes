@@ -36,7 +36,7 @@
 		display: flex;
 		align-items: center;
 
-		border-radius: 0.5em;
+		border-radius: 8px;
 		padding: 0.25em 0.5em 0.25em 0.5em;
 
 		> div.address-content {

@@ -48,7 +48,7 @@
     display: flex;
     flex-direction: column;
 
-    border-radius: 1em;
+    border-radius: 16px;
     flex-grow: 1;
 
     display: flex;

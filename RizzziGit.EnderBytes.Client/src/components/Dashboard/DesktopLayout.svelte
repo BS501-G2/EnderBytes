@@ -117,7 +117,7 @@
       min-width: 0px;
       flex-grow: 1;
 
-      border-radius: 1em;
+      border-radius: 16px;
       overflow: hidden;
 
       background-color: var(--background);

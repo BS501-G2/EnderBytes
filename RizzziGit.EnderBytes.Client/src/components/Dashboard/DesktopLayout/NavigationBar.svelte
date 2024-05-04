@@ -72,7 +72,7 @@
         color: var(--onPrimaryContainer);
 
         padding: 8px;
-        border-radius: 0.5em;
+        border-radius: 8px;
 
         user-select: none;
         cursor: pointer;

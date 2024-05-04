@@ -145,7 +145,7 @@
 
 		box-shadow: 2px 2px 8px #0000007f;
 
-		border-radius: 0.5em;
+		border-radius: 8px;
 
 		> div.menu-header {
 			display: flex;

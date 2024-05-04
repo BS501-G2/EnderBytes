@@ -43,7 +43,7 @@
 							<td class="name"><p><b>Created By: </b></p></td>
 							<td class="value">
 								<p>
-									<Awaiter callback={() => apiFetch(`/user/:${file.authorUserId}`)}>
+									<Awaiter callback={() => apiFetch({ path: `/user/:${file.authorUserId}` })}>
 										<svelte:fragment slot="success" let:result={user}>
 											<a class="user-link" href="/app/users/@{user.username}">
 												<UserFullName {user} />
@@ -66,7 +66,7 @@
 		background-color: var(--backgroundVariant);
 		color: var(--onBackgroundVariant);
 
-		border-radius: 0.5em;
+		border-radius: 8px;
 
 		display: flex;
 		flex-direction: column;

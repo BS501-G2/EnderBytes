@@ -17,7 +17,7 @@
 				<Button
 					onClick={() => {
 						$enabled = false;
-						return apiFetch('/auth/logout', 'POST');
+						return apiFetch({ path: '/auth/logout', method: 'POST' });
 					}}
 					buttonClass={ButtonClass.Primary}
 				>

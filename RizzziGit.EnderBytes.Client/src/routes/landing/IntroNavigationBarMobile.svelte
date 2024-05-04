@@ -49,7 +49,7 @@
 
         border-style: solid;
         border-color: #00000000;
-        border-radius: 0.5em;
+        border-radius: 8px;
 
         font-size: 14px;
 

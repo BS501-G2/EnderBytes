@@ -139,7 +139,7 @@
             padding: 0px 16px 0px 16px;
 
             margin: 0px 8px 0px 8px;
-            border-radius: 2em;
+            border-radius: 32px;
 
             color: inherit;
             text-decoration: unset;
@@ -172,7 +172,7 @@
 
             border-style: solid;
             border-color: #00000000;
-            border-radius: 0.5em;
+            border-radius: 8px;
 
             font-size: 14px;
             padding: 0px 16px 0px 16px;

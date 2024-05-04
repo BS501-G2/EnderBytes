@@ -67,7 +67,7 @@
     min-height: 64px;
     max-height: 90vh;
 
-    border-radius: 0.25em;
+    border-radius: 4px;
 
     padding: 48px 8px 8px 8px;
     box-sizing: border-box;
@@ -101,7 +101,7 @@
       margin: 0px auto 0px auto;
 
       background-color: white;
-      border-radius: 0.25em;
+      border-radius: 4px;
 
       > div.search {
         -webkit-app-region: no-drag;
@@ -117,7 +117,7 @@
 
         border-style: solid;
         border-width: 1px;
-        border-radius: 0.25em;
+        border-radius: 4px;
 
         display: flex;
 

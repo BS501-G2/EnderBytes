@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { FolderIcon } from 'svelte-feather-icons';
+	import { FileIcon, FolderIcon } from 'svelte-feather-icons';
 	import { hasKeys } from '../Bindings/Keyboard.svelte';
 
 	export let file: any;
@@ -30,95 +30,100 @@
 		}
 	}}
 >
-	<div class="overlay">
-		{#if selected || hovered}
-			<input type="checkbox" disabled checked={selected} on:click={onClick} />
-		{/if}
-	</div>
-	<div class="base">
-		<div class="file-preview">
+	<div class="preview"></div>
+	<div class="top">
+		<div class="icon">
 			{#if file.isFolder}
-				<FolderIcon size="100%" strokeWidth={0.5} />
+				<FolderIcon size="100%" />
 			{:else}
-				<img class="file-preview" src="/favicon.svg" alt="asd" />
+				<FileIcon size="100%" />
 			{/if}
 		</div>
-		<div class="file-info">
-			<span class="file-name">
-				{file.name}
-			</span>
+		<div class="name">
+			<p>{file.name}</p>
 		</div>
 	</div>
 </button>
 
 <style lang="scss">
 	button.file-entry:hover {
-		> div.base {
-			> div.file-info {
-				> span.file-name {
-					text-decoration: underline;
-				}
-			}
-		}
+		text-decoration: underline;
 	}
 
 	button.file-entry {
-		background-color: var(--backgroundVariant);
-		color: var(--onBackgroundVariant);
+		background-color: var(--background);
+		color: var(--onBackground);
 		border: solid 1px transparent;
 		cursor: pointer;
 
-		padding: 8px;
+		box-sizing: border-box;
 
 		display: flex;
 		flex-direction: column;
 
-		border-radius: 0.5em;
+		border-radius: 8px;
+		padding: 8px;
+		gap: 8px;
 
-		> div.overlay {
-			width: 100%;
-			height: 0px;
-			z-index: 0;
+		min-width: 172px;
+		max-width: 172px;
+		aspect-ratio: 1 / 1;
 
-			display: flex;
-			flex-direction: column;
-			align-items: last baseline;
+		> div.preview {
+			min-width: 100%;
+			max-width: 100%;
+
+			background-color: var(--backgroundVariant);
+			color: var(--onBackgroundVariant);
+
+			border-radius: 4px;
 		}
 
-		> div.base {
-			> div.file-preview {
-				max-width: 6em;
-				max-height: 6em;
-				min-width: 6em;
-				min-height: 6em;
+		> div.top {
+			min-width: 100%;
+			max-width: 100%;
+			min-height: 1.666em;
+			max-height: 1.666em;
 
-				padding: 8px;
-				box-sizing: border-box;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
 
-				> img.file-preview {
-					width: 100%;
-					height: 100%;
-				}
-			}
+			padding: 0px 4px 0px 4px;
 
-			> div.file-info {
-				width: 6em;
-				min-height: 1em;
+			gap: 8px;
+
+			> div.icon {
+				min-width: 16px;
+				max-width: 16px;
+				aspect-ratio: 1;
+
 				display: flex;
-				flex-direction: row;
+				justify-content: center;
+				align-items: center;
+			}
 
-				> span.file-name {
-					font-weight: bold;
+			> div.name {
+				flex-grow: 1;
+				min-width: 0px;
 
-					text-align: center;
-					text-overflow: ellipsis;
+				overflow: hidden;
 
-					overflow: hidden;
-					white-space: nowrap;
-
+				> p {
 					flex-grow: 1;
+
+					text-wrap: nowrap;
+					text-overflow: ellipsis;
+					overflow: hidden;
+
+					text-align: start;
+					line-height: 1em;
 				}
 			}
+		}
+
+		> div.preview {
+			flex-grow: 1;
 		}
 	}
 

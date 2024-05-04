@@ -3,6 +3,8 @@ using Newtonsoft.Json;
 
 namespace RizzziGit.EnderBytes.Resources;
 
+using Commons.Memory;
+
 using Utilities;
 using Services;
 
@@ -277,7 +279,22 @@ public sealed partial class FileManager : ResourceManager
     return await GetKey(transaction, file, fileAccessExtent, userAuthenticationToken) ?? throw new InvalidAccessException(file, userAuthenticationToken.User);
   }
 
-  public async Task<Resource[]> ScanFolder(ResourceService.Transaction transaction, Resource folder, UserAuthenticationToken userAuthenticationToken, LimitClause? limitClause = null, OrderByClause[]? orderByClause = null)
+  public async Task<long> CountFiles(ResourceService.Transaction transaction, Resource folder, UserAuthenticationToken userAuthenticationToken)
+  {
+    if (!folder.IsFolder)
+    {
+      throw new NotAFolderException(folder);
+    }
+
+    await GetKey(transaction, folder, FileAccessExtent.ReadOnly, userAuthenticationToken);
+    return await Count(transaction, new WhereClause.Nested("and",
+      new WhereClause.CompareColumn(COLUMN_DOMAIN_USER_ID, "=", folder.DomainUserId),
+      new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", folder.Id),
+      new WhereClause.Raw($"{COLUMN_TRASH_TIME} is null")
+    ));
+  }
+
+  public async Task<Resource[]> ScanFolder(ResourceService.Transaction transaction, Resource folder, UserAuthenticationToken userAuthenticationToken, LimitClause? limitClause = null, OrderByClause[]? orderByClause = null, bool? isFolder = null)
   {
     if (!folder.IsFolder)
     {
@@ -289,6 +306,7 @@ public sealed partial class FileManager : ResourceManager
     return await Select(transaction, new WhereClause.Nested("and",
       new WhereClause.CompareColumn(COLUMN_DOMAIN_USER_ID, "=", folder.DomainUserId),
       new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", folder.Id),
+      isFolder != null ? new WhereClause.CompareColumn(COLUMN_IS_FOLDER, "=", isFolder) : null,
       new WhereClause.Raw($"{COLUMN_TRASH_TIME} is null")
     ), limitClause, orderByClause);
   }
@@ -315,13 +333,22 @@ public sealed partial class FileManager : ResourceManager
 
       if (accessPoint != null)
       {
-        KeyService.AesPair pathChainEntryKey = KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(accessPoint.AccessPoint.TargetFileAesKey));
-        foreach (Resource pathChainEntry in accessPoint.PathChain)
+        async Task<KeyService.AesPair?> getKey(Resource file)
         {
-          pathChainEntryKey = KeyService.AesPair.Deserialize(pathChainEntryKey.Decrypt(pathChainEntry.AesKey));
+          if (file.Id == accessPoint.AccessPoint.TargetFileId)
+          {
+            return KeyService.AesPair.Deserialize(userAuthenticationToken.Decrypt(accessPoint.AccessPoint.TargetFileAesKey));
+          }
+
+          if (file.ParentId != null)
+          {
+            return await getKey((await GetManager<FileManager>().GetByRequiredId(transaction, (long)file.ParentId))!);
+          }
+
+          return null;
         }
 
-        return pathChainEntryKey;
+        return await getKey(file);
       }
 
       return null;

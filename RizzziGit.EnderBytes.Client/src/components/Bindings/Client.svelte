@@ -7,16 +7,17 @@
 		token: string;
 	}
 
-	export type FetchFunction = (
-		pathname: string,
-		method?: string,
-		data?: Blob | any,
-		headers?: Record<string, string>,
-		options?: Partial<{
-			uploadProgress: (progress: number, total: number) => void;
-			downloadProgress: (progress: number, total: number) => void;
-		}>
-	) => Promise<AxiosResponse>;
+	export interface FetchOptions {
+		path: string;
+		method?: string;
+		data?: Blob | any;
+		params?: Record<string, string>;
+		headers?: Record<string, string>;
+		uploadProgress?: (progress: number, total: number) => void;
+		downloadProgress?: (progress: number, total: number) => void;
+	}
+
+	export type FetchFunction = (options: FetchOptions) => Promise<AxiosResponse>;
 
 	export type FetchAndInterpretFunction = (
 		...args: Parameters<FetchFunction>
@@ -26,16 +27,23 @@
 		...args: Parameters<FetchAndInterpretFunction>
 	) => Promise<Blob | any>;
 
-	export function getApiUrl(path: string = '/'): URL {
+	export function getApiUrl(path: string, get?: Record<string, string>): URL {
 		let url = localStorage.getItem('client-url');
 
 		if (url == null) {
-			localStorage.setItem('client-url', (url = 'http://25.22.231.71:8083/'));
+			localStorage.setItem('client-url', (url = 'http://localhost:8083/'));
 		}
 
-		return Object.assign(new URL(url), {
-			pathname: path
-		});
+		const urlObj = new URL(url);
+		urlObj.pathname = `${!path.startsWith('/') ? '/' : ''}${path}`;
+		if (get != null) {
+			for (const [key, value] of Object.entries(get)) {
+				urlObj.searchParams.set(key, value);
+			}
+		}
+
+		console.log(`${urlObj}`);
+		return urlObj;
 	}
 
 	const sessionStore: Writable<Session | null> = writable(
@@ -61,27 +69,18 @@
 	}
 
 	export async function interpretResponse(response: AxiosResponse): Promise<Blob | any> {
-		// const responseType = `${response.headers["Content-Type"]}`;
-
-		// if (responseType != null && responseType.startsWith("application/json")) {
-		//   return response.data;
-		// } else {
-		//   return response.data;
-		// }
-
 		return response.data;
 	}
 
-	export const fetch: FetchFunction = async function fetch(
-		pathname: string,
-		method: string = 'GET',
-		data?: Blob | any,
-		headers?: Record<string, string>,
-		options?: Partial<{
-			uploadProgress: (progress: number, total: number) => void;
-			downloadProgress: (progress: number, total: number) => void;
-		}>
-	): Promise<AxiosResponse> {
+	export const fetch: FetchFunction = async function fetch({
+		path,
+		method,
+		data,
+		params,
+		headers,
+		uploadProgress,
+		downloadProgress
+	}): Promise<AxiosResponse> {
 		const session = get(sessionStore);
 		const request: AxiosRequestConfig = {};
 		request.headers = structuredClone(headers ?? {});
@@ -90,17 +89,11 @@
 			request.headers['Authorization'] = `Basic ${btoa(JSON.stringify(session))}`;
 		}
 
-		request.onUploadProgress = (progressEvent) => {
-			if (options?.uploadProgress != null) {
-				options.uploadProgress(progressEvent.loaded, progressEvent.total ?? 0);
-			}
-		};
+		request.onUploadProgress = (progressEvent) =>
+			uploadProgress?.(progressEvent.loaded, progressEvent.total ?? 0);
 
-		request.onDownloadProgress = (progressEvent) => {
-			if (options?.downloadProgress != null) {
-				options.downloadProgress(progressEvent.loaded, progressEvent.total ?? 0);
-			}
-		};
+		request.onDownloadProgress = (progressEvent) =>
+			downloadProgress?.(progressEvent.loaded, progressEvent.total ?? 0);
 
 		if (data != null) {
 			if (data instanceof Blob) {
@@ -110,11 +103,8 @@
 				request.data = data;
 			}
 		}
-		request.method = method;
-		const url = Object.assign(getApiUrl(), {
-			pathname
-		});
-
+		request.method = method ?? 'GET';
+		const url = getApiUrl(path, params);
 		request.url = `${url}`;
 
 		const response = await (async (): Promise<AxiosResponse> => {
@@ -128,8 +118,6 @@
 				throw error;
 			}
 		})();
-
-		console.log(response);
 
 		if (response.status === 200) {
 			if (url.pathname === '/auth/password-login' && request.method === 'POST') {

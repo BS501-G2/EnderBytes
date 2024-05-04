@@ -77,10 +77,18 @@ public partial class WebApi
     });
   }
 
+  public enum ScanFolderSortType
+  {
+    IsFolder,
+    Name
+  }
+  public sealed record ScanFolderSort(ScanFolderSortType Type, bool Descending);
+  public sealed record ScanFolderRequest(bool? IsFolder = null, ScanFolderSort[]? Sorts = null);
+
   [Route("~/file/!root/files")]
   [Route("~/file/:{fileId}/files")]
   [HttpGet]
-  public async Task<ObjectResult> ScanFolder(long? fileId)
+  public async Task<ObjectResult> ScanFolder(long? fileId, [FromBody] ScanFolderRequest? request)
   {
     ObjectResult fileResult = await GetFileById(fileId);
     if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
@@ -97,10 +105,46 @@ public partial class WebApi
 
       FileManager fileManager = GetResourceManager<FileManager>();
 
-      return Data(await fileManager.ScanFolder(CurrentTransaction, file, CurrentUserAuthenticationToken, null, [
-        new FileManager.OrderByClause(FileManager.COLUMN_IS_FOLDER, FileManager.OrderByClause.OrderBy.Descending),
-        new FileManager.OrderByClause(FileManager.COLUMN_NAME, FileManager.OrderByClause.OrderBy.Ascending),
-      ]));
+      List<FileManager.OrderByClause> orderByClause = [];
+
+      if (request?.Sorts != null)
+      {
+        foreach (ScanFolderSort sort in request.Sorts)
+        {
+          string? columnName = sort.Type switch
+          {
+            ScanFolderSortType.IsFolder => FileManager.COLUMN_IS_FOLDER,
+            ScanFolderSortType.Name => FileManager.COLUMN_NAME,
+            _ => null
+          };
+
+          if (columnName == null)
+          {
+            continue;
+          }
+
+          FileManager.OrderByClause.OrderBy orderBy = sort.Descending ? FileManager.OrderByClause.OrderBy.Descending : FileManager.OrderByClause.OrderBy.Ascending;
+
+          orderByClause.Add(new(columnName, orderBy));
+        }
+      }
+      else
+      {
+        orderByClause.Add(new(FileManager.COLUMN_IS_FOLDER, FileManager.OrderByClause.OrderBy.Descending));
+        orderByClause.Add(new(FileManager.COLUMN_NAME, FileManager.OrderByClause.OrderBy.Ascending));
+      }
+
+      FileManager.Resource[] files = await fileManager.ScanFolder(
+        CurrentTransaction,
+        file,
+        CurrentUserAuthenticationToken,
+        null,
+        [.. orderByClause],
+        request?.IsFolder
+      );
+      long fileCount = await fileManager.CountFiles(CurrentTransaction, file, CurrentUserAuthenticationToken);
+
+      return Data(files);
     });
   }
 
@@ -167,8 +211,7 @@ public partial class WebApi
 
       (FileManager.Resource file, KeyService.AesPair fileKey) = await fileManager.Create(CurrentTransaction, parentFolder, request.Name, false, CurrentUserAuthenticationToken);
       FileContentManager.Resource fileContent = await fileContentManager.GetMainContent(CurrentTransaction, file);
-      FileContentVersionManager.Resource fileContentVersion = await fileContentVersionManager.GetBaseVersion(CurrentTransaction,  fileContent);
-
+      FileContentVersionManager.Resource fileContentVersion = await fileContentVersionManager.GetBaseVersion(CurrentTransaction, fileContent);
       {
         await using Stream fileStream = request.Content.OpenReadStream();
         while (fileStream.Position < fileStream.Length)

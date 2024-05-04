@@ -8,7 +8,6 @@
 
 	export interface FileBrowserFolderInformation extends BaseFileBrowserInformation {
 		isFolder: true;
-		files: any[];
 	}
 
 	export interface FileBrowserFileInformation extends BaseFileBrowserInformation {
@@ -23,13 +22,11 @@
 		parentFolderId: number | null,
 		name: string
 	): Promise<string> {
-		const result = await apiFetch(
-			`/file/${parentFolderId != null ? `:${parentFolderId}` : '!root'}/files/new-name-validation`,
-			'POST',
-			{
-				name
-			}
-		);
+		const result = await apiFetch({
+			path: `/file/${parentFolderId != null ? `:${parentFolderId}` : '!root'}/files/new-name-validation`,
+			method: 'POST',
+			data: { name }
+		});
 
 		if (result.hasIllegalCharacters) {
 			throw new Error('Invalid file name');
@@ -51,13 +48,13 @@
 		const currentName = () => `${name}${count > 1 ? ` (${count})` : ''}`;
 
 		while (true) {
-			const result = await apiFetch(
-				`/file/${parentFolderId != null ? `:${parentFolderId}` : '!root'}/files/new-name-validation`,
-				'POST',
-				{
+			const result = await apiFetch({
+				path: `/file/${parentFolderId != null ? `:${parentFolderId}` : '!root'}/files/new-name-validation`,
+				method: 'POST',
+				data: {
 					name: currentName()
 				}
-			);
+			});
 
 			if (result.hasIllegalCharacters || result.hasIllegalLength || result.nameInUse) {
 				count++;
@@ -77,14 +74,14 @@
 			true,
 			async (_, setStatus) => {
 				setStatus(`Creating...`);
-				const result = await apiFetch(
-					`/file/${parentFolderId != null ? `:${parentFolderId}` : '!root'}/files/new-folder`,
-					'POST',
-					{
+				const result = await apiFetch({
+					path: `/file/${parentFolderId != null ? `:${parentFolderId}` : '!root'}/files/new-folder`,
+					method: 'POST',
+					data: {
 						name,
 						isFolder: true
 					}
-				);
+				});
 				setStatus(`Folder successfully created`);
 
 				return result.file;
@@ -113,21 +110,18 @@
 				formData.append('name', name);
 				formData.append('content', file, 'content');
 
-				const result = await apiFetch(
-					`/file/${parentFolderId != null ? `:${parentFolderId}` : '!root'}/files/new-file`,
-					'POST',
-					formData,
-					{},
-					{
-						uploadProgress: (progress, total) => {
-							if (progress == total) {
-								setStatus('Uploading...', progress / total);
-							} else {
-								setStatus('Processing...', null);
-							}
+				const result = await apiFetch({
+					path: `/file/${parentFolderId != null ? `:${parentFolderId}` : '!root'}/files/new-file`,
+					method: 'POST',
+					data: formData,
+					uploadProgress: (progress, total) => {
+						if (progress == total) {
+							setStatus('Uploading...', progress / total);
+						} else {
+							setStatus('Processing...', null);
 						}
 					}
-				);
+				});
 
 				setStatus('File successfully uploaded');
 				return result.file;
@@ -162,15 +156,13 @@
 
 		const id = currentFileId != null ? `:${currentFileId}` : '!root';
 		const [current, pathChain, access] = await Promise.all([
-			apiFetch(`/file/${id}`),
-			apiFetch(`/file/${id}/path-chain`),
-			apiFetch(`/file/${id}/access-list`)
+			apiFetch({ path: `/file/${id}` }),
+			apiFetch({ path: `/file/${id}/path-chain` }),
+			apiFetch({ path: `/file/${id}/shares` })
 		]);
 
 		if (current.isFolder) {
-			const files = await apiFetch(`/file/${id}/files`);
-
-			return { isFolder: true, current, pathChain, files, access };
+			return { isFolder: true, current, pathChain, access };
 		} else {
 			return { isFolder: false, current, pathChain, access };
 		}

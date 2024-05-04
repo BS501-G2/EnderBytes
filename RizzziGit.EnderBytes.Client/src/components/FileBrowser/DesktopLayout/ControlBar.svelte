@@ -69,12 +69,6 @@
 					<p class="button-label">Share</p>
 				</div>
 			</Button>
-			<Button {buttonClass} {outline} onClick={() => {}} {enabled}>
-				<div class="button">
-					<UsersIcon {size} />
-					<p class="button-label">Manage Access</p>
-				</div>
-			</Button>
 		{/if}
 		{#if $selection.length >= 1}
 			<Button {buttonClass} {outline} onClick={() => {}} {enabled}>
@@ -115,7 +109,7 @@
 <style lang="scss">
 	div.controls {
 		background-color: var(--backgroundVariant);
-		border-radius: 0.5em;
+		border-radius: 8px;
 
 		user-select: none;
 
@@ -145,6 +139,10 @@
 			gap: 8px;
 
 			min-width: max-content;
+
+			> p.button-label {
+				display: none;
+			}
 		}
 
 		div.section {

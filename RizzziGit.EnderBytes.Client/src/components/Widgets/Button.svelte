@@ -55,7 +55,7 @@
     transition: all linear 150ms;
 
     border: solid 1px transparent;
-    border-radius: 0.5em;
+    border-radius: 8px;
 
     cursor: pointer;
   }

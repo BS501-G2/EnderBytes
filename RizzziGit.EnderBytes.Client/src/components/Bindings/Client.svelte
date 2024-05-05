@@ -1,4 +1,5 @@
 <script lang="ts" context="module">
+	import { page } from '$app/stores';
 	import Axios, { AxiosError, type AxiosRequestConfig, type AxiosResponse } from 'axios';
 	import { get, writable, type Writable } from 'svelte/store';
 
@@ -27,17 +28,17 @@
 		...args: Parameters<FetchAndInterpretFunction>
 	) => Promise<Blob | any>;
 
-	export function getApiUrl(path: string, get?: Record<string, string>): URL {
+	export function getApiUrl(path: string, params?: Record<string, string>): URL {
 		let url = localStorage.getItem('client-url');
 
 		if (url == null) {
-			localStorage.setItem('client-url', (url = 'http://localhost:8083/'));
+			localStorage.setItem('client-url', (url = `http://${get(page).url.hostname}:8083/`));
 		}
 
 		const urlObj = new URL(url);
 		urlObj.pathname = `${!path.startsWith('/') ? '/' : ''}${path}`;
-		if (get != null) {
-			for (const [key, value] of Object.entries(get)) {
+		if (params != null) {
+			for (const [key, value] of Object.entries(params)) {
 				urlObj.searchParams.set(key, value);
 			}
 		}

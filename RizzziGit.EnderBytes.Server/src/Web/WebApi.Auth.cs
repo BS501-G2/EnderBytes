@@ -12,123 +12,123 @@ using Services;
 
 public sealed partial class WebApi
 {
-  [NonAction]
-  public static async Task UserAuthenticationTokenMiddleWare(Server server, HttpContext context, Func<Task> next)
-  {
-    string? authorizationHeader = context.Request.Headers.Authorization;
+	[NonAction]
+	public static async Task UserAuthenticationTokenMiddleWare(Server server, HttpContext context, Func<Task> next)
+	{
+		string? authorizationHeader = context.Request.Headers.Authorization;
 
-    if (authorizationHeader != null)
-    {
-      string type;
-      JObject tokenJson;
+		if (authorizationHeader != null)
+		{
+			string type;
+			JObject tokenJson;
 
-      {
-        string[] a = authorizationHeader.Split(" ");
+			{
+				string[] a = authorizationHeader.Split(" ");
 
-        type = a[0];
-        tokenJson = JObject.Parse(CompositeBuffer.From(a[1], StringEncoding.Base64).ToString());
-      }
+				type = a[0];
+				tokenJson = JObject.Parse(CompositeBuffer.From(a[1], StringEncoding.Base64).ToString());
+			}
 
-      if (type != "Basic")
-      {
-        new UnauthorizedResult().ExecuteResult(new()
-        {
-          HttpContext = context
-        });
+			if (type != "Basic")
+			{
+				new UnauthorizedResult().ExecuteResult(new()
+				{
+					HttpContext = context
+				});
 
-        return;
-      }
+				return;
+			}
 
-      long userId;
-      string token;
-      try
-      {
-        userId = (long)tokenJson["userId"]!;
-        token = (string)tokenJson["token"]!;
-      }
-      catch
-      {
-        new UnauthorizedResult().ExecuteResult(new()
-        {
-          HttpContext = context
-        });
+			long userId;
+			string token;
+			try
+			{
+				userId = (long)tokenJson["userId"]!;
+				token = (string)tokenJson["token"]!;
+			}
+			catch
+			{
+				new UnauthorizedResult().ExecuteResult(new()
+				{
+					HttpContext = context
+				});
 
-        return;
-      }
+				return;
+			}
 
-      if (!await server.ResourceService.Transact(async (transaction) =>
-      {
-        UserManager.Resource? user;
-        UserAuthenticationToken? userAuthenticationToken;
-        if (
-          ((user = await server.ResourceService.GetManager<UserManager>().GetById(transaction, userId)) != null) &&
-          ((userAuthenticationToken = await server.ResourceService.GetManager<UserAuthenticationManager>().GetSessionToken(transaction, user, token)) != null)
-        )
-        {
-          context.RequestServices.GetRequiredService<WebApiContext>().Token = userAuthenticationToken;
+			if (!await server.ResourceService.Transact(async (transaction) =>
+			{
+				UserManager.Resource? user;
+				UserAuthenticationToken? userAuthenticationToken;
+				if (
+				((user = await server.ResourceService.GetManager<UserManager>().GetById(transaction, userId)) != null) &&
+				((userAuthenticationToken = await server.ResourceService.GetManager<UserAuthenticationManager>().GetSessionToken(transaction, user, token)) != null)
+			)
+				{
+					context.RequestServices.GetRequiredService<WebApiContext>().Token = userAuthenticationToken;
 
-          UserAuthenticationSessionTokenManager.Resource userAuthenticationSessionTokenResource = await server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().GetByUserAuthentication(transaction, userAuthenticationToken.UserAuthentication);
+					UserAuthenticationSessionTokenManager.Resource userAuthenticationSessionTokenResource = await server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().GetByUserAuthentication(transaction, userAuthenticationToken.UserAuthentication);
 
-          await server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().ResetExpiryTime(transaction, userAuthenticationSessionTokenResource, 36000 * 1000 * 24);
-          return true;
-        }
+					await server.ResourceService.GetManager<UserAuthenticationSessionTokenManager>().ResetExpiryTime(transaction, userAuthenticationSessionTokenResource, 36000 * 1000 * 24);
+					return true;
+				}
 
-        return false;
-      }))
-      {
-        new UnauthorizedResult().ExecuteResult(new()
-        {
-          HttpContext = context
-        });
+				return false;
+			}))
+			{
+				new UnauthorizedResult().ExecuteResult(new()
+				{
+					HttpContext = context
+				});
 
-        return;
-      }
+				return;
+			}
 
-    }
+		}
 
-    await next();
-  }
+		await next();
+	}
 
-  public sealed record PasswordLoginRequest(string Username, string Password);
-  public sealed record PasswordLoginResponse(long UserId, string Token);
+	public sealed record PasswordLoginRequest(string Username, string Password);
+	public sealed record PasswordLoginResponse(long UserId, string Token);
 
-  [Route("~/auth/password-login")]
-  [HttpPost]
-  public Task<ObjectResult> Login([FromBody] PasswordLoginRequest request) => Run(async () =>
-  {
-    if (TryGetUserAuthenticationToken(out _))
-    {
-      return Error(409);
-    }
+	[Route("~/auth/password-login")]
+	[HttpPost]
+	public Task<ObjectResult> Login([FromBody] PasswordLoginRequest request) => Run(async () =>
+	{
+		if (TryGetUserAuthenticationToken(out _))
+		{
+			return Error(409);
+		}
 
-    (string Username, string Password) = request;
+		(string Username, string Password) = request;
 
-    UserManager.Resource? user;
-    UserAuthenticationToken? userAuthenticationToken;
+		UserManager.Resource? user;
+		UserAuthenticationToken? userAuthenticationToken;
 
-    if (
-      ((user = await GetResourceManager<UserManager>().GetByUsername(CurrentTransaction, Username)) == null) ||
-      ((userAuthenticationToken = await GetResourceManager<UserAuthenticationManager>().GetByPayload(CurrentTransaction, user, Encoding.UTF8.GetBytes(Password), UserAuthenticationType.Password)) == null)
-    )
-    {
-      return Error(401);
-    }
+		if (
+			((user = await GetResourceManager<UserManager>().GetByUsername(CurrentTransaction, Username)) == null) ||
+			((userAuthenticationToken = await GetResourceManager<UserAuthenticationManager>().GetByPayload(CurrentTransaction, user, Encoding.UTF8.GetBytes(Password), UserAuthenticationType.Password)) == null)
+		)
+		{
+			return Error(401);
+		}
 
-    string token = await GetResourceManager<UserAuthenticationManager>().CreateSessionToken(CurrentTransaction, user, userAuthenticationToken);
-    await Server.ResourceService.GetManager<UserAuthenticationManager>().TruncateSessionToken(CurrentTransaction, user);
+		string token = await GetResourceManager<UserAuthenticationManager>().CreateSessionToken(CurrentTransaction, user, userAuthenticationToken);
+		await Server.ResourceService.GetManager<UserAuthenticationManager>().TruncateSessionToken(CurrentTransaction, user);
 
-    return Data(new PasswordLoginResponse(user.Id, token));
-  });
+		return Data(new PasswordLoginResponse(user.Id, token));
+	});
 
-  [Route("~/auth/logout")]
-  public Task<ObjectResult> Logout() => Run(async () =>
-  {
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
-    {
-      return Error(401);
-    }
+	[Route("~/auth/logout")]
+	public Task<ObjectResult> Logout() => Run(async () =>
+	{
+		if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+		{
+			return Error(401);
+		}
 
-    await GetResourceManager<UserAuthenticationManager>().Delete(CurrentTransaction, userAuthenticationToken.UserAuthentication);
-    return Data();
-  });
+		await GetResourceManager<UserAuthenticationManager>().Delete(CurrentTransaction, userAuthenticationToken.UserAuthentication);
+		return Data();
+	});
 }

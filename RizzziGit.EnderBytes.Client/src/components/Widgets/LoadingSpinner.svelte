@@ -1,128 +1,122 @@
 <!-- https://www.benmvp.com/blog/how-to-create-circle-svg-gradient-loading-spinner -->
 
 <script lang="ts" context="module">
-  import { get, writable, type Writable } from "svelte/store";
+	import { get, writable, type Writable } from 'svelte/store';
 
-  let spinner: Writable<[degrees: number, time: number | null]> = writable([
-    0,
-    null,
-  ]);
-  let activeCount: number = 0;
+	let spinner: Writable<[degrees: number, time: number | null]> = writable([0, null]);
+	let activeCount: number = 0;
 
-  let degreesIncrement = 1000 / 360;
+	let degreesIncrement = 1000 / 360;
 
-  function connect() {
-    if (activeCount == 0) {
-      const oldData = get(spinner);
+	function connect() {
+		if (activeCount == 0) {
+			const oldData = get(spinner);
 
-      if (oldData[1] == null || oldData[1] < Date.now() - 10000) {
-        spinner.set([0, null]);
-      }
+			if (oldData[1] == null || oldData[1] < Date.now() - 10000) {
+				spinner.set([0, null]);
+			}
 
-      const update = () => {
-        if (activeCount <= 0) {
-          activeCount = 0;
+			const update = () => {
+				if (activeCount <= 0) {
+					activeCount = 0;
 
-          return;
-        }
+					return;
+				}
 
-        spinner.update((v) => {
-          if (v[0] >= 360) {
-            v[0] = 0;
-          }
+				spinner.update((v) => {
+					if (v[0] >= 360) {
+						v[0] = 0;
+					}
 
-          return [
-            v[0] + (Date.now() - (v[1] ?? Date.now())) / degreesIncrement,
-            Date.now(),
-          ];
-        });
+					return [v[0] + (Date.now() - (v[1] ?? Date.now())) / degreesIncrement, Date.now()];
+				});
 
-        requestAnimationFrame(update);
-      };
+				requestAnimationFrame(update);
+			};
 
-      activeCount++;
-      requestAnimationFrame(update);
-      return;
-    } else {
-      activeCount++;
-    }
-  }
+			activeCount++;
+			requestAnimationFrame(update);
+			return;
+		} else {
+			activeCount++;
+		}
+	}
 
-  function disconnect() {
-    activeCount--;
-  }
+	function disconnect() {
+		activeCount--;
+	}
 
-  export type Size = `${number}${"px" | "em"}`;
+	export type Size = `${number}${'px' | 'em'}`;
 </script>
 
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+	import { onDestroy, onMount } from 'svelte';
 
-  export let degrees: number = 0;
-  export let size: Size | null = null;
+	export let degrees: number = 0;
+	export let size: Size | null = null;
 
-  onMount(() => {
-    connect();
-  });
+	onMount(() => {
+		connect();
+	});
 
-  onDestroy(() => disconnect());
+	onDestroy(() => disconnect());
 
-  $: degrees = $spinner[0];
+	$: degrees = $spinner[0];
 </script>
 
 <svg
-  class={size == null ? "nosize" : ""}
-  viewBox="0 0 200 200"
-  fill="none"
-  style="transform: rotate({$spinner[0]}deg);"
-  xmlns="http://www.w3.org/2000/svg"
-  width={size != null ? `${size}` : null}
-  height={size != null ? `${size}` : null}
+	class={size == null ? 'nosize' : ''}
+	viewBox="0 0 200 200"
+	fill="none"
+	style="transform: rotate({$spinner[0]}deg);"
+	xmlns="http://www.w3.org/2000/svg"
+	width={size != null ? `${size}` : null}
+	height={size != null ? `${size}` : null}
 >
-  <defs>
-    <linearGradient id="spinner-secondHalf">
-      <stop offset="0%" stop-opacity="0" stop-color="currentColor" />
-      <stop offset="100%" stop-opacity="0.5" stop-color="currentColor" />
-    </linearGradient>
-    <linearGradient id="spinner-firstHalf">
-      <stop offset="0%" stop-opacity="1" stop-color="currentColor" />
-      <stop offset="100%" stop-opacity="0.5" stop-color="currentColor" />
-    </linearGradient>
-  </defs>
+	<defs>
+		<linearGradient id="spinner-secondHalf">
+			<stop offset="0%" stop-opacity="0" stop-color="currentColor" />
+			<stop offset="100%" stop-opacity="0.5" stop-color="currentColor" />
+		</linearGradient>
+		<linearGradient id="spinner-firstHalf">
+			<stop offset="0%" stop-opacity="1" stop-color="currentColor" />
+			<stop offset="100%" stop-opacity="0.5" stop-color="currentColor" />
+		</linearGradient>
+	</defs>
 
-  <g stroke-width="1">
-    <path
-      stroke="url(#spinner-secondHalf)"
-      d="M 4 100 A 96 96 0 0 1 196 100"
-      vector-effect="non-scaling-stroke"
-    />
-    <path
-      stroke="url(#spinner-firstHalf)"
-      d="M 196 100 A 96 96 0 0 1 4 100"
-      vector-effect="non-scaling-stroke"
-    />
+	<g stroke-width="1">
+		<path
+			stroke="url(#spinner-secondHalf)"
+			d="M 4 100 A 96 96 0 0 1 196 100"
+			vector-effect="non-scaling-stroke"
+		/>
+		<path
+			stroke="url(#spinner-firstHalf)"
+			d="M 196 100 A 96 96 0 0 1 4 100"
+			vector-effect="non-scaling-stroke"
+		/>
 
-    <path
-      stroke="currentColor"
-      stroke-linecap="round"
-      d="M 4 100 A 96 96 0 0 1 4 98"
-      vector-effect="non-scaling-stroke"
-    />
-  </g>
+		<path
+			stroke="currentColor"
+			stroke-linecap="round"
+			d="M 4 100 A 96 96 0 0 1 4 98"
+			vector-effect="non-scaling-stroke"
+		/>
+	</g>
 
-  <!-- <animateTransform
-    from="0 0 0"
-    to="360 0 0"
-    attributeName="transform"
-    type="rotate"
-    repeatCount="indefinite"
-    dur="1300ms"
-  /> -->
+	<!-- <animateTransform
+	from="0 0 0"
+	to="360 0 0"
+	attributeName="transform"
+	type="rotate"
+	repeatCount="indefinite"
+	dur="1300ms"
+	/> -->
 </svg>
 
 <style lang="scss">
-  svg.nosize {
-    width: 100%;
-    height: 100%;
-  }
+	svg.nosize {
+		width: 100%;
+		height: 100%;
+	}
 </style>

@@ -5,8 +5,8 @@
 
 // public sealed class SQLiteDatabase(SQLiteConnectionStringBuilder connectionStringBuilder) : Database(connectionStringBuilder)
 // {
-//   public override string ToParameterName(string name) => $"${name}";
+//	public override string ToParameterName(string name) => $"${name}";
 
-//   protected override DbParameter InternalCreateParameter(string name, object? value) => new SQLiteParameter(name, value);
-//   protected override DbConnection InternalCreateConnection(string connectionString) => new SQLiteConnection(connectionString);
+//	protected override DbParameter InternalCreateParameter(string name, object? value) => new SQLiteParameter(name, value);
+//	protected override DbConnection InternalCreateConnection(string connectionString) => new SQLiteConnection(connectionString);
 // }

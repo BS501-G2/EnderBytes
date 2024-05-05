@@ -1,50 +1,50 @@
 <script lang="ts">
-  import Account from "./TitleBar/Account.svelte";
-  import AppTitle from "./TitleBar/AppTitle.svelte";
-  import History from "./TitleBar/History.svelte";
-  import Miscellaneous from "./TitleBar/Miscellaneous.svelte";
-  import SearchBar from "./TitleBar/SearchBar.svelte";
+	import Account from './TitleBar/Account.svelte';
+	import AppTitle from './TitleBar/AppTitle.svelte';
+	import History from './TitleBar/History.svelte';
+	import Miscellaneous from './TitleBar/Miscellaneous.svelte';
+	import SearchBar from './TitleBar/SearchBar.svelte';
 
-  import { ViewMode, viewMode } from '../../Bindings/ResponsiveLayoutRoot.svelte';
+	import { ViewMode, viewMode } from '../../Bindings/ResponsiveLayoutRoot.svelte';
 </script>
 
 <div class="top-bar-container {$viewMode & ViewMode.OverlayControls ? 'pwa' : ''}">
-  <div class="top-bar">
-    <History />
-    <AppTitle />
-    <SearchBar />
-    <Miscellaneous />
-    <Account />
-  </div>
+	<div class="top-bar">
+		<History />
+		<AppTitle />
+		<SearchBar />
+		<Miscellaneous />
+		<Account />
+	</div>
 </div>
 
 <style lang="scss">
-  div.top-bar-container {
-    -webkit-app-region: drag;
+	div.top-bar-container {
+		-webkit-app-region: drag;
 
-    min-height: 48px;
-    max-height: 48px;
+		min-height: 48px;
+		max-height: 48px;
 
-    // background-color: var(--background);
-    // color: var(--onBackground);
+		// background-color: var(--background);
+		// color: var(--onBackground);
 
-    > div.top-bar {
-      margin-left: env(titlebar-area-x);
+		> div.top-bar {
+			margin-left: env(titlebar-area-x);
 
-      width: env(titlebar-area-width);
+			width: env(titlebar-area-width);
 
-      height: 100%;
-      padding: 0px 8px 0px 8px;
+			height: 100%;
+			padding: 0px 8px 0px 8px;
 
-      box-sizing: border-box;
+			box-sizing: border-box;
 
-      display: flex;
-      gap: 8px;
-    }
-  }
+			display: flex;
+			gap: 8px;
+		}
+	}
 
-  div.top-bar-container.pwa {
-    background-color: var(--primaryContainer);
-    color: var(--onPrimaryContainer);
-  }
+	div.top-bar-container.pwa {
+		background-color: var(--primaryContainer);
+		color: var(--onPrimaryContainer);
+	}
 </style>

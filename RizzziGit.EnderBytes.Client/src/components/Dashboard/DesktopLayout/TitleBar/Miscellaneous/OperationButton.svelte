@@ -94,7 +94,9 @@
 				{/if}
 				<BackgroundTaskList
 					filter={(list) => {
-						return list.filter((e) => e.status != BackgroundTaskStatus.Done || (e.lastUpdated + 10000) >= Date.now());
+						return list.filter(
+							(e) => e.status != BackgroundTaskStatus.Done || e.lastUpdated + 10000 >= Date.now()
+						);
 					}}
 				/>
 			{/if}

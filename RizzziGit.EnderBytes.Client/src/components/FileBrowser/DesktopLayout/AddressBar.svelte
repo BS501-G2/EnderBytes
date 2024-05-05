@@ -54,8 +54,8 @@
 			gap: 8px;
 			align-items: center;
 
-			min-height: calc(1em  + 14px);
-			max-height: calc(1em  + 14px);
+			min-height: calc(1em + 14px);
+			max-height: calc(1em + 14px);
 
 			overflow-x: auto;
 			overflow-y: hidden;

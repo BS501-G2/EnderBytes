@@ -2,258 +2,259 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace RizzziGit.EnderBytes.Web;
 
+using Commons.Memory;
+
 using Resources;
-using RizzziGit.Commons.Memory;
 using Services;
 
 public partial class WebApi
 {
-  public WebApiContext.InstanceHolder<FileManager.Resource> CurrentFile => new(this, nameof(CurrentFile));
+	public WebApiContext.InstanceHolder<FileManager.Resource> CurrentFile => new(this, nameof(CurrentFile));
 
-  [Route("~/file/!root")]
-  [Route("~/file/:{fileId}")]
-  [HttpGet]
-  public Task<ObjectResult> GetFileById(long? fileId) => Run(async () =>
-  {
-    if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
-    {
-      return Error(401);
-    }
+	[Route("~/file/!root")]
+	[Route("~/file/:{fileId}")]
+	[HttpGet]
+	public Task<ObjectResult> GetFileById(long? fileId) => Run(async () =>
+	{
+		if (!TryGetUserAuthenticationToken(out UserAuthenticationToken? userAuthenticationToken))
+		{
+			return Error(401);
+		}
 
-    FileManager fileManager = GetResourceManager<FileManager>();
-    FileAccessManager fileAccessManager = GetResourceManager<FileAccessManager>();
+		FileManager fileManager = GetResourceManager<FileManager>();
+		FileAccessManager fileAccessManager = GetResourceManager<FileAccessManager>();
 
-    FileManager.Resource? file = null;
-    if (fileId == null)
-    {
-      file = await fileManager.GetRootFromUser(CurrentTransaction, userAuthenticationToken);
-    }
-    else if ((file = await fileManager.GetById(CurrentTransaction, (long)fileId)) == null)
-    {
-      return Error(404);
-    }
-    else if (!await fileManager.TestAccess(CurrentTransaction, file, FileAccessExtent.ReadOnly, userAuthenticationToken))
-    {
-      return Error(403);
-    }
+		FileManager.Resource? file = null;
+		if (fileId == null)
+		{
+			file = await fileManager.GetRootFromUser(CurrentTransaction, userAuthenticationToken);
+		}
+		else if ((file = await fileManager.GetById(CurrentTransaction, (long)fileId)) == null)
+		{
+			return Error(404);
+		}
+		else if (!await fileManager.TestAccess(CurrentTransaction, file, FileAccessExtent.ReadOnly, userAuthenticationToken))
+		{
+			return Error(403);
+		}
 
-    CurrentFile.Set(file);
+		CurrentFile.Set(file);
 
-    return Data(file);
-  });
+		return Data(file);
+	});
 
-  public sealed record GetPathChainResponse(FileManager.Resource Root, FileManager.Resource[] Chain, bool IsSharePoint);
+	public sealed record GetPathChainResponse(FileManager.Resource Root, FileManager.Resource[] Chain, bool IsSharePoint);
 
-  [Route("~/file/:{fileId}/path-chain")]
-  [Route("~/file/!root/path-chain")]
-  [HttpGet]
-  public async Task<ObjectResult> GetFilePathChainById(long? fileId)
-  {
-    ObjectResult fileResult = await GetFileById(fileId);
-    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
-    {
-      return fileResult;
-    }
+	[Route("~/file/:{fileId}/path-chain")]
+	[Route("~/file/!root/path-chain")]
+	[HttpGet]
+	public async Task<ObjectResult> GetFilePathChainById(long? fileId)
+	{
+		ObjectResult fileResult = await GetFileById(fileId);
+		if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
+		{
+			return fileResult;
+		}
 
-    return await Run(async () =>
-    {
-      FileManager fileManager = GetResourceManager<FileManager>();
-      FileAccessManager fileAccessManager = GetResourceManager<FileAccessManager>();
+		return await Run(async () =>
+		{
+			FileManager fileManager = GetResourceManager<FileManager>();
+			FileAccessManager fileAccessManager = GetResourceManager<FileAccessManager>();
 
-      if (file.DomainUserId != CurrentUserAuthenticationToken.Required().UserId)
-      {
-        FileAccessPoint? fileAccessPoint = await fileAccessManager.GetAccessPoint(CurrentTransaction, CurrentUserAuthenticationToken.Required().User, file, FileAccessExtent.ReadOnly);
+			if (file.DomainUserId != CurrentUserAuthenticationToken.Required().UserId)
+			{
+				FileAccessPoint? fileAccessPoint = await fileAccessManager.GetAccessPoint(CurrentTransaction, CurrentUserAuthenticationToken.Required().User, file, FileAccessExtent.ReadOnly);
 
-        if (fileAccessPoint == null)
-        {
-          return Error(403);
-        }
+				if (fileAccessPoint == null)
+				{
+					return Error(403);
+				}
 
-        FileManager.Resource fileAccessPointRoot = await fileManager.GetByRequiredId(CurrentTransaction, fileAccessPoint.AccessPoint.TargetFileId);
-        return Data(new GetPathChainResponse(fileAccessPointRoot, fileAccessPoint.PathChain, true));
-      }
+				FileManager.Resource fileAccessPointRoot = await fileManager.GetByRequiredId(CurrentTransaction, fileAccessPoint.AccessPoint.TargetFileId);
+				return Data(new GetPathChainResponse(fileAccessPointRoot, fileAccessPoint.PathChain, true));
+			}
 
-      return Data(new GetPathChainResponse(await fileManager.GetRootFromUser(CurrentTransaction, CurrentUserAuthenticationToken), await fileManager.PathChain(CurrentTransaction, file), false));
-    });
-  }
+			return Data(new GetPathChainResponse(await fileManager.GetRootFromUser(CurrentTransaction, CurrentUserAuthenticationToken), await fileManager.PathChain(CurrentTransaction, file).ToArrayAsync(), false));
+		});
+	}
 
-  public enum ScanFolderSortType
-  {
-    IsFolder,
-    Name
-  }
-  public sealed record ScanFolderSort(ScanFolderSortType Type, bool Descending);
-  public sealed record ScanFolderRequest(bool? IsFolder = null, ScanFolderSort[]? Sorts = null);
+	public enum ScanFolderSortType
+	{
+		IsFolder,
+		Name
+	}
+	public sealed record ScanFolderSort(ScanFolderSortType Type, bool Descending);
+	public sealed record ScanFolderRequest(bool? IsFolder = null, ScanFolderSort[]? Sorts = null);
 
-  [Route("~/file/!root/files")]
-  [Route("~/file/:{fileId}/files")]
-  [HttpGet]
-  public async Task<ObjectResult> ScanFolder(long? fileId, [FromBody] ScanFolderRequest? request)
-  {
-    ObjectResult fileResult = await GetFileById(fileId);
-    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
-    {
-      return fileResult;
-    }
+	[Route("~/file/!root/files")]
+	[Route("~/file/:{fileId}/files")]
+	[HttpGet]
+	public async Task<ObjectResult> ScanFolder(long? fileId, [FromBody] ScanFolderRequest? request)
+	{
+		ObjectResult fileResult = await GetFileById(fileId);
+		if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
+		{
+			return fileResult;
+		}
 
-    return await Run(async () =>
-    {
-      if (!file.IsFolder)
-      {
-        return Error(400);
-      }
+		return await Run(async () =>
+		{
+			if (!file.IsFolder)
+			{
+				return Error(400);
+			}
 
-      FileManager fileManager = GetResourceManager<FileManager>();
+			FileManager fileManager = GetResourceManager<FileManager>();
 
-      List<FileManager.OrderByClause> orderByClause = [];
+			List<FileManager.OrderByClause> orderByClause = [];
 
-      if (request?.Sorts != null)
-      {
-        foreach (ScanFolderSort sort in request.Sorts)
-        {
-          string? columnName = sort.Type switch
-          {
-            ScanFolderSortType.IsFolder => FileManager.COLUMN_IS_FOLDER,
-            ScanFolderSortType.Name => FileManager.COLUMN_NAME,
-            _ => null
-          };
+			if (request?.Sorts != null)
+			{
+				foreach (ScanFolderSort sort in request.Sorts)
+				{
+					string? columnName = sort.Type switch
+					{
+						ScanFolderSortType.IsFolder => FileManager.COLUMN_IS_FOLDER,
+						ScanFolderSortType.Name => FileManager.COLUMN_NAME,
+						_ => null
+					};
 
-          if (columnName == null)
-          {
-            continue;
-          }
+					if (columnName == null)
+					{
+						continue;
+					}
 
-          FileManager.OrderByClause.OrderBy orderBy = sort.Descending ? FileManager.OrderByClause.OrderBy.Descending : FileManager.OrderByClause.OrderBy.Ascending;
+					FileManager.OrderByClause.OrderBy orderBy = sort.Descending ? FileManager.OrderByClause.OrderBy.Descending : FileManager.OrderByClause.OrderBy.Ascending;
 
-          orderByClause.Add(new(columnName, orderBy));
-        }
-      }
-      else
-      {
-        orderByClause.Add(new(FileManager.COLUMN_IS_FOLDER, FileManager.OrderByClause.OrderBy.Descending));
-        orderByClause.Add(new(FileManager.COLUMN_NAME, FileManager.OrderByClause.OrderBy.Ascending));
-      }
+					orderByClause.Add(new(columnName, orderBy));
+				}
+			}
+			else
+			{
+				orderByClause.Add(new(FileManager.COLUMN_IS_FOLDER, FileManager.OrderByClause.OrderBy.Descending));
+				orderByClause.Add(new(FileManager.COLUMN_NAME, FileManager.OrderByClause.OrderBy.Ascending));
+			}
 
-      FileManager.Resource[] files = await fileManager.ScanFolder(
-        CurrentTransaction,
-        file,
-        CurrentUserAuthenticationToken,
-        null,
-        [.. orderByClause],
-        request?.IsFolder
-      );
-      long fileCount = await fileManager.CountFiles(CurrentTransaction, file, CurrentUserAuthenticationToken);
+			FileManager.Resource[] files = await fileManager.ScanFolder(
+			CurrentTransaction,
+			file,
+			CurrentUserAuthenticationToken,
+			null,
+			[.. orderByClause],
+			request?.IsFolder
+			).ToArrayAsync();
+			long fileCount = await fileManager.CountFiles(CurrentTransaction, file, CurrentUserAuthenticationToken);
 
-      return Data(files);
-    });
-  }
+			return Data(files);
+		});
+	}
 
-  public sealed record NewFileNameValidationRequest(string Name);
+	public sealed record NewFileNameValidationRequest(string Name);
 
-  public sealed record NewFileNameValidationResponse(
-    bool HasIllegalCharacters,
-    bool HasIllegalLength,
-    bool NameInUse
-  );
+	public sealed record NewFileNameValidationResponse(
+	bool HasIllegalCharacters,
+	bool HasIllegalLength,
+	bool NameInUse
+	);
 
-  [Route("~/file/!root/files/new-name-validation")]
-  [Route("~/file/:{fileId}/files/new-name-validation")]
-  [HttpPost]
-  public async Task<ObjectResult> NewFileNameValidation(long? fileId, [FromBody] NewFileNameValidationRequest request)
-  {
-    ObjectResult fileResult = await GetFileById(fileId);
-    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
-    {
-      return fileResult;
-    }
+	[Route("~/file/!root/files/new-name-validation")]
+	[Route("~/file/:{fileId}/files/new-name-validation")]
+	[HttpPost]
+	public async Task<ObjectResult> NewFileNameValidation(long? fileId, [FromBody] NewFileNameValidationRequest request)
+	{
+		ObjectResult fileResult = await GetFileById(fileId);
+		if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
+		{
+			return fileResult;
+		}
 
-    return await Run(async () =>
-    {
-      FileNameVaildationFlag fileNameVaildationFlag = await GetResourceManager<FileManager>().ValidateName(CurrentTransaction, file, request.Name);
+		return await Run(async () =>
+		{
+			FileNameVaildationFlag fileNameVaildationFlag = await GetResourceManager<FileManager>().ValidateName(CurrentTransaction, file, request.Name);
 
-      return Data<NewFileNameValidationResponse>(new(
-        fileNameVaildationFlag.HasFlag(FileNameVaildationFlag.HasIllegalCharacters),
-        fileNameVaildationFlag.HasFlag(FileNameVaildationFlag.HasIllegalLength),
-        fileNameVaildationFlag.HasFlag(FileNameVaildationFlag.NameInUse)
-      ));
-    });
-  }
+			return Data<NewFileNameValidationResponse>(new(
+			fileNameVaildationFlag.HasFlag(FileNameVaildationFlag.HasIllegalCharacters),
+			fileNameVaildationFlag.HasFlag(FileNameVaildationFlag.HasIllegalLength),
+			fileNameVaildationFlag.HasFlag(FileNameVaildationFlag.NameInUse)
+			));
+		});
+	}
 
-  public sealed record CreateFileRequest(string Name, IFormFile Content);
-  public sealed record CreateFileResponse(FileManager.Resource File);
+	public sealed record CreateFileRequest(string Name, IFormFile Content);
+	public sealed record CreateFileResponse(FileManager.Resource File);
 
-  [Route("~/file/!root/files/new-file")]
-  [Route("~/file/:{fileId}/files/new-file")]
-  [HttpPost]
-  public async Task<ActionResult> CreateFile(long? fileId, [FromForm] CreateFileRequest request)
-  {
-    ObjectResult fileResult = await GetFileById(fileId);
-    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? parentFolder))
-    {
-      return fileResult;
-    }
+	[Route("~/file/!root/files/new-file")]
+	[Route("~/file/:{fileId}/files/new-file")]
+	[HttpPost]
+	public async Task<ActionResult> CreateFile(long? fileId, [FromForm] CreateFileRequest request)
+	{
+		ObjectResult fileResult = await GetFileById(fileId);
+		if (!TryGetValueFromResult(fileResult, out FileManager.Resource? parentFolder))
+		{
+			return fileResult;
+		}
 
-    return await Run(async () =>
-    {
-      FileManager fileManager = GetResourceManager<FileManager>();
-      FileContentManager fileContentManager = GetResourceManager<FileContentManager>();
-      FileContentVersionManager fileContentVersionManager = GetResourceManager<FileContentVersionManager>();
-      FileDataManager fileDataManager = GetResourceManager<FileDataManager>();
+		return await Run(async () =>
+		{
+			FileManager fileManager = GetResourceManager<FileManager>();
+			FileContentManager fileContentManager = GetResourceManager<FileContentManager>();
+			FileContentVersionManager fileContentVersionManager = GetResourceManager<FileContentVersionManager>();
+			FileDataManager fileDataManager = GetResourceManager<FileDataManager>();
 
-      if (!parentFolder.IsFolder)
-      {
-        return Error(400);
-      }
-      else if (!await fileManager.TestAccess(CurrentTransaction, parentFolder, FileAccessExtent.ReadWrite, CurrentUserAuthenticationToken))
-      {
-        return Error(403);
-      }
+			if (!parentFolder.IsFolder)
+			{
+				return Error(400);
+			}
+			else if (!await fileManager.TestAccess(CurrentTransaction, parentFolder, FileAccessExtent.ReadWrite, CurrentUserAuthenticationToken))
+			{
+				return Error(403);
+			}
 
-      (FileManager.Resource file, KeyService.AesPair fileKey) = await fileManager.Create(CurrentTransaction, parentFolder, request.Name, false, CurrentUserAuthenticationToken);
-      FileContentManager.Resource fileContent = await fileContentManager.GetMainContent(CurrentTransaction, file);
-      FileContentVersionManager.Resource fileContentVersion = await fileContentVersionManager.GetBaseVersion(CurrentTransaction, fileContent);
-      {
-        await using Stream fileStream = request.Content.OpenReadStream();
-        while (fileStream.Position < fileStream.Length)
-        {
-          byte[] buffer = new byte[1024 * 32];
-          int bufferLength = await fileStream.ReadAsync(buffer);
+			(FileManager.Resource file, KeyService.AesPair fileKey) = await fileManager.Create(CurrentTransaction, parentFolder, request.Name, false, CurrentUserAuthenticationToken);
+			FileContentManager.Resource fileContent = await fileContentManager.GetMainContent(CurrentTransaction, file);
+			FileContentVersionManager.Resource fileContentVersion = await fileContentVersionManager.GetBaseVersion(CurrentTransaction, fileContent);
+			{
+				await using Stream fileStream = request.Content.OpenReadStream();
+				while (fileStream.Position < fileStream.Length)
+				{
+					byte[] buffer = new byte[1024 * 32];
+					int bufferLength = await fileStream.ReadAsync(buffer);
 
-          await fileDataManager.Write(CurrentTransaction, file, fileKey, fileContent, fileContentVersion, CompositeBuffer.From(buffer, 0, bufferLength), fileStream.Position - bufferLength);
-        }
-      }
+					await fileDataManager.Write(CurrentTransaction, file, fileKey, fileContent, fileContentVersion, CompositeBuffer.From(buffer, 0, bufferLength), fileStream.Position - bufferLength);
+				}
+			}
 
-      return Data(file);
-    });
-  }
+			return Data(file);
+		});
+	}
 
-  public sealed record CreateFolderRequest(string Name);
+	public sealed record CreateFolderRequest(string Name);
 
-  [Route("~/file/!root/files/new-folder")]
-  [Route("~/file/:{fileId}/files/new-folder")]
-  [HttpPost]
-  public async Task<ActionResult> CreateFolder(long? fileId, [FromBody] CreateFolderRequest request)
-  {
-    ObjectResult fileResult = await GetFileById(fileId);
-    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
-    {
-      return fileResult;
-    }
+	[Route("~/file/!root/files/new-folder")]
+	[Route("~/file/:{fileId}/files/new-folder")]
+	[HttpPost]
+	public async Task<ActionResult> CreateFolder(long? fileId, [FromBody] CreateFolderRequest request)
+	{
+		ObjectResult fileResult = await GetFileById(fileId);
+		if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
+		{
+			return fileResult;
+		}
 
-    return await Run(async () =>
-    {
-      FileManager fileManager = GetResourceManager<FileManager>();
+		return await Run(async () =>
+		{
+			FileManager fileManager = GetResourceManager<FileManager>();
 
-      if (!file.IsFolder)
-      {
-        return Error(400);
-      }
-      else if (!await fileManager.TestAccess(CurrentTransaction, file, FileAccessExtent.ReadWrite, CurrentUserAuthenticationToken))
-      {
-        return Error(403);
-      }
+			if (!file.IsFolder)
+			{
+				return Error(400);
+			}
+			else if (!await fileManager.TestAccess(CurrentTransaction, file, FileAccessExtent.ReadWrite, CurrentUserAuthenticationToken))
+			{
+				return Error(403);
+			}
 
-      return Data(await fileManager.Create(CurrentTransaction, file, request.Name, true, CurrentUserAuthenticationToken));
-    });
-  }
+			return Data(await fileManager.Create(CurrentTransaction, file, request.Name, true, CurrentUserAuthenticationToken));
+		});
+	}
 }

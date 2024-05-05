@@ -80,15 +80,15 @@
 		}
 		.my-trash {
 			position: fixed;
-			right: -170px;
-			bottom: 210px;
+			right: -125px;
+			bottom: 350px;
 			width: 25%;
 			padding: 25px;
 		}
 		.my-share {
 			position: fixed;
 			top: 575px;
-			right: 285px;
+			right: 275px;
 			bottom: 150px;
 			cursor: pointer;
 			padding: 25px;

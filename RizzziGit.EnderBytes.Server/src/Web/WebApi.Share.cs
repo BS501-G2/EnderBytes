@@ -3,99 +3,85 @@ using Microsoft.AspNetCore.Mvc;
 namespace RizzziGit.EnderBytes.Web;
 
 using Resources;
-using RizzziGit.EnderBytes.Services;
+using Services;
 
 public sealed partial class WebApi
 {
-  public sealed record CreateFileAccessRequest(FileAccessExtent Extent, long UserId);
+	public sealed record GetAccessListRequest(
+		FileAccessExtent? Extent,
+		long? TargetUserId,
+		long? AuthorUserId,
+		long? DomainUserId,
+		long? FromCreatedAt,
+		long? ToCreatedAt,
+		long? AfterId
+	);
 
-  // [Route("~/file/:{fileId}/shares")]
-  // [Route("~/file/!root/shares")]
-  // [HttpPost]
-  // public async Task<ObjectResult> CreateFileAccess(long? fileId, [FromBody] CreateFileAccessRequest request)
-  // {
-  //   ObjectResult fileResult = await GetFileById(fileId);
-  //   if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
-  //   {
-  //     return fileResult;
-  //   }
+	[Route("~/shares")]
+	[HttpGet]
+	public async Task<ObjectResult> GetAccessList([FromBody] GetAccessListRequest request)
+	{
+		return await Run(async () =>
+		{
+			FileAccessManager fileAccessManager = GetResourceManager<FileAccessManager>();
 
-  //   return await Run(async () =>
-  //   {
-  //     FileAccessManager fileAccessManager = GetResourceManager<FileAccessManager>();
-  //     FileManager fileManager = GetResourceManager<FileManager>();
-  //     UserManager userManager = GetResourceManager<UserManager>();
+			FileAccessExtent extent = request.Extent ?? FileAccessExtent.None;
 
-  //     UserManager.Resource? user = null;
-  //     if ((user = await userManager.GetById(CurrentTransaction, request.UserId)) == null)
-  //     {
-  //       return Error(400, "User does not exist.");
-  //     }
+			return Data(await fileAccessManager.List(CurrentTransaction, null, CurrentUserAuthenticationToken.Required().User, null).ToArrayAsync());
+		});
+	}
 
-  //     KeyService.AesPair? fileKey = await fileManager.GetKey(CurrentTransaction, file, FileAccessExtent.ManageAccess, CurrentUserAuthenticationToken.Required());
-  //     if (fileKey == null)
-  //     {
-  //       return Error(403);
-  //     }
+	public sealed record GetFileAccessListResponse(FileAccessExtent HighestExtent, FileAccessPoint? AccessPoint, FileAccessManager.Resource[] AccessList);
 
-  //     if (file.DomainUserId == CurrentUserAuthenticationToken.Required().UserId)
-  //     {
-  //       await fileAccessManager.GrantUser(CurrentTransaction, file, user, fileKey, request.Extent);
-  //     }
-  //   });
-  // }
+	[Route("~/file/:{fileId}/shares")]
+	[Route("~/file/!root/shares")]
+	[HttpGet]
+	public async Task<ObjectResult> GetFileAccessList(long? fileId)
+	{
+		ObjectResult fileResult = await GetFileById(fileId);
+		if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
+		{
+			return fileResult;
+		}
 
-  public sealed record GetFileAccessListResponse(FileAccessExtent HighestExtent, FileAccessPoint? AccessPoint, FileAccessManager.Resource[] AccessList);
+		return await Run(async () =>
+		{
+			FileAccessManager fileAccessManager = GetResourceManager<FileAccessManager>();
+			FileAccessManager.Resource[] fileAccesses = await fileAccessManager.List(CurrentTransaction, file, CurrentUserAuthenticationToken.Required().User, null).ToArrayAsync();
 
-  [Route("~/file/:{fileId}/shares")]
-  [Route("~/file/!root/shares")]
-  [HttpGet]
-  public async Task<ObjectResult> GetFileAccessList(long? fileId)
-  {
-    ObjectResult fileResult = await GetFileById(fileId);
-    if (!TryGetValueFromResult(fileResult, out FileManager.Resource? file))
-    {
-      return fileResult;
-    }
+			if (file.DomainUserId == CurrentUserAuthenticationToken.Required().UserId)
+			{
+				return Data(new GetFileAccessListResponse(FileAccessExtent.Full, null, fileAccesses));
+			}
 
-    return await Run(async () =>
-    {
-      FileAccessManager fileAccessManager = GetResourceManager<FileAccessManager>();
-      FileAccessManager.Resource[] fileAccesses = await fileAccessManager.List(CurrentTransaction, file, CurrentUserAuthenticationToken.Required().User, null);
+			FileAccessPoint? fileAccessPoint = null;
+			if ((fileAccessPoint = await fileAccessManager.GetAccessPoint(CurrentTransaction, CurrentUserAuthenticationToken.Required().User, file, FileAccessExtent.None)) == null)
+			{
+				return Error(403);
+			}
 
-      if (file.DomainUserId == CurrentUserAuthenticationToken.Required().UserId)
-      {
-        return Data(new GetFileAccessListResponse(FileAccessExtent.Full, null, fileAccesses));
-      }
+			FileAccessExtent highestExtent = fileAccesses
+			.Select(fileAccess => fileAccess.FileAccessExtent)
+			.Append(fileAccessPoint.AccessPoint.FileAccessExtent)
+			.Max();
 
-      FileAccessPoint? fileAccessPoint = null;
-      if ((fileAccessPoint = await fileAccessManager.GetAccessPoint(CurrentTransaction, CurrentUserAuthenticationToken.Required().User, file, FileAccessExtent.None)) == null)
-      {
-        return Error(403);
-      }
+			return Data(new GetFileAccessListResponse(
+			highestExtent,
+			fileAccessPoint,
+			list()
+			));
 
-      FileAccessExtent highestExtent = fileAccesses
-        .Select(fileAccess => fileAccess.FileAccessExtent)
-        .Append(fileAccessPoint.AccessPoint.FileAccessExtent)
-        .Max();
+			FileAccessManager.Resource[] list()
+			{
+				if (highestExtent >= FileAccessExtent.ManageAccess)
+				{
+					return fileAccesses;
+				}
 
-      return Data(new GetFileAccessListResponse(
-        highestExtent,
-        fileAccessPoint,
-        list()
-      ));
-
-      FileAccessManager.Resource[] list()
-      {
-        if (highestExtent >= FileAccessExtent.ManageAccess)
-        {
-          return fileAccesses;
-        }
-
-        return fileAccesses
-          .Where(fileAccess => fileAccess.TargetEntityType == FileAccessTargetEntityType.User && fileAccess.TargetEntityId == CurrentUserAuthenticationToken.Required().UserId)
-          .ToArray();
-      }
-    });
-  }
+				return fileAccesses
+				.Where(fileAccess => fileAccess.TargetEntityType == FileAccessTargetEntityType.User && fileAccess.TargetEntityId == CurrentUserAuthenticationToken.Required().UserId)
+				.ToArray();
+			}
+		});
+	}
 }

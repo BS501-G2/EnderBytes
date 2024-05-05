@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+	import { onMount } from 'svelte';
 
-  import { goto } from "$app/navigation";
+	import { goto } from '$app/navigation';
 
-  onMount(() => {
-    goto("/app/auth/login", { replaceState: true });
-  });
+	onMount(() => {
+		goto('/app/auth/login', { replaceState: true });
+	});
 </script>

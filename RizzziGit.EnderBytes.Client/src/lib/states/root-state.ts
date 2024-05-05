@@ -5,47 +5,47 @@ import { writable, type Writable } from "svelte/store";
 import { AppState } from "./app-state";
 
 export class RootState {
-  static #state?: Writable<RootState>
+	static #state?: Writable<RootState>
 
-  public static get state(): Writable<RootState> {
-    const state = this.#state ??= writable(new this())
+	public static get state(): Writable<RootState> {
+		const state = this.#state ??= writable(new this())
 
-    return state
-  }
+		return state
+	}
 
-  public constructor() {
-    this.theme = ColorScheme.Ender;
-    this.viewMode = ViewMode.Unset;
-    this.locale = Locale.en_US;
+	public constructor() {
+		this.theme = ColorScheme.Ender;
+		this.viewMode = ViewMode.Unset;
+		this.locale = Locale.en_US;
 
-    this.appState = writable(new AppState())
-  }
+		this.appState = writable(new AppState())
+	}
 
-  theme: ColorScheme;
-  viewMode: ViewMode;
-  locale: Locale;
+	theme: ColorScheme;
+	viewMode: ViewMode;
+	locale: Locale;
 
-  appState: Writable<AppState>
+	appState: Writable<AppState>
 
-  public get isDesktop(): boolean { return !!(this.viewMode & ViewMode.Desktop) }
-  public get isMobile(): boolean { return !!(this.viewMode & ViewMode.Mobile) }
+	public get isDesktop(): boolean { return !!(this.viewMode & ViewMode.Desktop) }
+	public get isMobile(): boolean { return !!(this.viewMode & ViewMode.Mobile) }
 
-  public getColor<T extends ColorKey>(key: T): ColorValues[T] {
-    return colors[this.theme][key]
-  }
+	public getColor<T extends ColorKey>(key: T): ColorValues[T] {
+		return colors[this.theme][key]
+	}
 
-  public getColorHex<T extends ColorKey>(key: T): string {
-    return `#${this.getColor(key).toString(16).padStart(8, '0') ?? 'transparent'}`
-  }
+	public getColorHex<T extends ColorKey>(key: T): string {
+		return `#${this.getColor(key).toString(16).padStart(8, '0') ?? 'transparent'}`
+	}
 
-  public getString<T extends LocaleKey>(
-    key: T,
-    params?: Record<string, string>,
-  ) {
-    return getString(this.locale, key, params);
-  }
+	public getString<T extends LocaleKey>(
+		key: T,
+		params?: Record<string, string>,
+	) {
+		return getString(this.locale, key, params);
+	}
 
-  public getClientResponseString(responseCodeString: string): string {
-    return getClientResponseString(this.locale, responseCodeString)
-  }
+	public getClientResponseString(responseCodeString: string): string {
+		return getClientResponseString(this.locale, responseCodeString)
+	}
 }

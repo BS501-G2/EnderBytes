@@ -1,5 +1,33 @@
+<script lang="ts" context="module">
+	export interface SharedFile {
+		author: any;
+		files: any[];
+	}
+</script>
+
 <script lang="ts">
+	import SharedEntry from './SharedPage/SharedEntry.svelte';
+
 	async function loading() {}
+
+	let sharedFiles: SharedFile[] = [
+		{
+			author: {
+				username: 'test',
+				firstName: 'test',
+				lastName: 'test',
+				middleName: 'test'
+			},
+			files: [
+				{
+					name: 'test'
+				}
+			]
+		}
+	];
+	let nextPage: boolean = true;
+
+	$: sharedFilesCount = sharedFiles.map((file) => file.files.length).reduce((a, b) => a + b, 0);
 </script>
 
 <div class="page">
@@ -8,12 +36,8 @@
 	</div>
 
 	<div class="body">
-		{#each (function* () {
-			for (let index = 0; index < 1000; index++) {
-				yield `${Math.random()}`;
-			}
-		})() as entry}
-			<p>{entry}</p>
+		{#each sharedFiles as sharedFile}
+			<SharedEntry {sharedFile} />
 		{/each}
 	</div>
 </div>
@@ -27,8 +51,10 @@
 		flex-grow: 1;
 		gap: 32px;
 
-    overflow-y: auto;
-
-    max-height: 100%;
+		max-height: 100%;
+		> div.body {
+			overflow-y: auto;
+			overflow-x: hidden;
+		}
 	}
 </style>

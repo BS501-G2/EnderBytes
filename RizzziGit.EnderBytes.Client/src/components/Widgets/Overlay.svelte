@@ -32,7 +32,7 @@
 <div class="content">
 	{#if onDismiss != null}
 		<div class="layer">
-			<div class="view" transition:fade|global={{ duration: 200 }}>
+			<div class="view" transition:fade|global={{ duration: 200, delay: 100 }}>
 				<button on:click={onClick} style={dim ? 'background-color: #0000003f' : ''}></button>
 			</div>
 		</div>

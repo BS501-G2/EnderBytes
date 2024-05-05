@@ -1,18 +1,18 @@
 <script lang="ts">
-  import { ChevronLeftIcon, ChevronRightIcon } from "svelte-feather-icons";
+	import { ChevronLeftIcon, ChevronRightIcon } from 'svelte-feather-icons';
 
-  import TitleBarChip from "./TitleBarChip.svelte";
-  import TitleBarChipButton from "./TitleBarChip/Button.svelte";
+	import TitleBarChip from './TitleBarChip.svelte';
+	import TitleBarChipButton from './TitleBarChip/Button.svelte';
 </script>
 
 <TitleBarChip>
-  <TitleBarChipButton onClick={() => history.back()}>
-    <ChevronLeftIcon strokeWidth={2} size="18em" />
-  </TitleBarChipButton>
+	<TitleBarChipButton onClick={() => history.back()}>
+		<ChevronLeftIcon strokeWidth={2} size="18em" />
+	</TitleBarChipButton>
 </TitleBarChip>
 
 <TitleBarChip>
-  <TitleBarChipButton onClick={() => history.forward()}>
-    <ChevronRightIcon strokeWidth={2} size="18em" />
-  </TitleBarChipButton>
+	<TitleBarChipButton onClick={() => history.forward()}>
+		<ChevronRightIcon strokeWidth={2} size="18em" />
+	</TitleBarChipButton>
 </TitleBarChip>

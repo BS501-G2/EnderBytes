@@ -248,6 +248,7 @@
 			on:mousemove={(event) => listenBackgroundEvent('move', event)}
 			on:mouseup={(event) => listenBackgroundEvent('up', event)}
 			on:mousedown={(event) => listenBackgroundEvent('down', event)}
+			on:mouseleave={() => (mouseDrag = null)}
 		>
 			{#each files as file, index}
 				<FileElement

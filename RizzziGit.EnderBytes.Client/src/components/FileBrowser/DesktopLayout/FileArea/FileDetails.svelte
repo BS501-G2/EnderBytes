@@ -10,6 +10,13 @@
 </script>
 
 <div class="file-details">
+	<h2>{$selection[0]?.name ?? info?.current.name}</h2>
+	<div class="a">
+		<button>Details</button>
+		<button>{info?.access.accessList ?? 0 >= 3 ? 'Manage ' : ''}Access</button>
+		<button>History</button>
+	</div>
+
 	{#if $selection.length > 1}
 		<div class="multiple-selected-banner">
 			<i class="fa-regular fa-copy"></i>

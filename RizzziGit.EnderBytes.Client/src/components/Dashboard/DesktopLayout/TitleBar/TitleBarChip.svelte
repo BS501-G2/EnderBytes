@@ -1,25 +1,25 @@
 <div class="title-bar-chip">
-  <slot />
+	<slot />
 </div>
 
 <style lang="scss">
-  div.title-bar-chip {
-    -webkit-app-region: no-drag;
+	div.title-bar-chip {
+		-webkit-app-region: no-drag;
 
-    user-select: none;
+		user-select: none;
 
-    margin: 8px 0px 8px 0px;
+		margin: 8px 0px 8px 0px;
 
-    border-style: none;
-    border-radius: 8px;
+		border-style: none;
+		border-radius: 8px;
 
-    color: var(--onPrimaryContainer);
+		color: var(--onPrimaryContainer);
 
-    display: flex;
+		display: flex;
 
-    // align-items: center;
-    gap: 4px;
+		// align-items: center;
+		gap: 4px;
 
-    background-color: var(--primary);
-  }
+		background-color: var(--primary);
+	}
 </style>

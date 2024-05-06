@@ -42,11 +42,18 @@ public abstract partial class ResourceManager<M, R>
 		{
 			public override string Apply(List<object?> parameterList)
 			{
+				WhereClause[] expressions = Expressions.Where((e) => e != null).Select((e) => e!).ToArray();
+
+				if (expressions.Length == 0)
+				{
+					return "";
+				}
+
 				StringBuilder builder = new("(");
 
-				for (int index = 0; index < Expressions.Length; index++)
+				for (int index = 0; index < expressions.Length; index++)
 				{
-					WhereClause? clause = Expressions[index];
+					WhereClause? clause = expressions[index];
 					if (clause != null)
 					{
 						if (index != 0)

@@ -6,6 +6,7 @@ using Resources;
 
 public sealed partial class WebApi
 {
+
 	[Route("~/user/@{username}")]
 	[HttpGet]
 	public async Task<ActionResult> GetByUsername(string username)

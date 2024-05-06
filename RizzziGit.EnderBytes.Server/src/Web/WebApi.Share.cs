@@ -9,7 +9,6 @@ public sealed partial class WebApi
 {
 	public sealed record GetAccessListRequest(
 		FileAccessExtent? Extent,
-		long? TargetUserId,
 		long? AuthorUserId,
 		long? DomainUserId,
 		long? FromCreatedAt,
@@ -19,15 +18,46 @@ public sealed partial class WebApi
 
 	[Route("~/shares")]
 	[HttpGet]
-	public async Task<ObjectResult> GetAccessList([FromBody] GetAccessListRequest request)
+	public async Task<ObjectResult> GetAccessList([FromBody] GetAccessListRequest? request)
 	{
 		return await Run(async () =>
 		{
 			FileAccessManager fileAccessManager = GetResourceManager<FileAccessManager>();
 
-			FileAccessExtent extent = request.Extent ?? FileAccessExtent.None;
+			FileAccessExtent extent = request?.Extent ?? FileAccessExtent.None;
+			UserManager.Resource? authorUser = request?.AuthorUserId != null ? await GetResourceManager<UserManager>().GetByRequiredId(CurrentTransaction, (long)request.AuthorUserId) : null;
 
-			return Data(await fileAccessManager.List(CurrentTransaction, null, CurrentUserAuthenticationToken.Required().User, null).ToArrayAsync());
+			if (request?.FromCreatedAt != null)
+			{
+				extent = FileAccessExtent.ReadWrite;
+			}
+
+			List<FileAccessManager.Resource> fileAccesses = [];
+			foreach (FileAccessManager.Resource fileAccess in await fileAccessManager.List(
+				CurrentTransaction,
+				null,
+				CurrentUserAuthenticationToken.Required().User,
+				extent,
+				request?.AuthorUserId != null ? await GetResourceManager<UserManager>().GetByRequiredId(CurrentTransaction, (long)request.AuthorUserId) : null,
+				request?.FromCreatedAt,
+				request?.ToCreatedAt
+			).ToArrayAsync())
+			{
+				FileManager.Resource file = await GetResourceManager<FileManager>().GetByRequiredId(CurrentTransaction, fileAccess.TargetFileId);
+
+				if (
+					(request != null && request.DomainUserId != file.DomainUserId) ||
+					(request?.AfterId != null && fileAccess.Id <= request.AfterId) ||
+					fileAccesses.Count >= 100
+				)
+				{
+					continue;
+				}
+
+				fileAccesses.Add(fileAccess);
+			}
+
+			return Data(fileAccesses);
 		});
 	}
 
@@ -66,9 +96,9 @@ public sealed partial class WebApi
 			.Max();
 
 			return Data(new GetFileAccessListResponse(
-			highestExtent,
-			fileAccessPoint,
-			list()
+				highestExtent,
+				fileAccessPoint,
+				list()
 			));
 
 			FileAccessManager.Resource[] list()
@@ -79,8 +109,8 @@ public sealed partial class WebApi
 				}
 
 				return fileAccesses
-				.Where(fileAccess => fileAccess.TargetEntityType == FileAccessTargetEntityType.User && fileAccess.TargetEntityId == CurrentUserAuthenticationToken.Required().UserId)
-				.ToArray();
+					.Where(fileAccess => fileAccess.TargetEntityType == FileAccessTargetEntityType.User && fileAccess.TargetEntityId == CurrentUserAuthenticationToken.Required().UserId)
+					.ToArray();
 			}
 		});
 	}

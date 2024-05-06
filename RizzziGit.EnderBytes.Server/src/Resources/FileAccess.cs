@@ -98,10 +98,13 @@ public sealed class FileAccessManager : ResourceManager
 		));
 	}
 
-	public IAsyncEnumerable<Resource> List(ResourceService.Transaction transaction, FileManager.Resource? file = null, UserManager.Resource? targetUser = null, FileAccessExtent? extent = null, UserManager.Resource? authorUser = null, LimitClause? limit = null, OrderByClause[]? orderBy = null)
+	public IAsyncEnumerable<Resource> List(ResourceService.Transaction transaction, FileManager.Resource? file = null, UserManager.Resource? targetUser = null, FileAccessExtent? extent = null, UserManager.Resource? authorUser = null, long? fromCreateTime = null, long? toCreateTime = null, LimitClause? limit = null, OrderByClause[]? orderBy = null)
 	{
 		return Select(transaction, new WhereClause.Nested("and",
 			file != null ? new WhereClause.CompareColumn(COLUMN_TARGET_FILE_ID, "=", file.Id) : null,
+
+			fromCreateTime != null ? new WhereClause.CompareColumn(COLUMN_CREATE_TIME, ">=", fromCreateTime) : null,
+			toCreateTime != null ? new WhereClause.CompareColumn(COLUMN_CREATE_TIME, "<=", toCreateTime) : null,
 
 			targetUser != null ? new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_ID, "=", targetUser.Id) : null,
 			targetUser != null ? new WhereClause.CompareColumn(COLUMN_TARGET_ENTITY_TYPE, "=", FileAccessTargetEntityType.User) : null,

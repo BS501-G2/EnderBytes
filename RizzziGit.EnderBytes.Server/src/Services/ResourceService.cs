@@ -52,7 +52,7 @@ public sealed partial class ResourceService : Server.SubService
 		);
 	}
 
-	protected override async Task OnStop(System.Exception? exception = null)
+	protected override async Task OnStop(Exception? exception = null)
 	{
 		foreach (ResourceManager resourceManager in ResourceManagers.Reverse<ResourceManager>())
 		{

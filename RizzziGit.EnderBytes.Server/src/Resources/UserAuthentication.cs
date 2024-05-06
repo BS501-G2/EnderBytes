@@ -230,10 +230,10 @@ public sealed partial class UserAuthenticationManager : ResourceManager<UserAuth
 	{
 		UserAuthenticationToken? userAuthenticationToken = null;
 
-		await foreach (Resource userAuthentication in Select(transaction, new WhereClause.Nested("and",
+		foreach (Resource userAuthentication in await Select(transaction, new WhereClause.Nested("and",
 			new WhereClause.CompareColumn(COLUMN_TYPE, "=", (byte)UserAuthenticationType.SessionToken),
 			new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)
-		)))
+		)).ToArrayAsync())
 		{
 			if ((await transaction.GetManager<UserAuthenticationSessionTokenManager>().GetByUserAuthentication(transaction, userAuthentication)).Expired)
 			{

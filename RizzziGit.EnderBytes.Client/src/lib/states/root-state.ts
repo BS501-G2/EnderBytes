@@ -1,6 +1,5 @@
 import { ColorScheme, type ColorKey, type ColorValues, colors } from "$lib/color-schemes";
 import { Locale, LocaleKey, getClientResponseString, getString } from "$lib/locale";
-import { ViewMode } from "$lib/view-mode";
 import { writable, type Writable } from "svelte/store";
 import { AppState } from "./app-state";
 
@@ -15,20 +14,15 @@ export class RootState {
 
 	public constructor() {
 		this.theme = ColorScheme.Ender;
-		this.viewMode = ViewMode.Unset;
 		this.locale = Locale.en_US;
 
 		this.appState = writable(new AppState())
 	}
 
 	theme: ColorScheme;
-	viewMode: ViewMode;
 	locale: Locale;
 
 	appState: Writable<AppState>
-
-	public get isDesktop(): boolean { return !!(this.viewMode & ViewMode.Desktop) }
-	public get isMobile(): boolean { return !!(this.viewMode & ViewMode.Mobile) }
 
 	public getColor<T extends ColorKey>(key: T): ColorValues[T] {
 		return colors[this.theme][key]

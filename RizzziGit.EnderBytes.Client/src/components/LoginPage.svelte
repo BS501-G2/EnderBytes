@@ -1,7 +1,6 @@
 <script lang="ts" context="module">
 	import { LocaleKey } from '$lib/locale';
 	import { RootState } from '$lib/states/root-state';
-	import { ViewMode } from '$lib/view-mode';
 
 	import SiteBanner from './LoginPage/SiteBanner.svelte';
 	import Banner from './LoginPage/Banner.svelte';
@@ -10,6 +9,7 @@
 
 <script lang="ts">
 	import ResponsiveLayout from './Bindings/ResponsiveLayout.svelte';
+	import { ViewMode, viewMode } from './Bindings/ResponsiveLayoutRoot.svelte';
 
 	const rootState = RootState.state;
 
@@ -61,7 +61,7 @@
 				</svg>
 			</svelte:fragment>
 		</ResponsiveLayout>
-		<div class="form-area {$rootState.viewMode & ViewMode.Mobile ? 'form-area-mobile' : ''}">
+		<div class="form-area {$viewMode & ViewMode.Mobile ? 'form-area-mobile' : ''}">
 			<div class="form-content">
 				<SiteBanner />
 

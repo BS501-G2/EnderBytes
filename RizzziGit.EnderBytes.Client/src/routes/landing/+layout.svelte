@@ -1,12 +1,9 @@
 <script lang="ts">
-	import { ViewMode } from '$lib/view-mode';
 	import { RootState } from '$lib/states/root-state';
 
 	import NavigationBarDesktop from './IntroNavigationBarDesktop.svelte';
 	import NavigationBarMobile from './IntroNavigationBarMobile.svelte';
 	import ResponsiveLayout from '../../components/Bindings/ResponsiveLayout.svelte';
-
-	const rootState = RootState.state;
 </script>
 
 <ResponsiveLayout>

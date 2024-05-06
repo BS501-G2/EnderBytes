@@ -21,6 +21,18 @@
 			files: [
 				{
 					name: 'test'
+				},
+				{
+					name: 'test'
+				},
+				{
+					name: 'test'
+				},
+				{
+					name: 'test'
+				},
+				{
+					name: 'test'
 				}
 			]
 		}

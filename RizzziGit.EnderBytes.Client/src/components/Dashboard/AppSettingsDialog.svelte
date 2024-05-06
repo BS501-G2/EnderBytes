@@ -161,7 +161,7 @@
 					<svelte:fragment slot="body">
 						<div>
 							<div style="display: flex; justify-content: center; align-items: center;">
-								<div style="width: 25px; height: 50px; box-sizing: border-box;">
+								<div style="width: 25px; height: 50px; color: white; border: none;">
 									<select class="language-select">
 										<option value="en">English</option>
 										<option value="fil">Filipino</option>
@@ -242,7 +242,7 @@
 								</div>
 
 								<div
-									style="display:flex; justify-content:center; padding-top:10px; padding-bottom:10px"
+									style="display:flex; justify-content:center; padding-top:10px; padding-bottom:10px;"
 								>
 									<button
 										style="
@@ -265,6 +265,39 @@
 						</div></svelte:fragment
 					>
 				</Expandable>
+        <div class="buttonDiscardSave" style="Display:flex; margin-top:125px; margin-left:575px">
+          <button
+            style="
+          background-color: var(--error);
+          cursor: pointer;
+          border-color: var(--onPrimaryContainerVariant);
+          color: white;
+          padding: 10px 15px;
+          text-align: center;
+          text-decoration: none;
+          display: inline-block;
+          font-size: 16px;
+          border-radius:10px;
+          font-weight: bold;
+          margin-right:20px;
+          ">Discard</button
+          >
+          <button
+            style="
+          background-color: var(--primaryContainer);
+          cursor: pointer;
+          border-color: var(--onPrimaryContainerVariant);
+          color: white;
+          padding: 10px 23px;
+          text-align: center;
+          text-decoration: none;
+          display: inline-block;
+          font-size: 16px;
+          border-radius:10px;
+          font-weight: bold;
+          ">Save</button
+          >
+        </div>
 			</div>
 		</div>
 	</Dialog>

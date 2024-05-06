@@ -111,7 +111,7 @@ public abstract partial class ResourceManager<M, R>(ResourceService service, str
 
 		void log(long id) => Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{id}");
 		long count = 0;
-		await foreach (Func<Task> callback in SqlQuery(
+		foreach (Func<Task> callback in await SqlQuery(
 			transaction,
 			(reader) =>
 			{
@@ -136,7 +136,7 @@ public abstract partial class ResourceManager<M, R>(ResourceService service, str
 			$"select * from {Name} where {whereClause};" +
 			$"delete from {Name} where {whereClause};",
 			[.. parameterList]
-		))
+		).ToArrayAsync())
 		{
 			await callback();
 			count++;
@@ -159,7 +159,7 @@ public abstract partial class ResourceManager<M, R>(ResourceService service, str
 		void log(long id) => Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Updated {Name} resource: #{id}");
 
 		long count = 0;
-		await foreach (Func<Task> callback in SqlQuery(
+		foreach (Func<Task> callback in await SqlQuery(
 			transaction,
 			(reader) =>
 			{
@@ -190,7 +190,7 @@ public abstract partial class ResourceManager<M, R>(ResourceService service, str
 			$"select * from {temporaryTableName}; " +
 			$"drop table {temporaryTableName};",
 			[.. parameterList]
-		))
+		).ToArrayAsync())
 		{
 			await callback();
 			count++;

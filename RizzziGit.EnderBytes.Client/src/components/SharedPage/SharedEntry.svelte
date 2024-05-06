@@ -9,12 +9,14 @@
 	<div class="details">
 		<p class="username">
 			<a class="subject" href="/app/users/:{sharedFile.author.id}">{sharedFile.author.firstName}</a>
-			<span class="predicate"
-				>shared {sharedFile.files.length} file{sharedFile.files.length > 1 ? 's' : ''}</span
-			>
+			<span class="predicate">
+				shared {sharedFile.files.length} file{sharedFile.files.length > 1 ? 's' : ''}
+			</span>
 		</p>
 
-		<p>asd</p>
+		<div class="file-list">
+
+		</div>
 	</div>
 </div>
 
@@ -58,6 +60,10 @@
 					font-style: italic;
 					font-weight: lighter;
 				}
+			}
+
+			> div.file-list {
+
 			}
 		}
 	}

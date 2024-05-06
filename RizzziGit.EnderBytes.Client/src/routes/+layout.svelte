@@ -6,7 +6,7 @@
 
 	import { Locale, LocaleKey } from '$lib/locale';
 	import { RootState } from '$lib/states/root-state';
-	import { ColorScheme, serializeThemeColorsIntoInlineStyle } from '$lib/color-schemes';
+	import { ColorScheme, ColorKey, serializeThemeColorsIntoInlineStyle } from '$lib/color-schemes';
 	import ResponsiveLayoutRoot from '../components/Bindings/ResponsiveLayoutRoot.svelte';
 
 	const rootState = RootState.state;
@@ -38,6 +38,7 @@
 	<title>
 		{$rootState.getString(LocaleKey.AppName)} - {$rootState.getString(LocaleKey.AppTagline)}
 	</title>
+	<meta name="theme-color" content={$rootState.getColorHex(ColorKey.PrimaryContainer)} />
 
 	{@html `<style>
 	:root {

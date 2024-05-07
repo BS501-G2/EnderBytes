@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Moment from 'moment';
 	import { FileIcon, FolderIcon } from 'svelte-feather-icons';
 	import Awaiter from '../Bindings/Awaiter.svelte';
 	import { apiFetch } from '../Bindings/Client.svelte';
@@ -19,7 +20,9 @@
 						</a>
 						<span class="predicate"> shared to you. </span>
 					</p>
-					<p class="time">100 years ago</p>
+					<p class="time">
+						{Moment(Moment.unix(fileAccesses[0].createTime / 1000)).fromNow()}
+					</p>
 				</div>
 
 				<div class="file-list">
@@ -106,11 +109,13 @@
 					> span.predicate {
 						font-style: italic;
 						font-weight: lighter;
+						color: var(--shadow);
 					}
 				}
 
 				> p.time {
 					font-weight: lighter;
+					color: var(--shadow);
 					font-style: italic;
 					font-size: 0.75em;
 				}
@@ -127,22 +132,31 @@
 					display: flex;
 					flex-direction: row;
 					align-items: center;
+					padding: 8px;
 					gap: 8px;
+					min-width: min(320px, 100%);
+					max-width: min(320px, 100%);
+					box-sizing: border-box;
 					text-decoration: none;
 
 					background-color: var(--background);
 					color: var(--onBackground);
 
-					padding: 16px;
-
 					border-radius: 8px;
+
+					> div.icon {
+						display: flex;
+						align-items: center;
+						justify-content: center;
+					}
+
 					> div.info {
 						display: flex;
 						flex-direction: column;
 						gap: 4px;
 
 						> p.name {
-							font-weight: bolder;
+							// font-weight: bolder;
 						}
 
 						> p {

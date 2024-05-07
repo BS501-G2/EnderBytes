@@ -21,11 +21,12 @@
 
 <div class="page">
 	<div class="main-panel">
-		{#each sharedFiles as { fileAccesses }}
-			<SharedFilesGroup {fileAccesses} />
-		{/each}
-		<Awaiter
-			callback={async () => {
+		<div class="list-container">
+			{#each sharedFiles as { fileAccesses }}
+				<SharedFilesGroup {fileAccesses} />
+			{/each}
+			<Awaiter
+				callback={async () => {
 				if (!nextPage) return
 
 				const accesses = await apiFetch({ path: '/shares' })
@@ -48,7 +49,8 @@
 
 				console.log(sharedFiles)
 			}}
-		/>
+			/>
+		</div>
 	</div>
 
 	<div class="filter-panel">

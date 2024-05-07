@@ -17,9 +17,9 @@ public sealed partial class ResourceService
 		public sealed class NoMatchException(string name) : Exception($"No \"{name}\" resource has matched the criteria.");
 		public sealed class ConstraintException(string name, string? message = null) : Exception(message ?? $"The \"{name}\" resource failed to pass constraint check.");
 
-		protected const string COLUMN_ID = "Id";
-		protected const string COLUMN_CREATE_TIME = "CreateTime";
-		protected const string COLUMN_UPDATE_TIME = "UpdateTime";
+		public const string COLUMN_ID = "Id";
+		public const string COLUMN_CREATE_TIME = "CreateTime";
+		public const string COLUMN_UPDATE_TIME = "UpdateTime";
 
 		public readonly ResourceService Service = service;
 

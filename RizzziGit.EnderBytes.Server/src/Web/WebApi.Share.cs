@@ -40,7 +40,11 @@ public sealed partial class WebApi
 				extent,
 				request?.AuthorUserId != null ? await GetResourceManager<UserManager>().GetByRequiredId(CurrentTransaction, (long)request.AuthorUserId) : null,
 				request?.FromCreatedAt,
-				request?.ToCreatedAt
+				request?.ToCreatedAt,
+				null,
+				orderBy: [
+					new FileAccessManager.OrderByClause(ResourceService.ResourceManager.COLUMN_CREATE_TIME, FileAccessManager.OrderByClause.OrderBy.Descending)
+				]
 			).ToArrayAsync())
 			{
 				FileManager.Resource file = await GetResourceManager<FileManager>().GetByRequiredId(CurrentTransaction, fileAccess.TargetFileId);

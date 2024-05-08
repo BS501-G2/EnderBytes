@@ -69,15 +69,12 @@
 	}
 
 	div.entry {
-		background-color: var(--backgroundVariant);
 		color: var(--onBackgroundVariant);
 
 		// min-width: calc(520px - 3em - 48px);
 		// max-width: calc(520px - 3em - 48px);
 
 		padding: 16px;
-
-		border-radius: 8px;
 
 		display: flex;
 		flex-direction: row;
@@ -126,7 +123,12 @@
 				flex-direction: row;
 				flex-wrap: wrap;
 				align-items: flex-start;
+				justify-content: center;
 				gap: 8px;
+
+				background-color: var(--backgroundVariant);
+				padding: 8px;
+				border-radius: 8px;
 
 				> a.file-entry {
 					display: flex;
@@ -154,10 +156,6 @@
 						display: flex;
 						flex-direction: column;
 						gap: 4px;
-
-						> p.name {
-							// font-weight: bolder;
-						}
 
 						> p {
 							line-height: 1em;

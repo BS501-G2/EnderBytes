@@ -33,7 +33,7 @@
 
 <div class="controls">
 	<div class="section left-section">
-		{#if (info?.access.highestExtent ?? 0) >= 1}
+		{#if (info?.access.highestExtent ?? 0) >= 2}
 			<Button {buttonClass} {outline} {enabled} onClick={() => ($fileCreationDialog = true)}>
 				<div class="button">
 					<UploadIcon {size} />

@@ -29,13 +29,8 @@
 </script>
 
 <div class="page">
-	<div class="main-panel">
-		<SharedFilesList bind:filter bind:sharedFiles />
-	</div>
-
-	<div class="filter-panel">
-		<FilterPanel bind:filter />
-	</div>
+	<SharedFilesList bind:filter bind:sharedFiles />
+	<FilterPanel bind:filter />
 </div>
 
 <style lang="scss">
@@ -48,22 +43,8 @@
 
 		min-height: 100%;
 		max-height: 100%;
+		box-sizing: border-box;
+
 		max-width: 100%;
-
-		> div.main-panel {
-			display: flex;
-			flex-direction: column;
-			flex-grow: 1;
-			align-items: center;
-		}
-
-		> div.filter-panel {
-			min-width: 320px;
-			max-width: 320px;
-
-			border-radius: 8px;
-			padding: 16px;
-			background-color: var(--backgroundVariant);
-		}
 	}
 </style>

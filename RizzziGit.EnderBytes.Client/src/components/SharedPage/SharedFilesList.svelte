@@ -8,59 +8,63 @@
 	export let sharedFiles: SharedFileListGroup[] = [];
 
 	let nextPage: boolean = true;
+	let asd: number = 0;
 </script>
 
-<div class="list-container">
-	{#each sharedFiles as { fileAccesses }}
-		<SharedFilesGroup {fileAccesses} />
-	{/each}
-	<Awaiter
-		callback={async () => {
-			if (!nextPage) return;
+<div class="main-panel">
+	<div class="list-container">
+		{#each sharedFiles as { fileAccesses }}
+			<SharedFilesGroup {fileAccesses} />
+		{/each}
+		{#if nextPage}
+			<div>
+				<Awaiter
+					callback={async () => {
+						if (!nextPage) return;
 
-			const accesses = await apiFetch({ path: '/shares' });
+						const accesses = await apiFetch({ path: '/shares' });
 
-			if (accesses.length < 1) {
-				nextPage = false;
-				return;
-			}
+						if (accesses.length < 1) {
+							nextPage = false;
+							return;
+						}
 
-			for (const accesss of accesses) {
-        const group = sharedFiles.findLast((group) => group.fileAccesses[0]?.authorUserId == accesss.authorUserId);
+						for (const accesss of accesses) {
+							const group = sharedFiles.findLast(
+								(group) => group.fileAccesses[0]?.authorUserId == accesss.authorUserId
+							);
 
-        if (!group) {
-          sharedFiles.push({
-            fileAccesses: [accesss],
-          });
-        } else {
-          group.fileAccesses.push(accesss);
-        }
-			}
-
-			// let access: any | null
-			// while ((access = accesses.shift()) != null) {
-			// 	if (sharedFiles.length < 1 || sharedFiles[0].fileAccesses[0]?.authorUserId != access.authorUserId) {
-			// 		sharedFiles.unshift({
-			// 			fileAccesses: [access],
-			// 		})
-			// 	} else {
-			// 		sharedFiles[0].fileAccesses.unshift(access)
-			// 	}
-			// }
-
-			// console.log(sharedFiles)
-		}}
-	/>
+							if (!group) {
+								sharedFiles.push({
+									fileAccesses: [accesss]
+								});
+							} else {
+								group.fileAccesses.push(accesss);
+							}
+						}
+					}}
+				/>
+			</div>
+		{/if}
+	</div>
 </div>
 
 <style lang="scss">
-	div.list-container {
+	div.main-panel {
 		display: flex;
 		flex-direction: column;
 		flex-grow: 1;
-		gap: 16px;
+		align-items: center;
 
-		max-width: min(768px, 100%);
-		min-width: min(768px, 100%);
+		overflow-y: auto;
+
+		> div.list-container {
+			display: flex;
+			flex-direction: column;
+			flex-grow: 1;
+
+			max-width: min(768px, 100%);
+			min-width: min(768px, 100%);
+		}
 	}
 </style>

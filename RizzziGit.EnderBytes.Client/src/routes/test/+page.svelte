@@ -1,13 +1,18 @@
 <script lang="ts">
 	import BindThis from './BindThis.svelte';
 	import Runes from './Runes.svelte';
+	import Shimmer from './Shimmer.svelte';
 	import Trail from './Trail.svelte';
 
-	let number: number = 0
+	// let number: number = 0
 </script>
 
-<Trail />
-<BindThis />
+<Shimmer shimmer>
+	<p>Asd</p>
+</Shimmer>
 
-<p>{number}</p>
-<Runes bind:number={number}/>
+<!-- <Trail />
+<BindThis /> -->
+
+<!-- <p>{number}</p>
+<Runes bind:number={number}/> -->

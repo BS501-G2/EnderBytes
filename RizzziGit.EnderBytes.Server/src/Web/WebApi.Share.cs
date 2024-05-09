@@ -41,7 +41,7 @@ public sealed partial class WebApi
 				request?.AuthorUserId != null ? await GetResourceManager<UserManager>().GetByRequiredId(CurrentTransaction, (long)request.AuthorUserId) : null,
 				request?.FromCreatedAt,
 				request?.ToCreatedAt,
-				null,
+				new(25),
 				orderBy: [
 					new FileAccessManager.OrderByClause(ResourceService.ResourceManager.COLUMN_CREATE_TIME, FileAccessManager.OrderByClause.OrderBy.Descending)
 				]
@@ -52,7 +52,7 @@ public sealed partial class WebApi
 				if (
 					(request != null && request.DomainUserId != file.DomainUserId) ||
 					(request?.AfterId != null && fileAccess.Id <= request.AfterId) ||
-					fileAccesses.Count >= 100
+					fileAccesses.Count >= 25
 				)
 				{
 					continue;

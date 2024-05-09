@@ -9,6 +9,7 @@ using Core;
 using Utilities;
 using Services;
 using Resources;
+using System.Security.Cryptography;
 
 public static class Program
 {
@@ -115,6 +116,21 @@ public static class Program
 
 			await fileAccessManager.GrantUser(transaction, readWriteFolder, otherUser, readOnlyFolderKey, user, FileAccessExtent.ReadWrite);
 			await fileAccessManager.GrantUser(transaction, readOnlyFolder, otherUser, readOnlyFolderKey, user, FileAccessExtent.ReadOnly);
+
+			for (int index = 0; index < Random.Shared.Next(1000); index++)
+			{
+				(UserManager.Resource userTemp, UserAuthenticationToken userAuthenticationTokenTemp) = await userManager.Create(transaction, $"usertest{index}", "User", "Random" + $"{index}", "G", "TestTest123;");
+				Handlers.Add(async (transaction) => await userManager.Delete(transaction, userTemp));
+
+				FileManager.Resource rootFolderTemp = await fileManager.GetRootFromUser(transaction, userAuthenticationTokenTemp);
+
+				for (int folderIndex = 0; folderIndex < Random.Shared.Next(1000); folderIndex++)
+				{
+					(FileManager.Resource folder, KeyService.AesPair folderKey) = await fileManager.Create(transaction, rootFolderTemp, $"Folder #{folderIndex}", true, userAuthenticationTokenTemp);
+
+					await fileAccessManager.GrantUser(transaction, folder, otherUser, folderKey, userTemp, RandomNumberGenerator.GetBytes(1)[0] > 0x0f ? FileAccessExtent.ReadWrite : FileAccessExtent.ReadOnly);
+				}
+			}
 		});
 	});
 }

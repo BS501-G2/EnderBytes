@@ -33,7 +33,7 @@ public sealed class FileAccessManager : ResourceManager
 		long TargetFileId,
 
 		byte[] TargetFileAesKey,
-		FileAccessExtent FileAccessExtent
+		FileAccessExtent Extent
 	) : ResourceManager.Resource(Id, CreateTime, UpdateTime)
 	{
 		[JsonIgnore]

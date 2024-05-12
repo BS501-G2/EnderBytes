@@ -2,10 +2,10 @@
 	import { goto } from '$app/navigation';
 	import { navigating, page } from '$app/stores';
 
-	import Dashboard from '../../components/Dashboard.svelte';
-	import LoadingBar from '../../components/Widgets/LoadingBar.svelte';
-	import { runningBackgroundTasks } from '../../components/BackgroundTaskList.svelte';
-	import { session } from '../../components/Bindings/Client.svelte';
+	import Dashboard from './app.svelte';
+	import LoadingBar from '$lib/widgets/loading-bar.svelte';
+	import { runningBackgroundTasks } from '$lib/background-task.svelte';
+	import { session } from '$lib/client.svelte';
 
 	$: {
 		if ($session == null) {

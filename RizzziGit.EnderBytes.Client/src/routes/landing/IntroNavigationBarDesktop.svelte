@@ -174,7 +174,7 @@
 						font-size: 14px;
 						padding: 0px 16px 0px 16px;
 						transition: cubic-bezier(0.075, 0.82, 0.165, 1);
-						transition-duration: 300ms;
+						transition-duration: 200ms;
 
 						margin: 0px 8px 0px 8px;
 

@@ -54,7 +54,7 @@
 				font-size: 14px;
 
 				transition: cubic-bezier(0.075, 0.82, 0.165, 1);
-				transition-duration: 300ms;
+				transition-duration: 200ms;
 
 				cursor: pointer;
 			}

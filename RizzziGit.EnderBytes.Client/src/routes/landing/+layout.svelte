@@ -3,17 +3,27 @@
 
 	import NavigationBarDesktop from './IntroNavigationBarDesktop.svelte';
 	import NavigationBarMobile from './IntroNavigationBarMobile.svelte';
-	import ResponsiveLayout from '../../components/Bindings/ResponsiveLayout.svelte';
+	import ResponsiveLayout from '$lib/responsive-layout.svelte';
+	import Locale, { LocaleKey } from '$lib/locale.svelte';
+	import Title from '$lib/widgets/title.svelte';
 </script>
 
 <ResponsiveLayout>
-	<svelte:fragment slot="desktop">
+	{#snippet desktop()}
 		<NavigationBarDesktop />
-	</svelte:fragment>
-	<svelte:fragment slot="mobile">
+	{/snippet}
+	{#snippet mobile()}
 		<NavigationBarMobile />
-	</svelte:fragment>
+	{/snippet}
 </ResponsiveLayout>
+
+<svelte:head>
+	<Locale string={[[LocaleKey.AppName], [LocaleKey.AppTagline]]}>
+		{#snippet children([appName, appTagline])}
+			<Title title={appTagline} last />
+		{/snippet}
+	</Locale>
+</svelte:head>
 
 <div style="display: contents; margin-top: {0}px; margin-bottom: {0}px;"></div>
 <slot />

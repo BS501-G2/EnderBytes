@@ -114,17 +114,22 @@ public static class Program
 			(FileManager.Resource readWriteFolder, KeyService.AesPair readWriteFolderKey) = await fileManager.Create(transaction, rootFolder, "Read-Write Folder", true, userAuthenticationToken);
 			(FileManager.Resource readOnlyFolder, KeyService.AesPair readOnlyFolderKey) = await fileManager.Create(transaction, rootFolder, "Read-Only Folder", true, userAuthenticationToken);
 
+			for (int index = 0; index < 100; index++)
+			{
+				(FileManager.Resource file, KeyService.AesPair fileKey) = await fileManager.Create(transaction, readWriteFolder, $"Folder #{index}", true, userAuthenticationToken);
+			}
+
 			await fileAccessManager.GrantUser(transaction, readWriteFolder, otherUser, readOnlyFolderKey, user, FileAccessExtent.ReadWrite);
 			await fileAccessManager.GrantUser(transaction, readOnlyFolder, otherUser, readOnlyFolderKey, user, FileAccessExtent.ReadOnly);
 
-			for (int index = 0; index < Random.Shared.Next(1000); index++)
+			for (int index = 0; index < Random.Shared.Next(100); index++)
 			{
 				(UserManager.Resource userTemp, UserAuthenticationToken userAuthenticationTokenTemp) = await userManager.Create(transaction, $"usertest{index}", "User", "Random" + $"{index}", "G", "TestTest123;");
 				Handlers.Add(async (transaction) => await userManager.Delete(transaction, userTemp));
 
 				FileManager.Resource rootFolderTemp = await fileManager.GetRootFromUser(transaction, userAuthenticationTokenTemp);
 
-				for (int folderIndex = 0; folderIndex < Random.Shared.Next(1000); folderIndex++)
+				for (int folderIndex = 0; folderIndex < Random.Shared.Next(100); folderIndex++)
 				{
 					(FileManager.Resource folder, KeyService.AesPair folderKey) = await fileManager.Create(transaction, rootFolderTemp, $"Folder #{folderIndex}", true, userAuthenticationTokenTemp);
 

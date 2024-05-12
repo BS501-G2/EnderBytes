@@ -1,6 +1,6 @@
 <script lang="ts">
-	import ProfilePage, { UserResolveType } from '../../../../components/ProfilePage.svelte';
-	import { session } from '../../../../components/Bindings/Client.svelte';
+	import ProfilePage, { UserResolveType } from '../profile-page.svelte';
+	import { session } from '$lib/client.svelte';
 
 	$: userId = $session?.userId;
 </script>

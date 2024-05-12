@@ -95,8 +95,8 @@ public sealed partial class WebApi
 			}
 
 			FileAccessExtent highestExtent = fileAccesses
-			.Select(fileAccess => fileAccess.FileAccessExtent)
-			.Append(fileAccessPoint.AccessPoint.FileAccessExtent)
+			.Select(fileAccess => fileAccess.Extent)
+			.Append(fileAccessPoint.AccessPoint.Extent)
 			.Max();
 
 			return Data(new GetFileAccessListResponse(

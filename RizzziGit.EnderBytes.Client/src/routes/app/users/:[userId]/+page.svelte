@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 
-	import ProfilePage, { UserResolveType } from '../../../../components/ProfilePage.svelte';
+	import ProfilePage, { UserResolveType } from '../profile-page.svelte';
 </script>
 
 <ProfilePage

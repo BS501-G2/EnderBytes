@@ -4,20 +4,18 @@
 
 	import { onMount } from 'svelte';
 
-	import { Locale, LocaleKey } from '$lib/locale';
 	import { RootState } from '$lib/states/root-state';
 	import { ColorScheme, ColorKey, serializeThemeColorsIntoInlineStyle } from '$lib/color-schemes';
-	import ResponsiveLayoutRoot from '../components/Bindings/ResponsiveLayoutRoot.svelte';
+	import Locale, { LocaleKey } from '$lib/locale.svelte';
+	import Title, { titleString } from '$lib/widgets/title.svelte';
 
 	const rootState = RootState.state;
 
 	function loadSettings() {
 		$rootState.theme = <ColorScheme | null>localStorage.getItem('theme') ?? ColorScheme.Ender;
-		$rootState.locale = <Locale | null>localStorage.getItem('locale') ?? Locale.en_US;
 	}
 
 	function saveSettings() {
-		localStorage.setItem('locale', $rootState.locale);
 		localStorage.setItem('theme', $rootState.theme);
 	}
 
@@ -25,20 +23,14 @@
 		loadSettings();
 
 		rootState.subscribe((value) => {
-			document.documentElement.setAttribute('lang', value.locale);
-
 			saveSettings();
 		});
 	});
-
-	$: rootCss = `:root { ${serializeThemeColorsIntoInlineStyle($rootState.theme)} } body { margin: unset; min-height: 100vh; background-color: var(--background); }`;
 </script>
 
 <svelte:head>
-	<title>
-		{$rootState.getString(LocaleKey.AppName)} - {$rootState.getString(LocaleKey.AppTagline)}
-	</title>
 	<meta name="theme-color" content={$rootState.getColorHex(ColorKey.PrimaryContainer)} />
+	<title>{$titleString}</title>
 
 	{@html `<style>
 	:root {
@@ -53,9 +45,12 @@
 	</style>`}
 </svelte:head>
 
+<Locale string={[[LocaleKey.AppName]]}>
+	{#snippet children([appName])}
+		<Title title={appName} />
+	{/snippet}
+</Locale>
 <slot />
-
-<ResponsiveLayoutRoot />
 
 <style lang="scss">
 	:root {

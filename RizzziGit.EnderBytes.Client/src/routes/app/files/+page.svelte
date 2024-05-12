@@ -1,15 +1,59 @@
 <script lang="ts">
+	import FileBrowser, {
+		getFile,
+		getFileAccessList,
+		getFilePathChain,
+		scanFolder,
+		type FileBrowserState,
+		type FileResource
+	} from '../file-browser.svelte';
+
 	import { page } from '$app/stores';
+	import Awaiter from '$lib/awaiter.svelte';
+	import Title from '$lib/widgets/title.svelte';
 
-	import FileBrowser from '../../../components/FileBrowser.svelte';
-
-	function getCurrentId(url: URL) {
-		const currentId = url.pathname.split('/')[3] ?? null;
-
-		return (currentId != null ? Number.parseInt(currentId) : null) ?? null;
+	function parseId(id: string | null) {
+		if (id == null) {
+			return undefined;
+		} else {
+			return Number.parseInt(id) || undefined;
+		}
 	}
 
-	$: currentFileId = getCurrentId($page.url);
+	const id = $derived(parseId($page.url.searchParams.get('id')));
 </script>
 
-<FileBrowser {currentFileId} />
+{#key id}
+	<Awaiter
+		callback={async (): Promise<FileBrowserState & { isLoading: false }> => {
+		const file = await getFile(id);
+
+		const fileBrowserState: FileBrowserState & { isLoading: false } = $state({
+			isLoading: false,
+			files: file.isFolder ? await scanFolder(file) : [],
+			pathChain: await getFilePathChain(file),
+			access:  await getFileAccessList(file),
+			hideControlBar: !file.isFolder,
+			file,
+			title: id != null ? file.name : 'Home',
+
+			allowCreate: true
+		});
+
+		return fileBrowserState
+	}}
+	>
+		<svelte:fragment slot="loading">
+			<Title title="My Files" />
+			<FileBrowser fileBrowserState={{ isLoading: true }} />
+		</svelte:fragment>
+		<svelte:fragment slot="success" let:result={fileBrowserState}>
+			{#if fileBrowserState.file?.parentId != null}
+				<Title title={fileBrowserState.file.name} />
+			{:else}
+				<Title title="My Files" />
+			{/if}
+			<FileBrowser {fileBrowserState} />
+		</svelte:fragment>
+	</Awaiter>
+{/key}

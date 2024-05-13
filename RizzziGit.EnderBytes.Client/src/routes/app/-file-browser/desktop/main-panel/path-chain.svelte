@@ -5,7 +5,7 @@
 	import PathChainEntry from './path-chain/entry.svelte';
 	import PathChainMenuElement, { type PathChainMenu } from './path-chain/menu.svelte';
 
-	const { fileBrowserState }: { fileBrowserState: FileBrowserState } = $props();
+	const { fileBrowserState = $bindable() }: { fileBrowserState: FileBrowserState } = $props();
 
 	let pathChainMenus: PathChainMenu[] = $state([]);
 </script>

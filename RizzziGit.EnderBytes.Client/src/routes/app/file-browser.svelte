@@ -125,7 +125,7 @@
 	import DesktopLayout from './-file-browser/desktop.svelte';
 	import MobileLayout from './-file-browser/mobile.svelte';
 
-	let { fileBrowserState }: { fileBrowserState: FileBrowserState } = $props();
+	let { fileBrowserState = $bindable() }: { fileBrowserState: FileBrowserState } = $props();
 
 	let selection: FileResource[] = $state([]);
 </script>

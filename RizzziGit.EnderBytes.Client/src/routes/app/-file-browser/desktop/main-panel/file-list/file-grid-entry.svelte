@@ -4,7 +4,7 @@
 
 	let {
 		file,
-		fileBrowserState,
+		fileBrowserState = $bindable(),
 		onClick,
 		selection = $bindable()
 	}: {

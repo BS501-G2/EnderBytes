@@ -2,9 +2,10 @@
 	import Button, { ButtonClass } from '$lib/widgets/button.svelte';
 	import { scale } from 'svelte/transition';
 	import type { FileBrowserState, FileResource } from '../../../file-browser.svelte';
+	import UploadFileDialog from './control-bar/upload-file-dialog.svelte';
 
-	const {
-		fileBrowserState,
+	let {
+		fileBrowserState = $bindable(),
 		selection = $bindable()
 	}: { fileBrowserState: FileBrowserState; selection: FileResource[] } = $props();
 
@@ -34,7 +35,7 @@
 						label: 'Upload',
 						icon: 'fa-solid fa-file-circle-plus',
 						group: 'new',
-						action: async () => {}
+						action: async () => { uploadFileDialog = true; }
 					});
 
 					items.push({
@@ -78,7 +79,13 @@
 	}
 
 	const actions = $derived(getControlBarItems());
+
+	let uploadFileDialog: boolean = $state(false);
 </script>
+
+{#if uploadFileDialog}
+	<UploadFileDialog bind:enabled={uploadFileDialog} bind:fileBrowserState />
+{/if}
 
 {#snippet buttons(actions: ControlBarItem[], animations: boolean)}
 	{#each actions as action}
@@ -181,16 +188,16 @@
 		min-height: 2em;
 
 		gap: 8px;
+	}
 
-		> i.icon {
-			min-height: 100%;
-			max-height: 100%;
+	i.icon {
+		min-height: 100%;
+		max-height: 100%;
 
-			font-size: 1.25em;
-		}
+		font-size: 1.25em;
+	}
 
-		> p {
-			text-wrap: nowrap;
-		}
+	p {
+		text-wrap: nowrap;
 	}
 </style>

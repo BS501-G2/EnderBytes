@@ -28,7 +28,7 @@
 		callback={async (): Promise<FileBrowserState & { isLoading: false }> => {
 		const file = await getFile(id);
 
-		const fileBrowserState: FileBrowserState & { isLoading: false } = $state({
+		let fileBrowserState: FileBrowserState & { isLoading: false } = $state({
 			isLoading: false,
 			files: file.isFolder ? await scanFolder(file) : [],
 			pathChain: await getFilePathChain(file),

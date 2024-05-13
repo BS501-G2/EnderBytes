@@ -5,7 +5,7 @@
 	import PathChain from './main-panel/path-chain.svelte';
 
 	let {
-		fileBrowserState,
+		fileBrowserState = $bindable(),
 		selection = $bindable()
 	}: { fileBrowserState: FileBrowserState; selection: FileResource[] } = $props();
 </script>

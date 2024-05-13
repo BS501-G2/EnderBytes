@@ -3,11 +3,19 @@
 
 <script lang="ts">
 	import Dialog from '$lib/widgets/dialog.svelte';
+	import FileBrowser, { type FileBrowserState } from '../../../../file-browser.svelte';
 
-	const {}: {} = $props();
+	let {
+		fileBrowserState = $bindable(),
+		enabled = $bindable()
+	}: { fileBrowserState: FileBrowserState; enabled: boolean } = $props();
 </script>
 
-<Dialog onDismiss={() => {}}>
+<Dialog
+	onDismiss={() => {
+		enabled = false;
+	}}
+>
 	{#snippet head()}
 		<h2>ASd</h2>
 	{/snippet}

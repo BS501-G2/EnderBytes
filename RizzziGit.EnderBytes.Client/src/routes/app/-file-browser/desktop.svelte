@@ -3,7 +3,7 @@
 	import MainPanel from './desktop/main-panel.svelte';
 	import SidePanel from './desktop/side-panel.svelte';
 
-	let { fileBrowserState: fileBrowserState, selection = $bindable() }: { fileBrowserState: FileBrowserState, selection: FileResource[] } = $props();
+	let { fileBrowserState = $bindable(), selection = $bindable() }: { fileBrowserState: FileBrowserState, selection: FileResource[] } = $props();
 
 </script>
 

@@ -33,7 +33,7 @@
 	import AnimationFrame from '$lib/animation-frame.svelte';
 
 	let {
-		fileBrowserState,
+		fileBrowserState = $bindable(),
 		selection = $bindable()
 	}: { fileBrowserState: FileBrowserState; selection: FileResource[] } = $props();
 
@@ -95,7 +95,9 @@
 			clientX: cursorX,
 			clientY: cursorY,
 
-			capturedSelection: selectionBox?.capturedSelection ?? [...selection]
+			capturedSelection: hasKeys('shift') || hasKeys('control')
+				? selectionBox?.capturedSelection ?? [...selection]
+				: []
 		};
 	}
 
@@ -142,8 +144,6 @@
 					continue;
 				}
 
-				console.log(fileSelectionRect, fileRect)
-
 				if (
 					fileRect.x < fileSelectionRect.x + fileSelectionRect.width &&
 					fileRect.x + fileRect.width > fileSelectionRect.x &&
@@ -151,11 +151,14 @@
 					fileRect.y + fileRect.height > fileSelectionRect.y
 				) {
 					if (hasKeys('shift') && !selectedFiles.includes(file)) {
-						selectedFiles = [...selectedFiles, file];
+						selectedFiles.push(file)
 					} else if (hasKeys('control') && selectedFiles.includes(file)) {
-						selectedFiles = selectedFiles.filter((id) => id !== file);
+						const fileIndex = selectedFiles.indexOf(file);
+						if (fileIndex >= 0) {
+							selectedFiles.splice(fileIndex, 1);
+						}
 					} else if (!selectedFiles.includes(file)) {
-						selectedFiles = [...selectedFiles, file];
+						selectedFiles.push(file)
 					}
 				}
 			}
@@ -179,8 +182,11 @@
 					return;
 				}
 
+				if (e.currentTarget.clientWidth < (e.clientX - e.currentTarget.offsetLeft)) {
+					return;
+				}
+
 				setSelectionRectangle(e.clientX, e.clientY);
-				selection = []
 			}}
 			onmousemove={(e) => {
 				if (selectionBox == null) {
@@ -204,7 +210,11 @@
 							class="selection-rectangle-inner-container"
 							style="padding-left: {x}px; padding-top: {y}px;"
 						>
-							<div bind:this={selectionBoxElement} class="selection-rectangle" style="width: {w}px; height: {h}px;">
+							<div
+								bind:this={selectionBoxElement}
+								class="selection-rectangle"
+								style="width: {w}px; height: {h}px;"
+							>
 								<div class="selection-rectangle-inner"></div>
 							</div>
 						</div>

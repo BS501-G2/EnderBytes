@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { FileBrowserState } from '../file-browser.svelte';
 
-	let { fileBrowserState: fileBrowserState }: { fileBrowserState: FileBrowserState } = $props();
+	let { fileBrowserState = $bindable() }: { fileBrowserState: FileBrowserState } = $props();
 </script>
 
 <div class="main">

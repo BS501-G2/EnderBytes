@@ -3,6 +3,7 @@
 	import { scale } from 'svelte/transition';
 	import type { FileBrowserState, FileResource } from '../../../file-browser.svelte';
 	import UploadFileDialog from './control-bar/upload-file-dialog.svelte';
+	import CreateFolderDialog from './control-bar/create-folder-dialog.svelte';
 
 	let {
 		fileBrowserState = $bindable(),
@@ -35,14 +36,18 @@
 						label: 'Upload',
 						icon: 'fa-solid fa-file-circle-plus',
 						group: 'new',
-						action: async () => { uploadFileDialog = true; }
+						action: async () => {
+							uploadFileDialog = true;
+						}
 					});
 
 					items.push({
 						label: 'New Folder',
 						icon: 'fa-solid fa-folder-plus',
 						group: 'new',
-						action: async () => {}
+						action: async () => {
+							createFolderDialog = true;
+						}
 					});
 				}
 
@@ -81,10 +86,14 @@
 	const actions = $derived(getControlBarItems());
 
 	let uploadFileDialog: boolean = $state(false);
+	let createFolderDialog: boolean = $state(false);
 </script>
 
 {#if uploadFileDialog}
 	<UploadFileDialog bind:enabled={uploadFileDialog} bind:fileBrowserState />
+{/if}
+{#if createFolderDialog}
+	<CreateFolderDialog bind:enabled={createFolderDialog} bind:fileBrowserState />
 {/if}
 
 {#snippet buttons(actions: ControlBarItem[], animations: boolean)}

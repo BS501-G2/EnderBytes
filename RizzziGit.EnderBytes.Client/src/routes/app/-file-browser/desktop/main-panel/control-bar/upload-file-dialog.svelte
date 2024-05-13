@@ -17,7 +17,7 @@
 	}}
 >
 	{#snippet head()}
-		<h2>ASd</h2>
+		<h2>Upload new File</h2>
 	{/snippet}
 	{#snippet body()}{/snippet}
 </Dialog>

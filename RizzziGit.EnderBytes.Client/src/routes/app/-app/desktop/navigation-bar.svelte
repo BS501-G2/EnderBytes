@@ -33,7 +33,7 @@
 	{#each navigationEntries as entry}
 		<a href={$navigating ? null : `${'/app/' + entry.path}`}>
 			<div class="nav-entry {entry.path == $page.url.pathname.split('/')[2] ? 'active' : ''}">
-				<svelte:component this={entry.icon} size="18 em"></svelte:component>
+				<svelte:component this={entry.icon} size="24"></svelte:component>
 				<p>{entry.name}</p>
 			</div>
 		</a>
@@ -55,6 +55,7 @@
 		flex-grow: 1;
 
 		overflow-y: auto;
+		justify-content: safe center;
 
 		> a {
 			text-decoration: none;

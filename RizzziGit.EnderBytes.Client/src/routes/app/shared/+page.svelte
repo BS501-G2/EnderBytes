@@ -10,7 +10,8 @@
 		access: null,
 		file: null,
 
-		allowCreate: false
+		allowCreate: false,
+		title: 'Shared'
 	};
 </script>
 

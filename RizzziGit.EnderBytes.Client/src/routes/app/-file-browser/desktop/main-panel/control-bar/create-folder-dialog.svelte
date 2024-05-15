@@ -2,8 +2,8 @@
 </script>
 
 <script lang="ts">
-	import Dialog from '$lib/widgets/dialog.svelte';
-	import FileBrowser, { type FileBrowserState } from '../../../../file-browser.svelte';
+	import { Dialog } from '@rizzzi/svelte-commons';
+	import { type FileBrowserState } from '../../../../file-browser.svelte';
 
 	let {
 		fileBrowserState = $bindable(),

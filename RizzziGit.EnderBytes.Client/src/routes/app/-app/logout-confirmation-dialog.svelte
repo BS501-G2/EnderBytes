@@ -6,8 +6,8 @@
 
 <script lang="ts">
 	import Client from '$lib/client.svelte';
-	import Button, { ButtonClass } from '$lib/widgets/button.svelte';
-	import Dialog, { DialogClass } from '$lib/widgets/dialog.svelte';
+
+	import { Button, Dialog, DialogClass, ButtonClass } from '@rizzzi/svelte-commons';
 </script>
 
 {#if $enabled}

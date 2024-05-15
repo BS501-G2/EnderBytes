@@ -8,8 +8,8 @@
 <script lang="ts">
 	import NavigationBar from './desktop/navigation-bar.svelte';
 	import TitleBar from './desktop/title-bar.svelte';
-	import Keyboard from '$lib/keyboard.svelte';
-	import { ViewMode, viewMode } from '$lib/responsive-layout.svelte';
+
+	import { Keyboard, ViewMode, viewMode } from '@rizzzi/svelte-commons';
 </script>
 
 <Keyboard />
@@ -93,17 +93,13 @@
 		> div.left-panel {
 			display: flex;
 			flex-direction: column;
-
-			// > div.divider {
-			// 	min-height: 1px;
-			// 	max-height: 1px;
-			// 	background-color: var(--primary);
-			// }
 		}
 
 		> div.right-panel {
 			min-width: 0px;
 			flex-grow: 1;
+
+			-webkit-app-region: no-drag;
 
 			border-radius: 16px;
 			overflow: hidden;

@@ -79,6 +79,11 @@
 
 		> button.menu-button {
 			border-radius: 8px 0px 0px 8px;
+
+			i {
+				font-size: 1.25em;
+				font-weight: light;
+			}
 		}
 
 		> button.link {

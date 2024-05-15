@@ -1,4 +1,4 @@
-import { type ColorValues, ColorKey } from "$lib/color-schemes";
+import { ColorKey, type ColorValues } from '@rizzzi/svelte-commons'
 import { colors as base } from './ender'
 
 export const colors = (): ColorValues => {

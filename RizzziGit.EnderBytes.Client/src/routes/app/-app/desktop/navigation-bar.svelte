@@ -59,6 +59,7 @@
 
 		> a {
 			text-decoration: none;
+			-webkit-app-region: no-drag;
 
 			> div.nav-entry {
 				display: flex;

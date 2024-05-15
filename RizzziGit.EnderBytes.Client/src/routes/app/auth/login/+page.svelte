@@ -8,8 +8,7 @@
 </script>
 
 <script lang="ts">
-	import ResponsiveLayout from '$lib/responsive-layout.svelte';
-	import { ViewMode, viewMode } from '$lib/responsive-layout.svelte';
+	import { ResponsiveLayout, viewMode, ViewMode } from '@rizzzi/svelte-commons';
 
 	const rootState = RootState.state;
 
@@ -97,9 +96,7 @@
 						/>
 					</div>
 					<div class="field">
-						<button disabled={!enabled}
-							>{getString(LocaleKey.AuthLoginPageSubmit)}</button
-						>
+						<button disabled={!enabled}>{getString(LocaleKey.AuthLoginPageSubmit)}</button>
 					</div>
 				</form>
 			</div>

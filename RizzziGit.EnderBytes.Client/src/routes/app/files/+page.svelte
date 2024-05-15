@@ -9,8 +9,7 @@
 	} from '../file-browser.svelte';
 
 	import { page } from '$app/stores';
-	import Awaiter from '$lib/awaiter.svelte';
-	import Title from '$lib/widgets/title.svelte';
+	import { Title, Awaiter } from "@rizzzi/svelte-commons";
 
 	function parseId(id: string | null) {
 		if (id == null) {

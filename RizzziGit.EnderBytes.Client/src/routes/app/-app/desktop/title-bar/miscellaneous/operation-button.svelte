@@ -13,14 +13,18 @@
 		completedBackgroundTasks,
 		dismissAll
 	} from '$lib/background-task.svelte';
-	import type { FrameCallback } from '$lib/animation-frame.svelte';
-	import AnimationFrame from '$lib/animation-frame.svelte';
 	import TitleBarChipButton from '../chip/button.svelte';
-	import Overlay, { OverlayPositionType } from '$lib/widgets/overlay.svelte';
 	import { onDestroy, onMount } from 'svelte';
-	import LoadingBar from '$lib/widgets/loading-bar.svelte';
-	import Button, { ButtonClass } from '$lib/widgets/button.svelte';
 	import { scale } from 'svelte/transition';
+	import {
+		AnimationFrame,
+		Button,
+		ButtonClass,
+		LoadingBar,
+		Overlay,
+		OverlayPositionType,
+		type FrameCallback
+	} from '@rizzzi/svelte-commons';
 
 	const operationsIcon: FrameCallback<number> = (p, t, value = 0) => {
 		value += 2;

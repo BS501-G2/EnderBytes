@@ -3,9 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "vite dev",
+    "dev": "vite dev --host --port 8081",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --host --port 8081",
     "test": "npm run test:integration && npm run test:unit",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -17,6 +17,7 @@
   "devDependencies": {
     "@fortawesome/fontawesome-free": "^6.5.2",
     "@playwright/test": "^1.28.1",
+    "@rizzzi/svelte-commons": "github:RizzziGit/svelte-commons",
     "@sveltejs/adapter-auto": "^3.0.0",
     "@sveltejs/kit": "^2.0.0",
     "@sveltejs/vite-plugin-svelte": "^3.0.0",

@@ -1,7 +1,7 @@
 <script lang="ts" context="module">
 	import { LocaleKey, getString } from '$lib/locale.svelte';
 	import { RootState } from '$lib/states/root-state';
-	import { _getUrl as faviconSrc } from '../../../../dynamic-icons/[size]/favicon.svg/+server';
+	import { _getUrl as faviconSrc } from '../../../../favicon.svg/+server';
 </script>
 
 <script lang="ts">
@@ -31,7 +31,8 @@
 		align-items: center;
 
 		img.title-image {
-			height: 100%;
+			max-height: 16px;
+			aspect-ratio: 1;
 		}
 
 		-webkit-app-region: drag;

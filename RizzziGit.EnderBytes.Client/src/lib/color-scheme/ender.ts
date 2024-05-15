@@ -1,7 +1,4 @@
-import {
-	ColorKey,
-	type ColorValues
-} from "$lib/color-schemes";
+import { ColorKey, type ColorValues } from '@rizzzi/svelte-commons';
 
 export const colors = (): ColorValues => ({
 	[ColorKey.Primary]: 0x0f3031ff,
@@ -32,4 +29,4 @@ export const colors = (): ColorValues => ({
 	[ColorKey.OnInfo]: 0xffffffff,
 
 	[ColorKey.Shadow]: 0x0000007f
-})
+});

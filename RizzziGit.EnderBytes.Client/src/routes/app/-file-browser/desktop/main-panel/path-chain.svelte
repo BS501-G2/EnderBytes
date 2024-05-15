@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import LoadingSpinner from '$lib/widgets/loading-spinner.svelte';
+
 	import { type FileBrowserState, type FilePathChainInfo } from '../../../file-browser.svelte';
 	import PathChainEntry from './path-chain/entry.svelte';
 	import PathChainMenuElement, { type PathChainMenu } from './path-chain/menu.svelte';
+
+	import { LoadingSpinner } from '@rizzzi/svelte-commons';
 
 	const { fileBrowserState = $bindable() }: { fileBrowserState: FileBrowserState } = $props();
 

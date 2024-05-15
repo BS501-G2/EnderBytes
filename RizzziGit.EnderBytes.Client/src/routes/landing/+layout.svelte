@@ -3,9 +3,8 @@
 
 	import NavigationBarDesktop from './IntroNavigationBarDesktop.svelte';
 	import NavigationBarMobile from './IntroNavigationBarMobile.svelte';
-	import ResponsiveLayout from '$lib/responsive-layout.svelte';
 	import Locale, { LocaleKey } from '$lib/locale.svelte';
-	import Title from '$lib/widgets/title.svelte';
+	import { ResponsiveLayout, Title } from '@rizzzi/svelte-commons';
 </script>
 
 <ResponsiveLayout>

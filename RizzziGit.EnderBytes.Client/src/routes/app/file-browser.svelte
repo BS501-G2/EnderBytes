@@ -1,7 +1,6 @@
 <script lang="ts" context="module">
-	import { get, writable, type Writable } from 'svelte/store';
 	import { apiFetch } from '$lib/client.svelte';
-	import AnimationFrame from '$lib/animation-frame.svelte';
+	import { ResponsiveLayout } from '@rizzzi/svelte-commons';
 
 	export interface FileResource {
 		id: number;
@@ -120,8 +119,6 @@
 </script>
 
 <script lang="ts">
-	import ResponsiveLayout from '$lib/responsive-layout.svelte';
-
 	import DesktopLayout from './-file-browser/desktop.svelte';
 	import MobileLayout from './-file-browser/mobile.svelte';
 

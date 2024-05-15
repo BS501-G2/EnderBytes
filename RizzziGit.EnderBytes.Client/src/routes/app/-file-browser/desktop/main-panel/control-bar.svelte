@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Button, { ButtonClass } from '$lib/widgets/button.svelte';
+	import { Button, ButtonClass } from '@rizzzi/svelte-commons'
 	import { scale } from 'svelte/transition';
 	import type { FileBrowserState, FileResource } from '../../../file-browser.svelte';
 	import UploadFileDialog from './control-bar/upload-file-dialog.svelte';

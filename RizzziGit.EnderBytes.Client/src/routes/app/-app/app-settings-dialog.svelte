@@ -5,8 +5,7 @@
 </script>
 
 <script lang="ts">
-	import Dialog from '$lib/widgets/dialog.svelte';
-	import Expandable from '$lib/widgets/expandable.svelte';
+	import { Dialog, Expandable } from '@rizzzi/svelte-commons';
 </script>
 
 {#if $enabled}

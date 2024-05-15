@@ -2,11 +2,11 @@
 	import { ChevronDownIcon } from 'svelte-feather-icons';
 	import TitleBarChip from './chip.svelte';
 	import TitleBarButton from './chip/button.svelte';
-	import Overlay, { OverlayPositionType } from '$lib/widgets/overlay.svelte';
 	import { enabled as accountSettingsDialog } from '../../account-settings-dialog.svelte';
 	import { enabled as logoutConfirmationDialog } from '../../logout-confirmation-dialog.svelte';
 	import { enabled as appSettingsDialog } from '../../app-settings-dialog.svelte';
 	import { goto } from '$app/navigation';
+	import { Overlay, OverlayPositionType } from '@rizzzi/svelte-commons';
 
 	let menuLocationAnchor: HTMLElement;
 	let menuX = 0;
@@ -33,7 +33,7 @@
 	>
 		<div class="account-info"></div>
 		<div class="account-menu">
-			<a href="/app/users/!me" on:click={() => (menuOpen = false)}> View Profile </a>
+			<a href="/app/users?id=!me" on:click={() => (menuOpen = false)}> View Profile </a>
 			<button on:click={() => onClick(() => ($accountSettingsDialog = true))}>
 				Account Settings
 			</button>

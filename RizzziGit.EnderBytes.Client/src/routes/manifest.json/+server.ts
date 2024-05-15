@@ -1,12 +1,12 @@
 import { json } from '@sveltejs/kit';
-import { ColorScheme, colors } from '$lib/color-schemes';
 import { LocaleKey, Locale, getString } from '$lib/locale.svelte';
-import { _sizes } from '../dynamic-icons/[size]/favicon.svg/+server';
+import { _sizes } from '../favicon.svg/+server';
+import { registeredColors } from '../../../../../svelte-commons/dist/color-scheme.svelte';
 
 export const prerender = true;
 
 const icon = (size: number) => ({
-	src: `/dynamic-icons/${size}x${size}/favicon.svg`,
+	src: `/favicon.svg?size=${size}`,
 	sizes: `${size}x${size}`,
 	type: 'image/svg+xml'
 });
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 	const { searchParams } = new URL(request.url);
 
 	const locale = <Locale | null>searchParams.get('locale') ?? Locale.en_US;
-	const color = <ColorScheme | null>searchParams.get('theme') ?? ColorScheme.Ender;
+	const color = <string | null>searchParams.get('theme') ?? 'green';
 
 	const getStringWithLocale = (key: LocaleKey) => getString(key, locale);
 
@@ -44,8 +44,8 @@ export async function GET(request: Request) {
 				shortcut('Feed', '/feed')
 			],
 			start_url: '/app',
-			theme_color: `#${colors[color].primaryContainer.toString(16)}`,
-			background_color: `#${colors[color].background.toString(16)}`
+			theme_color: `#${registeredColors[color].primaryContainer.toString(16)}`,
+			background_color: `#${registeredColors[color].background.toString(16)}`
 		},
 		{
 			headers: {

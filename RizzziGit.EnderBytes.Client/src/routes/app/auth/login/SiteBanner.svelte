@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { LocaleKey, getString } from '$lib/locale.svelte';
-	import { RootState } from '$lib/states/root-state';
 
-	import { _getUrl as faviconSrc } from '../../../dynamic-icons/[size]/favicon.svg/+server';
+	import { _getUrl as faviconSrc } from '../../../favicon.svg/+server';
 </script>
 
 <div class="site-banner">

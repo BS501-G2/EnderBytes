@@ -9,10 +9,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 
-	import Awaiter from '$lib/awaiter.svelte';
-	import LoadingSpinner from '$lib/widgets/loading-spinner.svelte';
+	import {
+		Awaiter,
+		LoadingSpinner,
+		Overlay,
+		OverlayPositionType
+	} from '@rizzzi/svelte-commons';
 
-	import Overlay, { OverlayPositionType } from '$lib/widgets/overlay.svelte';
 	import { scale } from 'svelte/transition';
 	import { getFile, scanFolder, type FileResource } from '../../../../file-browser.svelte';
 	import PathChainEntry from './entry.svelte';
@@ -34,7 +37,10 @@
 	position={[
 		OverlayPositionType.Offset,
 		pathChainMenu.currentTarget.getBoundingClientRect().right,
-		Math.min(pathChainMenu.currentTarget.getBoundingClientRect().top - 1, Math.max(window.innerHeight - 128, 0))
+		Math.min(
+			pathChainMenu.currentTarget.getBoundingClientRect().top - 1,
+			Math.max(window.innerHeight - 128, 0)
+		)
 	]}
 	onDismiss={dismiss}
 >

@@ -1,11 +1,11 @@
 <script lang="ts">
+	import { ViewMode, viewMode } from '@rizzzi/svelte-commons';
 	import Account from './title-bar/account.svelte';
 	import AppTitle from './title-bar/app-title.svelte';
 	import History from './title-bar/history.svelte';
 	import Miscellaneous from './title-bar/miscellaneous.svelte';
 	import SearchBar from './title-bar/search-bar.svelte';
 
-	import { ViewMode, viewMode } from '$lib/responsive-layout.svelte';
 </script>
 
 <div class="top-bar-container {$viewMode & ViewMode.OverlayControls ? 'pwa' : ''}">

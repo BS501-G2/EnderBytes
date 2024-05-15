@@ -284,9 +284,9 @@
 </script>
 
 <script lang="ts">
-	import LoadingBar from './widgets/loading-bar.svelte';
 	import { RefreshCwIcon, XIcon, PlayIcon } from 'svelte-feather-icons';
 	import { onDestroy, onMount } from 'svelte';
+	import { LoadingBar } from '@rizzzi/svelte-commons';
 
 	export let maxCount: number = -1;
 

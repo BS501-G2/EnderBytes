@@ -11,10 +11,8 @@
 <script lang="ts">
 	import { enabled as accountSettingsDialog } from '../-app/account-settings-dialog.svelte';
 
-	import Awaiter from '$lib/awaiter.svelte';
+	import { Title, Awaiter, Button, ButtonClass } from "@rizzzi/svelte-commons";
 	import { apiFetch } from '$lib/client.svelte';
-	import Button, { ButtonClass } from '$lib/widgets/button.svelte';
-	import Title from '$lib/widgets/title.svelte';
 
 	export let identifier: UserResolve;
 	let userPromise: Promise<any> | null;

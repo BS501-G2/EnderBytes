@@ -3,9 +3,10 @@
 	import { navigating, page } from '$app/stores';
 
 	import Dashboard from './app.svelte';
-	import LoadingBar from '$lib/widgets/loading-bar.svelte';
 	import { runningBackgroundTasks } from '$lib/background-task.svelte';
 	import { session } from '$lib/client.svelte';
+
+	import { LoadingBar } from '@rizzzi/svelte-commons';
 
 	$: {
 		if ($session == null) {

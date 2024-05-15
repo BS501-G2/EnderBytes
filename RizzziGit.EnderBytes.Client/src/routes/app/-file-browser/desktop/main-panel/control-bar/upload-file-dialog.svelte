@@ -2,7 +2,7 @@
 </script>
 
 <script lang="ts">
-	import Dialog from '$lib/widgets/dialog.svelte';
+	import { Dialog } from '@rizzzi/svelte-commons';
 	import FileBrowser, { type FileBrowserState } from '../../../../file-browser.svelte';
 
 	let {

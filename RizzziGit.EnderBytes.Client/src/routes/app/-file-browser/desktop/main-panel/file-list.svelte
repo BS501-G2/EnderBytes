@@ -24,13 +24,12 @@
 </script>
 
 <script lang="ts">
-	import LoadingSpinnerPage from '$lib/widgets/loading-spinner-page.svelte';
 	import { type FileBrowserState, type FileResource } from '../../../file-browser.svelte';
 	import FileGridEntry from './file-list/file-grid-entry.svelte';
-	import { hasKeys } from '$lib/keyboard.svelte';
 	import FileTableEntry from './file-list/file-table-entry.svelte';
 	import { scale } from 'svelte/transition';
-	import AnimationFrame from '$lib/animation-frame.svelte';
+
+	import { hasKeys, AnimationFrame, LoadingSpinnerPage } from '@rizzzi/svelte-commons';
 
 	let {
 		fileBrowserState = $bindable(),

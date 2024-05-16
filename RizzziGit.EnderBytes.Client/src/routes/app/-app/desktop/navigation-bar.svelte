@@ -55,7 +55,7 @@
 		flex-grow: 1;
 
 		overflow-y: auto;
-		justify-content: safe center;
+		// justify-content: safe center;
 
 		> a {
 			text-decoration: none;

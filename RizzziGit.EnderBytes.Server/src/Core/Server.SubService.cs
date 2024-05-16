@@ -6,8 +6,8 @@ using Services;
 
 public sealed partial class Server
 {
-	public abstract class SubService(Server server, string name) : Service(name, server)
-	{
-		public readonly Server Server = server;
-	}
+    public abstract class SubService(Server server, string name) : Service(name, server)
+    {
+        public readonly Server Server = server;
+    }
 }

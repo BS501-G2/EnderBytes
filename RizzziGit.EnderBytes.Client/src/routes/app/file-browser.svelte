@@ -47,6 +47,15 @@
 		pathChain: FileResource[];
 	}
 
+	export interface SharedFileListFilter {
+		sort: 'name' | 'ctime' | 'utime';
+		desc: boolean;
+		offset: number;
+		authorUserId?: number;
+		domainUserId?: number;
+		extent?: number;
+	}
+
 	export const files: Record<number, FileResource> = {};
 
 	function storeFile(file: FileResource) {
@@ -96,6 +105,7 @@
 
 	export type FileBrowserState = {
 		refresh?: () => Promise<void>;
+		onFilter?: () => Promise<void>;
 		title?: string;
 
 		hideControlBar?: boolean;

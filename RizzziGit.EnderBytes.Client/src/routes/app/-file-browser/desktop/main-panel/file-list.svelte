@@ -120,7 +120,7 @@
 			}
 
 			const topY = 64 - Math.max( Math.min(-(rect.top - clientY), 64), 0);
-			const bottomY  = 64 - Math.max(Math.min(rect.bottom - clientY, 64), 0);
+			const bottomY	= 64 - Math.max(Math.min(rect.bottom - clientY, 64), 0);
 
 			if (topY > 0) {
 				fileList!.scrollTop -= topY / 4;

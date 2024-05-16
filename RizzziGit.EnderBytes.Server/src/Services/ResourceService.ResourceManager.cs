@@ -4,134 +4,210 @@ namespace RizzziGit.EnderBytes.Services;
 
 using Commons.Logging;
 using Commons.Services;
-
-using Utilities;
 using DatabaseWrappers;
+using Utilities;
 
 public sealed partial class ResourceService
 {
-	public abstract class ResourceManager(ResourceService service, string name, int version) : Service(name, service)
-	{
-		public abstract class Exception(string? message = null) : System.Exception(message ?? "A resource error has been thrown.");
-		public sealed class NotFoundException(string name, long? id) : Exception($"\"{name}\" resource #{id} does not exist.");
-		public sealed class NoMatchException(string name) : Exception($"No \"{name}\" resource has matched the criteria.");
-		public sealed class ConstraintException(string name, string? message = null) : Exception(message ?? $"The \"{name}\" resource failed to pass constraint check.");
+    public abstract class ResourceManager(ResourceService service, string name, int version)
+        : Service(name, service)
+    {
+        public abstract class Exception(string? message = null)
+            : System.Exception(message ?? "A resource error has been thrown.");
 
-		public const string COLUMN_ID = "Id";
-		public const string COLUMN_CREATE_TIME = "CreateTime";
-		public const string COLUMN_UPDATE_TIME = "UpdateTime";
+        public sealed class NotFoundException(string name, long? id)
+            : Exception($"\"{name}\" resource #{id} does not exist.");
 
-		public readonly ResourceService Service = service;
+        public sealed class NoMatchException(string name)
+            : Exception($"No \"{name}\" resource has matched the criteria.");
 
-		public readonly int Version = version;
+        public sealed class ConstraintException(string name, string? message = null)
+            : Exception(message ?? $"The \"{name}\" resource failed to pass constraint check.");
 
-		protected Database DatabaseWrapper => Service.Database!;
+        public const string COLUMN_ID = "Id";
+        public const string COLUMN_CREATE_TIME = "CreateTime";
+        public const string COLUMN_UPDATE_TIME = "UpdateTime";
 
-		protected abstract Task Upgrade(Transaction transaction, int oldVersion = default);
+        public readonly ResourceService Service = service;
 
-		protected Task<T> Transact<T>(TransactionHandler<T> handler) => Service.Transact(handler);
-		protected Task Transact(TransactionHandler handler) => Service.Transact(handler);
-		protected IAsyncEnumerable<T> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler) => Service.EnumeratedTransact(handler);
+        public readonly int Version = version;
 
-		private DbCommand CreateCommand(Transaction transaction, string sql, object?[] parameters)
-		{
-			DbCommand command = transaction.Connection.CreateCommand();
-			command.CommandText = string.Format(sql, createParameterArray());
+        protected Database DatabaseWrapper => Service.Database!;
 
-			return command;
+        protected abstract Task Upgrade(Transaction transaction, int oldVersion = default);
 
-			string[] createParameterArray()
-			{
-				int index = 0;
-				return parameters.Select((e) =>
-				{
-					try
-					{
-						string parameterName = $"{index}";
+        protected Task<T> Transact<T>(TransactionHandler<T> handler) => Service.Transact(handler);
 
-						command.Parameters.Add(DatabaseWrapper.CreateParameter(parameterName, parameters[index]));
-						return DatabaseWrapper.ToParameterName(parameterName);
-					}
-					finally
-					{
-						index++;
-					}
-				}).ToArray();
-			}
-		}
+        protected Task Transact(TransactionHandler handler) => Service.Transact(handler);
 
-		private void LogSql(Transaction transaction, string type, string sqlQuery, params object?[] parameters)
-		{
-			Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] SQL {type}: {string.Format(sqlQuery, parameters)}");
-		}
+        protected IAsyncEnumerable<T> EnumeratedTransact<T>(
+            TransactionEnumeratorHandler<T> handler
+        ) => Service.EnumeratedTransact(handler);
 
-		public delegate Task<T> SqlQueryTransformer<T>(DbDataReader reader);
+        private DbCommand CreateCommand(Transaction transaction, string sql, object?[] parameters)
+        {
+            DbCommand command = transaction.Connection.CreateCommand();
+            command.CommandText = string.Format(sql, createParameterArray());
 
-		protected async IAsyncEnumerable<T> SqlQuery<T>(Transaction transaction, SqlQueryTransformer<T> dataHandler, string sqlQuery, params object?[] parameters)
-		{
-			await using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
+            return command;
 
-			LogSql(transaction, "Query", sqlQuery, parameters);
+            string[] createParameterArray()
+            {
+                int index = 0;
+                return parameters
+                    .Select(
+                        (e) =>
+                        {
+                            try
+                            {
+                                string parameterName = $"{index}";
 
-			{
-				await using DbDataReader reader = await command.ExecuteReaderAsync(System.Data.CommandBehavior.SingleResult);
-				while (reader.Read())
-				{
-					yield return await dataHandler(reader);
-				}
-			}
-		}
+                                command.Parameters.Add(
+                                    DatabaseWrapper.CreateParameter(
+                                        parameterName,
+                                        parameters[index]
+                                    )
+                                );
+                                return DatabaseWrapper.ToParameterName(parameterName);
+                            }
+                            finally
+                            {
+                                index++;
+                            }
+                        }
+                    )
+                    .ToArray();
+            }
+        }
 
-		protected async Task<int> SqlNonQuery(Transaction transaction, string sqlQuery, params object?[] parameters)
-		{
-			await using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
+        private void LogSql(
+            Transaction transaction,
+            string type,
+            string sqlQuery,
+            params object?[] parameters
+        )
+        {
+            Logger.Log(
+                LogLevel.Debug,
+                $"[Transaction #{transaction.Id}] SQL {type}: {string.Format(sqlQuery, parameters)}"
+            );
+        }
 
-			LogSql(transaction, "Non-query", sqlQuery, parameters);
-			return await command.ExecuteNonQueryAsync();
-		}
+        public delegate Task<T> SqlQueryTransformer<T>(DbDataReader reader);
 
-		protected async Task<T> SqlScalar<T>(Transaction transaction, string sqlQuery, params object?[] parameters)
-		{
-			return (T)(await SqlScalar(transaction, sqlQuery, parameters))!;
-		}
+        protected async IAsyncEnumerable<T> SqlQuery<T>(
+            Transaction transaction,
+            SqlQueryTransformer<T> dataHandler,
+            string sqlQuery,
+            params object?[] parameters
+        )
+        {
+            await using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-		protected async Task<object?> SqlScalar(Transaction transaction, string sqlQuery, params object?[] parameters)
-		{
-			await using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
+            LogSql(transaction, "Query", sqlQuery, parameters);
 
-			LogSql(transaction, "Scalar", sqlQuery, parameters);
-			return await command.ExecuteScalarAsync();
-		}
+            {
+                await using DbDataReader reader = await command.ExecuteReaderAsync(
+                    System.Data.CommandBehavior.SingleResult
+                );
+                while (reader.Read())
+                {
+                    yield return await dataHandler(reader);
+                }
+            }
+        }
 
-		protected sealed override async Task OnStart(CancellationToken cancellationToken)
-		{
-			await Transact(async (transaction) =>
-			{
-				await SqlNonQuery(transaction, $"create table if not exists __VERSIONS(Name varchar(128) primary key not null, Version bigint not null);");
-				int? version = null;
+        protected async Task<int> SqlNonQuery(
+            Transaction transaction,
+            string sqlQuery,
+            params object?[] parameters
+        )
+        {
+            await using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
-				{
-					version = await SqlQuery(transaction, (reader) => Task.FromResult(reader.GetInt32Optional(reader.GetOrdinal("Version"))), "select Version from __VERSIONS where Name = {0} limit 1;", Name).FirstOrDefaultAsync();
-				}
+            LogSql(transaction, "Non-query", sqlQuery, parameters);
+            return await command.ExecuteNonQueryAsync();
+        }
 
-				if (version != Version)
-				{
-					if (version == null)
-					{
-						await SqlNonQuery(transaction, $"create table {Name}({COLUMN_ID} bigint primary key auto_increment, {COLUMN_CREATE_TIME} bigint not null, {COLUMN_UPDATE_TIME} bigint not null);");
-						await Upgrade(transaction);
-					}
-					else
-					{
-						await Upgrade(transaction, (int)version);
-					}
+        protected async Task<T> SqlScalar<T>(
+            Transaction transaction,
+            string sqlQuery,
+            params object?[] parameters
+        )
+        {
+            return (T)(await SqlScalar(transaction, sqlQuery, parameters))!;
+        }
 
-					if (await SqlNonQuery(transaction, $"update __VERSIONS set Version = {{0}} where Name = {{1}};", Version, Name) == 0)
-					{
-						await SqlNonQuery(transaction, $"insert into __VERSIONS (Name, Version) values ({{0}}, {{1}});", Name, Version);
-					}
-				}
-			});
-		}
-	}
+        protected async Task<object?> SqlScalar(
+            Transaction transaction,
+            string sqlQuery,
+            params object?[] parameters
+        )
+        {
+            await using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
+
+            LogSql(transaction, "Scalar", sqlQuery, parameters);
+            return await command.ExecuteScalarAsync();
+        }
+
+        protected sealed override async Task OnStart(CancellationToken cancellationToken)
+        {
+            await Transact(
+                async (transaction) =>
+                {
+                    await SqlNonQuery(
+                        transaction,
+                        $"create table if not exists __VERSIONS(Name varchar(128) primary key not null, Version integer not null);"
+                    );
+                    int? version = null;
+
+                    {
+                        version = await SqlQuery(
+                                transaction,
+                                (reader) =>
+                                    Task.FromResult(
+                                        reader.GetInt32Optional(reader.GetOrdinal("Version"))
+                                    ),
+                                "select Version from __VERSIONS where Name = {0} limit 1;",
+                                Name
+                            )
+                            .FirstOrDefaultAsync();
+                    }
+
+                    if (version != Version)
+                    {
+                        if (version == null)
+                        {
+                            await SqlNonQuery(
+                                transaction,
+                                $"create table {Name}({COLUMN_ID} integer primary key autoincrement, {COLUMN_CREATE_TIME} integer not null, {COLUMN_UPDATE_TIME} integer not null);"
+                            );
+                            await Upgrade(transaction);
+                        }
+                        else
+                        {
+                            await Upgrade(transaction, (int)version);
+                        }
+
+                        if (
+                            await SqlNonQuery(
+                                transaction,
+                                $"update __VERSIONS set Version = {{0}} where Name = {{1}};",
+                                Version,
+                                Name
+                            ) == 0
+                        )
+                        {
+                            await SqlNonQuery(
+                                transaction,
+                                $"insert into __VERSIONS (Name, Version) values ({{0}}, {{1}});",
+                                Name,
+                                Version
+                            );
+                        }
+                    }
+                }
+            );
+        }
+    }
 }

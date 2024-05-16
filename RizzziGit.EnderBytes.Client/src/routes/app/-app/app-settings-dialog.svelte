@@ -272,34 +272,34 @@
 					<div class="buttonDiscardSave" style="Display:flex; margin-top:125px; margin-left:575px">
 						<button
 							style="
-          background-color: var(--error);
-          cursor: pointer;
-          border-color: var(--onPrimaryContainerVariant);
-          color: white;
-          padding: 10px 15px;
-          text-align: center;
-          text-decoration: none;
-          display: inline-block;
-          font-size: 16px;
-          border-radius:10px;
-          font-weight: bold;
-          margin-right:20px;
-          ">Discard</button
+					background-color: var(--error);
+					cursor: pointer;
+					border-color: var(--onPrimaryContainerVariant);
+					color: white;
+					padding: 10px 15px;
+					text-align: center;
+					text-decoration: none;
+					display: inline-block;
+					font-size: 16px;
+					border-radius:10px;
+					font-weight: bold;
+					margin-right:20px;
+					">Discard</button
 						>
 						<button
 							style="
-          background-color: var(--primaryContainer);
-          cursor: pointer;
-          border-color: var(--onPrimaryContainerVariant);
-          color: white;
-          padding: 10px 23px;
-          text-align: center;
-          text-decoration: none;
-          display: inline-block;
-          font-size: 16px;
-          border-radius:10px;
-          font-weight: bold;
-          ">Save</button
+					background-color: var(--primaryContainer);
+					cursor: pointer;
+					border-color: var(--onPrimaryContainerVariant);
+					color: white;
+					padding: 10px 23px;
+					text-align: center;
+					text-decoration: none;
+					display: inline-block;
+					font-size: 16px;
+					border-radius:10px;
+					font-weight: bold;
+					">Save</button
 						>
 					</div>
 				</div>

@@ -1,20 +1,20 @@
 <script lang="ts">
-	import '@fortawesome/fontawesome-free/css/all.min.css';
+  import '@fortawesome/fontawesome-free/css/all.min.css';
 
-	import Locale, { LocaleKey } from '$lib/locale.svelte';
-	import { ColorKey, ResetCSS, Title, titleString } from '@rizzzi/svelte-commons';
-	import ColorScheme, { getColorHex } from '../../../../svelte-commons/dist/color-scheme.svelte';
+  import Locale, { LocaleKey } from '$lib/locale.svelte';
+  import { ColorKey, ResetCSS, Title, titleString } from '@rizzzi/svelte-commons';
+  import ColorScheme, { getColorHex } from '../../../../svelte-commons/dist/color-scheme.svelte';
 </script>
 
 <svelte:head>
-	<meta name="theme-color" content={getColorHex(ColorKey.PrimaryContainer)} />
-	<title>{$titleString}</title>
+  <meta name="theme-color" content={getColorHex(ColorKey.PrimaryContainer)} />
+  <title>{$titleString}</title>
 </svelte:head>
 
 <Locale string={[[LocaleKey.AppName]]}>
-	{#snippet children([appName])}
-		<Title title={appName} />
-	{/snippet}
+  {#snippet children([appName])}
+    <Title title={appName} />
+  {/snippet}
 </Locale>
 <ResetCSS />
 <ColorScheme />
@@ -22,21 +22,21 @@
 <slot />
 
 <style lang="scss">
-	:root {
-		-webkit-app-region: drag;
+  :root {
+    -webkit-app-region: drag;
 
-		font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 
-		background-color: var(--background);
+    background-color: var(--background);
 
-		color: var(--onBackground);
+    color: var(--onBackground);
 
-		min-width: 320px;
-	}
+    min-width: 320px;
+  }
 
-	:global(body) {
-		margin: unset;
-		min-height: 100vh;
-		background-color: var(--background);
-	}
+  :global(body) {
+    margin: unset;
+    min-height: 100vh;
+    background-color: var(--background);
+  }
 </style>

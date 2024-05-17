@@ -12,7 +12,8 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"test:integration": "playwright test",
-		"test:unit": "vitest"
+		"test:unit": "vitest",
+		"prototype": "npm run build && npm run preview -- --host --port 8081"
 	},
 	"devDependencies": {
 		"@fortawesome/fontawesome-free": "^6.5.2",

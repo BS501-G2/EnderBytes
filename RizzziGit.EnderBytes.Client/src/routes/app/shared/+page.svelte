@@ -1,18 +1,16 @@
 <script lang="ts">
-	import { Title } from "@rizzzi/svelte-commons";
-	import FileBrowser, { type FileBrowserState } from '../file-browser.svelte';
+  import { Title } from "@rizzzi/svelte-commons";
+  import FileBrowser, { type FileBrowserState } from '../file-browser.svelte';
 
-	const fileBrowserState: FileBrowserState = {
-		isLoading: false,
+  const fileBrowserState: FileBrowserState = {
+    isLoading: false,
 
-		files: [],
-		pathChain: null,
-		access: null,
-		file: null,
-
-		allowCreate: false,
-		title: 'Shared'
-	};
+    files: [],
+    pathChain: null,
+    access: null,
+    file: null,
+    title: 'Shared'
+  };
 </script>
 
 <Title title="Shared" />

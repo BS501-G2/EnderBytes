@@ -15,9 +15,7 @@
 		<PathChain {fileBrowserState} />
 	{/if}
 
-	{#if !fileBrowserState.hideControlBar}
-		<ControlBar {fileBrowserState} bind:selection />
-	{/if}
+	<ControlBar {fileBrowserState} bind:selection />
 
 	{#if fileBrowserState.isLoading || fileBrowserState.file == null || fileBrowserState.file.isFolder}
 		<FileList {fileBrowserState} bind:selection />

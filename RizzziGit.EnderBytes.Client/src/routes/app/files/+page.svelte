@@ -1,21 +1,21 @@
+<script lang="ts" context="module">
+	const filterOpen: Writable<boolean> = writable(false);
+</script>
+
 <script lang="ts">
 	import FileBrowser, {
 		getFile,
 		getFileAccessList,
 		getFilePathChain,
 		scanFolder,
-		type FileBrowserState,
-		type FileResource
+		type FileBrowserState
 	} from '../file-browser.svelte';
+	import { type ControlBarItem } from '../-file-browser/desktop/main-panel/control-bar.svelte';
+	import FilterDialog, { type FolderListFilter } from './filter-dialog.svelte';
 
 	import { page } from '$app/stores';
-	import { Title, Awaiter, Dialog } from '@rizzzi/svelte-commons';
-
-	interface FolderListFilter {
-		sort?: 'name' | 'ctime' | 'utime';
-		desc?: boolean;
-		offset?: number;
-	}
+	import { Title, Awaiter, type AwaiterResetFunction } from '@rizzzi/svelte-commons';
+	import { writable, type Writable } from 'svelte/store';
 
 	function parseId(id: string | null) {
 		if (id == null) {
@@ -27,62 +27,101 @@
 
 	const id = $derived(parseId($page.url.searchParams.get('id')));
 
-	let filterOpen: boolean = $state(false);
-	let filter: FolderListFilter = {};
+	let refresh: Writable<AwaiterResetFunction<null>> = writable();
+	let filter: FolderListFilter = $state({});
+
+  refresh.subscribe(console.log)
+
+	const actions: (ControlBarItem & { isLoading: boolean })[] = [
+		{
+			label: 'Refresh',
+			icon: 'fa-solid fa-sync',
+			action: async () => {
+				console.log('asds');
+				await $refresh(true, null);
+			},
+			group: 'arrangement',
+			isLoading: true
+		},
+		{
+			label: 'Filter',
+			icon: 'fa-solid fa-filter',
+			action: async () => {
+				$filterOpen = true;
+			},
+			group: 'arrangement',
+			isLoading: true
+		},
+		{
+			label: 'New Folder',
+			icon: 'fa-solid fa-folder',
+			action: async () => {},
+			isLoading: false,
+			group: 'new'
+		},
+		{
+			label: 'Upload',
+			icon: 'fa-solid fa-upload',
+			action: async () => {},
+			isLoading: false,
+			group: 'new'
+		}
+	];
 </script>
 
-{#if filterOpen}
-	<Dialog
+{#if $filterOpen}
+	<FilterDialog
+		bind:filter
+		onFilterApply={$refresh}
 		onDismiss={() => {
-			filterOpen = false;
+			$filterOpen = false;
 		}}
-	>
-		{#snippet head()}
-			<h2>Filter</h2>
-		{/snippet}
-		{#snippet body()}
-			<p>Select any metric to filter files.</p>
-		{/snippet}
-	</Dialog>
+	/>
 {/if}
 
 {#key id}
 	<Awaiter
+		bind:reset={$refresh}
 		callback={async (): Promise<FileBrowserState & { isLoading: false }> => {
-		const file = await getFile(id);
+    const file = await getFile(id);
 
-		let fileBrowserState: FileBrowserState & { isLoading: false } = $state({
-			onFilter: async ()  => {
-				console.log('opening filter dialog')
-				await new Promise<void>((resolve) => setTimeout(resolve, 1000))
-				filterOpen = true;
-			},
+    const [files, pathChain, access] = await Promise.all([
+      file.isFolder ? scanFolder(file) : [],
+      getFilePathChain(file),
+      getFileAccessList(file),
+    ])
 
-			isLoading: false,
-			files: file.isFolder ? await scanFolder(file) : [],
-			pathChain: await getFilePathChain(file),
-			access:	await getFileAccessList(file),
-			hideControlBar: !file.isFolder,
-			file,
-			title: id != null ? file.name : 'Home',
+    let fileBrowserState: FileBrowserState & { isLoading: false } = $state({
+      isLoading: false,
+      files,
+      pathChain,
+      access,
+      hideControlBar: !file.isFolder,
+      file,
 
-			allowCreate: true
-		});
+      allowCreate: true,
+      controlBarActions: actions
+    });
 
-		return fileBrowserState
-	}}
+    return fileBrowserState
+  }}
 	>
-		<svelte:fragment slot="loading">
+		{#snippet loading()}
 			<Title title="My Files" />
-			<FileBrowser fileBrowserState={{ isLoading: true }} />
-		</svelte:fragment>
-		<svelte:fragment slot="success" let:result={fileBrowserState}>
+			<FileBrowser
+				fileBrowserState={{
+					isLoading: true,
+					controlBarActions: actions.filter((action) => action.isLoading)
+				}}
+			/>
+		{/snippet}
+		{#snippet success({ result: fileBrowserState })}
 			{#if fileBrowserState.file?.parentId != null}
 				<Title title={fileBrowserState.file.name} />
 			{:else}
 				<Title title="My Files" />
 			{/if}
 			<FileBrowser {fileBrowserState} />
-		</svelte:fragment>
+		{/snippet}
 	</Awaiter>
 {/key}

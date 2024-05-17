@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { FileBrowserState } from '../file-browser.svelte';
+  import type { FileBrowserState } from '../file-browser.svelte';
 
-	let { fileBrowserState = $bindable() }: { fileBrowserState: FileBrowserState } = $props();
+  let { fileBrowserState = $bindable() }: { fileBrowserState: FileBrowserState } = $props();
 </script>
 
 <div class="main">
-	<div class="main panel"></div>
+  <div class="main panel"></div>
 </div>

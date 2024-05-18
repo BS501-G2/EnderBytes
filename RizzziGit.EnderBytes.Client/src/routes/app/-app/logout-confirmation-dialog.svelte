@@ -23,7 +23,7 @@
         >
           <p class="label">OK</p>
         </Button>
-        <Button onClick={() => ($enabled = false)} buttonClass={ButtonClass.Background}>
+        <Button onClick={() => { $enabled = false }} buttonClass={ButtonClass.Background}>
           <p class="label">Cancel</p>
         </Button>
       </Client>

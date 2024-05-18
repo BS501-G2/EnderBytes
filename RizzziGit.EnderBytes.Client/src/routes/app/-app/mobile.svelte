@@ -1,11 +1,14 @@
 <script lang="ts">
+    import type { Snippet } from 'svelte';
   import NavigationBar from './mobile/navigation-bar.svelte';
+
+  const { children }: { children: Snippet } = $props()
 </script>
 
 <div class="panel-container">
   <div class="panel top-panel"></div>
   <div class="panel middle-panel">
-    <slot />
+    {@render children()}
   </div>
   <div class="panel bottom-panel">
     <NavigationBar />
@@ -14,6 +17,8 @@
 
 <style lang="scss">
   div.panel-container {
+    -webkit-app-region: no-drag;
+
     width: 100vw;
     height: 100vh;
 
@@ -26,6 +31,8 @@
     flex-direction: column;
 
     > div.top-panel {
+      padding-top: env(titlebar-area-height, 0px);
+
       min-height: 32px;
 
       background-color: var(--primaryContainer);
@@ -38,7 +45,9 @@
     }
 
     > div.bottom-panel {
-      min-height: 32px;
+      box-sizing: border-box;
+
+      padding: 8px;
 
       background-color: var(--primaryContainer);
     }

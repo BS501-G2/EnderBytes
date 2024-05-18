@@ -7,3 +7,7 @@
 <div class="main">
   <div class="main panel"></div>
 </div>
+
+<style lang="scss">
+
+</style>

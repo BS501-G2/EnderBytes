@@ -5,7 +5,7 @@
     label: string;
     icon: string;
     group: ControlBarItemGroup;
-    action: (event: MouseEvent) => Promise<void>;
+    action: (event: MouseEvent) => Promise<void> | void;
   }
 </script>
 

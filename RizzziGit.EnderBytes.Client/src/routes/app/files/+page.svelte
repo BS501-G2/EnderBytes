@@ -1,6 +1,3 @@
-<script lang="ts" context="module">
-</script>
-
 <script lang="ts">
   import FileBrowser, {
     getFile,
@@ -10,14 +7,12 @@
     type FileBrowserState
   } from '../file-browser.svelte';
   import { type ControlBarItem } from '../-file-browser/desktop/main-panel/control-bar.svelte';
-  import FilterOverlay, {
-    type FolderListFilter,
-    filterOverlayState
-  } from './filter-overlay.svelte';
+  import FilterOverlay, { filterOverlayState } from './arrange-overlay.svelte';
 
   import { page } from '$app/stores';
   import { Title, Awaiter, type AwaiterResetFunction } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
+  import NewDialog, { newDialogState } from './new-dialog.svelte';
 
   function parseId(id: string | null) {
     if (id == null) {
@@ -44,7 +39,7 @@
       isLoading: true
     },
     {
-      label: 'Filter',
+      label: 'Arrange',
       icon: 'fa-solid fa-filter',
       action: async ({ currentTarget }) => {
         const bounds = (currentTarget as HTMLElement).getBoundingClientRect();
@@ -55,16 +50,13 @@
       isLoading: true
     },
     {
-      label: 'New Folder',
-      icon: 'fa-solid fa-folder',
-      action: async () => {},
-      isLoading: false,
-      group: 'new'
-    },
-    {
-      label: 'Upload',
-      icon: 'fa-solid fa-upload',
-      action: async () => {},
+      label: 'New',
+      icon: 'fa-solid fa-plus',
+      action: (event) => {
+        const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+
+        $newDialogState = { x: bounds.left, y: bounds.bottom, state: { type: 'file', files: [] } };
+      },
       isLoading: false,
       group: 'new'
     }
@@ -76,13 +68,9 @@
 {#key title}
   <Title title={title ?? 'My Files'} />
 {/key}
-<FilterOverlay
-  onFilterApply={() => $refresh(true, null)}
-  onDismiss={() => {
-    $filterOverlayState.enabled = null;
-    $filterOverlayState = $filterOverlayState;
-  }}
-/>
+
+<FilterOverlay onFilterApply={() => $refresh(true, null)} />
+<NewDialog onNew={() => $refresh(true, null)} />
 
 {#key id}
   <Awaiter
@@ -108,7 +96,7 @@
       controlBarActions: actions
     });
 
-  title = id != null ? fileBrowserState.file?.name ?? null : null
+    title = id != null ? fileBrowserState.file?.name ?? null : null
 
     return fileBrowserState
   }}

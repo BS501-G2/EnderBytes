@@ -39,6 +39,10 @@
     urlObj.pathname = `${!path.startsWith('/') ? '/' : ''}${path}`;
     if (params != null) {
       for (const [key, value] of Object.entries(params)) {
+        if (value == null) {
+          continue;
+        }
+
         urlObj.searchParams.set(key, value);
       }
     }

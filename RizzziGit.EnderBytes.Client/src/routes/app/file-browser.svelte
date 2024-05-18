@@ -130,7 +130,7 @@
 <script lang="ts">
   import DesktopLayout from './-file-browser/desktop.svelte';
   import MobileLayout from './-file-browser/mobile.svelte';
-	import type { FolderListFilter } from './files/filter-overlay.svelte';
+  import type { FolderListFilter } from './files/filter-overlay.svelte';
 
   let { fileBrowserState = $bindable() }: { fileBrowserState: FileBrowserState } = $props();
 

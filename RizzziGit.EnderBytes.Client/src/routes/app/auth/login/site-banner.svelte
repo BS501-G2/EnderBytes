@@ -5,7 +5,7 @@
 </script>
 
 <div class="site-banner">
-  <img src={faviconSrc(32)} alt={getString(LocaleKey.AltIconSite)} />
+  <img class="title-image" src={faviconSrc(32)} alt={getString(LocaleKey.AltIconSite)} />
 
   {getString(LocaleKey.AppName)}
 </div>
@@ -28,5 +28,12 @@
     line-height: 0px;
 
     color: var(--primaryVariant);
+
+    > img.title-image {
+      min-height: 32px;
+      min-width: 32px;
+      max-height: 32px;
+      max-width: 32px;
+    }
   }
 </style>

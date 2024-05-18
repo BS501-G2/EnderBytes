@@ -1,5 +1,4 @@
 <script lang="ts" context="module">
-	const filterOpen: Writable<boolean> = writable(false);
 </script>
 
 <script lang="ts">
@@ -11,7 +10,10 @@
 		type FileBrowserState
 	} from '../file-browser.svelte';
 	import { type ControlBarItem } from '../-file-browser/desktop/main-panel/control-bar.svelte';
-	import FilterDialog, { type FolderListFilter } from './filter-dialog.svelte';
+	import FilterOverlay, {
+		type FolderListFilter,
+		filterOverlayState
+	} from './filter-overlay.svelte';
 
 	import { page } from '$app/stores';
 	import { Title, Awaiter, type AwaiterResetFunction } from '@rizzzi/svelte-commons';
@@ -28,9 +30,6 @@
 	const id = $derived(parseId($page.url.searchParams.get('id')));
 
 	let refresh: Writable<AwaiterResetFunction<null>> = writable();
-	let filter: FolderListFilter = $state({});
-
-  refresh.subscribe(console.log)
 
 	const actions: (ControlBarItem & { isLoading: boolean })[] = [
 		{
@@ -46,8 +45,10 @@
 		{
 			label: 'Filter',
 			icon: 'fa-solid fa-filter',
-			action: async () => {
-				$filterOpen = true;
+			action: async ({ currentTarget }) => {
+				const bounds = (currentTarget as HTMLElement).getBoundingClientRect();
+
+				$filterOverlayState.enabled = [window.innerWidth - bounds.right, bounds.bottom];
 			},
 			group: 'arrangement',
 			isLoading: true
@@ -67,17 +68,17 @@
 			group: 'new'
 		}
 	];
+
+	$effect(() => console.log(JSON.stringify($filterOverlayState)));
 </script>
 
-{#if $filterOpen}
-	<FilterDialog
-		bind:filter
-		onFilterApply={$refresh}
-		onDismiss={() => {
-			$filterOpen = false;
-		}}
-	/>
-{/if}
+<FilterOverlay
+	onFilterApply={() => $refresh(true, null)}
+	onDismiss={() => {
+		$filterOverlayState.enabled = null;
+		$filterOverlayState = $filterOverlayState;
+	}}
+/>
 
 {#key id}
 	<Awaiter
@@ -86,7 +87,7 @@
     const file = await getFile(id);
 
     const [files, pathChain, access] = await Promise.all([
-      file.isFolder ? scanFolder(file) : [],
+      file.isFolder ? scanFolder(file, $filterOverlayState.state) : [],
       getFilePathChain(file),
       getFileAccessList(file),
     ])
@@ -121,6 +122,7 @@
 			{:else}
 				<Title title="My Files" />
 			{/if}
+
 			<FileBrowser {fileBrowserState} />
 		{/snippet}
 	</Awaiter>

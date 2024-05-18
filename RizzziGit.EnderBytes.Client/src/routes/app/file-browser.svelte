@@ -96,9 +96,10 @@
     return result;
   }
 
-  export async function scanFolder(file: FileResource): Promise<FileResource[]> {
+  export async function scanFolder(file: FileResource, params?: FolderListFilter): Promise<FileResource[]> {
     const result: FileResource[] = await apiFetch({
-      path: `/file/:${file.id}/files`
+      path: `/file/:${file.id}/files`,
+      params: params as Record<string, string>
     });
 
     return result.map(storeFile);
@@ -129,6 +130,7 @@
 <script lang="ts">
   import DesktopLayout from './-file-browser/desktop.svelte';
   import MobileLayout from './-file-browser/mobile.svelte';
+	import type { FolderListFilter } from './files/filter-overlay.svelte';
 
   let { fileBrowserState = $bindable() }: { fileBrowserState: FileBrowserState } = $props();
 

@@ -1,258 +1,257 @@
 <script lang="ts" context="module">
-  import { LocaleKey, getString } from '$lib/locale.svelte';
-  import { RootState } from '$lib/states/root-state';
+	import { LocaleKey, getString } from '$lib/locale.svelte';
 
-  import SiteBanner from './SiteBanner.svelte';
-  import Banner from './Banner.svelte';
-  import { apiFetch } from '$lib/client.svelte';
+	import SiteBanner from './site-banner.svelte';
+	import Banner from './banner.svelte';
+	import { apiFetch } from '$lib/client.svelte';
 </script>
 
 <script lang="ts">
-  import { ResponsiveLayout, viewMode, ViewMode } from '@rizzzi/svelte-commons';
+	import { ResponsiveLayout, viewMode, ViewMode } from '@rizzzi/svelte-commons';
 
-  const rootState = RootState.state;
+	let enabled: boolean = true;
 
-  let enabled: boolean = true;
+	let username: string;
+	let password: string;
 
-  let username: string;
-  let password: string;
+	async function onActivity(act: () => Promise<void>) {
+		try {
+			enabled = false;
 
-  async function onActivity(act: () => Promise<void>) {
-    try {
-      enabled = false;
+			await act();
+		} finally {
+			enabled = true;
+		}
+	}
 
-      await act();
-    } finally {
-      enabled = true;
-    }
-  }
+	let errorMessage: string | null = null;
 
-  let errorMessage: string | null = null;
+	async function onSubmit(username: string, password: string) {
+		try {
+			errorMessage = null;
 
-  async function onSubmit(username: string, password: string) {
-    try {
-      errorMessage = null;
+			await apiFetch({
+				path: '/auth/password-login',
+				method: 'POST',
+				data: {
+					username,
+					password
+				}
+			});
+		} catch (error: any) {
+			errorMessage = error.message;
 
-      await apiFetch({
-        path: '/auth/password-login',
-        method: 'POST',
-        data: {
-          username,
-          password
-        }
-      });
-    } catch (error: any) {
-      errorMessage = error.message;
-
-      throw error;
-    }
-  }
+			throw error;
+		}
+	}
 </script>
 
 <div class="content">
-  <div class="title-bar"></div>
+	<div class="title-bar"></div>
 
-  <div class="login-page">
-    <ResponsiveLayout>
-      {#snippet desktop()}
-        <svg class="banner-area">
-          <Banner></Banner>
-        </svg>
-      {/snippet}
-    </ResponsiveLayout>
-    <div class="form-area {$viewMode & ViewMode.Mobile ? 'form-area-mobile' : ''}">
-      <div class="form-content">
-        <SiteBanner />
+	<div class="login-page">
+		<ResponsiveLayout>
+			{#snippet desktop()}
+				<svg class="banner-area">
+					<Banner></Banner>
+				</svg>
+			{/snippet}
+		</ResponsiveLayout>
+		<div class="form-area {$viewMode & ViewMode.Mobile ? 'form-area-mobile' : ''}">
+			<div class="form-content">
+				<SiteBanner />
 
-        <form
-          on:submit={async (e) => {
-            e.preventDefault();
+				<form
+					on:submit={async (e) => {
+						e.preventDefault();
 
-            await onActivity(() => onSubmit(username, password));
-          }}
-        >
-          {#if errorMessage != null}
-            <p class="error-message">{errorMessage}</p>
-          {/if}
+						await onActivity(() => onSubmit(username, password));
+					}}
+				>
+					{#if errorMessage != null}
+						<p class="error-message">{errorMessage}</p>
+					{/if}
 
-          <div class="field">
-            <input
-              type="text"
-              id="-username"
-              name="username"
-              placeholder={getString(LocaleKey.AuthLoginPageUsernamePlaceholder)}
-              bind:value={username}
-              disabled={!enabled}
-            />
-          </div>
-          <div class="field">
-            <input
-              type="password"
-              id="-password"
-              name="password"
-              placeholder={getString(LocaleKey.AuthLoginPagePasswordPlaceholder)}
-              bind:value={password}
-              disabled={!enabled}
-            />
-          </div>
-          <div class="field">
-            <button disabled={!enabled}>{getString(LocaleKey.AuthLoginPageSubmit)}</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
+					<div class="field">
+						<input
+							type="text"
+							id="-username"
+							name="username"
+							placeholder={getString(LocaleKey.AuthLoginPageUsernamePlaceholder)}
+							bind:value={username}
+							disabled={!enabled}
+						/>
+					</div>
+					<div class="field">
+						<input
+							type="password"
+							id="-password"
+							name="password"
+							placeholder={getString(LocaleKey.AuthLoginPagePasswordPlaceholder)}
+							bind:value={password}
+							disabled={!enabled}
+						/>
+					</div>
+					<div class="field">
+						<button disabled={!enabled}>{getString(LocaleKey.AuthLoginPageSubmit)}</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
 </div>
 
 <style lang="scss">
-  div.content {
-    margin: auto;
+	div.content {
+		margin: auto;
 
-    height: 100vh;
+		height: 100vh;
 
-    display: flex;
-    flex-direction: column;
+		display: flex;
+		flex-direction: column;
 
-    align-items: center;
+		align-items: center;
 
-    > div.title-bar {
-      -webkit-app-region: drag;
+		> div.title-bar {
+			-webkit-app-region: drag;
 
-      width: 100%;
-      height: env(titlebar-area-height);
+			width: 100%;
+			height: env(titlebar-area-height);
 
-      background-color: var(--primaryContainer);
-    }
+			background-color: var(--primaryContainer);
+		}
 
-    > div.login-page {
-      width: 100%;
-      max-width: 1280px;
+		> div.login-page {
+			-webkit-app-region: no-drag;
 
-      flex-grow: 1;
+			width: 100%;
+			max-width: 1280px;
 
-      display: flex;
+			flex-grow: 1;
 
-      flex-direction: row;
+			display: flex;
 
-      > svg.banner-area {
-        flex-grow: 1;
+			flex-direction: row;
 
-        height: 100%;
-      }
+			> svg.banner-area {
+				flex-grow: 1;
 
-      > div.form-area {
-        max-width: 320px;
-        min-width: 320px;
-        height: 100%;
+				height: 100%;
+			}
 
-        overflow-y: auto;
+			> div.form-area {
+				max-width: 320px;
+				min-width: 320px;
+				height: 100%;
 
-        padding: 16px;
-        box-sizing: border-box;
+				overflow-y: auto;
 
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
+				padding: 16px;
+				box-sizing: border-box;
 
-        > div.form-content {
-          background-color: var(--backgroundVariant);
-          border-radius: 16px;
-          flex-grow: 1;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
 
-          max-width: 100%;
-          min-width: 0px;
+				> div.form-content {
+					background-color: var(--backgroundVariant);
+					border-radius: 16px;
+					flex-grow: 1;
 
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
+					max-width: 100%;
+					min-width: 0px;
 
-          > form {
-            width: 100%;
-            min-width: 0px;
-            max-width: 420px;
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+					justify-content: center;
 
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+					> form {
+						width: 100%;
+						min-width: 0px;
+						max-width: 420px;
 
-            padding: 8px 32px 8px 32px;
-            box-sizing: border-box;
+						display: flex;
+						flex-direction: column;
+						align-items: center;
+						justify-content: center;
 
-            gap: 16px;
+						padding: 8px 32px 8px 32px;
+						box-sizing: border-box;
 
-            > p.error-message {
-              padding: 8px;
-              margin: 0px;
+						gap: 16px;
 
-              min-width: 100%;
-              max-width: 100%;
+						> p.error-message {
+							padding: 8px;
+							margin: 0px;
 
-              overflow-x: hidden;
-              text-wrap: nowrap;
-              max-lines: 1;
-              text-overflow: ellipsis;
+							min-width: 100%;
+							max-width: 100%;
 
-              box-sizing: border-box;
+							overflow-x: hidden;
+							text-wrap: nowrap;
+							max-lines: 1;
+							text-overflow: ellipsis;
 
-              background-color: var(--error);
-              color: var(--onError);
-            }
+							box-sizing: border-box;
 
-            > div.field {
-              width: 100%;
+							background-color: var(--error);
+							color: var(--onError);
+						}
 
-              border: solid 1px rgba(0, 0, 0, 0.25);
-              color: var(--onBackgroundVariant);
+						> div.field {
+							width: 100%;
 
-              > input,
-              > button {
-                width: 100%;
+							border: solid 1px rgba(0, 0, 0, 0.25);
+							color: var(--onBackgroundVariant);
 
-                box-sizing: border-box;
+							> input,
+							> button {
+								width: 100%;
 
-                border: none;
-                outline: none;
+								box-sizing: border-box;
 
-                font-size: 18px;
-                padding: 8px;
+								border: none;
+								outline: none;
 
-                transition: all linear 150ms;
-              }
+								font-size: 18px;
+								padding: 8px;
 
-              > input {
-                border-style: solid;
-                border-color: transparent;
-                border-width: 1px;
-              }
+								transition: all linear 150ms;
+							}
 
-              > input:focus {
-                border-color: var(--primary);
-              }
+							> input {
+								border-style: solid;
+								border-color: transparent;
+								border-width: 1px;
+							}
 
-              > button {
-                background-color: var(--primary);
-                color: var(--onPrimary);
-              }
+							> input:focus {
+								border-color: var(--primary);
+							}
 
-              > button:hover {
-                cursor: pointer;
+							> button {
+								background-color: var(--primary);
+								color: var(--onPrimary);
+							}
 
-                background-color: var(--onPrimary);
-                color: var(--primary);
-              }
-            }
-          }
-        }
-      }
+							> button:hover {
+								cursor: pointer;
 
-      > div.form-area-mobile {
-        width: unset;
+								background-color: var(--onPrimary);
+								color: var(--primary);
+							}
+						}
+					}
+				}
+			}
 
-        flex-grow: 1;
-      }
-    }
-  }
+			> div.form-area-mobile {
+				width: unset;
+
+				flex-grow: 1;
+			}
+		}
+	}
 </style>

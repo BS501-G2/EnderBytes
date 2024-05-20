@@ -9,10 +9,12 @@
     fileBrowserState,
     selection
   }: {
-    fileBrowserState: Writable<FileBrowserState & {
-      isLoading: false;
-      file: FileResource & { isFolder: false };
-    }>;
+    fileBrowserState: Writable<
+      FileBrowserState & {
+        isLoading: false;
+        file: FileResource & { isFolder: false };
+      }
+    >;
     selection: Writable<FileResource[]>;
   } = $props();
 
@@ -23,7 +25,7 @@
 
   const mainView: Writable<HTMLElement | null> = writable(null);
 
-  $selection = [$fileBrowserState.file]
+  $selection = [$fileBrowserState.file];
 </script>
 
 <AnimationFrame
@@ -41,7 +43,7 @@
 {#snippet topBar()}
   <div class="top-bar-container" transition:fly|global={{ duration: 200, y: -32 }}>
     <div class="top-bar">
-      <Button buttonClass={ButtonClass.Transparent} outline={false} onClick={() => history.back()}>
+      <Button outline={false} onClick={() => history.back()}>
         <i class="icon fa-solid fa-arrow-left"></i>
       </Button>
       <h3 class="file-name">{$fileBrowserState.file.name}</h3>
@@ -54,7 +56,7 @@
           }
         }}
       >
-        {#if document.fullscreenElement != $mainView}
+        {#if $mainView != document.fullscreenElement}
           <i class="icon fa-solid fa-expand"></i>
         {:else}
           <i class="icon fa-solid fa-compress"></i>

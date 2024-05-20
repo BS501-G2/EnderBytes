@@ -1,7 +1,6 @@
 <script lang="ts">
   import { type Writable, type Readable, derived } from 'svelte/store';
   import type { FileBrowserState, FileResource } from '../../file-browser.svelte';
-  import { Button } from '@rizzzi/svelte-commons';
 
   let {
     fileBrowserState,
@@ -27,12 +26,13 @@
       {$fileBrowserState.title ?? (selected?.parentId != null ? selected?.name : 'My Files')}
     </h3>
   </div>
+  <div class="body"></div>
 {/snippet}
 
 <div class="side-panel-container">
   {#if !$fileBrowserState.isLoading}
     {#if $selection.length > 1}
-      <h2>Multiple files selected</h2>
+      <h2>{$selection.length} file{$selection.length > 1 ? 's' : ''}</h2>
     {:else if $selected == null}
       <h2>No file selected</h2>
     {:else}
@@ -42,6 +42,14 @@
 </div>
 
 <style lang="scss">
+  div.body {
+    flex-grow: 1;
+    min-height: 0px;
+    min-width: 0px;
+
+    overlay: auto;
+  }
+
   div.header {
     display: flex;
     flex-direction: row;

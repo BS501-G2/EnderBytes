@@ -31,6 +31,7 @@
 
   import { hasKeys, AnimationFrame, LoadingSpinnerPage } from '@rizzzi/svelte-commons';
   import type { Writable } from 'svelte/store';
+  import { cubicInOut, cubicOut } from 'svelte/easing';
 
   let {
     fileBrowserState,
@@ -179,7 +180,8 @@
     <div
       role="presentation"
       class="file-list-inner-container"
-      transition:scale|global={{ start: 0.95, duration: 200 }}
+      in:scale|global={{ start: 0.95, duration: 200 }}
+      out:scale|global={{ start: 1.05, duration: 200 }}
       bind:this={fileList}
       onmousedown={(e) => {
         if (fileList != e.target && fileListInner != e.target) {
@@ -278,6 +280,7 @@
 
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 
     user-select: none;
 

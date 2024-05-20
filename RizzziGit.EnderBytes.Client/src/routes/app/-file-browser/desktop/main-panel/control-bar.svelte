@@ -13,12 +13,13 @@
   import { Button, ButtonClass } from '@rizzzi/svelte-commons';
   import { scale } from 'svelte/transition';
   import type { FileBrowserState, FileResource } from '../../../file-browser.svelte';
-    import type { Writable } from 'svelte/store';
+  import type { Writable } from 'svelte/store';
 
   let {
     fileBrowserState,
     selection = $bindable()
-  }: { fileBrowserState: Writable<FileBrowserState>; selection: Writable<FileResource[]> } = $props();
+  }: { fileBrowserState: Writable<FileBrowserState>; selection: Writable<FileResource[]> } =
+    $props();
 </script>
 
 {#snippet buttons(actions: ControlBarItem[], animations: boolean)}

@@ -40,9 +40,8 @@ public sealed partial class ResourceService
 
         protected Task Transact(TransactionHandler handler) => Service.Transact(handler);
 
-        protected IAsyncEnumerable<T> EnumeratedTransact<T>(
-            TransactionEnumeratorHandler<T> handler
-        ) => Service.EnumeratedTransact(handler);
+        protected Task<T[]> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler) =>
+            Service.EnumeratedTransact(handler);
 
         private DbCommand CreateCommand(Transaction transaction, string sql, object?[] parameters)
         {
@@ -95,7 +94,7 @@ public sealed partial class ResourceService
 
         public delegate Task<T> SqlQueryTransformer<T>(DbDataReader reader);
 
-        protected async IAsyncEnumerable<T> SqlQuery<T>(
+        protected async Task<T[]> SqlQuery<T>(
             Transaction transaction,
             SqlQueryTransformer<T> dataHandler,
             string sqlQuery,
@@ -105,6 +104,7 @@ public sealed partial class ResourceService
             await using DbCommand command = CreateCommand(transaction, sqlQuery, parameters);
 
             LogSql(transaction, "Query", sqlQuery, parameters);
+            List<T> items = [];
 
             {
                 await using DbDataReader reader = await command.ExecuteReaderAsync(
@@ -112,9 +112,11 @@ public sealed partial class ResourceService
                 );
                 while (reader.Read())
                 {
-                    yield return await dataHandler(reader);
+                    items.Add(await dataHandler(reader));
                 }
             }
+
+            return [.. items];
         }
 
         protected async Task<int> SqlNonQuery(
@@ -162,7 +164,8 @@ public sealed partial class ResourceService
                     int? version = null;
 
                     {
-                        version = await SqlQuery(
+                        version = (
+                            await SqlQuery(
                                 transaction,
                                 (reader) =>
                                     Task.FromResult(
@@ -171,7 +174,7 @@ public sealed partial class ResourceService
                                 "select Version from __VERSIONS where Name = {0} limit 1;",
                                 Name
                             )
-                            .FirstOrDefaultAsync();
+                        ).FirstOrDefault();
                     }
 
                     if (version != Version)

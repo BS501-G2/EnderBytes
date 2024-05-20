@@ -30,36 +30,38 @@
   import { scale } from 'svelte/transition';
 
   import { hasKeys, AnimationFrame, LoadingSpinnerPage } from '@rizzzi/svelte-commons';
+  import type { Writable } from 'svelte/store';
 
   let {
-    fileBrowserState = $bindable(),
-    selection = $bindable()
-  }: { fileBrowserState: FileBrowserState; selection: FileResource[] } = $props();
+    fileBrowserState,
+    selection
+  }: { fileBrowserState: Writable<FileBrowserState>; selection: Writable<FileResource[]> } =
+    $props();
 
   function click(fileBrowserState: FileBrowserState & { isLoading: false }, file: FileResource) {
     if (hasKeys('control')) {
-      selection = !selection.includes(file)
-        ? [...selection, file]
-        : selection.filter((id) => id !== file);
+      $selection = !$selection.includes(file)
+        ? [...$selection, file]
+        : $selection.filter((id) => id !== file);
     } else if (hasKeys('shift')) {
       const { files } = fileBrowserState;
 
-      if (selection.length === 0) {
-        selection = [file];
+      if ($selection.length === 0) {
+        $selection = [file];
       } else {
-        const startIndex = files.indexOf(selection[0]);
+        const startIndex = files.indexOf($selection[0]);
         const endIndex = files.indexOf(file);
 
         if (startIndex > endIndex) {
-          selection = files.slice(endIndex, startIndex + 1).toReversed();
+          $selection = files.slice(endIndex, startIndex + 1).toReversed();
         } else {
-          selection = files.slice(startIndex, endIndex + 1);
+          $selection = files.slice(startIndex, endIndex + 1);
         }
       }
-    } else if (selection.length !== 1 || selection[0] !== file) {
-      selection = [file];
+    } else if ($selection.length !== 1 || $selection[0] !== file) {
+      $selection = [file];
     } else {
-      selection = [];
+      $selection = [];
     }
   }
 
@@ -94,9 +96,10 @@
       clientX: cursorX,
       clientY: cursorY,
 
-      capturedSelection: hasKeys('shift') || hasKeys('control')
-        ? selectionBox?.capturedSelection ?? [...selection]
-        : []
+      capturedSelection:
+        hasKeys('shift') || hasKeys('control')
+          ? selectionBox?.capturedSelection ?? [...$selection]
+          : []
     };
   }
 
@@ -108,7 +111,7 @@
 {#if selectionBox != null}
   <AnimationFrame
     callback={() => {
-      if (selectionBox == null || fileBrowserState.isLoading) {
+      if (selectionBox == null || $fileBrowserState.isLoading) {
         return;
       }
 
@@ -130,7 +133,7 @@
 
       setSelectionRectangle(selectionBox.clientX, selectionBox.clientY);
 
-      const files = fileBrowserState.files;
+      const files = $fileBrowserState.files;
       let selectedFiles = [...selectionBox.capturedSelection];
 
       for (let index = 0; index < files.length; index++) {
@@ -162,17 +165,19 @@
         }
       }
 
-      selection = selectedFiles;
+      $selection = selectedFiles;
     }}
   />
 {/if}
 
 <div class="file-list-container" bind:this={fileListContianer}>
-  {#if fileBrowserState.isLoading}
-    <LoadingSpinnerPage />
+  {#if $fileBrowserState.isLoading}
+    {#if fileList == null}
+      <LoadingSpinnerPage />
+    {/if}
   {:else}
     <div
-      role="none"
+      role="presentation"
       class="file-list-inner-container"
       transition:scale|global={{ start: 0.95, duration: 200 }}
       bind:this={fileList}
@@ -181,7 +186,11 @@
           return;
         }
 
-        if (e.currentTarget.clientWidth < (e.clientX - e.currentTarget.offsetLeft)) {
+        if (e.currentTarget.clientWidth < e.clientX - e.currentTarget.offsetLeft) {
+          return;
+        }
+
+        if (selectionBox != null) {
           return;
         }
 
@@ -232,14 +241,24 @@
       {/if}
       {#if getFileBrowserListStyle() === FileBrowserListConfig.Grid}
         <div class="file-grid" bind:this={fileListInner}>
-          {#each fileBrowserState.files as file}
-            <FileGridEntry {fileBrowserState} {file} bind:selection onClick={click} />
+          {#each $fileBrowserState.files as file}
+            <FileGridEntry
+              fileBrowserState={fileBrowserState as any}
+              {file}
+              {selection}
+              onClick={click}
+            />
           {/each}
         </div>
       {:else}
         <div class="file-table" bind:this={fileListInner}>
-          {#each fileBrowserState.files as file}
-            <FileTableEntry {fileBrowserState} {file} bind:selection onClick={click} />
+          {#each $fileBrowserState.files as file}
+            <FileTableEntry
+              fileBrowserState={fileBrowserState as any}
+              {file}
+              {selection}
+              onClick={click}
+            />
           {/each}
         </div>
       {/if}
@@ -250,7 +269,7 @@
 <style lang="scss">
   div.file-list-container {
     flex-grow: 1;
-    min-height: 0px;
+    min-height: 100%;
 
     border-radius: 8px;
 

@@ -188,26 +188,27 @@ public sealed partial class FileManager : ResourceManager
         return resource;
     }
 
-    public IAsyncEnumerable<Resource> PathChain(
-        ResourceService.Transaction transaction,
-        Resource file
-    )
+    public async Task<Resource[]> PathChain(ResourceService.Transaction transaction, Resource file)
     {
-        async IAsyncEnumerable<Resource> getChain()
+        async Task<Resource[]> getChain()
         {
             Resource? resource = file;
+            List<Resource> chain = [];
+
             while (resource.ParentId != null)
             {
-                yield return resource;
+                chain.Add(resource);
 
                 if ((resource = await GetById(transaction, (long)resource.ParentId)) == null)
                 {
                     break;
                 }
             }
+
+            return chain.ToArray();
         }
 
-        return getChain().Reverse();
+        return (await getChain()).Reverse().ToArray();
     }
 
     public async Task<FileCreationResult> Create(
@@ -262,8 +263,8 @@ public sealed partial class FileManager : ResourceManager
             throw new NotAFolderException(newParent);
         }
 
-        IAsyncEnumerable<Resource> pathChain = PathChain(transaction, newParent);
-        Resource oldParent = await pathChain.LastAsync();
+        Resource[] pathChain = await PathChain(transaction, newParent);
+        Resource oldParent = pathChain[^1];
         KeyService.AesPair oldParentKey = await GetKeyRequired(
             transaction,
             file,
@@ -277,10 +278,7 @@ public sealed partial class FileManager : ResourceManager
             userAuthenticationToken
         );
 
-        if (
-            file.Id == newParent.Id
-            || await pathChain.AnyAsync((fileTest) => fileTest.Id == file.Id)
-        )
+        if (file.Id == newParent.Id || pathChain.Any((fileTest) => fileTest.Id == file.Id))
         {
             throw new InvalidMoveException(file, newParent);
         }
@@ -446,12 +444,12 @@ public sealed partial class FileManager : ResourceManager
         );
     }
 
-    public async IAsyncEnumerable<Resource> ScanFolder(
+    public async Task<Resource[]> ScanFolder(
         ResourceService.Transaction transaction,
         Resource folder,
         UserAuthenticationToken userAuthenticationToken,
         LimitClause? limitClause = null,
-        OrderByClause[]? orderByClause = null,
+        OrderByClause?[]? orderByClause = null,
         bool? isFolder = null
     )
     {
@@ -462,25 +460,20 @@ public sealed partial class FileManager : ResourceManager
 
         await GetKey(transaction, folder, FileAccessExtent.ReadOnly, userAuthenticationToken);
 
-        await foreach (
-            Resource file in Select(
-                transaction,
-                new WhereClause.Nested(
-                    "and",
-                    new WhereClause.CompareColumn(COLUMN_DOMAIN_USER_ID, "=", folder.DomainUserId),
-                    new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", folder.Id),
-                    isFolder != null
-                        ? new WhereClause.CompareColumn(COLUMN_IS_FOLDER, "=", isFolder)
-                        : null,
-                    new WhereClause.Raw($"{COLUMN_TRASH_TIME} is null")
-                ),
-                limitClause,
-                orderByClause
-            )
-        )
-        {
-            yield return file;
-        }
+        return await Select(
+            transaction,
+            new WhereClause.Nested(
+                "and",
+                new WhereClause.CompareColumn(COLUMN_DOMAIN_USER_ID, "=", folder.DomainUserId),
+                new WhereClause.CompareColumn(COLUMN_PARENT_ID, "=", folder.Id),
+                isFolder != null
+                    ? new WhereClause.CompareColumn(COLUMN_IS_FOLDER, "=", isFolder)
+                    : null,
+                new WhereClause.Raw($"{COLUMN_TRASH_TIME} is null")
+            ),
+            limitClause,
+            orderByClause
+        );
     }
 
     public async Task<KeyService.AesPair?> GetKey(

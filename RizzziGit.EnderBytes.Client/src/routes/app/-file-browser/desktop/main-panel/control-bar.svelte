@@ -13,11 +13,12 @@
   import { Button, ButtonClass } from '@rizzzi/svelte-commons';
   import { scale } from 'svelte/transition';
   import type { FileBrowserState, FileResource } from '../../../file-browser.svelte';
+    import type { Writable } from 'svelte/store';
 
   let {
-    fileBrowserState = $bindable(),
+    fileBrowserState,
     selection = $bindable()
-  }: { fileBrowserState: FileBrowserState; selection: FileResource[] } = $props();
+  }: { fileBrowserState: Writable<FileBrowserState>; selection: Writable<FileResource[]> } = $props();
 </script>
 
 {#snippet buttons(actions: ControlBarItem[], animations: boolean)}
@@ -46,8 +47,8 @@
   {/each}
 {/snippet}
 
-{#if fileBrowserState.controlBarActions != null}
-  {@const actions = fileBrowserState.controlBarActions}
+{#if $fileBrowserState.controlBarActions != null}
+  {@const actions = $fileBrowserState.controlBarActions}
 
   <div class="control-bar-container">
     <div class="control-bar">

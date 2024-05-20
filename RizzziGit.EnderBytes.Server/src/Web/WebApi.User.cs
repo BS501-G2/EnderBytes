@@ -118,4 +118,11 @@ public sealed partial class WebApi
             return Data();
         });
     }
+
+    // [Route("~/user")]
+    // [HttpGet]
+    // public async Task<ActionResult> ListUser(string? searchString = null)
+    // {
+
+    // }
 }

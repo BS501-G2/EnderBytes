@@ -22,7 +22,7 @@ public sealed class FileDataManager : ResourceManager
         long Size
     ) : ResourceManager.Resource(Id, CreateTime, UpdateTime);
 
-    public const int BUFFER_SIZE = 1024 * 32;
+    public const int BUFFER_SIZE = 1024 * 256;
 
     public const string NAME = "FileData";
     public const int VERSION = 1;
@@ -333,11 +333,21 @@ public sealed class FileDataManager : ResourceManager
         }
     }
 
-    public async Task<long> GetReferenceCount(ResourceService.Transaction transaction, long blobId)
+    public async Task<long> GetReferenceCount(
+        ResourceService.Transaction transaction,
+        long blobId,
+        params Resource[] except
+    )
     {
         return await Count(
             transaction,
-            new WhereClause.CompareColumn(COLUMN_FILE_BLOB_ID, "=", blobId)
+            new WhereClause.Nested(
+                "and",
+                [
+                    new WhereClause.CompareColumn(COLUMN_FILE_BLOB_ID, "=", blobId),
+                    .. except.Select((e) => new WhereClause.CompareColumn(COLUMN_ID, "!=", e.Id))
+                ]
+            )
         );
     }
 }

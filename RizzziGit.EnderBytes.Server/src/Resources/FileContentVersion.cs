@@ -76,16 +76,14 @@ public sealed class FileContentVersionManager : ResourceManager
         }
     }
 
-    public IAsyncEnumerable<Resource> List(
+    public Task<Resource[]> List(
         ResourceService.Transaction transaction,
         FileContentManager.Resource fileContent
-    )
-    {
-        return Select(
+    ) =>
+        Select(
             transaction,
             new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_ID, "=", fileContent.Id)
         );
-    }
 
     public async Task<Resource> GetBaseVersion(
         ResourceService.Transaction transaction,

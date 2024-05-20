@@ -1,17 +1,17 @@
 <script lang="ts">
+    import type { Writable } from 'svelte/store';
   import type { FileBrowserState, FileResource } from '../file-browser.svelte';
   import MainPanel from './desktop/main-panel.svelte';
   import SidePanel from './desktop/side-panel.svelte';
 
-  let { fileBrowserState = $bindable(), selection = $bindable() }: { fileBrowserState: FileBrowserState, selection: FileResource[] } = $props();
-
+  const { fileBrowserState, selection }: { fileBrowserState: Writable<FileBrowserState>, selection: Writable<FileResource[]> } = $props();
 </script>
 
 <div>
-  <MainPanel {fileBrowserState} bind:selection />
+  <MainPanel fileBrowserState={fileBrowserState as any} {selection} />
 
-  {#if !fileBrowserState.hideSidePanel}
-    <SidePanel {fileBrowserState} />
+  {#if !$fileBrowserState.hideSidePanel}
+    <SidePanel fileBrowserState={fileBrowserState as any} {selection} />
   {/if}
 </div>
 

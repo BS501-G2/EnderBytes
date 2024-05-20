@@ -95,7 +95,7 @@ public abstract partial class ResourceManager<M, R>(
         OrderByClause[]? order = null
     )
     {
-        await foreach (R resource in Select(transaction, where, new(1, offset), order))
+        foreach (R resource in await Select(transaction, where, new(1, offset), order))
         {
             return resource;
         }
@@ -103,20 +103,21 @@ public abstract partial class ResourceManager<M, R>(
         return null;
     }
 
-    protected async IAsyncEnumerable<R> Select(
+    protected async Task<R[]> Select(
         ResourceService.Transaction transaction,
         WhereClause? where = null,
         LimitClause? limit = null,
-        OrderByClause[]? order = null
+        OrderByClause?[]? order = null
     )
     {
         List<object?> parameterList = [];
+        List<R> resources = [];
 
-        await foreach (
-            R resource in SqlQuery(
+        foreach (
+            R resource in await SqlQuery(
                 transaction,
                 (reader) => Task.FromResult(ToResource(reader)),
-                $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(order != null ? $" order by {string.Join(", ", order.Select((clause) => clause.Apply()))}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")};",
+                $"select * from {Name}{(where != null ? $" where {where.Apply(parameterList)}" : "")}{(order != null ? $" order by {string.Join(", ", order.Where((clause) => clause != null).Select((clause) => clause!.Apply()))}" : "")}{(limit != null ? $" limit {limit.Apply()}" : "")};",
                 [.. parameterList]
             )
         )
@@ -126,8 +127,10 @@ public abstract partial class ResourceManager<M, R>(
                 $"[Transaction #{transaction.Id}] Enumerated {Name} resource: #{resource.Id}"
             );
 
-            yield return resource;
+            resources.Add(resource);
         }
+
+        return [.. resources];
     }
 
     protected async Task<bool> Exists(
@@ -162,8 +165,24 @@ public abstract partial class ResourceManager<M, R>(
                 $"[Transaction #{transaction.Id}] Deleted {Name} resource: #{id}"
             );
         long count = 0;
-        await foreach (
-            Func<Task> callback in SqlQuery(
+
+        string temporaryTableName =
+            $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
+
+        await SqlNonQuery(
+            transaction,
+            $"create temporary table {temporaryTableName} as select * from {Name} where {whereClause};",
+            [.. parameterList]
+        );
+
+        await SqlNonQuery(
+            transaction,
+            $"delete from {Name} where {whereClause};",
+            [.. parameterList]
+        );
+
+        foreach (
+            Func<Task> callback in await SqlQuery(
                 transaction,
                 (reader) =>
                 {
@@ -185,8 +204,7 @@ public abstract partial class ResourceManager<M, R>(
                         }
                     });
                 },
-                $"select * from {Name} where {whereClause};"
-                    + $"delete from {Name} where {whereClause};",
+                $"select * from {temporaryTableName};",
                 [.. parameterList]
             )
         )
@@ -194,6 +212,8 @@ public abstract partial class ResourceManager<M, R>(
             await callback();
             count++;
         }
+
+        await SqlNonQuery(transaction, $"drop table {temporaryTableName};", [.. parameterList]);
 
         return count;
     }
@@ -220,22 +240,39 @@ public abstract partial class ResourceManager<M, R>(
             );
 
         long count = 0;
-        await foreach (
-            Func<Task> callback in SqlQuery(
+
+        await SqlNonQuery(
+            transaction,
+            $"create temporary table {temporaryTableName} as select {COLUMN_ID} from {Name} where {whereClause};",
+            [.. parameterList]
+        );
+
+        await SqlNonQuery(
+            transaction,
+            $"update {Name} set {setClause} where {whereClause};",
+            [.. parameterList]
+        );
+
+        foreach (
+            Func<Task> callback in await SqlQuery(
                 transaction,
                 (reader) =>
                 {
                     R oldResource = ToResource(reader);
                     async Task<R> getNewResource() =>
-                        await SqlQuery(
+                        (
+                            await SqlQuery(
                                 transaction,
                                 (reader) => Task.FromResult(ToResource(reader)),
                                 $"select * from {Name} where {COLUMN_ID} = {{0}};",
                                 oldResource.Id
                             )
-                            .FirstAsync();
+                        ).First();
 
                     log(oldResource.Id);
+
+                    string temporaryTableName =
+                        $"Temp_{((CompositeBuffer)RandomNumberGenerator.GetBytes(8)).ToHexString()}";
 
                     return Task.FromResult(async () =>
                     {
@@ -254,10 +291,7 @@ public abstract partial class ResourceManager<M, R>(
                         }
                     });
                 },
-                $"create temporary table {temporaryTableName} as select * from {Name} where {whereClause}; "
-                    + $"update {Name} set {setClause} where {whereClause}; "
-                    + $"select * from {temporaryTableName}; "
-                    + $"drop table {temporaryTableName};",
+                $"select {Name}.* from {temporaryTableName} left join (select * from {Name}) {Name} on {temporaryTableName}.{COLUMN_ID} = {Name}.{COLUMN_ID};",
                 [.. parameterList]
             )
         )
@@ -265,6 +299,8 @@ public abstract partial class ResourceManager<M, R>(
             await callback();
             count++;
         }
+
+        await SqlNonQuery(transaction, $"drop table {temporaryTableName};", [.. parameterList]);
 
         return count;
     }

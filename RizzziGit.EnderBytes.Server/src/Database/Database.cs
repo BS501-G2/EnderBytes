@@ -48,11 +48,7 @@ public abstract class Database(DbConnectionStringBuilder connectionStringBuilder
             }
             catch (Exception exception)
             {
-                if (
-                    exception.Message.Contains(
-                        "Deadlock found when trying to get lock; try restarting transaction"
-                    )
-                )
+                if (exception.Message.Contains("database table is locked"))
                 {
                     logger.Log(
                         LogLevel.Info,

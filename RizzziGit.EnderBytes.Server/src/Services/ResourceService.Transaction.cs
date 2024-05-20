@@ -1,24 +1,28 @@
-using System.Runtime.CompilerServices;
 using System.Data.Common;
+using System.Runtime.CompilerServices;
 
 namespace RizzziGit.EnderBytes.Services;
 
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.ExceptionServices;
 using Commons.Collections;
 using Commons.Logging;
-
-using Utilities;
 using Core;
-using System.Runtime.ExceptionServices;
-using System.Diagnostics.CodeAnalysis;
+using Utilities;
 
 public sealed partial class ResourceService
 {
     public delegate Task TransactionHandler(Transaction transaction);
     public delegate Task<T> TransactionHandler<T>(Transaction transaction);
-    public delegate IAsyncEnumerable<T> TransactionEnumeratorHandler<T>(Transaction transaction);
+    public delegate Task<T[]> TransactionEnumeratorHandler<T>(Transaction transaction);
 
     private long NextTransactionId;
-    public sealed record Transaction(DbConnection Connection, long Id, ResourceService ResourceService)
+
+    public sealed record Transaction(
+        DbConnection Connection,
+        long Id,
+        ResourceService ResourceService
+    )
     {
         private static string ContextKey<T>(string key) => $"{key}_{typeof(T).FullName}";
 
@@ -26,7 +30,8 @@ public sealed partial class ResourceService
 
         private readonly WeakDictionary<string, object> ContextValues = [];
 
-        public void SetOrUpdateContextValue<T>(string key, T value) where T : class
+        public void SetOrUpdateContextValue<T>(string key, T value)
+            where T : class
         {
             string contextKey = ContextKey<T>(key);
 
@@ -34,14 +39,16 @@ public sealed partial class ResourceService
             ContextValues.Add(contextKey, value);
         }
 
-        public bool TryGetContextValue<T>(string key, [NotNullWhen(true)] out T? value) where T : class
+        public bool TryGetContextValue<T>(string key, [NotNullWhen(true)] out T? value)
+            where T : class
         {
             ContextValues.TryGetValue(ContextKey<T>(key), out object? target);
             value = target as T;
             return value != null;
         }
 
-        public T GetContextValue<T>(string key) where T : class
+        public T GetContextValue<T>(string key)
+            where T : class
         {
             if (!TryGetContextValue<T>(key, out T? value))
             {
@@ -51,30 +58,34 @@ public sealed partial class ResourceService
             return value;
         }
 
-        public T GetManager<T>() where T : ResourceManager => ResourceService.GetManager<T>();
+        public T GetManager<T>()
+            where T : ResourceManager => ResourceService.GetManager<T>();
     }
 
-    public async IAsyncEnumerable<T> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler)
+    public async Task<T[]> EnumeratedTransact<T>(TransactionEnumeratorHandler<T> handler)
     {
         WaitQueue<StrongBox<T>?> waitQueue = new(0);
         ExceptionDispatchInfo? exceptionDispatchInfo = null;
+        List<T> items = [];
 
-        _ = Transact(async (transaction) =>
-        {
-            try
+        _ = Transact(
+            async (transaction) =>
             {
-                await foreach (T item in handler(transaction))
+                try
                 {
-                    await waitQueue.Enqueue(new(item));
+                    foreach (T item in await handler(transaction))
+                    {
+                        await waitQueue.Enqueue(new(item));
+                    }
                 }
-            }
-            catch (Exception exception)
-            {
-                exceptionDispatchInfo = ExceptionDispatchInfo.Capture(exception);
-            }
+                catch (Exception exception)
+                {
+                    exceptionDispatchInfo = ExceptionDispatchInfo.Capture(exception);
+                }
 
-            await waitQueue.Enqueue(null);
-        });
+                await waitQueue.Enqueue(null);
+            }
+        );
 
         await foreach (StrongBox<T>? item in waitQueue)
         {
@@ -83,13 +94,12 @@ public sealed partial class ResourceService
                 break;
             }
 
-            yield return item.Value!;
+            items.Add(item.Value!);
         }
 
-        if (exceptionDispatchInfo != null)
-        {
-            exceptionDispatchInfo.Throw();
-        }
+        exceptionDispatchInfo?.Throw();
+
+        return [.. items];
     }
 
     public async Task<T> Transact<T>(TransactionHandler<T> handler)
@@ -114,27 +124,37 @@ public sealed partial class ResourceService
 
         GetCancellationToken().ThrowIfCancellationRequested();
 
-        await Database!.Run(Logger, transactionId, async (connection) =>
-        {
-            await using DbTransaction dbTransaction = await connection.BeginTransactionAsync();
-
-            Transaction transaction = new(connection, transactionId, this);
-            Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");
-
-            try
+        await Database!.Run(
+            Logger,
+            transactionId,
+            async (connection) =>
             {
-                await handler(transaction);
-                Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction commit.");
+                await using DbTransaction dbTransaction = await connection.BeginTransactionAsync();
 
-                await dbTransaction.CommitAsync();
-            }
-            catch (Exception exception)
-            {
-                Logger.Log(LogLevel.Warn, $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}");
+                Transaction transaction = new(connection, transactionId, this);
+                Logger.Log(LogLevel.Debug, $"[Transaction #{transaction.Id}] Transaction begin.");
 
-                await dbTransaction.RollbackAsync(CancellationToken.None);
-                throw;
+                try
+                {
+                    await handler(transaction);
+                    Logger.Log(
+                        LogLevel.Debug,
+                        $"[Transaction #{transaction.Id}] Transaction commit."
+                    );
+
+                    await dbTransaction.CommitAsync();
+                }
+                catch (Exception exception)
+                {
+                    Logger.Log(
+                        LogLevel.Warn,
+                        $"[Transaction #{transaction.Id}] Transaction rollback due to exception: [{exception.GetType().Name}] {exception.Message}{(exception.StackTrace != null ? $"\n{exception.StackTrace}" : "")}"
+                    );
+
+                    await dbTransaction.RollbackAsync(CancellationToken.None);
+                    throw;
+                }
             }
-        });
+        );
     }
 }

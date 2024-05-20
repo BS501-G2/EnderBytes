@@ -31,7 +31,7 @@ public sealed class FileBlobManager : ResourceManager
         )
         {
             long referenceCount = await GetManager<FileDataManager>()
-                .GetReferenceCount(transaction, fileData.BlobId);
+                .GetReferenceCount(transaction, fileData.BlobId, fileData);
             if (referenceCount == 0)
             {
                 await SqlNonQuery(

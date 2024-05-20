@@ -17,7 +17,14 @@
 <div class="path-chain-entry">
   {#snippet link()}
     <button class="link {forward ? 'forward' : ''}" onclick={onClick}>
-      <p>{file.name}</p>
+      {#snippet icon()}
+        <i class="fa-solid fa-{file.isFolder ? 'folder' : 'file'}"></i>
+      {/snippet}
+      {#if forward}
+        {@render icon()}
+      {/if}
+
+      <p class="path-chain-string">{file.name}</p>
     </button>
   {/snippet}
 
@@ -29,7 +36,9 @@
 
   {#if forward}
     {@render link()}
-    {@render expand()}
+    {#if file.isFolder}
+      {@render expand()}
+    {/if}
   {:else}
     {@render expand()}
     {@render link()}
@@ -37,6 +46,14 @@
 </div>
 
 <style lang="scss">
+  p.path-chain-string {
+    max-width: 128px;
+
+    text-overflow: ellipsis;
+    text-wrap: nowrap;
+    overflow: hidden;
+  }
+
   div.path-chain-entry {
     display: flex;
     flex-direction: row;
@@ -50,6 +67,21 @@
     border-radius: 8px;
     transition: all linear 150ms;
     border: 1px solid transparent;
+
+    button.link {
+      display: flex;
+      flex-direction: row;
+      justify-content: start;
+      gap: 8px;
+      border: 1px solid transparent;
+
+      > i {
+        font-size: 1.25em;
+        min-height: 16px;
+        max-height: 16px;
+        aspect-ratio: 1;
+      }
+    }
 
     > button {
       min-width: 0px;

@@ -32,8 +32,8 @@ public sealed partial class WebApi
                 _ => null
             };
 
-            await foreach (
-                FileAccessManager.Resource fileAccess in fileAccessManager
+            foreach (
+                FileAccessManager.Resource fileAccess in await fileAccessManager
                     .List(
                         CurrentTransaction,
                         null,
@@ -91,8 +91,7 @@ public sealed partial class WebApi
                     file,
                     CurrentUserAuthenticationToken.Required().User,
                     null
-                )
-                .ToArrayAsync();
+                );
 
             if (file.DomainUserId == CurrentUserAuthenticationToken.Required().UserId)
             {

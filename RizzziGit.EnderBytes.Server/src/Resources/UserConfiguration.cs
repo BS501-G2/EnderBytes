@@ -76,19 +76,13 @@ public sealed class UserConfigurationManager
         UserManager.Resource user
     )
     {
-        await foreach (
-            Resource configuration in Select(
+        return await SelectFirst(
                 transaction,
                 new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id)
             )
-        )
-        {
-            return configuration;
-        }
-
-        return await InsertAndGet(
-            transaction,
-            new((COLUMN_USER_ID, user.Id), (COLUMN_ENABLE_FTP_ACCESS, false))
-        );
+            ?? await InsertAndGet(
+                transaction,
+                new((COLUMN_USER_ID, user.Id), (COLUMN_ENABLE_FTP_ACCESS, false))
+            );
     }
 }

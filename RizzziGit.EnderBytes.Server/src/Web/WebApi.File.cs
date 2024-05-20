@@ -107,7 +107,7 @@ public partial class WebApi
                         CurrentTransaction,
                         CurrentUserAuthenticationToken
                     ),
-                    await fileManager.PathChain(CurrentTransaction, file).ToArrayAsync(),
+                    await fileManager.PathChain(CurrentTransaction, file),
                     false
                 )
             );
@@ -153,15 +153,18 @@ public partial class WebApi
                 return Error(400);
             }
 
-            FileManager.Resource[] files = await fileManager
-                .ScanFolder(
+            FileManager.Resource[] files = (
+                await fileManager.ScanFolder(
                     CurrentTransaction,
                     file,
                     CurrentUserAuthenticationToken,
                     new(100, offset),
-                    sortColumn != null ? [new(sortColumn, desc)] : null
+                    [
+                        new(FileManager.COLUMN_IS_FOLDER, true),
+                        sortColumn != null ? new(sortColumn, desc) : null
+                    ]
                 )
-                .ToArrayAsync();
+            );
 
             return Data(files);
         });
@@ -174,6 +177,22 @@ public partial class WebApi
         bool HasIllegalLength,
         bool NameInUse
     );
+
+    [Route("/file/sanitize-name")]
+    [HttpPost]
+    public async Task<ObjectResult> SanitizeFileName(string name)
+    {
+        return await Run(
+            () =>
+                Task.FromResult<Result>(
+                    Data(
+                        Path.GetInvalidFileNameChars()
+                            .Aggregate(name, (name, character) => name.Replace(character, '_'))
+                            .ToString()
+                    )
+                )
+        );
+    }
 
     [Route("~/file/!root/files/new-name-validation")]
     [Route("~/file/:{fileId}/files/new-name-validation")]
@@ -260,7 +279,7 @@ public partial class WebApi
                 await using Stream fileStream = request.Content.OpenReadStream();
                 while (fileStream.Position < fileStream.Length)
                 {
-                    byte[] buffer = new byte[1024 * 32];
+                    byte[] buffer = new byte[FileDataManager.BUFFER_SIZE / 2];
                     int bufferLength = await fileStream.ReadAsync(buffer);
 
                     await fileDataManager.Write(
@@ -316,13 +335,15 @@ public partial class WebApi
             }
 
             return Data(
-                await fileManager.Create(
-                    CurrentTransaction,
-                    file,
-                    request.Name,
-                    true,
-                    CurrentUserAuthenticationToken
-                )
+                (
+                    await fileManager.Create(
+                        CurrentTransaction,
+                        file,
+                        request.Name,
+                        true,
+                        CurrentUserAuthenticationToken
+                    )
+                ).File
             );
         });
     }

@@ -162,7 +162,7 @@ public sealed class FileAccessManager : ResourceManager
         );
     }
 
-    public IAsyncEnumerable<Resource> List(
+    public Task<Resource[]> List(
         ResourceService.Transaction transaction,
         FileManager.Resource? file = null,
         UserManager.Resource? targetUser = null,

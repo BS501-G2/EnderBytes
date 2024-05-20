@@ -9,14 +9,9 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
 
-  import {
-    Awaiter,
-    LoadingSpinner,
-    Overlay,
-    OverlayPositionType
-  } from '@rizzzi/svelte-commons';
+  import { Awaiter, LoadingSpinner, Overlay, OverlayPositionType } from '@rizzzi/svelte-commons';
 
-  import { scale } from 'svelte/transition';
+  import { fly, scale } from 'svelte/transition';
   import { getFile, scanFolder, type FileResource } from '../../../../file-browser.svelte';
   import PathChainEntry from './entry.svelte';
 
@@ -44,7 +39,7 @@
   ]}
   onDismiss={dismiss}
 >
-  <div class="path-chain-menu" transition:scale={{ duration: 200, start: 0.95 }}>
+  <div class="path-chain-menu" transition:fly|global={{ duration: 200, x: -32 }}>
     <Awaiter
       callback={async (): Promise<FileResource[]> => {
         const parentFolder = await getFile(pathChainMenu.fileId);
@@ -53,7 +48,7 @@
       }}
     >
       {#snippet loading()}
-          <p class="note"><LoadingSpinner size="1em" /> Loading...</p>
+        <p class="note"><LoadingSpinner size="1em" /> Loading...</p>
       {/snippet}
       {#snippet error()}
         {(dismiss(), '')}
@@ -73,7 +68,10 @@
 
                 pathChainMenus.push({ forward: true, fileId: file.id, currentTarget: currentTarget as HTMLElement })
               }}
-            onClick={() => goto(`/app/files?id=${file.id}`)}
+            onClick={() => {
+              goto(`/app/files?id=${file.id}`);
+              pathChainMenus.splice(0, pathChainMenus.length);
+            }}
           />
         {/each}
       {/snippet}

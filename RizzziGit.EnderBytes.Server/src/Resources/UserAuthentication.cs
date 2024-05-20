@@ -331,8 +331,9 @@ public sealed partial class UserAuthenticationManager
         UserManager.Resource user
     )
     {
-        await foreach (
-            Resource userAuthentication in Select(
+        foreach (
+            Resource userAuthentication in (
+                await Select(
                     transaction,
                     new WhereClause.Nested(
                         "and",
@@ -345,7 +346,7 @@ public sealed partial class UserAuthenticationManager
                     ),
                     order: [new OrderByClause(COLUMN_CREATE_TIME, true)]
                 )
-                .Skip(10)
+            ).Skip(10)
         )
         {
             await Delete(transaction, userAuthentication);
@@ -362,8 +363,8 @@ public sealed partial class UserAuthenticationManager
     {
         UserAuthenticationToken? userAuthenticationToken = null;
 
-        await foreach (
-            Resource userAuthentication in Select(
+        foreach (
+            Resource userAuthentication in await Select(
                 transaction,
                 new WhereClause.Nested(
                     "and",
@@ -547,13 +548,13 @@ public sealed partial class UserAuthenticationManager
         );
     }
 
-    public IAsyncEnumerable<Resource> List(
+    public async Task<Resource[]> List(
         ResourceService.Transaction transaction,
         UserManager.Resource user,
         LimitClause? limitClause = null,
         OrderByClause[]? orderByClause = null
     ) =>
-        Select(
+        await Select(
             transaction,
             new WhereClause.CompareColumn(COLUMN_USER_ID, "=", user.Id),
             limitClause,
@@ -569,8 +570,8 @@ public sealed partial class UserAuthenticationManager
     {
         UserAuthenticationToken? userAuthenticationToken = null;
 
-        await foreach (
-            Resource userAuthentication in Select(
+        foreach (
+            Resource userAuthentication in await Select(
                 transaction,
                 new WhereClause.Nested(
                     "and",

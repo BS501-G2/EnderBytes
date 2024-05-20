@@ -116,10 +116,7 @@ public sealed class FileContentManager : ResourceManager
         return fileContent;
     }
 
-    public IAsyncEnumerable<Resource> List(
-        ResourceService.Transaction transaction,
-        FileManager.Resource file
-    )
+    public Task<Resource[]> List(ResourceService.Transaction transaction, FileManager.Resource file)
     {
         return Select(transaction, new WhereClause.CompareColumn(COLUMN_FILE_ID, "=", file.Id));
     }

@@ -16,7 +16,7 @@
     parentId?: number;
     name: string;
 
-    isFolder: string;
+    isFolder: boolean;
   }
 
   export interface FileAccessResource {
@@ -96,13 +96,116 @@
     return result;
   }
 
-  export async function scanFolder(file: FileResource, params?: FolderListFilter): Promise<FileResource[]> {
+  export async function scanFolder(
+    file: FileResource,
+    params?: FolderListFilter
+  ): Promise<FileResource[]> {
     const result: FileResource[] = await apiFetch({
       path: `/file/:${file.id}/files`,
       params: params as Record<string, string>
     });
 
     return result.map(storeFile);
+  }
+
+  export interface NewFileNameValidation {
+    hasIllegalCharacters: boolean;
+    hasIllegalLength: boolean;
+    nameInUse: boolean;
+  }
+
+  export async function getNewNameValidationFlag(
+    parentFolder: FileResource,
+    name: string
+  ): Promise<NewFileNameValidation> {
+    const result: NewFileNameValidation = await apiFetch({
+      path: `/file/:${parentFolder.id}/files/new-name-validation`,
+      method: 'POST',
+      data: {
+        name
+      }
+    });
+
+    return result;
+  }
+
+  export async function uploadFile(parentFolder: FileResource, file: File): Promise<FileResource> {
+    const backgroundTask = executeBackgroundTask<FileResource>(
+      'Upload File',
+      false,
+      async (_, setStatus) => {
+        const validation = await getNewNameValidationFlag(parentFolder, file.name);
+
+        if (validation.hasIllegalCharacters) {
+          throw new Error('Illegal characters.');
+        } else if (validation.hasIllegalLength) {
+          throw new Error('Illegal length.');
+        } else if (validation.nameInUse) {
+          throw new Error('Name in use.');
+        }
+
+        setStatus(`Uploading file ${file.name}...`);
+
+        const form = new FormData();
+
+        form.append('content', file);
+        form.append('name', file.name);
+
+        const result: FileResource = await apiFetch({
+          path: `/file/:${parentFolder.id}/files/new-file`,
+          method: 'POST',
+          data: form,
+          uploadProgress(progress, total) {
+            setStatus(`Uploading file ${file.name}...`, progress / total);
+          }
+        });
+
+        setStatus(`Uploaded file ${file.name}.`);
+
+        return result;
+      },
+      false
+    );
+
+    return await backgroundTask.run();
+  }
+
+  export async function createFolder(
+    parentFolder: FileResource,
+    newName: string
+  ): Promise<FileResource> {
+    const backgroundTask = executeBackgroundTask<FileResource>(
+      'Create Folder',
+      false,
+      async (_, setStatus) => {
+        const validation = await getNewNameValidationFlag(parentFolder, newName);
+
+        if (validation.hasIllegalCharacters) {
+          throw new Error('Illegal characters.');
+        } else if (validation.hasIllegalLength) {
+          throw new Error('Illegal length.');
+        } else if (validation.nameInUse) {
+          throw new Error('Name in use.');
+        }
+
+        setStatus(`Creating folder ${newName}...`);
+
+        const result: FileResource = await apiFetch({
+          path: `/file/:${parentFolder.id}/files/new-folder`,
+          method: 'POST',
+          data: {
+            name: newName
+          }
+        });
+
+        setStatus(`Created folder ${newName}.`);
+
+        return result;
+      },
+      false
+    );
+
+    return await backgroundTask.run();
   }
 
   export type FileBrowserState = {
@@ -131,18 +234,19 @@
   import DesktopLayout from './-file-browser/desktop.svelte';
   import MobileLayout from './-file-browser/mobile.svelte';
   import type { FolderListFilter } from './files/arrange-overlay.svelte';
+  import { executeBackgroundTask } from '$lib/background-task.svelte';
+  import { writable, type Writable } from 'svelte/store';
 
-  let { fileBrowserState = $bindable() }: { fileBrowserState: FileBrowserState } = $props();
-
-  let selection: FileResource[] = $state([]);
+  const { fileBrowserState }: { fileBrowserState: Writable<FileBrowserState> } = $props();
+  const selection: Writable<FileResource[]> = writable([]);
 </script>
 
 <ResponsiveLayout>
   {#snippet desktop()}
-    <DesktopLayout {fileBrowserState} bind:selection />
+    <DesktopLayout fileBrowserState={fileBrowserState as any} {selection} />
   {/snippet}
   {#snippet mobile()}
-    <MobileLayout {fileBrowserState} />
+    <MobileLayout fileBrowserState={fileBrowserState as any} />
   {/snippet}
 </ResponsiveLayout>
 

@@ -26,12 +26,26 @@
     LoadingSpinner,
     Overlay,
     OverlayPositionType,
-    ResponsiveLayout
+    ResponsiveLayout,
+    ViewMode,
+    viewMode
   } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
   import { fly } from 'svelte/transition';
+  import { createFolder, uploadFile, type FileBrowserState, type FileResource } from '../file-browser.svelte';
 
-  const { onNew }: { onNew: (id: number) => void } = $props();
+  const {
+    fileBrowserState,
+    onNewFiles,
+    onNewFolder
+  }: {
+    fileBrowserState: Writable<FileBrowserState>;
+    onNewFiles: (...ids: number[]) => void;
+    onNewFolder: (id: number) => void;
+  } = $props();
+
+  const files: Writable<File[]> = writable([]);
+  const fileInput: Writable<HTMLInputElement | null> = writable(null);
 
   function onDismiss() {
     $newDialogState = null;
@@ -99,19 +113,82 @@
       {/each}
     </div>
     <div class="tab-view">
-      {#if state.type == 'folder'}
-        <div class="input-row">
-          <Input type="text" name="Folder Name" bind:text={state.name} />
+      {#if state.type == 'file'}
+        {@const onCreate = async (files: File[]) => {
+          if ($fileBrowserState.isLoading || $fileBrowserState.file == null) {
+            return;
+          }
+          const newFiles = await Promise.allSettled(files.map(async (file) => uploadFile($fileBrowserState.file!, file)))
+
+          onDismiss()
+
+          onNewFiles(...newFiles.filter((result) => result.status === 'fulfilled').map((file) => (file as PromiseFulfilledResult<FileResource>).value.id));
+        }}
+
+        <div class="input-group">
+          <p class="description{$viewMode & ViewMode.Desktop ? ' desktop' : ''}">
+            A new file will be created in the current folder. Alternatively files can be dragged
+            inside the folder view to upload.
+          </p>
+          <input type="file" multiple hidden bind:this={$fileInput} onchange={({ currentTarget }) => {
+            $files = Array.from(currentTarget?.files ?? [])
+          }} />
+          {#if $files.length > 0}
+            <ul>
+              <li>
+                <b>Selected Files:</b>
+              </li>
+              {#each $files as file}
+                <li>{file.name}</li>
+              {/each}
+            </ul>
+          {/if}
+          <Button buttonClass={ButtonClass.PrimaryContainer} onClick={() => $fileInput?.click()}>
+            <p class="button">Select Files</p>
+            {#snippet loading()}
+              <p class="button"><LoadingSpinner size="1em" /></p>
+            {/snippet}
+            {#snippet error(error)}
+              <p class="button">{error.message}</p>
+            {/snippet}
+          </Button>
           <Button
             buttonClass={ButtonClass.Primary}
-            onClick={async () => {
-          await new Promise<void>((resolve) => setTimeout(resolve, 1000))
-          onDismiss()
-        }}
+            onClick={() => onCreate($files)}
           >
+            <p class="button">Upload File(s)</p>
+            {#snippet loading()}
+              <p class="button"><LoadingSpinner size="1em" /></p>
+            {/snippet}
+            {#snippet error(error)}
+              <p class="button">{error.message}</p>
+            {/snippet}
+          </Button>
+        </div>
+      {:else if state.type == 'folder'}
+        {@const onCreate = async () => {
+          if ($fileBrowserState.isLoading) {
+            return
+          }
+
+          const folder = await createFolder($fileBrowserState.file!, state.name);
+
+          onDismiss();
+          onNewFolder(folder.id)
+        }}
+
+        <div class="input-group">
+          <p class="description{$viewMode & ViewMode.Desktop ? ' desktop' : ''}">
+            A new folder will be created in the current folder.
+          </p>
+          <Input type="text" name="Folder Name" bind:text={state.name} onSubmit={onCreate} />
+          <Button buttonClass={ButtonClass.Primary} onClick={onCreate}>
             <p class="button">Create Folder</p>
             {#snippet loading()}
               <p class="button"><LoadingSpinner size="1em" /></p>
+            {/snippet}
+            {#snippet error(error)}
+              <p class="button">{error.message}</p>
             {/snippet}
           </Button>
         </div>
@@ -129,7 +206,7 @@
     > div.tab-view {
       padding: 8px;
 
-      div.input-row {
+      div.input-group {
         display: flex;
         flex-direction: column;
         align-items: stretch;
@@ -138,6 +215,11 @@
 
       p.button {
         margin: 8px;
+      }
+
+      p.description.desktop {
+        max-width: 256px;
+        text-align: justify;
       }
     }
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+    import type { Writable } from 'svelte/store';
 
   import { type FileBrowserState, type FilePathChainInfo } from '../../../file-browser.svelte';
   import PathChainEntry from './path-chain/entry.svelte';
@@ -7,18 +8,18 @@
 
   import { LoadingSpinner } from '@rizzzi/svelte-commons';
 
-  const { fileBrowserState = $bindable() }: { fileBrowserState: FileBrowserState } = $props();
+  const { fileBrowserState }: { fileBrowserState: Writable<FileBrowserState> } = $props();
 
   let pathChainMenus: PathChainMenu[] = $state([]);
 </script>
 
 <div class="path-chain-container">
   <div class="path-chain">
-    {#if fileBrowserState!.isLoading}
+    {#if $fileBrowserState!.isLoading}
       <LoadingSpinner size="1em" />
     {:else}
-      <i class="fa-regular fa-{fileBrowserState!.file?.isFolder ? 'folder' : 'file'}"></i>
-      {#each fileBrowserState!.pathChain!.chain as file}
+      <i class="fa-regular fa-{$fileBrowserState!.file?.isFolder ? 'folder' : 'file'}"></i>
+      {#each $fileBrowserState!.pathChain!.chain as file}
         <PathChainEntry
           {file}
           onClick={() => goto(`/app/files?id=${file.id}`)}

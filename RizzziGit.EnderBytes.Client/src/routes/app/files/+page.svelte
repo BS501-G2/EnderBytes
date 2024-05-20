@@ -10,9 +10,17 @@
   import FilterOverlay, { filterOverlayState } from './arrange-overlay.svelte';
 
   import { page } from '$app/stores';
-  import { Title, Awaiter, type AwaiterResetFunction } from '@rizzzi/svelte-commons';
+  import {
+    Title,
+    Awaiter,
+    type AwaiterResetFunction,
+    Banner,
+    BannerClass,
+    Button
+  } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
   import NewDialog, { newDialogState } from './new-dialog.svelte';
+  import { goto } from '$app/navigation';
 
   function parseId(id: string | null) {
     if (id == null) {
@@ -62,7 +70,10 @@
     }
   ];
 
-  $effect(() => console.log(JSON.stringify($filterOverlayState)));
+  const fileBrowserState: Writable<FileBrowserState> = writable({ isLoading: true });
+  const error: Writable<Error | null> = writable(null);
+
+  fileBrowserState.subscribe(console.log)
 </script>
 
 {#key title}
@@ -70,47 +81,78 @@
 {/key}
 
 <FilterOverlay onFilterApply={() => $refresh(true, null)} />
-<NewDialog onNew={() => $refresh(true, null)} />
 
 {#key id}
   <Awaiter
     bind:reset={$refresh}
-    callback={async (): Promise<FileBrowserState & { isLoading: false }> => {
-    const file = await getFile(id);
+    callback={async (): Promise<void> => {
+      $fileBrowserState = { isLoading: true }
 
-    const [files, pathChain, access] = await Promise.all([
-      file.isFolder ? scanFolder(file, $filterOverlayState.state) : [],
-      getFilePathChain(file),
-      getFileAccessList(file),
-    ])
+      try {
+        const file = await getFile(id);
 
-    let fileBrowserState: FileBrowserState & { isLoading: false } = $state({
-      isLoading: false,
-      files,
-      pathChain,
-      access,
-      hideControlBar: !file.isFolder,
-      file,
+        const [files, pathChain, access] = await Promise.all([
+          file.isFolder ? scanFolder(file, $filterOverlayState.state) : [],
+          getFilePathChain(file),
+          getFileAccessList(file),
+        ])
 
-      allowCreate: true,
-      controlBarActions: actions
-    });
+        $fileBrowserState = {
+          isLoading: false,
 
-    title = id != null ? fileBrowserState.file?.name ?? null : null
+          files,
+          pathChain,
+          access,
+          file,
 
-    return fileBrowserState
-  }}
+          controlBarActions: actions
+        }
+
+        title = id != null ? $fileBrowserState.file?.name ?? null : null
+      } catch (errorData: any) {
+        $error = errorData
+        throw errorData
+      }
+    }}
   >
-    {#snippet loading()}
-      <FileBrowser
-        fileBrowserState={{
-          isLoading: true,
-          controlBarActions: actions.filter((action) => action.isLoading)
-        }}
-      />
-    {/snippet}
-    {#snippet success({ result: fileBrowserState })}
-      <FileBrowser {fileBrowserState} />
+    {#snippet error({ error: errorData })}
+      <Banner bannerClass={BannerClass.Error}>
+        <div class="error-banner">
+          <p class="message">{errorData.name}: {errorData.message}</p>
+          <Button onClick={() => $refresh(true)}>
+            <p class="retry">Retry</p>
+          </Button>
+        </div>
+      </Banner>
     {/snippet}
   </Awaiter>
 {/key}
+
+{#if $error == null}
+  <FileBrowser {fileBrowserState} />
+  <NewDialog
+    {fileBrowserState}
+    onNewFiles={() => {
+      $refresh(true, null);
+    }}
+    onNewFolder={(id) => goto(`/app/files?id=${id}`)}
+  />
+{/if}
+
+<style lang="scss">
+  div.error-banner {
+    height: 100%;
+
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: safe center;
+
+    gap: 8px;
+    font-weight: bolder;
+
+    p.retry {
+      margin: 8px;
+    }
+  }
+</style>

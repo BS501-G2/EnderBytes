@@ -30,7 +30,7 @@
   import { scale } from 'svelte/transition';
 
   import { hasKeys, AnimationFrame, LoadingSpinnerPage } from '@rizzzi/svelte-commons';
-  import type { Writable } from 'svelte/store';
+  import { writable, type Writable } from 'svelte/store';
   import { cubicInOut, cubicOut } from 'svelte/easing';
 
   let {
@@ -77,20 +77,20 @@
     capturedSelection: FileResource[];
   }
 
-  let selectionBox: SelectionRectangle | null = $state(null);
-  let selectionBoxElement: HTMLDivElement | null = $state(null);
+  const selectionBox: Writable<SelectionRectangle | null> = writable(null);
+  const selectionBoxElement: Writable<HTMLDivElement | null> = writable(null);
 
-  let fileListContianer: HTMLDivElement | null = $state(null);
-  let fileList: HTMLDivElement | null = $state(null);
-  let fileListInner: HTMLDivElement | null = $state(null);
+  const fileListContianer: Writable<HTMLDivElement | null> = writable(null);
+  const fileList: Writable<HTMLDivElement | null> = writable(null);
+  const fileListInner: Writable<HTMLDivElement | null> = writable(null);
 
   function setSelectionRectangle(cursorX: number, cursorY: number) {
-    const scrollTop = fileList?.scrollTop ?? 0;
-    const { left, top } = fileListContianer!.getBoundingClientRect();
+    const scrollTop = $fileList?.scrollTop ?? 0;
+    const { left, top } = $fileListContianer!.getBoundingClientRect();
 
-    selectionBox = {
-      cursorOriginX: selectionBox?.cursorOriginX ?? cursorX - left,
-      cursorOriginY: selectionBox?.cursorOriginY ?? cursorY - top + scrollTop,
+    $selectionBox = {
+      cursorOriginX: $selectionBox?.cursorOriginX ?? cursorX - left,
+      cursorOriginY: $selectionBox?.cursorOriginY ?? cursorY - top + scrollTop,
       cursorX: cursorX - left,
       cursorY: cursorY - top + scrollTop,
 
@@ -99,25 +99,25 @@
 
       capturedSelection:
         hasKeys('shift') || hasKeys('control')
-          ? selectionBox?.capturedSelection ?? [...$selection]
+          ? $selectionBox?.capturedSelection ?? [...$selection]
           : []
     };
   }
 
   function clearSelectionRectangle() {
-    selectionBox = null;
+    $selectionBox = null;
   }
 </script>
 
 {#if selectionBox != null}
   <AnimationFrame
     callback={() => {
-      if (selectionBox == null || $fileBrowserState.isLoading) {
+      if ($selectionBox == null || $fileBrowserState.isLoading) {
         return;
       }
 
-      const { clientY } = selectionBox!;
-      const rect = fileListContianer?.getBoundingClientRect();
+      const { clientY } = $selectionBox;
+      const rect = $fileListContianer?.getBoundingClientRect();
 
       if (rect == null) {
         return;
@@ -127,21 +127,21 @@
       const bottomY  = 64 - Math.max(Math.min(rect.bottom - clientY, 64), 0);
 
       if (topY > 0) {
-        fileList!.scrollTop -= topY / 4;
+        $fileList!.scrollTop -= topY / 4;
       } else if (bottomY > 0) {
-        fileList!.scrollTop += bottomY / 4;
+        $fileList!.scrollTop += bottomY / 4;
       }
 
-      setSelectionRectangle(selectionBox.clientX, selectionBox.clientY);
+      setSelectionRectangle($selectionBox!.clientX, $selectionBox!.clientY);
 
       const files = $fileBrowserState.files;
-      let selectedFiles = [...selectionBox.capturedSelection];
+      const selectedFiles = [...$selectionBox.capturedSelection];
 
       for (let index = 0; index < files.length; index++) {
         const file = files[index];
-        const fileElement = fileListInner!.children[index] as HTMLDivElement;
+        const fileElement = $fileListInner!.children[index] as HTMLDivElement;
         const fileRect = fileElement.getBoundingClientRect();
-        const fileSelectionRect = selectionBoxElement?.getBoundingClientRect()
+        const fileSelectionRect = $selectionBoxElement?.getBoundingClientRect()
 
         if (fileSelectionRect == null) {
           continue;
@@ -171,7 +171,7 @@
   />
 {/if}
 
-<div class="file-list-container" bind:this={fileListContianer}>
+<div class="file-list-container" bind:this={$fileListContianer}>
   {#if $fileBrowserState.isLoading}
     {#if fileList == null}
       <LoadingSpinnerPage />
@@ -182,24 +182,24 @@
       class="file-list-inner-container"
       in:scale|global={{ start: 0.95, duration: 200 }}
       out:scale|global={{ start: 1.05, duration: 200 }}
-      bind:this={fileList}
-      onmousedown={(e) => {
-        if (fileList != e.target && fileListInner != e.target) {
+      bind:this={$fileList}
+      onmousedown={(event) => {
+        if ($fileList != event.target && $fileListInner != event.target) {
           return;
         }
 
-        if (e.currentTarget.clientWidth < e.clientX - e.currentTarget.offsetLeft) {
+        if (event.currentTarget.clientWidth < event.clientX - event.currentTarget.offsetLeft) {
           return;
         }
 
-        if (selectionBox != null) {
+        if ($selectionBox != null) {
           return;
         }
 
-        setSelectionRectangle(e.clientX, e.clientY);
+        setSelectionRectangle(event.clientX, event.clientY);
       }}
       onmousemove={(e) => {
-        if (selectionBox == null) {
+        if ($selectionBox == null) {
           return;
         }
 
@@ -207,8 +207,8 @@
       }}
       onmouseup={clearSelectionRectangle}
     >
-      {#if selectionBox != null}
-        {@const { cursorOriginX, cursorOriginY, cursorX, cursorY } = selectionBox}
+      {#if $selectionBox != null}
+        {@const { cursorOriginX, cursorOriginY, cursorX, cursorY } = $selectionBox!}
         {@const x = cursorOriginX}
         {@const y = cursorOriginY}
         {@const width = cursorX - cursorOriginX}
@@ -221,7 +221,7 @@
               style="padding-left: {x}px; padding-top: {y}px;"
             >
               <div
-                bind:this={selectionBoxElement}
+                bind:this={$selectionBoxElement}
                 class="selection-rectangle"
                 style="width: {w}px; height: {h}px;"
               >
@@ -242,7 +242,7 @@
         {/if}
       {/if}
       {#if getFileBrowserListStyle() === FileBrowserListConfig.Grid}
-        <div class="file-grid" bind:this={fileListInner}>
+        <div class="file-grid" bind:this={$fileListInner}>
           {#each $fileBrowserState.files as file}
             <FileGridEntry
               fileBrowserState={fileBrowserState as any}
@@ -253,7 +253,7 @@
           {/each}
         </div>
       {:else}
-        <div class="file-table" bind:this={fileListInner}>
+        <div class="file-table" bind:this={$fileListInner}>
           {#each $fileBrowserState.files as file}
             <FileTableEntry
               fileBrowserState={fileBrowserState as any}

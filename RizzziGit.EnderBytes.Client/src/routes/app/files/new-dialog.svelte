@@ -32,7 +32,12 @@
   } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
   import { fly } from 'svelte/transition';
-  import { createFolder, uploadFile, type FileBrowserState, type FileResource } from '../file-browser.svelte';
+  import {
+    createFolder,
+    uploadFile,
+    type FileBrowserState,
+    type FileResource
+  } from '../file-browser.svelte';
 
   const {
     fileBrowserState,
@@ -121,7 +126,6 @@
           const newFiles = await Promise.allSettled(files.map(async (file) => uploadFile($fileBrowserState.file!, file)))
 
           onDismiss()
-
           onNewFiles(...newFiles.filter((result) => result.status === 'fulfilled').map((file) => (file as PromiseFulfilledResult<FileResource>).value.id));
         }}
 
@@ -130,9 +134,15 @@
             A new file will be created in the current folder. Alternatively files can be dragged
             inside the folder view to upload.
           </p>
-          <input type="file" multiple hidden bind:this={$fileInput} onchange={({ currentTarget }) => {
-            $files = Array.from(currentTarget?.files ?? [])
-          }} />
+          <input
+            type="file"
+            multiple
+            hidden
+            bind:this={$fileInput}
+            onchange={({ currentTarget }) => {
+              $files = Array.from(currentTarget?.files ?? []);
+            }}
+          />
           {#if $files.length > 0}
             <ul>
               <li>
@@ -154,7 +164,13 @@
           </Button>
           <Button
             buttonClass={ButtonClass.Primary}
-            onClick={() => onCreate($files)}
+            onClick={async () => {
+              try {
+                await onCreate($files);
+              } finally {
+                $files = [];
+              }
+            }}
           >
             <p class="button">Upload File(s)</p>
             {#snippet loading()}
@@ -203,14 +219,29 @@
     flex-direction: column;
     gap: 8px;
 
+    min-height: 0px;
+
     > div.tab-view {
       padding: 8px;
+      min-height: 0px;
 
       div.input-group {
         display: flex;
         flex-direction: column;
         align-items: stretch;
         gap: 8px;
+
+        min-height: 0px;
+
+        > ul {
+          overflow: auto;
+
+          min-height: 0px;
+          max-height: min(512px, 100vh - 512px);
+
+          display: flex;
+          flex-direction: column;
+        }
       }
 
       p.button {
@@ -253,6 +284,8 @@
 
     display: flex;
     flex-direction: column;
+
+    min-height: 0px;
 
     box-shadow: var(--shadow) 0px 0px 8px;
   }

@@ -48,7 +48,10 @@ public abstract class Database(DbConnectionStringBuilder connectionStringBuilder
             }
             catch (Exception exception)
             {
-                if (exception.Message.Contains("database table is locked"))
+                if (
+                    exception.Message.Contains("database table is locked")
+                    || exception.Message.Contains("database is locked\ndatabase is locked")
+                )
                 {
                     logger.Log(
                         LogLevel.Info,

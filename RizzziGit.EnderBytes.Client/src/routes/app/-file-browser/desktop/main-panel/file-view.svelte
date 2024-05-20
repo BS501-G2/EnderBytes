@@ -70,7 +70,7 @@
 
 <div
   bind:this={$mainView}
-  class="file-view {document.fullscreenElement == $mainView ? 'fullscreen' : ''}"
+  class="file-view{document.fullscreenElement == $mainView ? ' fullscreen' : ''}"
   role="document"
   onmousemove={() => {
     $viewState[0] = Date.now();
@@ -104,6 +104,10 @@
     overflow: hidden;
   }
 
+  div.file-view.fullscreen {
+    border-radius: 0px;
+  }
+
   div.top-bar-container {
     max-height: 0px;
 
@@ -117,7 +121,6 @@
 
       > h3.file-name {
         flex-grow: 1;
-        flex-basis: 800px;
         min-width: 0px;
 
         overflow: hidden;

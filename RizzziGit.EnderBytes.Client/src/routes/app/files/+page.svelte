@@ -16,7 +16,8 @@
     type AwaiterResetFunction,
     Banner,
     BannerClass,
-    Button
+    Button,
+    LoadingSpinnerPage
   } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
   import NewDialog, { newDialogState } from './new-dialog.svelte';
@@ -70,10 +71,8 @@
     }
   ];
 
-  const fileBrowserState: Writable<FileBrowserState> = writable({ isLoading: true });
+  const fileBrowserState: Writable<FileBrowserState> = writable({ isLoading: true, controlBarActions: [] });
   const error: Writable<Error | null> = writable(null);
-
-  fileBrowserState.subscribe(console.log)
 </script>
 
 {#key title}
@@ -86,7 +85,7 @@
   <Awaiter
     bind:reset={$refresh}
     callback={async (): Promise<void> => {
-      $fileBrowserState = { isLoading: true }
+      $fileBrowserState = { isLoading: true, controlBarActions: [] };
 
       try {
         const file = await getFile(id);
@@ -104,6 +103,7 @@
           pathChain,
           access,
           file,
+          title: 'My Files',
 
           controlBarActions: actions
         }
@@ -115,10 +115,10 @@
       }
     }}
   >
-    {#snippet error({ error: errorData })}
+    {#snippet error({ error })}
       <Banner bannerClass={BannerClass.Error}>
         <div class="error-banner">
-          <p class="message">{errorData.name}: {errorData.message}</p>
+          <p class="message">{error.name}: {error.message}</p>
           <Button onClick={() => $refresh(true)}>
             <p class="retry">Retry</p>
           </Button>

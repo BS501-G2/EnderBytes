@@ -173,7 +173,7 @@
 
 <div class="file-list-container" bind:this={$fileListContianer}>
   {#if $fileBrowserState.isLoading}
-    {#if fileList == null}
+    {#if $fileList == null}
       <LoadingSpinnerPage />
     {/if}
   {:else}

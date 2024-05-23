@@ -1,4 +1,4 @@
-import { LocaleKey, type LocaleValues } from '$lib/locale.svelte';
+import { type LocaleValues } from '$lib/locale.svelte';
 
 import { locale as en_US } from './en-us';
 

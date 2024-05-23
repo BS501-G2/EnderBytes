@@ -48,7 +48,7 @@
     pathChain: FileResource[];
   }
 
-  export interface SharedFileListFilter {
+  export interface ShareFileListFilter {
     sort: 'name' | 'ctime' | 'utime';
     desc: boolean;
     offset: number;
@@ -208,6 +208,23 @@
     return await backgroundTask.run();
   }
 
+  export interface ShareFileEntry {
+    fileAccess: FileAccessResource;
+    file: FileResource;
+  }
+
+  export async function getFileAccesses(params?: ShareFileListFilter): Promise<ShareFileEntry[]> {
+    const result: ShareFileEntry[] = await apiFetch({
+      path: '/shares',
+      params: params as any
+    });
+
+    return result.map(({ fileAccess, file }) => ({
+      fileAccess,
+      file: storeFile(file)
+    }));
+  }
+
   export type FileBrowserState = {
     title?: string;
 
@@ -249,6 +266,3 @@
     <MobileLayout fileBrowserState={fileBrowserState as any} />
   {/snippet}
 </ResponsiveLayout>
-
-<style lang="scss">
-</style>

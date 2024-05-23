@@ -16,7 +16,7 @@
 
 <div class="path-chain-entry">
   {#snippet link()}
-    <button class="link {forward ? 'forward' : ''}" onclick={onClick}>
+    <button class="link {forward ? 'forward' : ''}" title="{file.name}" onclick={onClick}>
       {#snippet icon()}
         <i class="fa-solid fa-{file.isFolder ? 'folder' : 'file'}"></i>
       {/snippet}

@@ -22,7 +22,7 @@
     $props();
 </script>
 
-{#snippet buttons(actions: ControlBarItem[], animations: boolean)}
+{#snippet buttons(actions: ControlBarItem[])}
   {#each actions as action}
     {#snippet entry(action: ControlBarItem)}
       <i class="icon {action.icon}"></i>
@@ -36,13 +36,9 @@
         outline={false}
         onClick={action.action}
       >
-        {#if animations}
-          <div class="button">
-            {@render entry(action)}
-          </div>
-        {:else}
-          <div class="button">{@render entry(action)}</div>
-        {/if}
+        <div class="button">
+          {@render entry(action)}
+        </div>
       </Button>
     </div>
   {/each}
@@ -53,26 +49,20 @@
 
   <div class="control-bar-container">
     <div class="control-bar">
-      {#snippet action(actions: ControlBarItem[], group: ControlBarItemGroup, animations: boolean)}
+      {#snippet action(actions: ControlBarItem[], group: ControlBarItemGroup)}
         {@const filteredActions = actions?.filter((action) => action.group == group) ?? []}
 
         {#if filteredActions.length != 0}
-          {#if animations}
-            <div class="control-group" transition:scale|global={{ duration: 200, start: 0.95 }}>
-              {@render buttons(filteredActions, animations)}
-            </div>
-          {:else}
-            <div class="control-group">
-              {@render buttons(filteredActions, animations)}
-            </div>
-          {/if}
+          <div class="control-group" transition:scale|global={{ duration: 200, start: 0.95 }}>
+            {@render buttons(filteredActions)}
+          </div>
         {/if}
       {/snippet}
 
-      {@render action(actions, 'new', true)}
-      {@render action(actions, 'actions', true)}
+      {@render action(actions, 'new')}
+      {@render action(actions, 'actions')}
       <div class="spacer"></div>
-      {@render action(actions, 'arrangement', false)}
+      {@render action(actions, 'arrangement')}
     </div>
   </div>
 {/if}

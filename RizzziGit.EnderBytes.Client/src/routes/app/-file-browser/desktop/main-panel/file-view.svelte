@@ -30,6 +30,7 @@
 
 <AnimationFrame
   callback={() => {
+    $mainView = $mainView;
     $viewState = [$viewState[0], Date.now()];
   }}
 />

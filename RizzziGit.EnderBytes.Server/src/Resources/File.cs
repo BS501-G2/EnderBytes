@@ -247,6 +247,7 @@ public sealed partial class FileManager : ResourceManager
             )
         );
 
+        await Update(transaction, parentFolder, new((COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())));
         return new(file, newKey);
     }
 

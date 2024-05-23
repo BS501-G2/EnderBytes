@@ -33,35 +33,43 @@ public sealed partial class WebApi
             };
 
             foreach (
-                FileAccessManager.Resource fileAccess in await fileAccessManager
-                    .List(
-                        CurrentTransaction,
-                        null,
-                        CurrentUserAuthenticationToken.Required().User,
-                        (FileAccessExtent)extent,
-                        authorUserId != null
-                            ? await GetResourceManager<UserManager>()
-                                .GetByRequiredId(CurrentTransaction, (long)authorUserId)
-                            : null,
-                        null,
-                        null,
-                        new(100, offset),
-                        sortColumn != null ? [new(sort, desc)] : null
-                    )
+                FileAccessManager.Resource fileAccess in await fileAccessManager.List(
+                    CurrentTransaction,
+                    null,
+                    CurrentUserAuthenticationToken.Required().User,
+                    (FileAccessExtent)extent,
+                    authorUserId != null
+                        ? await GetResourceManager<UserManager>()
+                            .GetByRequiredId(CurrentTransaction, (long)authorUserId)
+                        : null,
+                    null,
+                    null,
+                    null,
+                    sortColumn != null ? [new(sortColumn, desc)] : null
+                )
             )
             {
                 FileManager.Resource file = await GetResourceManager<FileManager>()
                     .GetByRequiredId(CurrentTransaction, fileAccess.TargetFileId);
 
-                if ((domainUserId != file.DomainUserId) && fileAccesses.Count >= 25)
-                {
-                    continue;
-                }
-
                 fileAccesses.Add(fileAccess);
             }
 
-            return Data(fileAccesses);
+            return Data(
+                await Task.WhenAll(
+                    fileAccesses.Select(
+                        async (fileAccess) =>
+                        {
+                            return new
+                            {
+                                FileAccess = fileAccess,
+                                File = await GetResourceManager<FileManager>()
+                                    .GetByRequiredId(CurrentTransaction, fileAccess.TargetFileId)
+                            };
+                        }
+                    )
+                )
+            );
         });
     }
 
@@ -85,13 +93,12 @@ public sealed partial class WebApi
         return await Run(async () =>
         {
             FileAccessManager fileAccessManager = GetResourceManager<FileAccessManager>();
-            FileAccessManager.Resource[] fileAccesses = await fileAccessManager
-                .List(
-                    CurrentTransaction,
-                    file,
-                    CurrentUserAuthenticationToken.Required().User,
-                    null
-                );
+            FileAccessManager.Resource[] fileAccesses = await fileAccessManager.List(
+                CurrentTransaction,
+                file,
+                CurrentUserAuthenticationToken.Required().User,
+                null
+            );
 
             if (file.DomainUserId == CurrentUserAuthenticationToken.Required().UserId)
             {

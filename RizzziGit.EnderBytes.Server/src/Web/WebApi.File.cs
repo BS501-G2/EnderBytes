@@ -158,7 +158,7 @@ public partial class WebApi
                     CurrentTransaction,
                     file,
                     CurrentUserAuthenticationToken,
-                    new(100, offset),
+                    null,
                     [
                         new(FileManager.COLUMN_IS_FOLDER, true),
                         sortColumn != null ? new(sortColumn, desc) : null

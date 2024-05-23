@@ -103,4 +103,19 @@ public sealed class FileContentVersionManager : ResourceManager
                 new((COLUMN_FILE_CONTENT_ID, fileContent.Id), (COLUMN_BASE_VERSION_ID, null))
             );
     }
+
+    public async Task<Resource> GetLatestVersion(
+        ResourceService.Transaction transaction,
+        FileContentManager.Resource fileContent
+    )
+    {
+        return await SelectFirst(
+                transaction,
+                new WhereClause.Nested(
+                    "and",
+                    new WhereClause.CompareColumn(COLUMN_FILE_CONTENT_ID, "=", fileContent.Id)
+                ),
+                [new OrderByClause(COLUMN_ID, true)]
+            ) ?? await GetBaseVersion(transaction, fileContent);
+    }
 }

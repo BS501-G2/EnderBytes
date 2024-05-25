@@ -28,6 +28,7 @@
     background-color: var(--background);
 
     color: var(--onBackground);
+    user-select: none;
 
     min-width: 320px;
   }

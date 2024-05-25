@@ -4,7 +4,10 @@
     getFileAccessList,
     getFilePathChain,
     scanFolder,
-    type FileBrowserState
+    type FileBrowserState,
+
+    type FileResource
+
   } from '../file-browser.svelte';
   import { type ControlBarItem } from '../-file-browser/desktop/main-panel/control-bar.svelte';
   import FilterOverlay, { filterOverlayState } from './arrange-overlay.svelte';
@@ -32,20 +35,20 @@
   }
 
   const id = $derived(parseId($page.url.searchParams.get('id')));
+  const selection: Writable<FileResource[]> = writable([])
 
   let refresh: Writable<AwaiterResetFunction<null>> = writable();
   let title: string | null = $state(null);
 
-  const actions: (ControlBarItem & { isLoading: boolean })[] = [
+  const actions: ControlBarItem[] = [
     {
       label: 'Refresh',
       icon: 'fa-solid fa-sync',
       action: async () => {
-        console.log('asds');
         await $refresh(true, null);
       },
       group: 'arrangement',
-      isLoading: true
+      isVisible: () => !$fileBrowserState.isLoading && $fileBrowserState.file?.isFolder == true
     },
     {
       label: 'Arrange',
@@ -56,7 +59,20 @@
         $filterOverlayState.enabled = [window.innerWidth - bounds.right, bounds.bottom];
       },
       group: 'arrangement',
-      isLoading: true
+      isVisible: () => !$fileBrowserState.isLoading && $fileBrowserState.file?.isFolder == true
+    },
+    {
+      label: 'Open  File',
+      icon: 'fa-solid fa-folder-open',
+      action: async () => {
+        await goto(`/app/files?id=${$selection[0].id}`);
+      },
+      group: 'actions',
+      isVisible: (selection) =>
+        !$fileBrowserState.isLoading &&
+        window.matchMedia('(any-pointer: coarse)').matches &&
+        selection.length === 1 &&
+        selection[0].id != id
     },
     {
       label: 'New',
@@ -66,12 +82,18 @@
 
         $newDialogState = { x: bounds.left, y: bounds.bottom, state: { type: 'file', files: [] } };
       },
-      isLoading: false,
-      group: 'new'
+      group: 'new',
+      isVisible: () =>
+        !$fileBrowserState.isLoading &&
+        $fileBrowserState.file?.isFolder == true &&
+        ($fileBrowserState.access?.highestExtent ?? 0) >= 2
     }
   ];
 
-  const fileBrowserState: Writable<FileBrowserState> = writable({ isLoading: true, controlBarActions: [] });
+  const fileBrowserState: Writable<FileBrowserState> = writable({
+    isLoading: true,
+    controlBarActions: []
+  });
   const error: Writable<Error | null> = writable(null);
 </script>
 
@@ -129,7 +151,7 @@
 {/key}
 
 {#if $error == null}
-  <FileBrowser {fileBrowserState} />
+  <FileBrowser {fileBrowserState} {selection} />
   <NewDialog
     {fileBrowserState}
     onNewFiles={() => {

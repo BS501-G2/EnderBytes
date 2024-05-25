@@ -1,5 +1,5 @@
 <script lang="ts" context="module">
-  import { LocaleKey, getString } from '$lib/locale.svelte';
+  import { LocaleKey, getDerivedString } from '$lib/locale.svelte';
 
   import SiteBanner from './site-banner.svelte';
   import Banner from './banner.svelte';
@@ -8,6 +8,14 @@
 
 <script lang="ts">
   import { ResponsiveLayout, viewMode, ViewMode } from '@rizzzi/svelte-commons';
+
+  const string_AuthLoginPageUsernamePlaceholder = getDerivedString(
+    LocaleKey.AuthLoginPageUsernamePlaceholder
+  );
+  const string_AuthLoginPagePasswordPlaceholder = getDerivedString(
+    LocaleKey.AuthLoginPagePasswordPlaceholder
+  );
+  const string_AuthLoginPageSubmit = getDerivedString(LocaleKey.AuthLoginPageSubmit);
 
   let enabled: boolean = true;
 
@@ -77,7 +85,7 @@
               type="text"
               id="-username"
               name="username"
-              placeholder={getString(LocaleKey.AuthLoginPageUsernamePlaceholder)}
+              placeholder={$string_AuthLoginPageUsernamePlaceholder}
               bind:value={username}
               disabled={!enabled}
             />
@@ -87,13 +95,13 @@
               type="password"
               id="-password"
               name="password"
-              placeholder={getString(LocaleKey.AuthLoginPagePasswordPlaceholder)}
+              placeholder={$string_AuthLoginPagePasswordPlaceholder}
               bind:value={password}
               disabled={!enabled}
             />
           </div>
           <div class="field">
-            <button disabled={!enabled}>{getString(LocaleKey.AuthLoginPageSubmit)}</button>
+            <button disabled={!enabled}>{$string_AuthLoginPageSubmit}</button>
           </div>
         </form>
       </div>

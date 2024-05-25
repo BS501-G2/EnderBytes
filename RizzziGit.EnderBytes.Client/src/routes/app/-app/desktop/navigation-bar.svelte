@@ -75,7 +75,6 @@
         padding: 8px;
         border-radius: 8px;
 
-        user-select: none;
         cursor: pointer;
 
         > p {

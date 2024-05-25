@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { LocaleKey, Locale, getString } from '$lib/locale.svelte';
+import { LocaleKey, LocaleType, getString } from '$lib/locale.svelte';
 import { _sizes } from '../favicon.svg/+server';
 import { registeredColors } from '../../../../../svelte-commons/dist/color-scheme.svelte';
 
@@ -18,7 +18,7 @@ const shortcut = (name: string, url: string) => ({ name, url, icons: icons() });
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
-  const locale = <Locale | null>searchParams.get('locale') ?? Locale.en_US;
+  const locale = <LocaleType | null>searchParams.get('locale') ?? LocaleType.en_US;
   const color = <string | null>searchParams.get('theme') ?? 'green';
 
   const getStringWithLocale = (key: LocaleKey) => getString(key, locale);

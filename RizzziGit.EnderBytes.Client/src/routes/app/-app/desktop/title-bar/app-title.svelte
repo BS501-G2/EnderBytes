@@ -1,24 +1,22 @@
 <script lang="ts" context="module">
-  import { LocaleKey, getString } from '$lib/locale.svelte';
-  import { RootState } from '$lib/states/root-state';
+  import { LocaleKey, getDerivedString } from '$lib/locale.svelte';
   import { _getUrl as faviconSrc } from '../../../../favicon.svg/+server';
 </script>
 
 <script lang="ts">
+  import Locale from '$lib/locale.svelte';
   import TitleBarChip from './chip.svelte';
 
-  const rootState = RootState.state;
+  const stringAltIcon = getDerivedString(LocaleKey.AltIconSite);
 </script>
 
 <TitleBarChip>
   <div class="chip">
-    <img
-      class="title-image"
-      src={faviconSrc(16)}
-      alt={getString(LocaleKey.AltIconSite)}
-    />
+    <img class="title-image" src={faviconSrc(16)} alt={$stringAltIcon} />
 
-    <p class="title-text">{getString(LocaleKey.AppName)}</p>
+    <p class="title-text">
+      <Locale string={[[LocaleKey.AppName]]} />
+    </p>
   </div>
 </TitleBarChip>
 

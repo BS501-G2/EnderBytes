@@ -2,13 +2,15 @@
   import { SearchIcon } from 'svelte-feather-icons';
 
   import { RootState } from '$lib/states/root-state';
-  import { LocaleKey, getString } from '$lib/locale.svelte';
+  import Locale, { LocaleKey, getDerivedString } from '$lib/locale.svelte';
 
   const rootState = RootState.state;
   const appState = $rootState.appState;
   const searchState = $appState.searchState;
 
   let searchElement: HTMLDivElement | null = null;
+
+  const string_SearchBarPlaceHolder = getDerivedString(LocaleKey.SearchBarPlaceholder);
 
   function updateFocus() {
     if (($searchState.focused = document.activeElement == searchElement?.children[1])) {
@@ -30,7 +32,9 @@
     {:else}
       <div class="empty-search-string">
         <SearchIcon size="16" strokeWidth={2} />
-        <p>{getString(LocaleKey.SearchBannerPlaceholderText)}</p>
+        <p>
+          <Locale string={[[LocaleKey.SearchBannerPlaceholderText]]} />
+        </p>
       </div>
     {/if}
   </div>
@@ -44,7 +48,7 @@
         bind:value={$searchState.string}
         on:focusin={updateFocus}
         on:focusout={updateFocus}
-        placeholder={getString(LocaleKey.SearchBarPlaceholder)}
+        placeholder={$string_SearchBarPlaceHolder}
       />
     </div>
   </div>

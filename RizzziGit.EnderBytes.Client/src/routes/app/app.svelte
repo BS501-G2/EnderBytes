@@ -10,6 +10,7 @@
   import LogoutConfirmationDialog from './-app/logout-confirmation-dialog.svelte';
   import AppSettingsDialog from './-app/app-settings-dialog.svelte';
   import { ResponsiveLayout, currentColorScheme } from '@rizzzi/svelte-commons';
+  import SettingsDialog from './settings-dialog.svelte';
 
   const rootState = RootState.state;
 </script>
@@ -35,6 +36,5 @@
   </ResponsiveLayout>
 
   <LogoutConfirmationDialog />
-  <AccountSettingsDialog />
-  <AppSettingsDialog />
+  <SettingsDialog />
 {/if}

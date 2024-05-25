@@ -7,6 +7,7 @@
   import { enabled as appSettingsDialog } from '../../app-settings-dialog.svelte';
   import { goto } from '$app/navigation';
   import { Overlay, OverlayPositionType } from '@rizzzi/svelte-commons';
+  import { settingsDialogState, showSettingsDialog } from '../../../settings-dialog.svelte';
 
   let menuLocationAnchor: HTMLElement;
   let menuX = 0;
@@ -34,10 +35,7 @@
     <div class="account-info"></div>
     <div class="account-menu">
       <a href="/app/users?id=!me" on:click={() => (menuOpen = false)}> View Profile </a>
-      <button on:click={() => onClick(() => ($accountSettingsDialog = true))}>
-        Account Settings
-      </button>
-      <button on:click={() => onClick(() => ($appSettingsDialog = true))}> App Settings </button>
+      <button on:click={() => onClick(() => showSettingsDialog())}> App Settings </button>
       <div class="divider"></div>
       <button class="logout" on:click={() => onClick(() => ($logoutConfirmationDialog = true))}
         >Logout</button
@@ -90,7 +88,6 @@
       font-size: small;
 
       cursor: pointer;
-      user-select: none;
 
       border-radius: 8px;
     }

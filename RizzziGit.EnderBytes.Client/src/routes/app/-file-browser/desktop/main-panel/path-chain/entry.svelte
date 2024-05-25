@@ -58,8 +58,6 @@
     display: flex;
     flex-direction: row;
 
-    user-select: none;
-
     color: var(--onBackgroundVariant);
 
     max-width: 256px;

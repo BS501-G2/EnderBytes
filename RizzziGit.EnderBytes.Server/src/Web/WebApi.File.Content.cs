@@ -161,28 +161,28 @@ public sealed partial class WebApi
         {
             return Error(404);
 
-            // FileContentVersionManager fileContentVersionManager =
-            //     GetResourceManager<FileContentVersionManager>();
-            // FileContentManager fileContentManager = GetResourceManager<FileContentManager>();
-            // FileDataManager fileDataManager = GetResourceManager<FileDataManager>();
+            FileContentVersionManager fileContentVersionManager =
+                GetResourceManager<FileContentVersionManager>();
+            FileContentManager fileContentManager = GetResourceManager<FileContentManager>();
+            FileDataManager fileDataManager = GetResourceManager<FileDataManager>();
 
-            // while (true)
-            // {
-            //     long size = await fileDataManager.GetSize(
-            //         CurrentTransaction,
-            //         CurrentFile,
-            //         CurrentFileContent,
-            //         fileContentVersion
-            //     );
+            while (true)
+            {
+                long size = await fileDataManager.GetSize(
+                    CurrentTransaction,
+                    CurrentFile,
+                    CurrentFileContent,
+                    fileContentVersion
+                );
 
-            //     FileContentDataStream a =
-            //         new(this, fileId, fileContentId ?? 0, fileContentVersion.Id, size);
+                FileContentDataStream a =
+                    new(this, fileId, fileContentId ?? 0, fileContentVersion.Id, size);
 
-            //     lock (Streams)
-            //     {
-            //         Streams.TryAdd(fileContentVersion.Id, a);
-            //     }
-            // }
+                lock (Streams)
+                {
+                    Streams.TryAdd(fileContentVersion.Id, a);
+                }
+            }
         });
     }
 

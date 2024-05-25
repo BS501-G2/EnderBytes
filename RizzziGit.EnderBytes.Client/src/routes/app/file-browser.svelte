@@ -254,8 +254,7 @@
   import { executeBackgroundTask } from '$lib/background-task.svelte';
   import { writable, type Writable } from 'svelte/store';
 
-  const { fileBrowserState }: { fileBrowserState: Writable<FileBrowserState> } = $props();
-  const selection: Writable<FileResource[]> = writable([]);
+  const { fileBrowserState, selection = writable([]) }: { fileBrowserState: Writable<FileBrowserState>, selection?: Writable<FileResource[]> } = $props();
 </script>
 
 <ResponsiveLayout>

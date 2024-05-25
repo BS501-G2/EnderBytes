@@ -1,13 +1,15 @@
 <script lang="ts">
-  import { LocaleKey, getString } from '$lib/locale.svelte';
+  import Locale, { LocaleKey, getDerivedString } from '$lib/locale.svelte';
 
   import { _getUrl as faviconSrc } from '../../../favicon.svg/+server';
+
+  const string_AltIconSite = getDerivedString(LocaleKey.AltIconSite);
 </script>
 
 <div class="site-banner">
-  <img class="title-image" src={faviconSrc(32)} alt={getString(LocaleKey.AltIconSite)} />
+  <img class="title-image" src={faviconSrc(32)} alt={$string_AltIconSite} />
 
-  {getString(LocaleKey.AppName)}
+  <Locale string={[[LocaleKey.AppName]]} />
 </div>
 
 <style lang="scss">

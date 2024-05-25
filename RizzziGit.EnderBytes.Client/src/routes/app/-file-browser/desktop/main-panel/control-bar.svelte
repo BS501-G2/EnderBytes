@@ -6,6 +6,7 @@
     icon: string;
     group: ControlBarItemGroup;
     action: (event: MouseEvent) => Promise<void> | void;
+    isVisible: (selection: FileResource[]) => boolean;
   }
 </script>
 
@@ -50,7 +51,8 @@
   <div class="control-bar-container">
     <div class="control-bar">
       {#snippet action(actions: ControlBarItem[], group: ControlBarItemGroup)}
-        {@const filteredActions = actions?.filter((action) => action.group == group) ?? []}
+        {@const filteredActions =
+          actions?.filter((action) => action.group == group && action.isVisible($selection)) ?? []}
 
         {#if filteredActions.length != 0}
           <div class="control-group" transition:scale|global={{ duration: 200, start: 0.95 }}>
@@ -75,8 +77,6 @@
     // max-height: 2em;
 
     overflow: auto hidden;
-
-    user-select: none;
 
     box-sizing: border-box;
 

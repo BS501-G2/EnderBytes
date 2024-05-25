@@ -31,7 +31,7 @@
 
   import { hasKeys, AnimationFrame, LoadingSpinnerPage } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
-  import { cubicInOut, cubicOut } from 'svelte/easing';
+    import { goto } from '$app/navigation';
 
   let {
     fileBrowserState,
@@ -39,7 +39,10 @@
   }: { fileBrowserState: Writable<FileBrowserState>; selection: Writable<FileResource[]> } =
     $props();
 
-  function click(fileBrowserState: FileBrowserState & { isLoading: false }, file: FileResource) {
+  function click(
+    fileBrowserState: FileBrowserState & { isLoading: false },
+    file: FileResource,
+  ) {
     if (hasKeys('control')) {
       $selection = !$selection.includes(file)
         ? [...$selection, file]
@@ -281,8 +284,6 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-
-    user-select: none;
 
     > div.file-list-inner-container {
       flex-grow: 1;

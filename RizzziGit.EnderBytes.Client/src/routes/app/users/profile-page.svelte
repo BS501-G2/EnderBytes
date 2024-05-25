@@ -9,10 +9,9 @@
 </script>
 
 <script lang="ts">
-  import { enabled as accountSettingsDialog } from '../-app/account-settings-dialog.svelte';
-
-  import { Title, Awaiter, Button, ButtonClass } from "@rizzzi/svelte-commons";
+  import { Title, Awaiter, Button, ButtonClass } from '@rizzzi/svelte-commons';
   import { apiFetch } from '$lib/client.svelte';
+  import { showSettingsDialog } from '../settings-dialog.svelte';
 
   export let identifier: UserResolve;
   let userPromise: Promise<any> | null;
@@ -58,7 +57,9 @@
           >
             <Button
               buttonClass={ButtonClass.PrimaryContainer}
-              onClick={() => { $accountSettingsDialog = true }}>Edit Profile</Button
+              onClick={() => {
+                showSettingsDialog();
+              }}>Edit Profile</Button
             >
           </div>
 

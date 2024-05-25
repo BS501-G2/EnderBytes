@@ -6,8 +6,6 @@
   div.title-bar-chip {
     -webkit-app-region: no-drag;
 
-    user-select: none;
-
     // margin: 8px 0px 8px 0px;
 
     border-style: none;

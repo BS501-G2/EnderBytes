@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-    import type { Writable } from 'svelte/store';
+  import type { Writable } from 'svelte/store';
   import type { FileResource, FileBrowserState } from '../../../../file-browser.svelte';
 
   let {
@@ -13,7 +13,10 @@
     file: FileResource;
     onClick: (
       fileBrowserState: FileBrowserState & { isLoading: false },
-      file: FileResource
+      file: FileResource,
+      event: MouseEvent & {
+        currentTarget: EventTarget & HTMLButtonElement;
+      }
     ) => void;
     selection: Writable<FileResource[]>;
   } = $props();
@@ -24,7 +27,7 @@
   onclick={(event) => {
     event.preventDefault();
 
-    onClick($fileBrowserState, file);
+    onClick($fileBrowserState, file, event);
   }}
   ondblclick={(event) => {
     event.preventDefault();

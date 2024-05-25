@@ -84,8 +84,6 @@
     display: flex;
     flex-direction: column;
 
-    user-select: none;
-
     max-height: 100%;
     max-width: 256px;
     overflow: hidden auto;

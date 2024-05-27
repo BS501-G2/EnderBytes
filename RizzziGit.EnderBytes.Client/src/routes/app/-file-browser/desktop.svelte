@@ -1,10 +1,15 @@
 <script lang="ts">
-    import type { Writable } from 'svelte/store';
-  import type { FileBrowserState, FileResource } from '../file-browser.svelte';
+  import type { Writable } from 'svelte/store';
+  import type { FileBrowserState } from '../file-browser.svelte';
   import MainPanel from './desktop/main-panel.svelte';
   import SidePanel from './desktop/side-panel.svelte';
+  import type { FileResource } from '$lib/client/file';
 
-  const { fileBrowserState, selection }: { fileBrowserState: Writable<FileBrowserState>, selection: Writable<FileResource[]> } = $props();
+  const {
+    fileBrowserState,
+    selection
+  }: { fileBrowserState: Writable<FileBrowserState>; selection: Writable<FileResource[]> } =
+    $props();
 </script>
 
 <div>

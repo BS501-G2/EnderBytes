@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { Writable } from 'svelte/store';
-  import type { FileBrowserState, FileResource } from '../../file-browser.svelte';
+  import type { FileBrowserState } from '../../file-browser.svelte';
   import ControlBar from './main-panel/control-bar.svelte';
   import FileList from './main-panel/file-list.svelte';
   import FileView from './main-panel/file-view.svelte';
   import PathChain from './main-panel/path-chain.svelte';
+  import type { FileResource } from '$lib/client/file';
 
   let {
     fileBrowserState,

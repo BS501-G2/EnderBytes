@@ -1,8 +1,8 @@
 <script lang="ts">
-  import UserName from '$lib/widgets/user-name.svelte';
+  import UserName from '$lib/client/user.svelte';
   import { Awaiter, LoadingSpinner } from '@rizzzi/svelte-commons';
-  import type { FileResource } from '../../../../file-browser.svelte';
   import { apiFetch } from '$lib/client.svelte';
+  import type { FileResource } from '$lib/client/file';
 
   const { file }: { file: FileResource } = $props();
 </script>

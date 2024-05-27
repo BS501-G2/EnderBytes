@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { FileResource } from '../../../../file-browser.svelte';
+  import type { FileResource } from '$lib/client/file';
 
   const {
     file,
@@ -16,7 +16,7 @@
 
 <div class="path-chain-entry">
   {#snippet link()}
-    <button class="link {forward ? 'forward' : ''}" title="{file.name}" onclick={onClick}>
+    <button class="link {forward ? 'forward' : ''}" title={file.name} onclick={onClick}>
       {#snippet icon()}
         <i class="fa-solid fa-{file.isFolder ? 'folder' : 'file'}"></i>
       {/snippet}

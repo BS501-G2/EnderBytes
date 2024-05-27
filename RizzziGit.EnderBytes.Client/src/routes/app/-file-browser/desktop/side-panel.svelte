@@ -1,8 +1,8 @@
 <script lang="ts">
   import { type Writable, type Readable, derived } from 'svelte/store';
-  import type { FileBrowserState, FileResource } from '../../file-browser.svelte';
+  import type { FileBrowserState } from '../../file-browser.svelte';
   import FileDetails from './main-panel/side-panel/file-details.svelte';
-  import { fly } from 'svelte/transition';
+  import type { FileResource } from '$lib/client/file';
 
   let {
     fileBrowserState,

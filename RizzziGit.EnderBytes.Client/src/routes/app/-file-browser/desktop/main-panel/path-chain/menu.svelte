@@ -11,9 +11,9 @@
 
   import { Awaiter, LoadingSpinner, Overlay, OverlayPositionType } from '@rizzzi/svelte-commons';
 
-  import { fly, scale } from 'svelte/transition';
-  import { getFile, scanFolder, type FileResource } from '../../../../file-browser.svelte';
+  import { fly } from 'svelte/transition';
   import PathChainEntry from './entry.svelte';
+  import { type FileResource, getFile, scanFolder } from '$lib/client/file';
 
   const {
     pathChainMenu,

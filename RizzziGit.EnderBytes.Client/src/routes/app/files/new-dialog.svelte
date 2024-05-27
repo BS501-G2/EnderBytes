@@ -32,12 +32,8 @@
   } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
   import { fly } from 'svelte/transition';
-  import {
-    createFolder,
-    uploadFile,
-    type FileBrowserState,
-    type FileResource
-  } from '../file-browser.svelte';
+  import { type FileBrowserState } from '../file-browser.svelte';
+  import { uploadFile, type FileResource, createFolder } from '$lib/client/file';
 
   const {
     fileBrowserState,
@@ -123,10 +119,10 @@
           if ($fileBrowserState.isLoading || $fileBrowserState.file == null) {
             return;
           }
-          const newFiles = await Promise.allSettled(files.map(async (file) => uploadFile($fileBrowserState.file!, file)))
+          const newFiles = await uploadFile($fileBrowserState.file!, ...files)
 
           onDismiss()
-          onNewFiles(...newFiles.filter((result) => result.status === 'fulfilled').map((file) => (file as PromiseFulfilledResult<FileResource>).value.id));
+          onNewFiles(...newFiles.map((f) => f.id));
         }}
 
         <div class="input-group">

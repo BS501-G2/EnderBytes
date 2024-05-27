@@ -1,6 +1,5 @@
 <script lang="ts">
   import '@fortawesome/fontawesome-free/css/all.min.css';
-
   import Locale, { LocaleKey } from '$lib/locale.svelte';
   import { ColorKey, ResetCSS, Title, titleString } from '@rizzzi/svelte-commons';
   import ColorScheme, { getColorHex } from '../../../../svelte-commons/dist/color-scheme.svelte';
@@ -18,7 +17,6 @@
 </Locale>
 <ResetCSS />
 <ColorScheme />
-
 <slot />
 
 <style lang="scss">

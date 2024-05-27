@@ -7,8 +7,9 @@
     Title,
     type AwaiterResetFunction
   } from '@rizzzi/svelte-commons';
-  import FileBrowser, { getFileAccesses, type FileBrowserState } from '../file-browser.svelte';
+  import FileBrowser, { type FileBrowserState } from '../file-browser.svelte';
   import { writable, type Writable } from 'svelte/store';
+  import { getFileAccesses } from '$lib/client/file';
 
   let refresh: Writable<AwaiterResetFunction<null>> = writable();
   const fileBrowserState: Writable<FileBrowserState> = writable({ isLoading: true });

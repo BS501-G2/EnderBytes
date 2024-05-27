@@ -1,7 +1,7 @@
 <script lang="ts" context="module">
   export interface SettingsDialogState {}
 
-  export const settingsDialogState: Writable<SettingsDialogState | null> = writable({});
+  export const settingsDialogState: Writable<SettingsDialogState | null> = writable(null);
 
   export function hideSettingsDialog() {
     settingsDialogState.set(null);
@@ -25,7 +25,6 @@
     BannerClass,
     Button,
     ButtonClass,
-    ColorScheme,
     Dialog,
     ResponsiveLayout,
     Tab,
@@ -33,12 +32,12 @@
     createTabId,
     currentColorScheme,
     viewMode,
+    colors,
+    setColorScheme,
     type ColorSchemeName,
-    type TabId,
     type TabItem
   } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
-  import { colors, setColorScheme } from '@rizzzi/svelte-commons';
 
   function getLanguageList(): LocaleType[] {
     return [LocaleType.en_US, LocaleType.tl_PH];

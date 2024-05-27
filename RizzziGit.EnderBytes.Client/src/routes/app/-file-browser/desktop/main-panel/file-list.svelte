@@ -24,14 +24,14 @@
 </script>
 
 <script lang="ts">
-  import { type FileBrowserState, type FileResource } from '../../../file-browser.svelte';
+  import { type FileBrowserState } from '../../../file-browser.svelte';
   import FileGridEntry from './file-list/file-grid-entry.svelte';
   import FileTableEntry from './file-list/file-table-entry.svelte';
   import { scale } from 'svelte/transition';
 
   import { hasKeys, AnimationFrame, LoadingSpinnerPage } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
-    import { goto } from '$app/navigation';
+    import type { FileResource } from '$lib/client/file';
 
   let {
     fileBrowserState,

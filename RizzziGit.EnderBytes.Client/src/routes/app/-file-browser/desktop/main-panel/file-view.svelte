@@ -1,9 +1,10 @@
 <script lang="ts">
   import { fly, scale } from 'svelte/transition';
-  import type { FileBrowserState, FileResource } from '../../../file-browser.svelte';
+  import type { FileBrowserState } from '../../../file-browser.svelte';
   import { AnimationFrame, Button, ButtonClass } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
   import { type Snippet } from 'svelte';
+  import type { FileResource } from '$lib/client/file';
 
   let {
     fileBrowserState,
@@ -44,11 +45,22 @@
 {#snippet topBar()}
   <div class="top-bar-container" transition:fly|global={{ duration: 200, y: -32 }}>
     <div class="top-bar">
-      <Button outline={false} onClick={() => history.back()}>
+      <Button buttonClass={ButtonClass.Transparent} outline={false} onClick={() => history.back()}>
         <i class="icon fa-solid fa-arrow-left"></i>
       </Button>
       <h3 class="file-name">{$fileBrowserState.file.name}</h3>
+      {#each $fileBrowserState.controlBarActions?.filter((action) => action.group == 'actions' && action.isVisible($selection)) ?? [] as action}
+        <Button
+          buttonClass={ButtonClass.Transparent}
+          hint={action.label}
+          outline={false}
+          onClick={action.action}
+        >
+          <i class="icon fa-solid {action.icon}"></i>
+        </Button>
+      {/each}
       <Button
+        buttonClass={ButtonClass.Transparent}
         onClick={() => {
           if (document.fullscreenElement != $mainView) {
             $mainView?.requestFullscreen();

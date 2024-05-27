@@ -1,14 +1,5 @@
 <script lang="ts">
-  import FileBrowser, {
-    getFile,
-    getFileAccessList,
-    getFilePathChain,
-    scanFolder,
-    type FileBrowserState,
-
-    type FileResource
-
-  } from '../file-browser.svelte';
+  import FileBrowser, { type FileBrowserState } from '../file-browser.svelte';
   import { type ControlBarItem } from '../-file-browser/desktop/main-panel/control-bar.svelte';
   import FilterOverlay, { filterOverlayState } from './arrange-overlay.svelte';
 
@@ -20,11 +11,17 @@
     Banner,
     BannerClass,
     Button,
-    LoadingSpinnerPage
   } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
   import NewDialog, { newDialogState } from './new-dialog.svelte';
   import { goto } from '$app/navigation';
+  import {
+    getFile,
+    getFileAccessList,
+    getFilePathChain,
+    scanFolder,
+    type FileResource
+  } from '$lib/client/file';
 
   function parseId(id: string | null) {
     if (id == null) {
@@ -35,7 +32,7 @@
   }
 
   const id = $derived(parseId($page.url.searchParams.get('id')));
-  const selection: Writable<FileResource[]> = writable([])
+  const selection: Writable<FileResource[]> = writable([]);
 
   let refresh: Writable<AwaiterResetFunction<null>> = writable();
   let title: string | null = $state(null);
@@ -73,6 +70,35 @@
         window.matchMedia('(any-pointer: coarse)').matches &&
         selection.length === 1 &&
         selection[0].id != id
+    },{
+      label: 'Delete',
+      icon: 'fa-solid fa-trash',
+      action: async () => {
+      },
+      group: 'actions',
+      isVisible: (selection) =>
+        !$fileBrowserState.isLoading &&
+        selection.length > 0
+    },
+    {
+      label: 'Download',
+      icon: 'fa-solid fa-download',
+      action: async () => {
+      },
+      group: 'actions',
+      isVisible: (selection) =>
+        !$fileBrowserState.isLoading &&
+        selection.length == 1
+    },
+    {
+      label: 'Move',
+      icon: 'fa-solid fa-arrow-right-arrow-left',
+      action: async () => {
+      },
+      group: 'actions',
+      isVisible: (selection) =>
+        !$fileBrowserState.isLoading &&
+        selection.length > 0
     },
     {
       label: 'New',

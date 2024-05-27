@@ -6,14 +6,13 @@ export default defineConfig({
   test: {
     include: ['src/**/*.{test,spec}.{js,ts}']
   },
-  server: {
-    proxy: {
-      '/api': {
-        target: 'https://localhost:8083',
-        changeOrigin: true,
-        secure: false,
-        ws: true
-      }
+  server: {},
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'esnext'
     }
+  },
+  build: {
+    target: 'esnext'
   }
 });

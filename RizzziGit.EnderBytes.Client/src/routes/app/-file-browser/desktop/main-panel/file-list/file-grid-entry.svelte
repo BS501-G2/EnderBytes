@@ -1,7 +1,8 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import type { Writable } from 'svelte/store';
-  import type { FileResource, FileBrowserState } from '../../../../file-browser.svelte';
+  import type { FileBrowserState } from '../../../../file-browser.svelte';
+    import type { FileResource } from '$lib/client/file';
 
   let {
     file,

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Button, ButtonClass, Tab, createTabId, type TabItem } from '@rizzzi/svelte-commons';
-  import type { FileResource } from '../../../../file-browser.svelte';
-  import FileOverview from './file-overview.svelte';
-  import { goto } from '$app/navigation';
+  import FileOverviewTab from './file-overview-tab.svelte';
+  import FileHistoryTab from './file-history-tab.svelte';
+  import type { FileResource } from '$lib/client/file';
 
   const { file }: { file: FileResource } = $props();
 
@@ -33,11 +33,11 @@
 </script>
 
 {#snippet overview()}
-  <FileOverview {file} />
+  <FileOverviewTab {file} />
 {/snippet}
 
 {#snippet history()}
-  <p>History</p>
+  <FileHistoryTab {file} />
 {/snippet}
 
 {#snippet access()}

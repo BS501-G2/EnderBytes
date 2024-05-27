@@ -1,32 +1,11 @@
-<script lang="ts">
-  import { Awaiter, Title } from '@rizzzi/svelte-commons';
-  import { getFile } from '../app/file-browser.svelte';
-  import { apiFetch } from '$lib/client.svelte';
-
-  async function callback(): Promise<any> {
-    const file = await getFile();
-    const fileContent = apiFetch({ path: `/file/:${file.id}/content` });
-
-    return fileContent;
-  }
+<script lang="ts" context="module">
+  export interface PageData {}
 </script>
 
-<div class="container">
-  <Title title="Testing Ground">
-    {#snippet children(title: string)}
-      <h2 class="title">{title}</h2>
-    {/snippet}
-  </Title>
+<script lang="ts">
+  import { onMount } from 'svelte';
 
-  <Awaiter {callback}>
-    {#snippet success({ result })}
-      <pre class="code">{JSON.stringify(result, undefined, '  ')}</pre>
-    {/snippet}
-  </Awaiter>
-</div>
+  const {}: {} = $props();
 
-<style lang="scss">
-  div.container {
-    padding: 16px;
-  }
-</style>
+  onMount(async () => {});
+</script>

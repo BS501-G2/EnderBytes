@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
   const locale = <LocaleType | null>searchParams.get('locale') ?? LocaleType.en_US;
-  const color = <string | null>searchParams.get('theme') ?? 'green';
+  const color = <string | null>searchParams.get('theme') ?? 'Green';
 
   const getStringWithLocale = (key: LocaleKey) => getString(key, locale);
 

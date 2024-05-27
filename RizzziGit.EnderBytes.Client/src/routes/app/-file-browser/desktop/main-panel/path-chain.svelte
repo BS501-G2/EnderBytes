@@ -2,7 +2,7 @@
   import { goto } from '$app/navigation';
     import type { Writable } from 'svelte/store';
 
-  import { type FileBrowserState, type FilePathChainInfo } from '../../../file-browser.svelte';
+  import { type FileBrowserState } from '../../../file-browser.svelte';
   import PathChainEntry from './path-chain/entry.svelte';
   import PathChainMenuElement, { type PathChainMenu } from './path-chain/menu.svelte';
 

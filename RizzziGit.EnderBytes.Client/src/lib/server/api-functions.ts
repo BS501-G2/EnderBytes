@@ -1,4 +1,5 @@
 import { Database } from './db';
+import { TestManager, type TestData } from './db/test';
 import { UserManager, type User } from './db/user';
 import { UserRoleManager, UserRoleType, type UserRole } from './db/user-role';
 
@@ -52,4 +53,17 @@ export async function createAdminUser(
 
   const userRole = await userRoleManager.create(user, UserRoleType.SiteAdmin);
   return [user, userRole];
+}
+
+export async function testFunction(test: string): Promise<TestData> {
+  const database = await Database.getInstance();
+  const testManager = database.getManager(TestManager);
+
+  return await testManager.create(test);
+}
+
+export async function getTest(id: number): Promise<TestData | null> {
+  const database = await Database.getInstance();
+  const testManager = database.getManager(TestManager);
+  return await testManager.getById(id);
 }

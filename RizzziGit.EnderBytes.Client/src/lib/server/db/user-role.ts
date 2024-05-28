@@ -23,12 +23,10 @@ export class UserRoleManager extends DataManager<UserRoleManager, UserRole> {
     super(db, transaction, UserRoleManager.NAME, UserRoleManager.VERSION);
   }
 
-  protected async upgrade(oldVersion: number = 0): Promise<void> {
+  protected async upgrade(table: Knex.AlterTableBuilder, oldVersion: number = 0): Promise<void> {
     if (oldVersion < 1) {
-      await this.db.schema.alterTable(this.name, (table) => {
-        table.integer(UserRoleManager.KEY_USER_ID).notNullable();
-        table.integer(UserRoleManager.KEY_TYPE).notNullable();
-      });
+      table.integer(UserRoleManager.KEY_USER_ID).notNullable();
+      table.integer(UserRoleManager.KEY_TYPE).notNullable();
     }
   }
 
@@ -43,15 +41,14 @@ export class UserRoleManager extends DataManager<UserRoleManager, UserRole> {
   }
 
   public async create(user: User, type: UserRoleType): Promise<UserRole> {
-    const result = await this.db
-      .insert({
-        userId: user.id,
-        type
-      })
-      .into(this.name);
+    return this.insert({
+      userId: user.id,
+      type
+    });
+  }
 
-    const userRole = <UserRole>await this.get(result[0]);
-    return userRole;
+  public deleteAllFromUser(user: User) {
+    return this.deleteWhere([[UserRoleManager.KEY_USER_ID, '=', user.id]]);
   }
 }
 

@@ -84,23 +84,24 @@ export const encryptAsymmetric = (publicKey: Buffer, buffer: Buffer): Buffer =>
   Crypto.publicEncrypt(publicKey, buffer);
 
 export enum UserKeyType {
-  Password = 0
+  Password = 0,
+  Session
 }
 
 export interface UserKey extends Data<UserKeyManager, UserKey> {
-  userId: number;
-  type: UserKeyType;
+  [UserKeyManager.KEY_USER_ID]: number;
+  [UserKeyManager.KEY_TYPE]: UserKeyType;
 
-  iterations: number;
-  salt: Buffer;
-  iv: Buffer;
+  [UserKeyManager.KEY_ITERATIONS]: number;
+  [UserKeyManager.KEY_SALT]: Buffer;
+  [UserKeyManager.KEY_IV]: Buffer;
 
-  encryptedPrivateKey: Buffer;
-  encryptedAuthTag: Buffer;
-  publicKey: Buffer;
+  [UserKeyManager.KEY_ENCRYPTED_PRIVATE_KEY]: Buffer;
+  [UserKeyManager.KEY_ENCRYPTED_AUTH_TAG]: Buffer;
+  [UserKeyManager.KEY_PUBLIC_KEY]: Buffer;
 
-  testBytes: Buffer;
-  testEncryptedBytes: Buffer;
+  [UserKeyManager.KEY_TEST_BYTES]: Buffer;
+  [UserKeyManager.KEY_TEST_ENCRYPTED_BYTES]: Buffer;
 }
 
 export interface UnlockedUserKey extends UserKey {
@@ -126,23 +127,21 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
     super(db, transaction, 'UserKey', 1);
   }
 
-  protected async upgrade(oldVersion: number = 0): Promise<void> {
+  protected async upgrade(table: Knex.TableBuilder, oldVersion: number = 0): Promise<void> {
     if (oldVersion < 1) {
-      await this.db.schema.alterTable(this.name, (table) => {
-        table.integer(UserKeyManager.KEY_USER_ID).notNullable();
-        table.integer(UserKeyManager.KEY_TYPE).notNullable();
+      table.integer(UserKeyManager.KEY_USER_ID).notNullable();
+      table.integer(UserKeyManager.KEY_TYPE).notNullable();
 
-        table.integer(UserKeyManager.KEY_ITERATIONS).notNullable();
-        table.string(UserKeyManager.KEY_SALT).notNullable();
-        table.string(UserKeyManager.KEY_IV).notNullable();
+      table.integer(UserKeyManager.KEY_ITERATIONS).notNullable();
+      table.string(UserKeyManager.KEY_SALT).notNullable();
+      table.string(UserKeyManager.KEY_IV).notNullable();
 
-        table.binary(UserKeyManager.KEY_ENCRYPTED_PRIVATE_KEY).notNullable();
-        table.binary(UserKeyManager.KEY_ENCRYPTED_AUTH_TAG).notNullable();
-        table.binary(UserKeyManager.KEY_PUBLIC_KEY).notNullable();
+      table.binary(UserKeyManager.KEY_ENCRYPTED_PRIVATE_KEY).notNullable();
+      table.binary(UserKeyManager.KEY_ENCRYPTED_AUTH_TAG).notNullable();
+      table.binary(UserKeyManager.KEY_PUBLIC_KEY).notNullable();
 
-        table.binary(UserKeyManager.KEY_TEST_BYTES).notNullable();
-        table.binary(UserKeyManager.KEY_TEST_ENCRYPTED_BYTES).notNullable();
-      });
+      table.binary(UserKeyManager.KEY_TEST_BYTES).notNullable();
+      table.binary(UserKeyManager.KEY_TEST_ENCRYPTED_BYTES).notNullable();
     }
   }
 
@@ -160,31 +159,27 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
       encryptAsymmetric(publicKey, testBytes)
     ]);
 
-    const result = await this.db
-      .insert(
-        this.new({
-          userId: user.id,
-          type,
+    const userKey = await this.insert({
+      userId: user.id,
+      type,
 
-          iterations: 10000,
-          salt: salt,
-          iv: iv,
+      iterations: 10000,
+      salt: salt,
+      iv: iv,
 
-          encryptedPrivateKey,
-          encryptedAuthTag,
-          publicKey,
+      encryptedPrivateKey,
+      encryptedAuthTag,
+      publicKey,
 
-          testBytes: testBytes,
-          testEncryptedBytes: testEncryptedBytes
-        })
-      )
-      .into(this.name);
+      testBytes: testBytes,
+      testEncryptedBytes: testEncryptedBytes
+    });
 
-    return this.unlock(<UserKey>await this.get(result[0]), payload);
+    return this.unlock(userKey, payload);
   }
 
   public async list(filterType?: UserKeyType): Promise<UserKey[]> {
-    let a = this.db.select('*').from<UserKey>(this.name).orderBy(DataManager.KEY_ID, 'asc');
+    let a = this.db.select('*').from<UserKey>(this.name).orderBy(DataManager.KEY_DATA_ID, 'asc');
 
     if (filterType != null) {
       a = a.where(UserKeyManager.KEY_TYPE, '=', filterType);
@@ -206,6 +201,22 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
 
       privateKey
     };
+  }
+
+  public async decrypt(key: UnlockedUserKey, payload: Buffer): Promise<Buffer> {
+    return decryptAsymmetric(key.privateKey, payload);
+  }
+
+  public async encrypt(key: UserKey, payload: Buffer): Promise<Buffer> {
+    return encryptAsymmetric(key.publicKey, payload);
+  }
+
+  public async delete(key: UserKey): Promise<void> {
+    await super.delete(key);
+  }
+
+  public async deleteAllFromUser(user: User): Promise<void> {
+    await this.deleteWhere([[UserKeyManager.KEY_USER_ID, '=', user.id]]);
   }
 }
 

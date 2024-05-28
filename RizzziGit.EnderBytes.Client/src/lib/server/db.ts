@@ -165,23 +165,37 @@ export class Database {
   }
 }
 
+interface DataHolder {
+  [DataManager.KEY_HOLDER_ID]: number;
+  [DataManager.KEY_HOLDER_DELETED]: boolean;
+}
+
 export interface Data<M extends DataManager<M, D>, D extends Data<M, D>> {
-  id: number;
-  createTime: number;
-  updateTime: number;
+  [DataManager.KEY_DATA_VERSION_ID]: number;
+  [DataManager.KEY_DATA_ID]: number;
+  [DataManager.KEY_DATA_CREATE_TIME]: number;
+  [DataManager.KEY_DATA_PREVIOUS_ID]: number | null;
+  [DataManager.KEY_DATA_NEXT_ID]: number | null;
 }
 
 export interface IDataManager {}
 
 const SYMBOL_DATA_MANAGER_DATABASE = Symbol('Database');
-const SYMBOL_DATA_MANAGER_TRANSACTION = Symbol('DatabaseTransaction');
+const SYMBOL_DATA_MANAGER_TRANSACTION = Symbol('Transaction');
+const SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME = Symbol('HolderTableName');
+const SYMBOL_DATA_MANAGER_DATA_TABLE_NAME = Symbol('DataTableName');
 
 export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M, D>>
   implements IDataManager
 {
-  public static readonly KEY_ID = 'id';
-  public static readonly KEY_CREATE_TIME = 'createTime';
-  public static readonly KEY_UPDATE_TIME = 'updateTime';
+  public static readonly KEY_HOLDER_ID = 'id';
+  public static readonly KEY_HOLDER_DELETED = 'deleted';
+
+  public static readonly KEY_DATA_ID = 'id';
+  public static readonly KEY_DATA_VERSION_ID = 'versionId';
+  public static readonly KEY_DATA_CREATE_TIME = 'createTime';
+  public static readonly KEY_DATA_PREVIOUS_ID = 'previousId';
+  public static readonly KEY_DATA_NEXT_ID = 'nextId';
 
   public constructor(
     db: Database,
@@ -201,47 +215,59 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
   public readonly name: string;
   public readonly version: number;
 
+  public get [SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME](): string {
+    return `${this.name}_Holder`;
+  }
+
+  public get [SYMBOL_DATA_MANAGER_DATA_TABLE_NAME](): string {
+    return `${this.name}_Data`;
+  }
+
   public getManager<M extends DataManager<M, D>, D extends Data<M, D>>(
     init: DataManagerConstructor<M, D>
   ): M {
-    return this[SYMBOL_DATA_MANAGER_DATABASE].getManager(init as any) as M;
+    return this[SYMBOL_DATA_MANAGER_DATABASE].getManager(init as any) as unknown as M;
   }
 
   public get db(): Knex.Transaction<D, D[]> {
     return this[SYMBOL_DATA_MANAGER_TRANSACTION]();
   }
 
-  protected abstract upgrade(oldVersion?: number): Promise<void>;
-  protected new(obj: Omit<D, keyof Data<never, never>>): D {
-    const createTime = Date.now();
-    return <never>{
-      createTime,
-      updateTime: createTime,
-      ...obj
-    };
-  }
+  protected abstract upgrade(table: Knex.AlterTableBuilder, oldVersion?: number): void;
 
   public async init(version?: number): Promise<void> {
     const exists = await this.db.raw(
-      `select name from sqlite_master where type='table' and name='${this.name}';`
+      `select name from sqlite_master where type='table' and name='${this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME]}';`
     );
 
     if (exists.length == 0) {
-      await this.db.schema.createTable(this.name, (table) => {
-        table.increments(DataManager.KEY_ID);
-        table.integer(DataManager.KEY_CREATE_TIME).notNullable();
-        table.integer(DataManager.KEY_UPDATE_TIME).notNullable();
+      await this.db.schema.createTable(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME], (table) => {
+        table.increments(DataManager.KEY_HOLDER_ID);
+        table.boolean(DataManager.KEY_HOLDER_DELETED).notNullable();
+      });
+
+      await this.db.schema.createTable(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME], (table) => {
+        table.increments(DataManager.KEY_DATA_VERSION_ID);
+        table.integer(DataManager.KEY_DATA_ID).notNullable().index();
+        table.integer(DataManager.KEY_DATA_CREATE_TIME).notNullable();
+        table.integer(DataManager.KEY_DATA_PREVIOUS_ID).nullable();
+        table.integer(DataManager.KEY_DATA_NEXT_ID).nullable();
       });
     }
 
     if (version == null || version < this.version) {
-      await this.upgrade(version);
+      for (let currentVersion = version ?? 0; currentVersion < this.version; currentVersion++) {
+        await this.db.schema.alterTable(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME], (table) => {
+          this.upgrade(table, currentVersion);
+        });
+      }
 
       const result = await this.db
         .table<VersionTable>('version')
         .update({ version: this.version })
         .into('version')
         .where('name', '=', this.name);
+
       if (result == 0) {
         await this.db
           .table<VersionTable>('version')
@@ -250,17 +276,226 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
     }
   }
 
-  public async get(id: number): Promise<D | null> {
-    const result = await this.db
+  public async getById(id: number, options?: GetByIdOptions<M, D>): Promise<D | null> {
+    const holder = await this.db
       .select('*')
-      .from(this.name)
-      .where(DataManager.KEY_ID, '=', id)
+      .from<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
+      .where(DataManager.KEY_HOLDER_ID, '=', id)
+      .where(DataManager.KEY_HOLDER_DELETED, '=', false)
       .first();
 
-    return result ?? null;
+    if (holder == null) {
+      return null;
+    }
+
+    if (options?.deleted != null ? holder.deleted !== options.deleted : holder.deleted) {
+      return null;
+    }
+
+    let query = this.db
+      .select('*')
+      .from<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
+      .where(DataManager.KEY_DATA_ID, '=', holder.id);
+
+    if (options?.versionId != null) {
+      query = query.where(DataManager.KEY_DATA_VERSION_ID, '=', options.versionId);
+    }
+
+    return <D | null>(
+      ((await query.orderBy(DataManager.KEY_DATA_VERSION_ID, 'desc').first()) ?? null)
+    );
   }
 
-  public async delete(user: D): Promise<void> {
-    await this.db.delete().from(this.name).where(DataManager.KEY_ID, '=', user.id);
+  public async listVersions(id: number): Promise<D[]> {
+    const holder = await this.db
+      .select('*')
+      .from<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
+      .where(DataManager.KEY_HOLDER_ID, '=', id)
+      .first();
+
+    if (holder == null) {
+      return [];
+    }
+
+    return <D[]>(
+      await this.db
+        .select('*')
+        .from<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
+        .where(DataManager.KEY_DATA_ID, '=', holder[DataManager.KEY_HOLDER_ID])
+    );
+  }
+
+  public async update(id: number, data: Partial<D>, options?: UpdateOptions<M, D>): Promise<D> {
+    const latest = await this.getById(id);
+    const baseVersion =
+      options?.baseVersionId != null
+        ? await this.getById(id, {
+            versionId: options.baseVersionId
+          })
+        : latest;
+
+    if (baseVersion == null) {
+      throw new Error('Base version not found');
+    }
+
+    const newData = Object.assign<{}, D, Partial<D>, Partial<Data<M, D>>>({}, baseVersion, data, {
+      [DataManager.KEY_DATA_PREVIOUS_ID]: latest?.[DataManager.KEY_DATA_VERSION_ID] ?? null
+    });
+
+    const result = await this.db
+      .insert(<never>newData)
+      .into<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]);
+
+    return <D>await this.getById(result[0]);
+  }
+
+  public async insert(data: Omit<D, keyof Data<never, never>>): Promise<D> {
+    const resultHolder = await this.db
+      .table<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
+      .insert({ deleted: false });
+
+    const holder = <DataHolder>(
+      await this.db
+        .select('*')
+        .from<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
+        .where(DataManager.KEY_HOLDER_ID, '=', resultHolder[0])
+        .first()
+    );
+
+    const result = await this.db.table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]).insert(
+      <never>Object.assign<{}, Omit<D, keyof Data<never, never>>, Partial<Data<M, D>>>({}, data, {
+        [DataManager.KEY_DATA_ID]: holder[DataManager.KEY_HOLDER_ID],
+        [DataManager.KEY_DATA_CREATE_TIME]: Date.now()
+      })
+    );
+
+    return <D>(
+      await this.db
+        .table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
+        .where(DataManager.KEY_DATA_VERSION_ID, '=', result[0])
+    );
+  }
+
+  public async delete(data: D): Promise<void> {
+    await this.db
+      .table<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
+      .where(DataManager.KEY_HOLDER_ID, '=', data[DataManager.KEY_DATA_ID])
+      .where(DataManager.KEY_HOLDER_DELETED, '=', false)
+      .update({ deleted: true });
+  }
+
+  public async deleteWhere(whereClause?: WhereClause<M, D>[]): Promise<void> {
+    const results = <D[]>await (whereClause ?? [])
+      .reduce(
+        (query, [columnName, operator, value]) =>
+          query.where(columnName as any, operator, value as any),
+        this.db.table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]).select('*')
+      )
+      .where(DataManager.KEY_DATA_NEXT_ID, '=', null);
+
+    for (const result of results) {
+      await this.delete(result);
+    }
+  }
+
+  public async purge(id: number): Promise<void> {
+    await this.db
+      .table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
+      .where(DataManager.KEY_DATA_ID, '=', id)
+      .del();
+
+    await this.db
+      .table<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
+      .where(DataManager.KEY_HOLDER_ID, '=', id)
+      .del();
+  }
+
+  public async query(options?: QueryOptions<M, D>): Promise<D[]> {
+    let currentOffset = options?.offset ?? 0;
+
+    const results: D[] = [];
+
+    while (results.length < (options?.limit ?? Infinity)) {
+      let query = (options?.where ?? []).reduce(
+        (query, [columnName, operator, value]) =>
+          query.where(columnName as any, operator, value as any),
+
+        this.db.select('*').from<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
+      );
+
+      query.where(DataManager.KEY_DATA_NEXT_ID, '=', null);
+
+      if (options?.limit != null) {
+        query = query.limit(options.limit - results.length);
+      }
+
+      if (options?.offset != null) {
+        query = query.offset(currentOffset);
+      }
+
+      const entres = <D[]>await query;
+      if (entres.length === 0) {
+        break;
+      }
+
+      for (const entry of entres) {
+        const holder = await this.db
+          .select('*')
+          .from<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
+          .where(DataManager.KEY_HOLDER_ID, '=', entry[DataManager.KEY_DATA_ID])
+          .first();
+
+        if (holder == null) {
+          continue;
+        }
+
+        if (options?.deleted != null ? holder.deleted !== options.deleted : holder.deleted) {
+          continue;
+        }
+
+        results.push(entry);
+      }
+
+      if (options?.limit != null) {
+        currentOffset += options.limit;
+      }
+    }
+
+    return results;
   }
 }
+
+export interface UpdateOptions<M extends DataManager<M, D>, D extends Data<M, D>> {
+  baseVersionId?: number;
+}
+
+export interface DeleteOptions<M extends DataManager<M, D>, D extends Data<M, D>> {
+  where?: WhereClause<M, D>[];
+}
+
+export interface GetByIdOptions<M extends DataManager<M, D>, D extends Data<M, D>> {
+  deleted?: boolean;
+  versionId?: number;
+}
+
+export interface QueryOptions<M extends DataManager<M, D>, D extends Data<M, D>> {
+  where?: WhereClause<M, D>[];
+  orderBy?: OrderByClause<M, D>[];
+
+  offset?: number;
+  limit?: number;
+
+  deleted?: boolean;
+}
+
+export type WhereClause<
+  M extends DataManager<M, D>,
+  D extends Data<M, D>,
+  T extends keyof D = keyof D
+> = [T, '=' | '>' | '>=' | '<' | '<=' | '<>', D[T]];
+
+export type OrderByClause<
+  M extends DataManager<M, D>,
+  D extends Data<M, D>,
+  T extends keyof D = keyof D
+> = [T, 'asc' | 'desc'];

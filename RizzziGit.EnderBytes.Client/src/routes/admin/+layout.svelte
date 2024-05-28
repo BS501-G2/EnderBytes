@@ -2,7 +2,7 @@
   import { Awaiter } from '@rizzzi/svelte-commons';
   import { type Snippet } from 'svelte';
   import { goto } from '$app/navigation';
-  import { clientSideInvoke } from '$lib/client/api'
+  import { clientSideInvoke } from '$lib/client/api';
 
   const { children }: { children: Snippet } = $props();
 </script>

@@ -6,7 +6,9 @@
 </script>
 
 <Page>
-  <div class="panel side-panel"></div>
+  <div class="panel side-panel">
+    
+  </div>
   <div class="panel main-panel"></div>
 </Page>
 

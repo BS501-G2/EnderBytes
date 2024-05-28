@@ -205,10 +205,37 @@ public sealed partial class FileManager : ResourceManager
                 }
             }
 
-            return chain.ToArray();
+            return [.. chain];
         }
 
         return (await getChain()).Reverse().ToArray();
+    }
+
+    public async Task<string> SanitizeFileName(
+        ResourceService.Transaction transaction,
+        Resource parentFolder,
+        UserAuthenticationToken userAuthenticationToken,
+        string fileName
+    )
+    {
+        string output = Path.GetInvalidFileNameChars()
+            .Aggregate(fileName, (name, character) => name.Replace(character, '_'));
+
+        Resource[] files = await ScanFolder(
+            transaction,
+            parentFolder,
+            userAuthenticationToken,
+            null,
+            null
+        );
+
+        string getF(long useCount) => $"{output}{(useCount != 1 ? $" ({useCount})" : "")}";
+        int useCount = 1;
+        while (files.Where((file) => file.Name == getF(useCount)).Any())
+        {
+            useCount++;
+        }
+        return getF(useCount);
     }
 
     public async Task<FileCreationResult> Create(
@@ -247,7 +274,11 @@ public sealed partial class FileManager : ResourceManager
             )
         );
 
-        await Update(transaction, parentFolder, new((COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())));
+        await Update(
+            transaction,
+            parentFolder,
+            new((COLUMN_UPDATE_TIME, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()))
+        );
         return new(file, newKey);
     }
 

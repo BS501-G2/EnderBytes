@@ -1,10 +1,8 @@
 {
 	"folders": [
 		{
+			"name": "EnderDrive"
 			"path": "RizzziGit.EnderBytes.Client"
-		},
-		{
-			"path": "RizzziGit.EnderBytes.Server"
 		}
 	],
 	"settings": {}

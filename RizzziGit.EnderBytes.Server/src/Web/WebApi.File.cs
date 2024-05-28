@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace RizzziGit.EnderBytes.Web;
 
+using System.Runtime.CompilerServices;
 using Commons.Memory;
 using Resources;
 using Services;
@@ -223,14 +224,10 @@ public partial class WebApi
         });
     }
 
-    public sealed record CreateFileRequest(string Name, IFormFile Content);
-
-    public sealed record CreateFileResponse(FileManager.Resource File);
-
     [Route("~/file/!root/files/new-file")]
     [Route("~/file/:{fileId}/files/new-file")]
     [HttpPost]
-    public async Task<ActionResult> CreateFile(long? fileId, [FromForm] CreateFileRequest request)
+    public async Task<ActionResult> CreateFile(long? fileId, [FromForm] IFormFile[] requestFiles)
     {
         ObjectResult fileResult = await GetFileById(fileId);
         if (!TryGetValueFromResult(fileResult, out FileManager.Resource? parentFolder))
@@ -262,39 +259,49 @@ public partial class WebApi
                 return Error(403);
             }
 
-            (FileManager.Resource file, KeyService.AesPair fileKey) = await fileManager.Create(
-                CurrentTransaction,
-                parentFolder,
-                request.Name,
-                false,
-                CurrentUserAuthenticationToken
-            );
-            FileContentManager.Resource fileContent = await fileContentManager.GetMainContent(
-                CurrentTransaction,
-                file
-            );
-            FileContentVersionManager.Resource fileContentVersion =
-                await fileContentVersionManager.GetBaseVersion(CurrentTransaction, fileContent);
-            {
-                await using Stream fileStream = request.Content.OpenReadStream();
-                while (fileStream.Position < fileStream.Length)
-                {
-                    byte[] buffer = new byte[FileDataManager.BUFFER_SIZE / 2];
-                    int bufferLength = await fileStream.ReadAsync(buffer);
+            List<FileManager.Resource> files = [];
 
-                    await fileDataManager.Write(
+            foreach (IFormFile requestFile in requestFiles)
+            {
+                (FileManager.Resource file, KeyService.AesPair fileKey) = await fileManager.Create(
+                    CurrentTransaction,
+                    parentFolder,
+                    await fileManager.SanitizeFileName(
                         CurrentTransaction,
-                        file,
-                        fileKey,
-                        fileContent,
-                        fileContentVersion,
-                        CompositeBuffer.From(buffer, 0, bufferLength),
-                        fileStream.Position - bufferLength
-                    );
+                        parentFolder,
+                        CurrentUserAuthenticationToken,
+                        requestFile.FileName
+                    ),
+                    false,
+                    CurrentUserAuthenticationToken
+                );
+                FileContentManager.Resource fileContent = await fileContentManager.GetMainContent(
+                    CurrentTransaction,
+                    file
+                );
+                FileContentVersionManager.Resource fileContentVersion =
+                    await fileContentVersionManager.GetBaseVersion(CurrentTransaction, fileContent);
+                {
+                    await using Stream fileStream = requestFile.OpenReadStream();
+                    while (fileStream.Position < fileStream.Length)
+                    {
+                        byte[] buffer = new byte[FileDataManager.BUFFER_SIZE / 2];
+                        int bufferLength = await fileStream.ReadAsync(buffer);
+
+                        await fileDataManager.Write(
+                            CurrentTransaction,
+                            file,
+                            fileKey,
+                            fileContent,
+                            fileContentVersion,
+                            CompositeBuffer.From(buffer, 0, bufferLength),
+                            fileStream.Position - bufferLength
+                        );
+                    }
                 }
             }
 
-            return Data(file);
+            return Data(files);
         });
     }
 

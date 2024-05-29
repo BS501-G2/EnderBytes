@@ -10,11 +10,11 @@ import {
   type RequestData,
   type ResponseData
 } from '$lib/client/api';
-import { requestSizeLimit } from '$lib/shared/values';
+import { maxRequestSizeLimit } from '$lib/shared/values';
 
 async function processRequest(raw: Uint8Array): Promise<Uint8Array> {
   const result = await (async (): Promise<ApiResponse> => {
-    if (raw.length > requestSizeLimit) {
+    if (raw.length > maxRequestSizeLimit) {
       return [ApiResponseType.InvalidInvocationRequest, 'Request too large'];
     } else if (raw.length === 0) {
       return [ApiResponseType.InvalidInvocationRequest, 'Empty request'];
@@ -27,8 +27,15 @@ async function processRequest(raw: Uint8Array): Promise<Uint8Array> {
       return [ApiResponseType.InvalidInvocationRequest, error.message];
     }
 
-    if (!functionExists(request[0])) {
-      return [ApiResponseType.InvalidInvocationRequest, `Unknown function: ${request[0]}`];
+    const name = request[0];
+    const args = request.slice(1);
+
+    if (typeof name !== 'string') {
+      return [ApiResponseType.InvalidInvocationRequest, `Invalid function name: ${name}`];
+    }
+
+    if (!functionExists(name as (typeof request)[0])) {
+      return [ApiResponseType.InvalidInvocationRequest, `Unknown function: ${name}`];
     }
 
     try {
@@ -48,7 +55,7 @@ export async function POST({ request }: RequestEvent): Promise<Response> {
 
     if (requestBuffer.byteLength === 0) {
       return [false, 'Empty Request'];
-    } else if (requestBuffer.byteLength > requestSizeLimit) {
+    } else if (requestBuffer.byteLength > maxRequestSizeLimit) {
       return [false, 'Request too large'];
     }
 
@@ -60,6 +67,10 @@ export async function POST({ request }: RequestEvent): Promise<Response> {
       );
     } catch (e: any) {
       return [false, e.message];
+    }
+
+    if (requests.reduce((request, value) => request + value.length, 0) > maxRequestSizeLimit) {
+      return [false, 'Request too Large'];
     }
 
     return [true, await Promise.all(requests.map(processRequest))];

@@ -55,15 +55,42 @@ export async function createAdminUser(
   return [user, userRole];
 }
 
-export async function testFunction(test: string): Promise<TestData> {
+export async function createTest(test: string): Promise<TestData> {
   const database = await Database.getInstance();
   const testManager = database.getManager(TestManager);
 
-  return await testManager.create(test);
+  const result = await testManager.create(test);
+  return result;
 }
 
 export async function getTest(id: number): Promise<TestData | null> {
   const database = await Database.getInstance();
   const testManager = database.getManager(TestManager);
-  return await testManager.getById(id);
+  const result = await testManager.getById(id);
+
+  return result;
+}
+
+export async function updateTest(id: number, test: string): Promise<TestData> {
+  const database = await Database.getInstance();
+  const testManager = database.getManager(TestManager);
+
+  await testManager.update(id, { test });
+
+  return <TestData>await testManager.getById(id);
+}
+
+export async function listTestVersion(id: number): Promise<TestData[]> {
+  const database = await Database.getInstance();
+  const testManager = database.getManager(TestManager);
+
+  return await testManager.listVersions(id);
+}
+export async function deleteTest(id: number): Promise<void> {
+  const database = await Database.getInstance();
+  const testManager = database.getManager(TestManager);
+
+  const testData = (await getTest(id))!;
+  await testManager.delete(testData);
+  // await testManager.purge(id);
 }

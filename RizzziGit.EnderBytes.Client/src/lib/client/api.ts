@@ -1,7 +1,11 @@
 import { BSON } from 'bson';
 
 import type { Map } from '$lib/server/api';
-import { requestSizeLimit } from '$lib/shared/values';
+import {
+  maxBulkRequestEntryCount,
+  maxRequestSizeLimit,
+  waitForNextBulkReqestTimeout
+} from '$lib/shared/values';
 
 export type ApiRequest<T extends keyof Map> = [name: T, ...args: Parameters<Map[T]>];
 export enum ApiResponseType {
@@ -23,15 +27,24 @@ export interface ResponseData extends BSON.Document {
   data: [true, Uint8Array[]] | [false, message: string];
 }
 
+class A extends Error {}
+
 async function bulkRequest(requests: Uint8Array[]): Promise<Uint8Array[]> {
+  const requestBody = BSON.serialize({
+    data: requests
+  } as RequestData);
+
+  if (requestBody.length > maxRequestSizeLimit) {
+    // throw new Error('Request too large');
+    throw new A();
+  }
+
   const request = new Request('/api', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/bson'
     },
-    body: BSON.serialize({
-      data: requests
-    } as RequestData)
+    body: requestBody
   });
 
   const { data: response } = BSON.deserialize(
@@ -52,7 +65,7 @@ type RequestQueueEntry = [
 ];
 let requestQueue: RequestQueueEntry[] = [];
 let requestQueueRunning: boolean = false;
-let requestQueueDeadline: number = 0;
+let requestQueueWaitForNextTimeout: number = 0;
 
 async function runQueue(): Promise<void> {
   if (requestQueueRunning) {
@@ -62,42 +75,68 @@ async function runQueue(): Promise<void> {
   requestQueueRunning = true;
   try {
     while (requestQueue.length > 0) {
-      requestQueueDeadline = Date.now() + 500;
+      requestQueueWaitForNextTimeout = Date.now() + waitForNextBulkReqestTimeout;
 
       const entries: RequestQueueEntry[] = [];
       const entriesSize = () => entries.reduce((size, entry) => size + entry[0].byteLength, 0);
 
-      while (requestQueue.length > 0 && entriesSize() < requestSizeLimit && entries.length < 500) {
-        const entry: RequestQueueEntry = requestQueue.shift()!;
+      const skipped: RequestQueueEntry[] = [];
+      while (
+        requestQueue.length > 0 &&
+        entriesSize() < maxRequestSizeLimit &&
+        entries.length < maxBulkRequestEntryCount
+      ) {
+        const entry = requestQueue.shift();
+        if (entry == null) {
+          break;
+        }
 
-        if (entry[0].byteLength > requestSizeLimit) {
+        if (entry[0].byteLength > maxRequestSizeLimit) {
           entry[2](new Error('Request too large'));
-        } else if (entriesSize() + entry[0].byteLength <= requestSizeLimit) {
+        } else if (entriesSize() + entry[0].byteLength <= maxRequestSizeLimit) {
           entries.push(entry);
         } else {
-          requestQueue.unshift(entry);
+          skipped.push(entry);
+        }
+
+        if (entries.length < maxBulkRequestEntryCount && requestQueue.length === 0) {
+          await new Promise<void>((resolve) =>
+            setTimeout(resolve, requestQueueWaitForNextTimeout - Date.now())
+          );
         }
       }
-
-      if (entries.length > 0) {
-        await new Promise<void>((resolve) =>
-          setTimeout(resolve, requestQueueDeadline - Date.now())
-        );
-      }
+      requestQueue.push(...skipped);
 
       if (entries.length === 0) {
         continue;
       }
 
-      try {
-        const mapped = entries.map((entry) => entry[0]);
-        const data = (await bulkRequest(mapped)).map((buffer) => new Uint8Array(buffer.buffer));
-        for (let i = 0; i < entries.length; i++) {
-          entries[i][1](data[i]);
-        }
-      } catch (error: any) {
-        for (let i = 0; i < entries.length; i++) {
-          entries[i][2](error);
+      while (true) {
+        try {
+          const mapped = entries.map((entry) => entry[0]);
+          let data: Uint8Array[];
+
+          try {
+            data = (await bulkRequest(mapped)).map((buffer) => new Uint8Array(buffer.buffer));
+          } catch (error: any) {
+            if (error instanceof A) {
+              requestQueue.unshift(entries.pop()!);
+
+              continue;
+            } else {
+              throw error;
+            }
+          }
+
+          for (let i = 0; i < entries.length; i++) {
+            entries[i][1](data[i]);
+          }
+          break;
+        } catch (error: any) {
+          for (let i = 0; i < entries.length; i++) {
+            entries[i][2](error);
+          }
+          break;
         }
       }
     }
@@ -113,7 +152,7 @@ export async function clientSideInvoke<T extends keyof Map>(
   const result = BSON.deserialize(
     new Uint8Array(
       await new Promise<Uint8Array>((resolve, reject) => {
-        requestQueue.push([
+        requestQueue.unshift([
           BSON.serialize({ data: [name, ...args] as ApiRequest<T> }),
           resolve,
           reject

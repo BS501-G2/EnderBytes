@@ -281,8 +281,10 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
       .select('*')
       .from<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
       .where(DataManager.KEY_HOLDER_ID, '=', id)
-      .where(DataManager.KEY_HOLDER_DELETED, '=', false)
+      // .where(DataManager.KEY_HOLDER_DELETED, '=', false)
       .first();
+
+    // console.log(id, holder)
 
     if (holder == null) {
       return null;
@@ -326,7 +328,7 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
   }
 
   public async update(id: number, data: Partial<D>, options?: UpdateOptions<M, D>): Promise<D> {
-    const latest = await this.getById(id);
+    const latest = <D>await this.getById(id);
     const baseVersion =
       options?.baseVersionId != null
         ? await this.getById(id, {
@@ -338,13 +340,26 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
       throw new Error('Base version not found');
     }
 
-    const newData = Object.assign<{}, D, Partial<D>, Partial<Data<M, D>>>({}, baseVersion, data, {
-      [DataManager.KEY_DATA_PREVIOUS_ID]: latest?.[DataManager.KEY_DATA_VERSION_ID] ?? null
+    const newData = Object.assign<
+      {},
+      D,
+      Partial<D>,
+      Partial<Omit<Data<M, D>, typeof DataManager.KEY_DATA_VERSION_ID>> & {
+        [DataManager.KEY_DATA_VERSION_ID]: null;
+      }
+    >({}, baseVersion, data, {
+      [DataManager.KEY_DATA_PREVIOUS_ID]: latest?.[DataManager.KEY_DATA_VERSION_ID] ?? null,
+      [DataManager.KEY_DATA_VERSION_ID]: null
     });
 
     const result = await this.db
       .insert(<never>newData)
       .into<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]);
+
+    await this.db
+      .table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
+      .update({ [DataManager.KEY_DATA_NEXT_ID]: result[0] } as never)
+      .where({ [DataManager.KEY_DATA_VERSION_ID]: latest[DataManager.KEY_DATA_VERSION_ID] } as never);
 
     return <D>await this.getById(result[0]);
   }
@@ -352,7 +367,7 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
   public async insert(data: Omit<D, keyof Data<never, never>>): Promise<D> {
     const resultHolder = await this.db
       .table<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
-      .insert({ deleted: false });
+      .insert({ [DataManager.KEY_HOLDER_DELETED]: false });
 
     const holder = <DataHolder>(
       await this.db
@@ -373,6 +388,7 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
       await this.db
         .table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
         .where(DataManager.KEY_DATA_VERSION_ID, '=', result[0])
+        .first()
     );
   }
 
@@ -385,13 +401,15 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
   }
 
   public async deleteWhere(whereClause?: WhereClause<M, D>[]): Promise<void> {
-    const results = <D[]>await (whereClause ?? [])
-      .reduce(
-        (query, [columnName, operator, value]) =>
-          query.where(columnName as any, operator, value as any),
-        this.db.table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]).select('*')
-      )
-      .where(DataManager.KEY_DATA_NEXT_ID, '=', null);
+    const results = <D[]>(
+      await (whereClause ?? [])
+        .reduce(
+          (query, [columnName, operator, value]) =>
+            query.where(columnName as any, operator, value as any),
+          this.db.table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]).select('*')
+        )
+        .where(DataManager.KEY_DATA_NEXT_ID, '=', null)
+    );
 
     for (const result of results) {
       await this.delete(result);

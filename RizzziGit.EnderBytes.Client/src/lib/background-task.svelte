@@ -197,7 +197,6 @@
             refresh();
 
             if (backgroundTask.autoDismiss) {
-              console.log('auto dismiss');
               backgroundTask.dismiss();
             }
 

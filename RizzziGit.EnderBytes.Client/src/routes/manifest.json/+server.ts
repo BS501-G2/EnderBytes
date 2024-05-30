@@ -3,7 +3,7 @@ import { LocaleKey, LocaleType, getString } from '$lib/locale.svelte';
 import { _sizes } from '../favicon.svg/+server';
 import { registeredColors } from '../../../../../svelte-commons/dist/color-scheme.svelte';
 
-export const prerender = true;
+export const prerender = false;
 
 const icon = (size: number) => ({
   src: `/favicon.svg?size=${size}`,

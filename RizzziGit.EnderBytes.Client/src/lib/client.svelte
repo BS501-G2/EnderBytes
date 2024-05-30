@@ -47,7 +47,6 @@
       }
     }
 
-    console.log(`${urlObj}`);
     return urlObj;
   }
 

@@ -2,10 +2,12 @@ import { BSON } from 'bson';
 
 import type { Map } from '$lib/server/api';
 import {
+  ApiError,
+  ApiErrorType,
   maxBulkRequestEntryCount,
   maxRequestSizeLimit,
   waitForNextBulkReqestTimeout
-} from '$lib/shared/values';
+} from '$lib/shared/api';
 
 export type ApiRequest<T extends keyof Map> = [name: T, ...args: Parameters<Map[T]>];
 export enum ApiResponseType {
@@ -16,8 +18,19 @@ export enum ApiResponseType {
 
 export type ApiResponse =
   | [type: ApiResponseType.InvokeSuccess, data: any]
-  | [type: ApiResponseType.InvokeError, name: string, message: string, stack?: string]
-  | [type: ApiResponseType.InvalidInvocationRequest, message: string, stack?: string];
+  | [
+      type: ApiResponseType.InvokeError,
+      status: number,
+      name: string,
+      message: string,
+      stack?: string
+    ]
+  | [
+      type: ApiResponseType.InvalidInvocationRequest,
+      status: number,
+      message: string,
+      stack?: string
+    ];
 
 export interface RequestData extends BSON.Document {
   data: Uint8Array[];
@@ -48,7 +61,10 @@ async function bulkRequest(requests: Uint8Array[]): Promise<Uint8Array[]> {
   });
 
   const { data: response } = BSON.deserialize(
-    new Uint8Array(await (await fetch(request)).arrayBuffer())
+    new Uint8Array(await (await fetch(request)).arrayBuffer()),
+    {
+      promoteBuffers: true
+    }
   ) as ResponseData;
 
   if (response[0]) {
@@ -117,7 +133,7 @@ async function runQueue(): Promise<void> {
           let data: Uint8Array[];
 
           try {
-            data = (await bulkRequest(mapped)).map((buffer) => new Uint8Array(buffer.buffer));
+            data = await bulkRequest(mapped);
           } catch (error: any) {
             if (error instanceof A) {
               requestQueue.unshift(entries.pop()!);
@@ -159,16 +175,19 @@ export async function clientSideInvoke<T extends keyof Map>(
         ]);
         runQueue();
       })
-    )
+    ),
+    {
+      promoteBuffers: true
+    }
   ).data as ApiResponse;
 
   if (result[0] === ApiResponseType.InvokeError) {
-    throw Object.assign(new Error(result[2]), {
-      name: result[1],
+    throw Object.assign(new ApiError(result[1], result[2]), {
+      name: ApiResponseType[result[0]],
       stack: result[3]
     });
   } else if (result[0] === ApiResponseType.InvalidInvocationRequest) {
-    throw new Error(result[1]);
+    throw new ApiError(result[1], result[2]);
   } else {
     return result[1];
   }

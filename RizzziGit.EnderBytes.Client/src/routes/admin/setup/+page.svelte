@@ -13,6 +13,7 @@
 
   import { onMount } from 'svelte';
   import { clientSideInvoke } from '$lib/client/api';
+  import { goto } from '$app/navigation';
 
   const enabled: Writable<boolean> = writable(false);
 
@@ -118,6 +119,8 @@
                   middleName: $middleName,
                   lastName: $lastName
                 });
+
+                await goto('/admin');
               }
             }}
           >

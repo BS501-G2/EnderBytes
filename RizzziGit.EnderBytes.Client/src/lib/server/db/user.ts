@@ -1,14 +1,16 @@
 import type { Knex } from 'knex';
 import { DataManager, Database, type Data } from '../db';
-import { UserKeyManager, UserKeyType, generateKeyPair, type UnlockedUserKey } from './user-key';
-import { UserRoleManager } from './user-role';
+import { UserKeyManager, type UnlockedUserKey } from './user-key';
 import { UserSessionManager } from './user-session';
+import { UserKeyType, UserRole } from '$lib/shared/db';
+import { KeyShardManager } from './key-shard';
 
 export interface User extends Data<UserManager, User> {
-  username: string;
-  firstName: string;
-  middleName: string | null;
-  lastName: string;
+  [UserManager.KEY_USERNAME]: string;
+  [UserManager.KEY_FIRST_NAME]: string;
+  [UserManager.KEY_MIDDLE_NAME]: string | null;
+  [UserManager.KEY_LAST_NAME]: string;
+  [UserManager.KEY_ROLE]: UserRole;
 }
 
 export class UserManager extends DataManager<UserManager, User> {
@@ -16,6 +18,7 @@ export class UserManager extends DataManager<UserManager, User> {
   public static readonly KEY_FIRST_NAME = 'firstName';
   public static readonly KEY_MIDDLE_NAME = 'middleName';
   public static readonly KEY_LAST_NAME = 'lastName';
+  public static readonly KEY_ROLE = 'role';
 
   public constructor(db: Database, transaction: () => Knex.Transaction<User>) {
     super(db, transaction, 'User', 1);
@@ -35,7 +38,8 @@ export class UserManager extends DataManager<UserManager, User> {
     firstName: string,
     middleName: string | null,
     lastName: string,
-    password: string
+    password: string,
+    role: UserRole = UserRole.Member
   ): Promise<[User, UnlockedUserKey]> {
     const userKeyManager = this.getManager(UserKeyManager);
 
@@ -43,30 +47,40 @@ export class UserManager extends DataManager<UserManager, User> {
       username,
       firstName,
       middleName,
-      lastName
+      lastName,
+      role
     });
-    const [privateKey, publicKey] = await generateKeyPair();
+
     const userKey = await userKeyManager.create(
       user,
-      privateKey,
-      publicKey,
       UserKeyType.Password,
-      Buffer.from(password)
+      new TextEncoder().encode(password)
     );
 
     return [user, userKey];
   }
 
   public async delete(user: User) {
-    const userRoleManager = this.getManager(UserRoleManager);
-    const userKeyManager = this.getManager(UserKeyManager);
-    const userSessionManager = this.getManager(UserSessionManager);
+    const [userKeys, userSessions, keyShards] = this.getManagers(UserKeyManager, UserSessionManager, KeyShardManager);
 
-    await userSessionManager.deleteAllFromUser(user);
-    await userKeyManager.deleteAllFromUser(user);
-    await userRoleManager.deleteAllFromUser(user);
+    await Promise.all([
+      userKeys.deleteWhere([[UserKeyManager.KEY_USER_ID, '=', user.id]]),
+      userSessions.deleteWhere([[UserSessionManager.KEY_USER_ID, '=', user.id]]),
+      keyShards.deleteWhere([[KeyShardManager.KEY_USER_ID, '=', user.id]])
+    ]);
 
     await super.delete(user);
+  }
+
+  public async getByUsername(username: string): Promise<User | null> {
+    return (
+      (
+        await this.query({
+          where: [[UserManager.KEY_USERNAME, '=', username]],
+          limit: 1
+        })
+      )[0] ?? null
+    );
   }
 }
 

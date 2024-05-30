@@ -10,32 +10,36 @@ import {
   type RequestData,
   type ResponseData
 } from '$lib/client/api';
-import { maxRequestSizeLimit } from '$lib/shared/values';
+import { ApiError, maxRequestSizeLimit } from '$lib/shared/api';
 
 async function processRequest(raw: Uint8Array): Promise<Uint8Array> {
   const result = await (async (): Promise<ApiResponse> => {
     if (raw.length > maxRequestSizeLimit) {
-      return [ApiResponseType.InvalidInvocationRequest, 'Request too large'];
+      return [ApiResponseType.InvalidInvocationRequest, 400, 'Request too large'];
     } else if (raw.length === 0) {
-      return [ApiResponseType.InvalidInvocationRequest, 'Empty request'];
+      return [ApiResponseType.InvalidInvocationRequest, 400, 'Empty request'];
     }
 
     let request: ApiRequest<any>;
     try {
       request = BSON.deserialize(raw).data as ApiRequest<any>;
     } catch (error: any) {
-      return [ApiResponseType.InvalidInvocationRequest, error.message];
+      if (error instanceof ApiError) {
+        return [ApiResponseType.InvalidInvocationRequest, error.status, error.message];
+      } else {
+        return [ApiResponseType.InvalidInvocationRequest, 500, error.message];
+      }
     }
 
     const name = request[0];
     const args = request.slice(1);
 
     if (typeof name !== 'string') {
-      return [ApiResponseType.InvalidInvocationRequest, `Invalid function name: ${name}`];
+      return [ApiResponseType.InvalidInvocationRequest, 400, `Invalid function name: ${name}`];
     }
 
     if (!functionExists(name as (typeof request)[0])) {
-      return [ApiResponseType.InvalidInvocationRequest, `Unknown function: ${name}`];
+      return [ApiResponseType.InvalidInvocationRequest, 400, `Unknown function: ${name}`];
     }
 
     try {
@@ -62,9 +66,11 @@ export async function POST({ request }: RequestEvent): Promise<Response> {
     let requests: Uint8Array[];
 
     try {
-      requests = (BSON.deserialize(new Uint8Array(requestBuffer)) as RequestData).data.map(
-        (request) => new Uint8Array(request.buffer)
-      );
+      requests = (
+        BSON.deserialize(new Uint8Array(requestBuffer), {
+          promoteBuffers: true
+        }) as RequestData
+      ).data;
     } catch (e: any) {
       return [false, e.message];
     }

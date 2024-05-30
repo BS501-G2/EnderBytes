@@ -1,111 +1,34 @@
-import * as Crypto from 'crypto';
-
 import type { Knex } from 'knex';
 import { DataManager, Database, type Data } from '../db';
-import { UserManager, type User } from './user';
-
-export type KeyPair = [privateKey: Buffer, publicKey: Buffer];
-
-export const generateKeyPair = (): Promise<KeyPair> =>
-  new Promise<KeyPair>((resolve, reject) => {
-    Crypto.generateKeyPair(
-      'rsa',
-      {
-        modulusLength: 2048,
-        publicKeyEncoding: {
-          type: 'spki',
-          format: 'pem'
-        },
-        privateKeyEncoding: {
-          type: 'pkcs8',
-          format: 'pem'
-        }
-      },
-      function (error: Error | null, publicKey: string, privateKey: string) {
-        if (error) {
-          reject(error);
-        } else {
-          resolve([Buffer.from(privateKey, 'utf-8'), Buffer.from(publicKey, 'utf-8')]);
-        }
-      }
-    );
-  });
-
-export const hashPayload = (payload: Buffer, salt: Buffer): Promise<Buffer> =>
-  new Promise((resolve, reject) => {
-    Crypto.scrypt(payload, salt, 32, (error: Error | null, hash: Buffer) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(hash);
-      }
-    });
-  });
-
-export const randomBytes = (length: number): Promise<Buffer> =>
-  new Promise((resolve, reject) => {
-    Crypto.randomBytes(length, (error: Error | null, buffer: Buffer) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(buffer);
-      }
-    });
-  });
-
-export const encryptSymmetric = (
-  key: Buffer,
-  iv: Buffer,
-  buffer: Buffer
-): [authTag: Buffer, output: Buffer] => {
-  const cipher = Crypto.createCipheriv('aes-256-gcm', key, iv);
-  const output = Buffer.concat([cipher.update(buffer), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-
-  return [authTag, output];
-};
-
-export const decryptSymmetric = (
-  key: Buffer,
-  iv: Buffer,
-  buffer: Buffer,
-  authTag: Buffer
-): Buffer => {
-  const decipher = Crypto.createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(authTag);
-
-  return Buffer.concat([decipher.update(buffer), decipher.final()]);
-};
-
-export const decryptAsymmetric = (privateKey: Buffer, buffer: Buffer): Buffer =>
-  Crypto.privateDecrypt(privateKey, buffer);
-
-export const encryptAsymmetric = (publicKey: Buffer, buffer: Buffer): Buffer =>
-  Crypto.publicEncrypt(publicKey, buffer);
-
-export enum UserKeyType {
-  Password = 0,
-  Session
-}
+import { type User } from './user';
+import type { UserKeyType } from '$lib/shared/db';
+import {
+  decryptAsymmetric,
+  decryptSymmetric,
+  encryptAsymmetric,
+  encryptSymmetric,
+  generateKeyPair,
+  hashPayload,
+  randomBytes
+} from '../utils';
 
 export interface UserKey extends Data<UserKeyManager, UserKey> {
   [UserKeyManager.KEY_USER_ID]: number;
   [UserKeyManager.KEY_TYPE]: UserKeyType;
-
   [UserKeyManager.KEY_ITERATIONS]: number;
-  [UserKeyManager.KEY_SALT]: Buffer;
-  [UserKeyManager.KEY_IV]: Buffer;
+  [UserKeyManager.KEY_SALT]: Uint8Array;
+  [UserKeyManager.KEY_IV]: Uint8Array;
 
-  [UserKeyManager.KEY_ENCRYPTED_PRIVATE_KEY]: Buffer;
-  [UserKeyManager.KEY_ENCRYPTED_AUTH_TAG]: Buffer;
-  [UserKeyManager.KEY_PUBLIC_KEY]: Buffer;
+  [UserKeyManager.KEY_ENCRYPTED_PRIVATE_KEY]: Uint8Array;
+  [UserKeyManager.KEY_ENCRYPTED_AUTH_TAG]: Uint8Array;
+  [UserKeyManager.KEY_PUBLIC_KEY]: Uint8Array;
 
-  [UserKeyManager.KEY_TEST_BYTES]: Buffer;
-  [UserKeyManager.KEY_TEST_ENCRYPTED_BYTES]: Buffer;
+  [UserKeyManager.KEY_TEST_BYTES]: Uint8Array;
+  [UserKeyManager.KEY_TEST_ENCRYPTED_BYTES]: Uint8Array;
 }
 
 export interface UnlockedUserKey extends UserKey {
-  privateKey: Buffer;
+  privateKey: Uint8Array;
 }
 
 export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
@@ -147,12 +70,14 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
 
   public async create(
     user: User,
-    privateKey: Buffer,
-    publicKey: Buffer,
     type: UserKeyType,
-    payload: Buffer
+    payload: Uint8Array
   ): Promise<UnlockedUserKey> {
-    const [salt, iv] = await Promise.all([randomBytes(32), randomBytes(16)]);
+    const [[privateKey, publicKey], salt, iv] = await Promise.all([
+      generateKeyPair(),
+      randomBytes(32),
+      randomBytes(16)
+    ]);
     const [key, testBytes] = await Promise.all([hashPayload(payload, salt), randomBytes(32)]);
     const [[encryptedAuthTag, encryptedPrivateKey], testEncryptedBytes] = await Promise.all([
       encryptSymmetric(key, iv, privateKey),
@@ -178,18 +103,39 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
     return this.unlock(userKey, payload);
   }
 
-  public async list(filterType?: UserKeyType): Promise<UserKey[]> {
-    let a = this.db.select('*').from<UserKey>(this.name).orderBy(DataManager.KEY_DATA_ID, 'asc');
-
-    if (filterType != null) {
-      a = a.where(UserKeyManager.KEY_TYPE, '=', filterType);
-    }
-
-    return await a;
+  public async list(user: User, filterType?: UserKeyType): Promise<UserKey[]> {
+    return await this.query({
+      where: [
+        filterType != null ? [UserKeyManager.KEY_TYPE, '=', filterType] : null,
+        [UserKeyManager.KEY_USER_ID, '=', user.id]
+      ]
+    });
   }
 
-  public async unlock(key: UserKey, payload: Buffer): Promise<UnlockedUserKey> {
-    const privateKey = await decryptSymmetric(
+  public async findByPayload(
+    user: User,
+    type: UserKeyType,
+    payload: Uint8Array
+  ): Promise<UnlockedUserKey | null> {
+    const keys = await this.list(user, type);
+
+    for (const key of keys) {
+      try {
+        const unlocked = await this.unlock(key, payload);
+
+        if (unlocked != null) {
+          return unlocked;
+        }
+      } catch (error: any) {
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  public async unlock(key: UserKey, payload: Uint8Array): Promise<UnlockedUserKey> {
+    const privateKey = decryptSymmetric(
       await hashPayload(payload, key.salt),
       key.iv,
       key.encryptedPrivateKey,
@@ -203,20 +149,16 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
     };
   }
 
-  public async decrypt(key: UnlockedUserKey, payload: Buffer): Promise<Buffer> {
+  public decrypt(key: UnlockedUserKey, payload: Uint8Array): Uint8Array {
     return decryptAsymmetric(key.privateKey, payload);
   }
 
-  public async encrypt(key: UserKey, payload: Buffer): Promise<Buffer> {
+  public encrypt(key: UserKey, payload: Uint8Array): Uint8Array {
     return encryptAsymmetric(key.publicKey, payload);
   }
 
   public async delete(key: UserKey): Promise<void> {
     await super.delete(key);
-  }
-
-  public async deleteAllFromUser(user: User): Promise<void> {
-    await this.deleteWhere([[UserKeyManager.KEY_USER_ID, '=', user.id]]);
   }
 }
 

@@ -1,7 +1,7 @@
 import FS from 'fs';
 import Path from 'path';
 
-export const prerender = true;
+export const prerender = false;
 
 export const _sizes: number[] = [16, 32, 64, 72, 96, 128, 144];
 

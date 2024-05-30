@@ -26,15 +26,14 @@ interface VersionTable {
   version: number;
 }
 
-const DATABASE_INSTANTIATING = Symbol('DatabaseInstantiating');
-const DATABASE_INSTANCE = Symbol('DatabaseInstance');
 const DATABASE_INIT = Symbol('DatabaseInit');
 const DATABASE_GET_VERSION = Symbol('GetVersion');
 
+let instantiating: boolean = false;
+let instance: Database | null = null;
+
 export class Database {
   public static readonly managers: DataManagerRegistration<never, never>[] = [];
-  public static [DATABASE_INSTANTIATING]: boolean = false;
-  public static [DATABASE_INSTANCE]: Database | null = null;
 
   public static register<M extends DataManager<M, D>, D extends Data<M, D>>(
     init: DataManagerConstructor<M, D>
@@ -43,15 +42,15 @@ export class Database {
   }
 
   public static async getInstance(): Promise<Database> {
-    if (this[DATABASE_INSTANCE] != null) {
-      return this[DATABASE_INSTANCE];
+    if (instance != null) {
+      return instance;
     }
 
     try {
-      this[DATABASE_INSTANTIATING] = true;
+      instantiating = true;
 
       try {
-        const instance = (this[DATABASE_INSTANCE] = new this());
+        instance = new this();
 
         await instance[DATABASE_INIT]();
         return instance;
@@ -59,12 +58,12 @@ export class Database {
         throw error;
       }
     } finally {
-      this[DATABASE_INSTANTIATING] = false;
+      instantiating = false;
     }
   }
 
   public constructor() {
-    if (!Database[DATABASE_INSTANTIATING]) {
+    if (!instantiating) {
       throw new Error('Invalid call to Database constructor');
     }
 
@@ -157,13 +156,20 @@ export class Database {
     this[DATABASE_CURRENT_TRANSACTION] = null;
     return transaction;
   }
-
   public getManager<M extends DataManager<M, D>, D extends Data<M, D>>(
     init: DataManagerConstructor<M, D>
   ): M {
     return this.managers.find((entry) => entry.init === (init as any))!.instance as M;
   }
+
+  public getManagers<C extends readonly DataManagerConstructor<any, any>[]>(
+    ...init: C
+  ): { [K in keyof C]: DataManagerConstructorInstance<C[K]> } {
+    return init.map((init) => this.getManager(init)) as { [K in keyof C]: DataManagerConstructorInstance<C[K]> };
+  }
 }
+
+export type DataManagerConstructorInstance<T> = T extends DataManagerConstructor<infer M, infer D> ? M : never;
 
 interface DataHolder {
   [DataManager.KEY_HOLDER_ID]: number;
@@ -229,6 +235,12 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
     return this[SYMBOL_DATA_MANAGER_DATABASE].getManager(init as any) as unknown as M;
   }
 
+  public getManagers<C extends readonly DataManagerConstructor<any, any>[]>(
+    ...init: C
+  ): { [K in keyof C]: DataManagerConstructorInstance<C[K]> } {
+    return this[SYMBOL_DATA_MANAGER_DATABASE].getManagers(...init)
+  }
+
   public get db(): Knex.Transaction<D, D[]> {
     return this[SYMBOL_DATA_MANAGER_TRANSACTION]();
   }
@@ -281,10 +293,8 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
       .select('*')
       .from<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
       .where(DataManager.KEY_HOLDER_ID, '=', id)
-      // .where(DataManager.KEY_HOLDER_DELETED, '=', false)
+      .where(DataManager.KEY_HOLDER_DELETED, '=', false)
       .first();
-
-    // console.log(id, holder)
 
     if (holder == null) {
       return null;
@@ -359,7 +369,9 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
     await this.db
       .table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
       .update({ [DataManager.KEY_DATA_NEXT_ID]: result[0] } as never)
-      .where({ [DataManager.KEY_DATA_VERSION_ID]: latest[DataManager.KEY_DATA_VERSION_ID] } as never);
+      .where({
+        [DataManager.KEY_DATA_VERSION_ID]: latest[DataManager.KEY_DATA_VERSION_ID]
+      } as never);
 
     return <D>await this.getById(result[0]);
   }
@@ -393,22 +405,24 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
   }
 
   public async delete(data: D): Promise<void> {
-    await this.db
+    const query = this.db
       .table<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
       .where(DataManager.KEY_HOLDER_ID, '=', data[DataManager.KEY_DATA_ID])
       .where(DataManager.KEY_HOLDER_DELETED, '=', false)
       .update({ deleted: true });
+
+    await query;
   }
 
-  public async deleteWhere(whereClause?: WhereClause<M, D>[]): Promise<void> {
+  public async deleteWhere(whereClause?: (WhereClause<M, D> | null)[]): Promise<void> {
     const results = <D[]>(
       await (whereClause ?? [])
         .reduce(
-          (query, [columnName, operator, value]) =>
-            query.where(columnName as any, operator, value as any),
+          (query, entry) =>
+            entry != null ? query.where(entry[0] as any, entry[1], entry[2] as any) : query,
           this.db.table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]).select('*')
         )
-        .where(DataManager.KEY_DATA_NEXT_ID, '=', null)
+        .where(DataManager.KEY_DATA_NEXT_ID, 'is', null)
     );
 
     for (const result of results) {
@@ -428,35 +442,56 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
       .del();
   }
 
+  public async queryCount(whereClause?: (WhereClause<M, D> | null)[]): Promise<number> {
+    const result = await (whereClause ?? [])
+      .reduce(
+        (query, entry) =>
+          entry != null ? query.where(entry[0] as any, entry[1], entry[2] as any) : query,
+        this.db.table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
+      )
+      .count('*');
+
+    return result[0]['count(*)'];
+  }
+
   public async query(options?: QueryOptions<M, D>): Promise<D[]> {
     let currentOffset = options?.offset ?? 0;
 
     const results: D[] = [];
 
     while (results.length < (options?.limit ?? Infinity)) {
-      let query = (options?.where ?? []).reduce(
-        (query, [columnName, operator, value]) =>
-          query.where(columnName as any, operator, value as any),
+      let query = this.db.select('*').from<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]);
 
-        this.db.select('*').from<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
-      );
+      if (options?.where != null) {
+        query = options.where.reduce(
+          (query, entry) =>
+            entry != null ? query.where(entry[0] as any, entry[1], entry[2] as any) : query,
+          query
+        );
+      }
 
-      query.where(DataManager.KEY_DATA_NEXT_ID, '=', null);
+      if (options?.orderBy != null) {
+        query = options.orderBy.reduce(
+          (query, entry) =>
+            entry != null
+              ? query.orderBy(entry[0] as any, entry[1] == true ? 'desc' : 'asc')
+              : query,
+          query
+        );
+      }
 
       if (options?.limit != null) {
         query = query.limit(options.limit - results.length);
       }
 
-      if (options?.offset != null) {
-        query = query.offset(currentOffset);
-      }
+      query = query.offset(currentOffset);
 
-      const entres = <D[]>await query;
-      if (entres.length === 0) {
+      const entries = <D[]>await query;
+      if (entries.length === 0) {
         break;
       }
 
-      for (const entry of entres) {
+      for (const entry of entries) {
         const holder = await this.db
           .select('*')
           .from<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
@@ -474,9 +509,7 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
         results.push(entry);
       }
 
-      if (options?.limit != null) {
-        currentOffset += options.limit;
-      }
+      currentOffset += entries.length;
     }
 
     return results;
@@ -497,8 +530,8 @@ export interface GetByIdOptions<M extends DataManager<M, D>, D extends Data<M, D
 }
 
 export interface QueryOptions<M extends DataManager<M, D>, D extends Data<M, D>> {
-  where?: WhereClause<M, D>[];
-  orderBy?: OrderByClause<M, D>[];
+  where?: (WhereClause<M, D> | null)[];
+  orderBy?: (OrderByClause<M, D> | null)[];
 
   offset?: number;
   limit?: number;
@@ -510,10 +543,10 @@ export type WhereClause<
   M extends DataManager<M, D>,
   D extends Data<M, D>,
   T extends keyof D = keyof D
-> = [T, '=' | '>' | '>=' | '<' | '<=' | '<>', D[T]];
+> = [T, '=' | '>' | '>=' | '<' | '<=' | '<>' | 'is' | 'is not', D[T]];
 
 export type OrderByClause<
   M extends DataManager<M, D>,
   D extends Data<M, D>,
   T extends keyof D = keyof D
-> = [T, 'asc' | 'desc'];
+> = [key: T, descending?: boolean];

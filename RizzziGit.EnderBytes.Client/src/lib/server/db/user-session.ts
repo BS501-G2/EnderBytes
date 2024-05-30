@@ -1,29 +1,24 @@
 import type { Knex } from 'knex';
-import { DataManager, Database, type Data } from '../db';
+import { DataManager, Database, type Data, type OrderByClause, type QueryOptions } from '../db';
 import type { User } from './user';
-import {
-  decryptSymmetric,
-  encryptSymmetric,
-  hashPayload,
-  randomBytes,
-  type UnlockedUserKey,
-  type UserKey
-} from './user-key';
+import { type UnlockedUserKey, type UserKey } from './user-key';
+import { decryptSymmetric, encryptSymmetric, randomBytes } from '../utils';
+import { KeyShardManager } from './key-shard';
 
 export interface UserSession extends Data<UserSessionManager, UserSession> {
   expireTime: number;
   userId: number;
   originKeyId: number;
 
-  iv: Buffer;
+  iv: Uint8Array;
 
-  encryptedAuthTag: Buffer;
-  encryptedPrivateKey: Buffer;
+  encryptedAuthTag: Uint8Array;
+  encryptedPrivateKey: Uint8Array;
 }
 
 export interface UnlockedUserSession extends UserSession {
-  privateKey: Buffer;
-  key: Buffer;
+  privateKey: Uint8Array;
+  key: Uint8Array;
 }
 
 export class UserSessionManager extends DataManager<UserSessionManager, UserSession> {
@@ -53,54 +48,46 @@ export class UserSessionManager extends DataManager<UserSessionManager, UserSess
     }
   }
 
-  public async list(user: User | null, originkey: UserKey | null): Promise<UserSession[]> {
-    let a = this.db.select('*').from<UserSession>(this.name);
-
-    if (user != null) {
-      a = a.where(UserSessionManager.KEY_USER_ID, '=', user.id);
-    }
-
-    if (originkey != null) {
-      a = a.where(UserSessionManager.KEY_ORIGIN_KEY_ID, '=', originkey.id);
-    }
-
-    return await a;
-  }
-
-  public async delete(userSession: UserSession): Promise<void> {
-    await this.db.delete().from(this.name).where(DataManager.KEY_DATA_ID, '=', userSession.id);
-  }
-
-  public async deleteAllFromUser(user: User): Promise<void> {
-    await this.db.delete().from(this.name).where(UserSessionManager.KEY_USER_ID, '=', user.id);
-  }
-
   public async create(
     user: User,
-    originKey: UnlockedUserKey,
+    userKey: UnlockedUserKey,
     expireTime: number
   ): Promise<UnlockedUserSession> {
     const iv = await randomBytes(16);
     const key = await randomBytes(32);
-    const [authTag, encryptedPrivateKey] = encryptSymmetric(key, iv, originKey.privateKey);
+    const [authTag, encryptedPrivateKey] = encryptSymmetric(key, iv, userKey.privateKey);
 
-    return {
-      ...await this.insert({
+    const unlockedUserSession: UnlockedUserSession = {
+      ...(await this.insert({
         expireTime,
         userId: user.id,
-        originKeyId: originKey.id,
+        originKeyId: userKey.id,
         iv,
         encryptedAuthTag: authTag,
         encryptedPrivateKey
-      }),
+      })),
       key,
-      privateKey: originKey.privateKey
+      privateKey: userKey.privateKey
     };
+
+    const toDelete: UserSession[] = [];
+    for (const userSession of (
+      await this.query({
+        where: [[UserSessionManager.KEY_USER_ID, '=', user.id]],
+        orderBy: [[DataManager.KEY_DATA_ID, true]]
+      })
+    ).slice(10)) {
+      toDelete.push(userSession);
+    }
+
+    await Promise.all(toDelete.map((userSession) => this.delete(userSession)));
+
+    return unlockedUserSession;
   }
 
-  public async unlock(userSession: UnlockedUserSession, key: Buffer): Promise<UnlockedUserSession> {
+  public async unlock(userSession: UserSession, key: Uint8Array): Promise<UnlockedUserSession> {
     const privateKey = decryptSymmetric(
-      userSession.key,
+      key,
       userSession.iv,
       userSession.encryptedPrivateKey,
       userSession.encryptedAuthTag
@@ -109,6 +96,13 @@ export class UserSessionManager extends DataManager<UserSessionManager, UserSess
       ...userSession,
       key,
       privateKey
+    };
+  }
+
+  public unlockUserKey(userSession: UnlockedUserSession, userKey: UserKey): UnlockedUserKey {
+    return {
+      ...userKey,
+      privateKey: userSession.privateKey
     };
   }
 }

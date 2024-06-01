@@ -5,28 +5,32 @@
 </script>
 
 <script lang="ts">
-  import Client from '$lib/client.svelte';
-
   import { Button, Dialog, DialogClass, ButtonClass } from '@rizzzi/svelte-commons';
+  import { clearAuthentication } from '$lib/client/api-functions';
+  import { goto } from '$app/navigation';
 </script>
 
 {#if $enabled}
   <Dialog dialogClass={DialogClass.Normal} onDismiss={() => ($enabled = false)}>
     {#snippet actions()}
-      <Client let:apiFetch>
-        <Button
-          onClick={() => {
-            $enabled = false;
-            return apiFetch({ path: '/auth/logout', method: 'POST' });
-          }}
-          buttonClass={ButtonClass.Primary}
-        >
-          <p class="label">OK</p>
-        </Button>
-        <Button onClick={() => { $enabled = false }} buttonClass={ButtonClass.Background}>
-          <p class="label">Cancel</p>
-        </Button>
-      </Client>
+      <Button
+        onClick={async () => {
+          $enabled = false;
+          clearAuthentication();
+          await goto('/login', { replaceState: true });
+        }}
+        buttonClass={ButtonClass.Primary}
+      >
+        <p class="label">OK</p>
+      </Button>
+      <Button
+        onClick={() => {
+          $enabled = false;
+        }}
+        buttonClass={ButtonClass.Background}
+      >
+        <p class="label">Cancel</p>
+      </Button>
     {/snippet}
     {#snippet head()}
       <h2 style="margin: 0px;">Account Logout</h2>

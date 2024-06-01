@@ -1,10 +1,4 @@
-import { BSON } from 'bson';
-
 import * as ApiFunctions from './api-functions';
-
-export interface ServerStatus {
-  requiresAdminSetup: boolean;
-}
 
 export type Map = typeof ApiFunctions;
 

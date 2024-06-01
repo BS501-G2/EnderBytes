@@ -23,6 +23,7 @@
     ButtonClass,
     Dialog,
     Input,
+    InputType,
     LoadingSpinner,
     Overlay,
     OverlayPositionType,
@@ -56,6 +57,8 @@
     ['file', 'File', 'fa-solid fa-file', 'Create a new file.'],
     ['folder', 'Folder', 'fa-solid fa-folder', 'Create a new folder.']
   ];
+
+  const newFolderName: Writable<string> = writable('');
 </script>
 
 {#if $newDialogState != null}
@@ -183,7 +186,7 @@
             return
           }
 
-          const folder = await createFolder($fileBrowserState.file!, state.name);
+          const folder = await createFolder($fileBrowserState.file!, $newFolderName);
 
           onDismiss();
           onNewFolder(folder.id)
@@ -193,7 +196,7 @@
           <p class="description{$viewMode & ViewMode.Desktop ? ' desktop' : ''}">
             A new folder will be created in the current folder.
           </p>
-          <Input type="text" name="Folder Name" bind:text={state.name} onSubmit={onCreate} />
+          <Input type={InputType.Text} name="Folder Name" value={newFolderName} />
           <Button buttonClass={ButtonClass.Primary} onClick={onCreate}>
             <p class="button">Create Folder</p>
             {#snippet loading()}

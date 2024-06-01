@@ -1,26 +1,12 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-  import { navigating, page } from '$app/stores';
+  import { type Snippet } from 'svelte';
+  import { navigating } from '$app/stores';
 
   import Dashboard from './app.svelte';
   import { runningBackgroundTasks } from '$lib/background-task.svelte';
-  import { session } from '$lib/client.svelte';
-
   import { LoadingBar } from '@rizzzi/svelte-commons';
 
-  $: {
-    if ($session == null) {
-      if (!$page.url.pathname.startsWith('/app/auth')) {
-        goto(`/app/auth/login?return=${decodeURIComponent($page.url.pathname)}`, {
-          replaceState: true
-        });
-      }
-    } else {
-      if ($page.url.pathname.startsWith('/app/auth')) {
-        goto($page.url.searchParams.get('return') ?? '/app', { replaceState: true });
-      }
-    }
-  }
+  const { children }: { children: Snippet } = $props();
 </script>
 
 <svelte:window
@@ -40,7 +26,7 @@
       <LoadingBar />
     </div>
   {/if}
-  <slot />
+  {@render children()}
 </Dashboard>
 
 <style lang="scss">

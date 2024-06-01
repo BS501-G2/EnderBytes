@@ -1,8 +1,8 @@
 <script lang="ts">
   import UserName from '$lib/client/user.svelte';
   import { Awaiter, LoadingSpinner } from '@rizzzi/svelte-commons';
-  import { apiFetch } from '$lib/client.svelte';
   import type { FileResource } from '$lib/client/file';
+  import { getUser } from '$lib/client/api-functions';
 
   const { file }: { file: FileResource } = $props();
 </script>
@@ -32,9 +32,7 @@
       <p class="value">
         <Awaiter
           callback={async () => {
-            const user = await apiFetch({
-              path: '/user/:' + file.domainUserId
-            });
+            const user = await getUser(file.domainUserId);
 
             return user;
           }}
@@ -55,9 +53,7 @@
         <p class="value">
           <Awaiter
             callback={async () => {
-              const user = await apiFetch({
-                path: '/user/:' + file.authorUserId
-              });
+              const user = await getUser(file.authorUserId);
 
               return user;
             }}

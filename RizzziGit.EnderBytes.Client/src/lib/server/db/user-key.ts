@@ -1,7 +1,7 @@
 import type { Knex } from 'knex';
 import { DataManager, Database, type Data } from '../db';
 import { type User } from './user';
-import type { UserKeyType } from '$lib/shared/db';
+import { UserKeyType } from '$lib/shared/db';
 import {
   decryptAsymmetric,
   decryptSymmetric,
@@ -18,17 +18,14 @@ export interface UserKey extends Data<UserKeyManager, UserKey> {
   [UserKeyManager.KEY_ITERATIONS]: number;
   [UserKeyManager.KEY_SALT]: Uint8Array;
   [UserKeyManager.KEY_IV]: Uint8Array;
+  [UserKeyManager.KEY_AUTH_TAG]: Uint8Array;
 
   [UserKeyManager.KEY_ENCRYPTED_PRIVATE_KEY]: Uint8Array;
-  [UserKeyManager.KEY_ENCRYPTED_AUTH_TAG]: Uint8Array;
   [UserKeyManager.KEY_PUBLIC_KEY]: Uint8Array;
-
-  [UserKeyManager.KEY_TEST_BYTES]: Uint8Array;
-  [UserKeyManager.KEY_TEST_ENCRYPTED_BYTES]: Uint8Array;
 }
 
 export interface UnlockedUserKey extends UserKey {
-  privateKey: Uint8Array;
+  [UserKeyManager.KEY_UNLOCKED_PRIVATE_KEY]: Uint8Array;
 }
 
 export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
@@ -38,13 +35,12 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
   public static readonly KEY_ITERATIONS = 'iterations';
   public static readonly KEY_SALT = 'salt';
   public static readonly KEY_IV = 'iv';
+  public static readonly KEY_AUTH_TAG = 'authTag';
 
   public static readonly KEY_ENCRYPTED_PRIVATE_KEY = 'encryptedPrivateKey';
-  public static readonly KEY_ENCRYPTED_AUTH_TAG = 'encryptedAuthTag';
   public static readonly KEY_PUBLIC_KEY = 'publicKey';
 
-  public static readonly KEY_TEST_BYTES = 'testBytes';
-  public static readonly KEY_TEST_ENCRYPTED_BYTES = 'testEncryptedBytes';
+  public static readonly KEY_UNLOCKED_PRIVATE_KEY = 'privateKey';
 
   public constructor(db: Database, transaction: () => Knex.Transaction<UserKey>) {
     super(db, transaction, 'UserKey', 1);
@@ -60,11 +56,8 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
       table.string(UserKeyManager.KEY_IV).notNullable();
 
       table.binary(UserKeyManager.KEY_ENCRYPTED_PRIVATE_KEY).notNullable();
-      table.binary(UserKeyManager.KEY_ENCRYPTED_AUTH_TAG).notNullable();
+      table.binary(UserKeyManager.KEY_AUTH_TAG).notNullable();
       table.binary(UserKeyManager.KEY_PUBLIC_KEY).notNullable();
-
-      table.binary(UserKeyManager.KEY_TEST_BYTES).notNullable();
-      table.binary(UserKeyManager.KEY_TEST_ENCRYPTED_BYTES).notNullable();
     }
   }
 
@@ -78,29 +71,24 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
       randomBytes(32),
       randomBytes(16)
     ]);
-    const [key, testBytes] = await Promise.all([hashPayload(payload, salt), randomBytes(32)]);
-    const [[encryptedAuthTag, encryptedPrivateKey], testEncryptedBytes] = await Promise.all([
-      encryptSymmetric(key, iv, privateKey),
-      encryptAsymmetric(publicKey, testBytes)
-    ]);
+    const key = await hashPayload(payload, salt);
+    const [encryptedAuthTag, encryptedPrivateKey] = await encryptSymmetric(key, iv, privateKey);
 
     const userKey = await this.insert({
-      userId: user.id,
-      type,
+      [UserKeyManager.KEY_USER_ID]: user.id,
+      [UserKeyManager.KEY_TYPE]: type,
 
-      iterations: 10000,
-      salt: salt,
-      iv: iv,
+      [UserKeyManager.KEY_ITERATIONS]: 10000,
+      [UserKeyManager.KEY_SALT]: salt,
+      [UserKeyManager.KEY_IV]: iv,
 
-      encryptedPrivateKey,
-      encryptedAuthTag,
-      publicKey,
-
-      testBytes: testBytes,
-      testEncryptedBytes: testEncryptedBytes
+      [UserKeyManager.KEY_ENCRYPTED_PRIVATE_KEY]: encryptedPrivateKey,
+      [UserKeyManager.KEY_AUTH_TAG]: encryptedAuthTag,
+      [UserKeyManager.KEY_PUBLIC_KEY]: publicKey
     });
 
-    return this.unlock(userKey, payload);
+    const unlocked = this.unlock(userKey, payload);
+    return unlocked;
   }
 
   public async list(user: User, filterType?: UserKeyType): Promise<UserKey[]> {
@@ -137,16 +125,49 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
   public async unlock(key: UserKey, payload: Uint8Array): Promise<UnlockedUserKey> {
     const privateKey = decryptSymmetric(
       await hashPayload(payload, key.salt),
-      key.iv,
-      key.encryptedPrivateKey,
-      key.encryptedAuthTag
+
+      key[UserKeyManager.KEY_IV],
+      key[UserKeyManager.KEY_ENCRYPTED_PRIVATE_KEY],
+      key[UserKeyManager.KEY_AUTH_TAG]
     );
 
     return {
       ...key,
 
-      privateKey
+      [UserKeyManager.KEY_UNLOCKED_PRIVATE_KEY]: privateKey
     };
+  }
+
+  public async setPassword(
+    user: User,
+    oldPassword: string,
+    newPassword: string
+  ): Promise<UnlockedUserKey> {
+    const [userKey] = await this.list(user, UserKeyType.Password);
+    if (userKey == null) {
+      throw new Error('User has no password');
+    }
+
+    let unlockedUserKey: UnlockedUserKey;
+    try {
+      unlockedUserKey = await this.unlock(userKey, new TextEncoder().encode(oldPassword));
+    } catch {
+      throw new Error('Wrong password');
+    }
+
+    const newKey = await hashPayload(new TextEncoder().encode(newPassword), unlockedUserKey.salt);
+    const [encryptedAuthTag, encryptedPrivateKey] = encryptSymmetric(
+      newKey,
+      unlockedUserKey[UserKeyManager.KEY_IV],
+      unlockedUserKey[UserKeyManager.KEY_UNLOCKED_PRIVATE_KEY]
+    );
+
+    const newUserKey = await this.update(userKey.id, {
+      [UserKeyManager.KEY_ENCRYPTED_PRIVATE_KEY]: encryptedPrivateKey,
+      [UserKeyManager.KEY_AUTH_TAG]: encryptedAuthTag
+    });
+
+    return this.unlock(newUserKey, new TextEncoder().encode(newPassword));
   }
 
   public decrypt(key: UnlockedUserKey, payload: Uint8Array): Uint8Array {
@@ -155,10 +176,6 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
 
   public encrypt(key: UserKey, payload: Uint8Array): Uint8Array {
     return encryptAsymmetric(key.publicKey, payload);
-  }
-
-  public async delete(key: UserKey): Promise<void> {
-    await super.delete(key);
   }
 }
 

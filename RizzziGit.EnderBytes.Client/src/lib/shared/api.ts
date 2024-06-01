@@ -4,9 +4,17 @@ export const maxBulkRequestEntryCount = 10000;
 export const userSessionExpiryDuration = 30 * 24 * 60 * 60 * 1000;
 
 export interface Authentication {
+  userId: number;
   userSessionId: number;
+
   userSessionKey: Uint8Array;
-  userKeyId: number;
+  userSessionIv: Uint8Array;
+  userSessionAuthTag: Uint8Array;
+}
+
+export interface AuthenticationRequest {
+  userSessionId: number;
+  userSessionAuthTag: Uint8Array;
 }
 
 export enum ApiErrorType {
@@ -14,7 +22,13 @@ export enum ApiErrorType {
   InvalidRequest,
 
   Unauthorized,
-  Forbidden
+  Forbidden,
+
+  NotFound
+}
+
+export interface ServerStatus {
+  setupRequired: boolean;
 }
 
 export class ApiError extends Error {
@@ -25,7 +39,7 @@ export class ApiError extends Error {
   ): never {
     throw new ApiError(
       status,
-      cause?.message ?? message ?? `${ApiErrorType[status]} (code ${status})`,
+      cause?.message ?? message ?? `${ApiErrorType[status]}`,
       { stack, cause }
     );
   }
@@ -43,12 +57,15 @@ export class ApiError extends Error {
     message: string,
     { stack, cause }: ApiErrorOptions = {}
   ) {
-    super(message, { cause });
+    super(`${message} (code ${status}${message == ApiErrorType[status] ?  '': ` ${ApiErrorType[status]}`})`, { cause });
+
+    this.rawMessage = message
 
     this.status = status;
     this.stack = stack;
   }
 
+  public readonly rawMessage: string
   public readonly status: ApiErrorType;
 }
 

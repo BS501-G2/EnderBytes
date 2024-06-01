@@ -1,8 +1,8 @@
 <script lang="ts">
   import { page } from '$app/stores';
+    import { authentication } from '$lib/client/api-functions';
 
   import ProfilePage, { type UserResolve, UserResolveType } from './profile-page.svelte';
-  import { session } from '$lib/client.svelte';
 
   const parse = (): UserResolve | null => {
     const idenfierString = $page.url.searchParams.get('id');
@@ -17,10 +17,10 @@
           type: UserResolveType.UserId,
           userId: Number.parseInt(idenfierString.substring(1))
         };
-      } else if (idenfierString.startsWith('!')) {
+      } else if (idenfierString == '!me') {
         return {
           type: UserResolveType.UserId,
-          userId: $session!.userId
+          userId: $authentication!.userId
         };
       }
     }

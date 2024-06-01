@@ -1,27 +1,43 @@
-<script lang="ts" context="module">
-  async function run(): Promise<void> {
-    const authentication = (await clientSideInvoke(
-      'autenticate',
-      'testuser',
-      UserKeyType.Password,
-      new TextEncoder().encode('TestTest123;')
-    ))!;
+<script lang="ts">
+  import {
+    Button,
+    LoadingSpinner,
+    type ButtonCallback,
+    Dialog,
+    DialogClass
+  } from '@rizzzi/svelte-commons';
+  import { writable, type Writable } from 'svelte/store';
+  import { testFunctions } from './test-functions';
 
-    const result = await clientSideInvoke('verify', authentication);
-    console.log(result)
+  const returnedData: Writable<any> = writable(null);
+  const messages: Writable<any[]> = writable([]);
+  const error: Writable<Error | null> = writable(null);
+
+  async function onClick(
+    callback: (log: (data: any) => void) => any | Promise<any>
+  ): Promise<void> {
+    try {
+      $messages = [];
+      $returnedData = await callback((data) => {
+        console.log(data);
+        messages.update((value) => {
+          value.push(data);
+          return value;
+        });
+      });
+    } catch (errorData: any) {
+      throw ($error = errorData);
+    }
+  }
+
+  async function dismissError() {
+    $error = null;
   }
 </script>
 
-<script lang="ts">
-  import { clientSideInvoke } from '$lib/client/api';
-
-  import { Button, LoadingSpinner } from '@rizzzi/svelte-commons';
-  import { UserKeyType } from '$lib/shared/db';
-</script>
-
-<div class="button-container">
-  <Button onClick={run}>
-    <div class="button">Rerun</div>
+{#snippet button(onClick: ButtonCallback, label: string)}
+  <Button {onClick}>
+    <div class="button">{label}</div>
 
     {#snippet loading()}
       <div class="button">
@@ -29,11 +45,89 @@
       </div>
     {/snippet}
   </Button>
+{/snippet}
+
+<div class="container">
+  <h2>Buttons</h2>
+
+  <div class="button-list">
+    {#each testFunctions as [label, callback]}
+      {@render button(() => onClick(callback), label)}
+    {/each}
+  </div>
+
+  {#if typeof $returnedData === 'function'}
+    {@render $returnedData()}
+  {:else}
+    <h2>Returned Data</h2>
+
+    <div class="json-data">
+      <p>JSON</p>
+      <pre>{JSON.stringify($returnedData, undefined, '  ')}</pre>
+    </div>
+  {/if}
 </div>
 
+{#if $error != null}
+  <Dialog onDismiss={dismissError} dialogClass={DialogClass.Error}>
+    {#snippet head()}
+      <h2 class="error-head">{$error!.name}</h2>
+    {/snippet}
+
+    {#snippet body()}
+      <div class="error-message">
+        <b>{$error!.message}</b>
+        <pre>
+          {$error!.stack}
+        </pre>
+      </div>
+    {/snippet}
+
+    {#snippet actions()}
+      <Button onClick={dismissError}><div class="button">OK</div></Button>
+    {/snippet}
+  </Dialog>
+{/if}
+
 <style lang="scss">
-  div.button-container {
-    margin: 8px;
+  h2.error-head {
+    color: var(--error);
+  }
+
+  div.error-message {
+    color: var(--error);
+
+    min-width: min(720px, 100vw - 64px);
+  }
+
+  div.container {
+    display: flex;
+    flex-direction: column;
+
+    padding: 16px;
+    gap: 8px;
+  }
+
+  div.button-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    min-width: 0px;
+
+    gap: 8px;
+  }
+
+  div.json-data {
+    background-color: var(--backgroundVariant);
+    padding: 8px;
+
+    > p {
+      font-weight: lighter;
+    }
+
+    > pre {
+      padding: 8px;
+    }
   }
 
   div.button {

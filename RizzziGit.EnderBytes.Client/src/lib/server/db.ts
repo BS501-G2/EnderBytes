@@ -2,6 +2,7 @@ import knex, { type Knex } from 'knex';
 import { existsSync as fileExists, mkdirSync as createFolder } from 'fs';
 
 import { createTaskQueue, type TaskQueue } from '../task-queue';
+import type { M } from 'vitest/dist/reporters-yx5ZTtEV.js';
 
 const DATABASE_TRANSACTION_QUEUE = Symbol('DatabaseTransactionQueue');
 const DATABASE_CURRENT_TRANSACTION = Symbol('DatabaseCurrentTransaction');
@@ -165,11 +166,14 @@ export class Database {
   public getManagers<C extends readonly DataManagerConstructor<any, any>[]>(
     ...init: C
   ): { [K in keyof C]: DataManagerConstructorInstance<C[K]> } {
-    return init.map((init) => this.getManager(init)) as { [K in keyof C]: DataManagerConstructorInstance<C[K]> };
+    return init.map((init) => this.getManager(init)) as {
+      [K in keyof C]: DataManagerConstructorInstance<C[K]>;
+    };
   }
 }
 
-export type DataManagerConstructorInstance<T> = T extends DataManagerConstructor<infer M, infer D> ? M : never;
+export type DataManagerConstructorInstance<T> =
+  T extends DataManagerConstructor<infer M, infer D> ? M : never;
 
 interface DataHolder {
   [DataManager.KEY_HOLDER_ID]: number;
@@ -238,7 +242,7 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
   public getManagers<C extends readonly DataManagerConstructor<any, any>[]>(
     ...init: C
   ): { [K in keyof C]: DataManagerConstructorInstance<C[K]> } {
-    return this[SYMBOL_DATA_MANAGER_DATABASE].getManagers(...init)
+    return this[SYMBOL_DATA_MANAGER_DATABASE].getManagers(...init);
   }
 
   public get db(): Knex.Transaction<D, D[]> {
@@ -373,7 +377,7 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
         [DataManager.KEY_DATA_VERSION_ID]: latest[DataManager.KEY_DATA_VERSION_ID]
       } as never);
 
-    return <D>await this.getById(result[0]);
+    return <D>await this.getById(id);
   }
 
   public async insert(data: Omit<D, keyof Data<never, never>>): Promise<D> {
@@ -460,7 +464,10 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
     const results: D[] = [];
 
     while (results.length < (options?.limit ?? Infinity)) {
-      let query = this.db.select('*').from<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]);
+      let query = this.db
+        .select('*')
+        .from<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
+        .where(DataManager.KEY_DATA_NEXT_ID, 'is', null);
 
       if (options?.where != null) {
         query = options.where.reduce(
@@ -529,7 +536,15 @@ export interface GetByIdOptions<M extends DataManager<M, D>, D extends Data<M, D
   versionId?: number;
 }
 
+export interface SearchOptions<M extends DataManager<M, D>, D extends Data<M, D>> {
+  string: string
+
+  searchColumns: (keyof D)[]
+}
+
 export interface QueryOptions<M extends DataManager<M, D>, D extends Data<M, D>> {
+  search?: SearchOptions<M,D>
+
   where?: (WhereClause<M, D> | null)[];
   orderBy?: (OrderByClause<M, D> | null)[];
 
@@ -543,7 +558,7 @@ export type WhereClause<
   M extends DataManager<M, D>,
   D extends Data<M, D>,
   T extends keyof D = keyof D
-> = [T, '=' | '>' | '>=' | '<' | '<=' | '<>' | 'is' | 'is not', D[T]];
+> = [T, '=' | '>' | '>=' | '<' | '<=' | '<>' | '!=' | 'is' | 'is not', D[T]];
 
 export type OrderByClause<
   M extends DataManager<M, D>,

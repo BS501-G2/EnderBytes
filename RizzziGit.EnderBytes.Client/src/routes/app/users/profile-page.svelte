@@ -10,17 +10,17 @@
 
 <script lang="ts">
   import { Title, Awaiter, Button, ButtonClass } from '@rizzzi/svelte-commons';
-  import { apiFetch } from '$lib/client.svelte';
   import { showSettingsDialog } from '../settings-dialog.svelte';
+  import { getUser } from '$lib/client/api-functions';
 
   export let identifier: UserResolve;
   let userPromise: Promise<any> | null;
 
   async function resolve(): Promise<any | null> {
     if (identifier.type == UserResolveType.Username) {
-      return await apiFetch({ path: `/user/@${identifier.username}` });
+      return await getUser(identifier.username);
     } else {
-      return await apiFetch({ path: `/user/:${identifier.userId}` });
+      return await getUser(identifier.userId);
     }
   }
 </script>

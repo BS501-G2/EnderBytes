@@ -3,10 +3,15 @@ interface QueueItem<T = any, A = never> {
 
   resolve: (value: T) => void;
   reject: (reason?: A) => void;
+
+  stack: Error;
 }
 
-export interface TaskQueue{
-  pushQueue: <T, A extends any[] = never[]>(callback: (...args: A) => T | Promise<T>, ...args: A) => Promise<T>;
+export interface TaskQueue {
+  pushQueue: <T, A extends any[] = never[]>(
+    callback: (...args: A) => T | Promise<T>,
+    ...args: A
+  ) => Promise<T>;
 }
 
 export const createTaskQueue = (): TaskQueue => {
@@ -38,7 +43,10 @@ export const createTaskQueue = (): TaskQueue => {
           }
         });
 
-        promise.then(item.resolve).catch(item.reject).finally(run);
+        promise
+          .then(item.resolve)
+          .catch((error) => new AggregateError([error, item.stack]))
+          .finally(run);
       };
 
       if (!isRunning) {
@@ -56,7 +64,8 @@ export const createTaskQueue = (): TaskQueue => {
       queue.push({
         callback: async () => await callback(...args),
         resolve,
-        reject
+        reject,
+        stack: new Error('Failed to complete task.')
       });
 
       runQueue();

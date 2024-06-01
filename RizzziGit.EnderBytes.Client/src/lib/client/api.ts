@@ -8,6 +8,7 @@ import {
   maxRequestSizeLimit,
   waitForNextBulkReqestTimeout
 } from '$lib/shared/api';
+import { clearAuthentication } from './api-functions';
 
 export type ApiRequest<T extends keyof Map> = [name: T, ...args: Parameters<Map[T]>];
 export enum ApiResponseType {
@@ -20,14 +21,14 @@ export type ApiResponse =
   | [type: ApiResponseType.InvokeSuccess, data: any]
   | [
       type: ApiResponseType.InvokeError,
-      status: number,
+      status: ApiErrorType,
       name: string,
       message: string,
       stack?: string
     ]
   | [
       type: ApiResponseType.InvalidInvocationRequest,
-      status: number,
+      status: ApiErrorType,
       message: string,
       stack?: string
     ];
@@ -182,12 +183,17 @@ export async function clientSideInvoke<T extends keyof Map>(
   ).data as ApiResponse;
 
   if (result[0] === ApiResponseType.InvokeError) {
-    throw Object.assign(new ApiError(result[1], result[2]), {
-      name: ApiResponseType[result[0]],
-      stack: result[3]
+    const error = Object.assign(new ApiError(result[1], result[2], { stack: result[3] }), {
+      name: ApiResponseType[result[0]]
     });
+
+    if (error.status === ApiErrorType.Unauthorized) {
+      clearAuthentication();
+    }
+
+    throw error;
   } else if (result[0] === ApiResponseType.InvalidInvocationRequest) {
-    throw new ApiError(result[1], result[2]);
+    throw new ApiError(result[1], result[2], { stack: result[3] });
   } else {
     return result[1];
   }

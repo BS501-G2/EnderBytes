@@ -1,22 +1,26 @@
 <script lang="ts">
-  import { Awaiter } from '@rizzzi/svelte-commons';
   import { type Snippet } from 'svelte';
-  import { goto } from '$app/navigation';
-  import { clientSideInvoke } from '$lib/client/api';
+  import { type Writable, writable } from 'svelte/store';
+  import { authentication } from '$lib/client/api-functions';
+  import { Dialog } from '@rizzzi/svelte-commons';
 
   const { children }: { children: Snippet } = $props();
+
+  const username: Writable<string> = writable('');
 </script>
 
-<Awaiter
-  callback={async () => {
-    const status = await clientSideInvoke('getServerStatus');
+{#if $authentication != null}
+  {@render children()}
+{:else}
+  <Dialog onDismiss={() => {}}>
+    {#snippet head()}
+      <h2>Login</h2>
+    {/snippet}
 
-    if (status.setupRequired) {
-      goto('/admin/setup', { replaceState: true });
-    }
-  }}
->
-  {#snippet success()}
-    {@render children()}
-  {/snippet}
-</Awaiter>
+    {#snippet body()}
+
+    {/snippet}
+
+    {#snippet actions()}{/snippet}
+  </Dialog>
+{/if}

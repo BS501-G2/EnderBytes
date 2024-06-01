@@ -1,24 +1,25 @@
 import type { Knex } from 'knex';
 import { DataManager, Database, type Data, type OrderByClause, type QueryOptions } from '../db';
 import type { User } from './user';
-import { type UnlockedUserKey, type UserKey } from './user-key';
+import { UserKeyManager, type UnlockedUserKey, type UserKey } from './user-key';
 import { decryptSymmetric, encryptSymmetric, randomBytes } from '../utils';
 import { KeyShardManager } from './key-shard';
+import { userSessionExpiryDuration } from '$lib/shared/api';
 
 export interface UserSession extends Data<UserSessionManager, UserSession> {
-  expireTime: number;
-  userId: number;
-  originKeyId: number;
+  [UserSessionManager.KEY_EXPIRE_TIME]: number;
+  [UserSessionManager.KEY_USER_ID]: number;
+  [UserSessionManager.KEY_ORIGIN_KEY_ID]: number;
 
-  iv: Uint8Array;
+  [UserSessionManager.KEY_KEY]: Uint8Array;
+  [UserSessionManager.KEY_IV]: Uint8Array;
 
-  encryptedAuthTag: Uint8Array;
-  encryptedPrivateKey: Uint8Array;
+  [UserSessionManager.KEY_ENCRYPTED_PRIVATE_KEY]: Uint8Array;
 }
 
 export interface UnlockedUserSession extends UserSession {
-  privateKey: Uint8Array;
-  key: Uint8Array;
+  [UserSessionManager.KEY_UNLOCKED_AUTH_TAG]: Uint8Array;
+  [UserSessionManager.KEY_UNLOCKED_PRIVATE_KEY]: Uint8Array;
 }
 
 export class UserSessionManager extends DataManager<UserSessionManager, UserSession> {
@@ -28,10 +29,14 @@ export class UserSessionManager extends DataManager<UserSessionManager, UserSess
   public static readonly KEY_EXPIRE_TIME = 'expireTime';
   public static readonly KEY_USER_ID = 'userId';
   public static readonly KEY_ORIGIN_KEY_ID = 'originKeyId';
+
+  public static readonly KEY_KEY = 'key';
   public static readonly KEY_IV = 'iv';
 
-  public static readonly KEY_ENCRYPTED_AUTH_TAG = 'encryptedAuthTag';
   public static readonly KEY_ENCRYPTED_PRIVATE_KEY = 'encryptedPrivateKey';
+
+  public static readonly KEY_UNLOCKED_AUTH_TAG = 'authTag';
+  public static readonly KEY_UNLOCKED_PRIVATE_KEY = 'privateKey';
 
   public constructor(db: Database, transaction: () => Knex.Transaction<UserSession>) {
     super(db, transaction, UserSessionManager.NAME, UserSessionManager.VERSION);
@@ -42,67 +47,57 @@ export class UserSessionManager extends DataManager<UserSessionManager, UserSess
       table.integer(UserSessionManager.KEY_EXPIRE_TIME).notNullable();
       table.integer(UserSessionManager.KEY_USER_ID).notNullable();
       table.integer(UserSessionManager.KEY_ORIGIN_KEY_ID).notNullable();
+
+      table.binary(UserSessionManager.KEY_KEY).notNullable();
       table.binary(UserSessionManager.KEY_IV).notNullable();
-      table.binary(UserSessionManager.KEY_ENCRYPTED_AUTH_TAG).notNullable();
+
       table.binary(UserSessionManager.KEY_ENCRYPTED_PRIVATE_KEY).notNullable();
     }
   }
 
   public async create(
-    user: User,
-    userKey: UnlockedUserKey,
-    expireTime: number
+    unlockedUserKey: UnlockedUserKey,
+    expireDuration: number = userSessionExpiryDuration
   ): Promise<UnlockedUserSession> {
-    const iv = await randomBytes(16);
-    const key = await randomBytes(32);
-    const [authTag, encryptedPrivateKey] = encryptSymmetric(key, iv, userKey.privateKey);
+    const [key, iv] = await Promise.all([randomBytes(32), randomBytes(16)]);
+    const [authTag, encryptedPrivateKey] = encryptSymmetric(key, iv, unlockedUserKey[UserKeyManager.KEY_UNLOCKED_PRIVATE_KEY]);
 
-    const unlockedUserSession: UnlockedUserSession = {
-      ...(await this.insert({
-        expireTime,
-        userId: user.id,
-        originKeyId: userKey.id,
-        iv,
-        encryptedAuthTag: authTag,
-        encryptedPrivateKey
-      })),
-      key,
-      privateKey: userKey.privateKey
-    };
+    const userSession = await this.insert({
+      [UserSessionManager.KEY_EXPIRE_TIME]: Date.now() + expireDuration,
+      [UserSessionManager.KEY_USER_ID]: unlockedUserKey[UserKeyManager.KEY_USER_ID],
+      [UserSessionManager.KEY_ORIGIN_KEY_ID]: unlockedUserKey[UserKeyManager.KEY_DATA_ID],
 
-    const toDelete: UserSession[] = [];
-    for (const userSession of (
-      await this.query({
-        where: [[UserSessionManager.KEY_USER_ID, '=', user.id]],
-        orderBy: [[DataManager.KEY_DATA_ID, true]]
-      })
-    ).slice(10)) {
-      toDelete.push(userSession);
-    }
+      [UserSessionManager.KEY_KEY]: key,
+      [UserSessionManager.KEY_IV]: iv,
 
-    await Promise.all(toDelete.map((userSession) => this.delete(userSession)));
+      [UserSessionManager.KEY_ENCRYPTED_PRIVATE_KEY]: encryptedPrivateKey
+    });
 
-    return unlockedUserSession;
-  }
-
-  public async unlock(userSession: UserSession, key: Uint8Array): Promise<UnlockedUserSession> {
-    const privateKey = decryptSymmetric(
-      key,
-      userSession.iv,
-      userSession.encryptedPrivateKey,
-      userSession.encryptedAuthTag
-    );
     return {
       ...userSession,
-      key,
-      privateKey
+      [UserSessionManager.KEY_UNLOCKED_AUTH_TAG]: authTag,
+      [UserSessionManager.KEY_UNLOCKED_PRIVATE_KEY]: unlockedUserKey.privateKey
     };
   }
 
-  public unlockUserKey(userSession: UnlockedUserSession, userKey: UserKey): UnlockedUserKey {
+  public unlock(userSession: UserSession, authtag: Uint8Array): UnlockedUserSession {
+    return {
+      ...userSession,
+      [UserSessionManager.KEY_UNLOCKED_PRIVATE_KEY]: decryptSymmetric(
+        userSession[UserSessionManager.KEY_KEY],
+        userSession[UserSessionManager.KEY_IV],
+        userSession[UserSessionManager.KEY_ENCRYPTED_PRIVATE_KEY],
+        authtag
+      ),
+      [UserSessionManager.KEY_UNLOCKED_AUTH_TAG]: authtag
+    };
+  }
+
+  public unlockKey(userSession: UnlockedUserSession, userKey: UserKey): UnlockedUserKey {
     return {
       ...userKey,
-      privateKey: userSession.privateKey
+
+      [UserKeyManager.KEY_UNLOCKED_PRIVATE_KEY]: userSession[UserSessionManager.KEY_UNLOCKED_PRIVATE_KEY]
     };
   }
 }

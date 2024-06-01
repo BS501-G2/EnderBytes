@@ -1,5 +1,5 @@
 <script lang="ts" context="module">
-  import { session } from './client.svelte';
+  import { authentication } from '$lib/client/api-functions';
   import { writable, get, type Writable, type Readable, derived } from 'svelte/store';
 
   export type BackgroundTaskSetStatusFunction = (
@@ -273,7 +273,7 @@
     return client;
   }
 
-  session.subscribe(() => {
+  authentication.subscribe(() => {
     for (const task of get(backgroundTasks)) {
       task.cancel();
     }

@@ -20,19 +20,26 @@ export const testFunctions: TestFunctions = [
   ['Hello', () => 'hello'],
   ['World', () => 'world'],
   [
-    'Get Server Status',
-    async () => {
-      return await getServerStatus();
+    'Echo',
+    async (log) => {
+      const bytes = new Uint8Array(1024 * 1024 * 8);
+      log(`Sending random ${bytes.length} bytes.`);
+
+      for (let i = 0; i < bytes.length; i++) {
+        bytes[i] = Math.floor(Math.random() * 256);
+      }
+
+      log(await clientSideInvoke('echo', bytes));
     }
   ],
+  ['Random Bytes', async (log) => log(await clientSideInvoke('random', 1024 * 1024 * 8))],
+  ['Get Server Status', () => getServerStatus()],
   [
     'Get Admin User Credentials',
-    async () => {
-      return {
-        username: adminUser,
-        password: adminPassword
-      };
-    }
+    () => ({
+      username: adminUser,
+      password: adminPassword
+    })
   ],
   [
     'Register Admin User',
@@ -64,35 +71,5 @@ export const testFunctions: TestFunctions = [
       return await updateUser(authentication!.userId, { firstName: 'Test' + Date.now() });
     }
   ],
-  [
-    'List Users',
-    async ()=> {
-      const authentication = getAuthentication()
-      const result = await listUsers()
-
-      return result
-    }
-  ],
-  [
-    'Echo',
-    async (log) => {
-      const bytes = new Uint8Array(1024 * 1024 * 8)
-      log(`Sending random ${bytes.length} bytes.`)
-
-      for (let i = 0; i < bytes.length; i++) {
-        bytes[i] = Math.floor(Math.random() * 256)
-      }
-
-      const result: Uint8Array = await clientSideInvoke('echo', bytes) as Uint8Array
-      log(result)
-    }
-  ],
-  [
-    'Random Bytes',
-    async (log) => {
-      const bytes = await clientSideInvoke('random', 1024 * 1024 * 8)
-
-      log(bytes)
-    }
-  ]
+  ['List Users', () => listUsers()]
 ];

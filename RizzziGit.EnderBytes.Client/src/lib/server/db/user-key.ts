@@ -46,6 +46,10 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
     super(db, transaction, 'UserKey', 1);
   }
 
+  protected get ftsColumns(): (keyof UserKey)[] {
+    return [];
+  }
+
   protected async upgrade(table: Knex.TableBuilder, oldVersion: number = 0): Promise<void> {
     if (oldVersion < 1) {
       table.integer(UserKeyManager.KEY_USER_ID).notNullable();
@@ -162,7 +166,7 @@ export class UserKeyManager extends DataManager<UserKeyManager, UserKey> {
       unlockedUserKey[UserKeyManager.KEY_UNLOCKED_PRIVATE_KEY]
     );
 
-    const newUserKey = await this.update(userKey.id, {
+    const newUserKey = await this.update(userKey, {
       [UserKeyManager.KEY_ENCRYPTED_PRIVATE_KEY]: encryptedPrivateKey,
       [UserKeyManager.KEY_AUTH_TAG]: encryptedAuthTag
     });

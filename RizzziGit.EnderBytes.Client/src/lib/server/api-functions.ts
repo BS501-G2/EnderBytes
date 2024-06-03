@@ -1,23 +1,28 @@
-import {
-  ApiError,
-  ApiErrorType,
-  type Authentication,
-  type AuthenticationRequest,
-  type ServerStatus
-} from '$lib/shared/api';
-import { UserKeyType, UserRole } from '$lib/shared/db';
+import { ApiError, ApiErrorType, type Authentication, type ServerStatus } from '$lib/shared/api';
+import { FileType, UserRole, type UserKeyType } from '$lib/shared/db';
 import {
   Database,
-  DataManager,
   type Data,
+  type DataManager,
   type DataManagerConstructor,
   type DataManagerConstructorInstance,
   type QueryOptions
 } from './db';
+import type { File, FileManager } from './db/file';
 import { UserManager, type UpdateUserOptions, type User } from './db/user';
 import { UserKeyManager, type UnlockedUserKey } from './db/user-key';
 import { UserSessionManager } from './db/user-session';
 import { randomBytes } from './utils';
+
+export async function random(size: number): Promise<Uint8Array> {
+  const bytes = await randomBytes(size);
+
+  return bytes;
+}
+
+export function echo<T extends any>(data: T): T {
+  return data;
+}
 
 function getManager<M extends DataManager<M, D>, D extends Data<M, D>>(
   init: DataManagerConstructor<M, D>
@@ -32,7 +37,7 @@ async function getManagers<C extends readonly DataManagerConstructor<any, any>[]
 }
 
 async function requireAuthentication(
-  authentication: AuthenticationRequest | null
+  authentication: Authentication | null
 ): Promise<UnlockedUserKey> {
   if (authentication == null) {
     ApiError.throw(ApiErrorType.Unauthorized);
@@ -43,7 +48,7 @@ async function requireAuthentication(
     UserKeyManager,
     UserSessionManager
   );
-  const { userSessionAuthTag, userSessionId } = authentication;
+  const { userSessionId, userSessionKey } = authentication;
 
   const userSession = await userSessions.getById(userSessionId);
   if (userSession == null) {
@@ -66,7 +71,7 @@ async function requireAuthentication(
     ApiError.throw(ApiErrorType.Unauthorized);
   }
 
-  const unlockedUserSessions = userSessions.unlock(userSession, userSessionAuthTag);
+  const unlockedUserSessions = userSessions.unlock(userSession, userSessionKey);
 
   const userKey = await userKeys.getById(
     unlockedUserSessions[UserSessionManager.KEY_ORIGIN_KEY_ID]
@@ -90,54 +95,7 @@ async function ensureUserRole(unlockedUserKey: UnlockedUserKey, type: UserRole):
   }
 }
 
-export async function random(size: number): Promise<Uint8Array> {
-  const bytes = await randomBytes(size);
-
-  return bytes;
-}
-
-export function echo<T extends any>(data: T): T {
-  return data;
-}
-
-export async function getServerStatus(): Promise<ServerStatus> {
-  const users = await getManager(UserManager);
-
-  const result = {
-    setupRequired:
-      (await users.queryCount([[UserManager.KEY_ROLE, '>=', UserRole.SiteAdmin]])) === 0
-  };
-
-  return result;
-}
-
-export async function createAdminUser(
-  username: string,
-  firstName: string,
-  middleName: string | null,
-  lastName: string,
-  password: string
-): Promise<User> {
-  const [users] = await getManagers(UserManager);
-
-  const status = await getServerStatus();
-  if (!status.setupRequired) {
-    throw new Error('Admin user already exists');
-  }
-
-  const [user, unlockedUserKey] = await users.create(
-    username,
-    firstName,
-    middleName,
-    lastName,
-    password,
-    UserRole.SiteAdmin
-  );
-
-  return user;
-}
-
-export async function autenticate(
+export async function authenticate(
   username: string,
   userPayloadType: UserKeyType,
   payload: Uint8Array
@@ -170,13 +128,11 @@ export async function autenticate(
   return {
     userId: user.id,
     userSessionId: unlockedSession.id,
-    userSessionKey: unlockedSession[UserSessionManager.KEY_KEY],
-    userSessionIv: unlockedSession[UserSessionManager.KEY_IV],
-    userSessionAuthTag: unlockedSession[UserSessionManager.KEY_UNLOCKED_AUTH_TAG]
+    userSessionKey: unlockedSession[UserSessionManager.KEY_UNLOCKED_KEY]
   };
 }
 
-export async function validateAuthentication(authentication: AuthenticationRequest): Promise<boolean> {
+export async function validateAuthentication(authentication: Authentication): Promise<boolean> {
   try {
     await requireAuthentication(authentication);
     return true;
@@ -185,8 +141,45 @@ export async function validateAuthentication(authentication: AuthenticationReque
   }
 }
 
+export async function getServerStatus(): Promise<ServerStatus> {
+  const users = await getManager(UserManager);
+
+  const result = {
+    setupRequired:
+      (await users.queryCount([[UserManager.KEY_ROLE, '>=', UserRole.SiteAdmin]])) === 0
+  };
+
+  return result;
+}
+
+export async function createAdminUser(
+  username: string,
+  firstName: string,
+  middleName: string | null,
+  lastName: string,
+  password: string
+): Promise<User> {
+  const [users] = await getManagers(UserManager);
+
+  const status = await getServerStatus();
+  if (!status.setupRequired) {
+    throw new Error('Admin user already exists');
+  }
+
+  const [user] = await users.create(
+    username,
+    firstName,
+    middleName,
+    lastName,
+    password,
+    UserRole.SiteAdmin
+  );
+
+  return user;
+}
+
 export async function getUser(
-  authentication: AuthenticationRequest | null,
+  authentication: Authentication | null,
   idOrUsername: number | string
 ): Promise<User | null> {
   await requireAuthentication(authentication);
@@ -203,7 +196,7 @@ export async function getUser(
 }
 
 export async function listUsers(
-  authentication: AuthenticationRequest | null,
+  authentication: Authentication | null,
   options?: QueryOptions<UserManager, User>
 ): Promise<User[]> {
   await requireAuthentication(authentication);
@@ -214,7 +207,7 @@ export async function listUsers(
 }
 
 export async function createUser(
-  authentication: AuthenticationRequest | null,
+  authentication: Authentication | null,
   username: string,
   firstName: string,
   middleName: string | null,
@@ -238,7 +231,7 @@ export async function createUser(
 }
 
 export async function updateUser(
-  authentication: AuthenticationRequest | null,
+  authentication: Authentication | null,
   id: number,
   newData: UpdateUserOptions
 ): Promise<User> {
@@ -254,12 +247,12 @@ export async function updateUser(
     ApiError.throw(ApiErrorType.Forbidden);
   }
 
-  const result = await users.update(id, newData);
+  const result = await users.update(user, newData);
   return result;
 }
 
 export async function suspendUser(
-  authentication: AuthenticationRequest | null,
+  authentication: Authentication | null,
   id: number
 ): Promise<User> {
   const unlockedUserKey = await requireAuthentication(authentication);
@@ -271,5 +264,19 @@ export async function suspendUser(
     ApiError.throw(ApiErrorType.NotFound);
   }
 
-  return await users.suspend(id);
+  return await users.suspend(user);
+}
+
+export async function createFile(
+  parentFolderId: number,
+  name: string
+): Promise<File & { [FileManager.KEY_TYPE]: FileType.File }> {
+
+}
+
+export async function createFolder(
+  parentFolderId: number,
+  name: string
+): Promise<File & { [FileManager.KEY_TYPE]: FileType.Folder }> {
+
 }

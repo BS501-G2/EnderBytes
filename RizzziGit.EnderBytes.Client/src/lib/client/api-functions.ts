@@ -1,4 +1,4 @@
-import type { Authentication, AuthenticationRequest } from '$lib/shared/api';
+import type { Authentication } from '$lib/shared/api';
 import type { UpdateUserOptions, User, UserManager } from '$lib/server/db/user';
 import type { UnlockedUserKey } from '$lib/server/db/user-key';
 import type { QueryOptions } from '$lib/server/db';
@@ -19,7 +19,7 @@ const authentication: Writable<Authentication | null> = persisted('authenticatio
 
 export async function authenticateByPassword(username: string, password: string): Promise<Authentication> {
   const result = await clientSideInvoke(
-    'autenticate',
+    'authenticate',
     username,
     UserKeyType.Password,
     new TextEncoder().encode(password)
@@ -34,7 +34,7 @@ export function getAuthentication(): Authentication | null {
 }
 
 export async function getAndVerifyAuthentication(): Promise<Authentication | null> {
-  const value = requestAuthentication();
+  const value = getAuthentication();
   if (value == null) {
     return null;
   }
@@ -48,18 +48,6 @@ export async function getAndVerifyAuthentication(): Promise<Authentication | nul
 
 export function clearAuthentication(): void {
   authentication.set(null);
-}
-
-function requestAuthentication(): AuthenticationRequest | null {
-  const value = get(authentication);
-  if (value == null) {
-    return null;
-  }
-
-  return {
-    userSessionId: value.userSessionId,
-    userSessionAuthTag: value.userSessionAuthTag
-  };
 }
 
 export async function getServerStatus() {
@@ -84,11 +72,11 @@ export async function createAdminUser(
 }
 
 export async function listUsers(options?: QueryOptions<UserManager, User>): Promise<User[]> {
-  return await clientSideInvoke('listUsers', requestAuthentication(), options);
+  return await clientSideInvoke('listUsers', getAuthentication(), options);
 }
 
 export async function getUser(id: number | string): Promise<User | null> {
-  return await clientSideInvoke('getUser', requestAuthentication(), id)
+  return await clientSideInvoke('getUser', getAuthentication(), id)
 }
 
 export async function createUser(
@@ -100,7 +88,7 @@ export async function createUser(
 ): Promise<[user: User, unlockedUserKey: UnlockedUserKey, password: string]> {
   return await clientSideInvoke(
     'createUser',
-    requestAuthentication(),
+    getAuthentication(),
     username,
     firstName,
     middleName,
@@ -110,7 +98,7 @@ export async function createUser(
 }
 
 export async function updateUser(id: number, newData: UpdateUserOptions) {
-  return await clientSideInvoke('updateUser', requestAuthentication(), id, newData);
+  return await clientSideInvoke('updateUser', getAuthentication(), id, newData);
 }
 
 const readonlyAuthentication = derived(authentication, (value) => {

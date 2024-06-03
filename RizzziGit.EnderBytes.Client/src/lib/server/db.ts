@@ -102,6 +102,7 @@ export class Database {
   private async [DATABASE_INIT](): Promise<void> {
     await this[DATABASE_CONNECTION].raw('PRAGMA synchtonization = ON;');
     await this[DATABASE_CONNECTION].raw('PRAGMA journal_mode = MEMORY;');
+    await this[DATABASE_CONNECTION].raw('PRAGMA read_uncommitted = true;');
 
     await this[DATABASE_CONNECTION].raw(
       `create table if not exists version (name text primary key, version integer);`
@@ -192,8 +193,10 @@ export interface IDataManager {}
 
 const SYMBOL_DATA_MANAGER_DATABASE = Symbol('Database');
 const SYMBOL_DATA_MANAGER_TRANSACTION = Symbol('Transaction');
-const SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME = Symbol('HolderTableName');
-const SYMBOL_DATA_MANAGER_DATA_TABLE_NAME = Symbol('DataTableName');
+const SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME = Symbol('HolderTable');
+const SYMBOL_DATA_MANAGER_DATA_TABLE_NAME = Symbol('DataTable');
+const SYMBOL_DATA_MANAGER_FTS_TABLE_NAME = Symbol('FtsTable');
+const SYMBOL_DATA_MANAGER_ = Symbol('asd');
 
 export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M, D>>
   implements IDataManager
@@ -206,6 +209,8 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
   public static readonly KEY_DATA_CREATE_TIME = 'createTime';
   public static readonly KEY_DATA_PREVIOUS_ID = 'previousId';
   public static readonly KEY_DATA_NEXT_ID = 'nextId';
+
+  public static readonly KEY_ID = DataManager.KEY_DATA_ID;
 
   public constructor(
     db: Database,
@@ -222,6 +227,8 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
   private readonly [SYMBOL_DATA_MANAGER_DATABASE]: Database;
   private readonly [SYMBOL_DATA_MANAGER_TRANSACTION]: () => Knex.Transaction<D>;
 
+  protected abstract get ftsColumns(): (keyof D)[];
+
   public readonly name: string;
   public readonly version: number;
 
@@ -231,6 +238,10 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
 
   public get [SYMBOL_DATA_MANAGER_DATA_TABLE_NAME](): string {
     return `${this.name}_Data`;
+  }
+
+  public get [SYMBOL_DATA_MANAGER_FTS_TABLE_NAME](): string {
+    return `${this.name}_FTS`;
   }
 
   public getManager<M extends DataManager<M, D>, D extends Data<M, D>>(
@@ -315,6 +326,8 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
 
     if (options?.versionId != null) {
       query = query.where(DataManager.KEY_DATA_VERSION_ID, '=', options.versionId);
+    } else {
+      query = query.where(DataManager.KEY_DATA_NEXT_ID, 'is', null);
     }
 
     return <D | null>(
@@ -341,11 +354,14 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
     );
   }
 
-  public async update(id: number, data: Partial<D>, options?: UpdateOptions<M, D>): Promise<D> {
-    const latest = <D>await this.getById(id);
+  public async update(oldData: D, data: Partial<D>, options?: UpdateOptions<M, D>): Promise<D> {
+    const latest = <D>await this.getById(oldData[DataManager.KEY_ID]);
+
+    console.log(latest.id);
+
     const baseVersion =
       options?.baseVersionId != null
-        ? await this.getById(id, {
+        ? await this.getById(oldData[DataManager.KEY_ID], {
             versionId: options.baseVersionId
           })
         : latest;
@@ -354,30 +370,26 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
       throw new Error('Base version not found');
     }
 
-    const newData = Object.assign<
-      {},
-      D,
-      Partial<D>,
-      Partial<Omit<Data<M, D>, typeof DataManager.KEY_DATA_VERSION_ID>> & {
-        [DataManager.KEY_DATA_VERSION_ID]: null;
-      }
-    >({}, baseVersion, data, {
-      [DataManager.KEY_DATA_PREVIOUS_ID]: latest?.[DataManager.KEY_DATA_VERSION_ID] ?? null,
-      [DataManager.KEY_DATA_VERSION_ID]: null
-    });
-
-    const result = await this.db
-      .insert(<never>newData)
-      .into<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]);
+    const versionId = (
+      await this.db.table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]).insert({
+        ...baseVersion,
+        ...data,
+        [DataManager.KEY_DATA_PREVIOUS_ID]: latest[DataManager.KEY_DATA_VERSION_ID],
+        [DataManager.KEY_DATA_NEXT_ID]: null,
+        [DataManager.KEY_DATA_VERSION_ID]: null,
+        [DataManager.KEY_ID]: latest[DataManager.KEY_ID],
+        [DataManager.KEY_DATA_CREATE_TIME]: Date.now()
+      })
+    )[0];
 
     await this.db
       .table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
-      .update({ [DataManager.KEY_DATA_NEXT_ID]: result[0] } as never)
+      .update({ [DataManager.KEY_DATA_NEXT_ID]: versionId } as never)
       .where({
         [DataManager.KEY_DATA_VERSION_ID]: latest[DataManager.KEY_DATA_VERSION_ID]
       } as never);
 
-    return <D>await this.getById(id);
+    return <D>await this.getById(oldData[DataManager.KEY_ID]);
   }
 
   public async insert(data: Omit<D, keyof Data<never, never>>): Promise<D> {
@@ -437,13 +449,13 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
   public async purge(id: number): Promise<void> {
     await this.db
       .table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
-      .where(DataManager.KEY_DATA_ID, '=', id)
-      .del();
+      .delete()
+      .where(DataManager.KEY_DATA_ID, '=', id);
 
     await this.db
       .table<DataHolder>(this[SYMBOL_DATA_MANAGER_HOLDER_TABLE_NAME])
-      .where(DataManager.KEY_HOLDER_ID, '=', id)
-      .del();
+      .delete()
+      .where(DataManager.KEY_HOLDER_ID, '=', id);
   }
 
   public async queryCount(whereClause?: (WhereClause<M, D> | null)[]): Promise<number> {
@@ -464,17 +476,20 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
     const results: D[] = [];
 
     while (results.length < (options?.limit ?? Infinity)) {
-      let query = this.db
-        .select('*')
-        .from<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
-        .where(DataManager.KEY_DATA_NEXT_ID, 'is', null);
+      let query = this.db.select('*').where(DataManager.KEY_DATA_NEXT_ID, 'is', null);
 
-      if (options?.where != null) {
-        query = options.where.reduce(
-          (query, entry) =>
-            entry != null ? query.where(entry[0] as any, entry[1], entry[2] as any) : query,
-          query
-        );
+      if (options?.search != null) {
+        query.from(this[SYMBOL_DATA_MANAGER_FTS_TABLE_NAME]);
+      } else {
+        if (options?.where != null) {
+          query = options.where.reduce(
+            (query, entry) =>
+              entry != null ? query.where(entry[0] as any, entry[1], entry[2] as any) : query,
+            query
+          );
+        }
+
+        query = query.from<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]);
       }
 
       if (options?.orderBy != null) {
@@ -537,22 +552,32 @@ export interface GetByIdOptions<M extends DataManager<M, D>, D extends Data<M, D
 }
 
 export interface SearchOptions<M extends DataManager<M, D>, D extends Data<M, D>> {
-  string: string
+  string: string;
 
-  searchColumns: (keyof D)[]
+  searchColumns: (keyof D)[];
 }
 
-export interface QueryOptions<M extends DataManager<M, D>, D extends Data<M, D>> {
-  search?: SearchOptions<M,D>
-
+export type QueryOptions<M extends DataManager<M, D>, D extends Data<M, D>> = {
   where?: (WhereClause<M, D> | null)[];
+  search?: string;
+
   orderBy?: (OrderByClause<M, D> | null)[];
 
   offset?: number;
   limit?: number;
 
   deleted?: boolean;
-}
+} & (
+  | {
+      where: (WhereClause<M, D> | null)[];
+      search: null;
+    }
+  | {
+      where: null;
+      search: string;
+    }
+  | {}
+);
 
 export type WhereClause<
   M extends DataManager<M, D>,

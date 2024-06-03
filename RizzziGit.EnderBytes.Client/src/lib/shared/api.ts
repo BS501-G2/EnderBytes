@@ -5,16 +5,9 @@ export const userSessionExpiryDuration = 30 * 24 * 60 * 60 * 1000;
 
 export interface Authentication {
   userId: number;
-  userSessionId: number;
 
+  userSessionId: number;
   userSessionKey: Uint8Array;
-  userSessionIv: Uint8Array;
-  userSessionAuthTag: Uint8Array;
-}
-
-export interface AuthenticationRequest {
-  userSessionId: number;
-  userSessionAuthTag: Uint8Array;
 }
 
 export enum ApiErrorType {
@@ -37,11 +30,10 @@ export class ApiError extends Error {
     message?: string,
     { cause, stack }: ApiErrorOptions = {}
   ): never {
-    throw new ApiError(
-      status,
-      cause?.message ?? message ?? `${ApiErrorType[status]}`,
-      { stack, cause }
-    );
+    throw new ApiError(status, cause?.message ?? message ?? `${ApiErrorType[status]}`, {
+      stack,
+      cause
+    });
   }
 
   public static throwFrom(
@@ -57,15 +49,18 @@ export class ApiError extends Error {
     message: string,
     { stack, cause }: ApiErrorOptions = {}
   ) {
-    super(`${message} (code ${status}${message == ApiErrorType[status] ?  '': ` ${ApiErrorType[status]}`})`, { cause });
+    super(
+      `${message} (code ${status}${message == ApiErrorType[status] ? '' : ` ${ApiErrorType[status]}`})`,
+      { cause }
+    );
 
-    this.rawMessage = message
+    this.rawMessage = message;
 
     this.status = status;
     this.stack = stack;
   }
 
-  public readonly rawMessage: string
+  public readonly rawMessage: string;
   public readonly status: ApiErrorType;
 }
 

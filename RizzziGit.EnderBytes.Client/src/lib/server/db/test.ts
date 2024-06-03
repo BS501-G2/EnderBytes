@@ -24,6 +24,10 @@ export class TestManager extends DataManager<TestManager, TestData> {
   public async create(test: string): Promise<TestData> {
     return this.insert({ test });
   }
+
+  public get ftsColumns(): (keyof TestData)[] {
+    return [TestManager.KEY_TEST];
+  }
 }
 
 Database.register(TestManager);

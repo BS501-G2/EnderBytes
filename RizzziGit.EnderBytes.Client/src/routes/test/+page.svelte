@@ -37,11 +37,15 @@
 
 {#snippet button(onClick: ButtonCallback, label: string)}
   <Button {onClick}>
-    <div class="button">{label}</div>
+    {label}
 
     {#snippet loading()}
+      <LoadingSpinner size="1em" />
+    {/snippet}
+
+    {#snippet container(content)}
       <div class="button">
-        <LoadingSpinner size="1em" />
+        {@render content()}
       </div>
     {/snippet}
   </Button>

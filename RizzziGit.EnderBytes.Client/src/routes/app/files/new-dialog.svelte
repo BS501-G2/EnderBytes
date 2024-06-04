@@ -34,11 +34,12 @@
   import { writable, type Writable } from 'svelte/store';
   import { fly } from 'svelte/transition';
   import { type FileBrowserState } from '../file-browser.svelte';
-  import { uploadFile, type FileResource, createFolder } from '$lib/client/file';
+  import { createFile, createFolder } from '$lib/client/api-functions';
+  import type { File as DbFile } from '$lib/server/db/file';
+  import { FileType } from '$lib/shared/db';
 
   const {
     fileBrowserState,
-    onNewFiles,
     onNewFolder
   }: {
     fileBrowserState: Writable<FileBrowserState>;
@@ -119,13 +120,17 @@
     <div class="tab-view">
       {#if state.type == 'file'}
         {@const onCreate = async (files: File[]) => {
-          if ($fileBrowserState.isLoading || $fileBrowserState.file == null) {
-            return;
+          if ($fileBrowserState.isLoading) {
+            return
           }
-          const newFiles = await uploadFile($fileBrowserState.file!, ...files)
+          const newFiles: DbFile[] = []
 
-          onDismiss()
-          onNewFiles(...newFiles.map((f) => f.id));
+          for (const file of files) {
+            const blob = new Blob([file], { type: file.type });
+            const newFile = await createFile($fileBrowserState.file! as DbFile & { type: FileType.Folder }, file.name, new Uint8Array(await blob.arrayBuffer()));
+
+            newFiles.push(newFile)
+          }
         }}
 
         <div class="input-group">
@@ -186,8 +191,7 @@
             return
           }
 
-          const folder = await createFolder($fileBrowserState.file!, $newFolderName);
-
+          const folder = await createFolder($fileBrowserState.file! as DbFile & { type: FileType.Folder }, $newFolderName);
           onDismiss();
           onNewFolder(folder.id)
         }}

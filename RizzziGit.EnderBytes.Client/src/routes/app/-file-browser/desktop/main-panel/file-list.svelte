@@ -31,17 +31,17 @@
 
   import { hasKeys, AnimationFrame, LoadingSpinnerPage } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
-    import type { FileResource } from '$lib/client/file';
+    import type { File } from '$lib/server/db/file';
 
   let {
     fileBrowserState,
     selection
-  }: { fileBrowserState: Writable<FileBrowserState>; selection: Writable<FileResource[]> } =
+  }: { fileBrowserState: Writable<FileBrowserState>; selection: Writable<File[]> } =
     $props();
 
   function click(
     fileBrowserState: FileBrowserState & { isLoading: false },
-    file: FileResource,
+    file: File,
   ) {
     if (hasKeys('control')) {
       $selection = !$selection.includes(file)
@@ -77,7 +77,7 @@
     clientX: number;
     clientY: number;
 
-    capturedSelection: FileResource[];
+    capturedSelection: File[];
   }
 
   const selectionBox: Writable<SelectionRectangle | null> = writable(null);

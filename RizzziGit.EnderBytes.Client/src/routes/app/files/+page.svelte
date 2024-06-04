@@ -10,18 +10,27 @@
     type AwaiterResetFunction,
     Banner,
     BannerClass,
-    Button,
+    Button
   } from '@rizzzi/svelte-commons';
   import { writable, type Writable } from 'svelte/store';
   import NewDialog, { newDialogState } from './new-dialog.svelte';
   import { goto } from '$app/navigation';
+  import type { File } from '$lib/server/db/file';
+  import { FileAccessLevel, FileType } from '$lib/shared/db';
   import {
+    getAuthentication,
     getFile,
-    getFileAccessList,
-    getFilePathChain,
+    listPathChain,
     scanFolder,
-    type FileResource
-  } from '$lib/client/file';
+    listFileAccess
+  } from '$lib/client/api-functions';
+  // import {
+  //   getFile,
+  //   getFileAccessList,
+  //   getFilePathChain,
+  //   scanFolder,
+  //   type FileResource
+  // } from '$lib/client/file';
 
   function parseId(id: string | null) {
     if (id == null) {
@@ -32,7 +41,7 @@
   }
 
   const id = $derived(parseId($page.url.searchParams.get('id')));
-  const selection: Writable<FileResource[]> = writable([]);
+  const selection: Writable<File[]> = writable([]);
 
   let refresh: Writable<AwaiterResetFunction<null>> = writable();
   let title: string | null = $state(null);
@@ -45,7 +54,8 @@
         await $refresh(true, null);
       },
       group: 'arrangement',
-      isVisible: () => !$fileBrowserState.isLoading && $fileBrowserState.file?.isFolder == true
+      isVisible: () =>
+        !$fileBrowserState.isLoading && $fileBrowserState.file?.type === FileType.Folder
     },
     {
       label: 'Arrange',
@@ -56,7 +66,8 @@
         $filterOverlayState.enabled = [window.innerWidth - bounds.right, bounds.bottom];
       },
       group: 'arrangement',
-      isVisible: () => !$fileBrowserState.isLoading && $fileBrowserState.file?.isFolder == true
+      isVisible: () =>
+        !$fileBrowserState.isLoading && $fileBrowserState.file?.type === FileType.Folder
     },
     {
       label: 'Open  File',
@@ -70,35 +81,27 @@
         window.matchMedia('(any-pointer: coarse)').matches &&
         selection.length === 1 &&
         selection[0].id != id
-    },{
+    },
+    {
       label: 'Delete',
       icon: 'fa-solid fa-trash',
-      action: async () => {
-      },
+      action: async () => {},
       group: 'actions',
-      isVisible: (selection) =>
-        !$fileBrowserState.isLoading &&
-        selection.length > 0
+      isVisible: (selection) => !$fileBrowserState.isLoading && selection.length > 0
     },
     {
       label: 'Download',
       icon: 'fa-solid fa-download',
-      action: async () => {
-      },
+      action: async () => {},
       group: 'actions',
-      isVisible: (selection) =>
-        !$fileBrowserState.isLoading &&
-        selection.length == 1
+      isVisible: (selection) => !$fileBrowserState.isLoading && selection.length == 1
     },
     {
       label: 'Move',
       icon: 'fa-solid fa-arrow-right-arrow-left',
-      action: async () => {
-      },
+      action: async () => {},
       group: 'actions',
-      isVisible: (selection) =>
-        !$fileBrowserState.isLoading &&
-        selection.length > 0
+      isVisible: (selection) => !$fileBrowserState.isLoading && selection.length > 0
     },
     {
       label: 'New',
@@ -111,8 +114,8 @@
       group: 'new',
       isVisible: () =>
         !$fileBrowserState.isLoading &&
-        $fileBrowserState.file?.isFolder == true &&
-        ($fileBrowserState.access?.highestExtent ?? 0) >= 2
+        $fileBrowserState.file?.type === FileType.Folder &&
+        ($fileBrowserState.access?.highestLevel ?? FileAccessLevel.Read) >= 2
     }
   ];
 
@@ -120,7 +123,7 @@
     isLoading: true,
     controlBarActions: []
   });
-  const error: Writable<Error | null> = writable(null);
+  const errorStore: Writable<Error | null> = writable(null);
 </script>
 
 {#key title}
@@ -136,20 +139,29 @@
       $fileBrowserState = { isLoading: true, controlBarActions: [] };
 
       try {
-        const file = await getFile(id);
+        const file = await getFile(id ?? null);
 
-        const [files, pathChain, access] = await Promise.all([
-          file.isFolder ? scanFolder(file, $filterOverlayState.state) : [],
-          getFilePathChain(file),
-          getFileAccessList(file),
+        const [files, pathChain, accesses] = await Promise.all([
+          file.type === FileType.Folder ? scanFolder(file) : [],
+          listPathChain(file),
+          listFileAccess(file),
         ])
 
+        console.log(pathChain)
         $fileBrowserState = {
           isLoading: false,
 
           files,
-          pathChain,
-          access,
+          pathChain: {
+            root: pathChain[0],
+            chain: pathChain.slice(1),
+            isForeign: pathChain[0].ownerUserId === getAuthentication()!.userId
+          },
+          access: file.ownerUserId === getAuthentication()!.userId ? null : {
+            highestLevel: accesses[0].accessLevel,
+            accessPoint:  accesses[0],
+            list: accesses
+          },
           file,
           title: 'My Files',
 
@@ -158,8 +170,8 @@
 
         title = id != null ? $fileBrowserState.file?.name ?? null : null
       } catch (errorData: any) {
-        $error = errorData
-        throw errorData
+        $errorStore = errorData
+        throw $errorStore
       }
     }}
   >
@@ -176,7 +188,7 @@
   </Awaiter>
 {/key}
 
-{#if $error == null}
+{#if $errorStore == null}
   <FileBrowser {fileBrowserState} {selection} />
   <NewDialog
     {fileBrowserState}

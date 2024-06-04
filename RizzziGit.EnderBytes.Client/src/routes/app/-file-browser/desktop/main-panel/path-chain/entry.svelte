@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { FileResource } from '$lib/client/file';
+  import type { File } from '$lib/server/db/file';
+    import { FileType } from '$lib/shared/db';
 
   const {
     file,
@@ -7,7 +8,7 @@
     onMenu,
     onClick
   }: {
-    file: FileResource;
+    file: File;
     forward?: boolean;
     onMenu: (event: MouseEvent) => void;
     onClick: (event: MouseEvent) => void;
@@ -18,7 +19,7 @@
   {#snippet link()}
     <button class="link {forward ? 'forward' : ''}" title={file.name} onclick={onClick}>
       {#snippet icon()}
-        <i class="fa-solid fa-{file.isFolder ? 'folder' : 'file'}"></i>
+        <i class="fa-solid fa-{file.type === FileType.Folder ? 'folder' : 'file'}"></i>
       {/snippet}
       {#if forward}
         {@render icon()}
@@ -36,7 +37,7 @@
 
   {#if forward}
     {@render link()}
-    {#if file.isFolder}
+    {#if file.type === FileType.Folder}
       {@render expand()}
     {/if}
   {:else}

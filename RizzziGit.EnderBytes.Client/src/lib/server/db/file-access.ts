@@ -4,7 +4,7 @@ import type { FileAccessLevel } from '$lib/shared/db';
 import { FileManager, type UnlockedFile } from './file';
 import type { User } from './user';
 import { randomBytes } from '../utils';
-import { UserKeyManager } from './user-key';
+import { UserKeyManager, type UnlockedUserKey } from './user-key';
 
 export interface FileAccess extends Data<FileAccessManager, FileAccess> {
   [FileAccessManager.KEY_FILE_ID]: number;
@@ -12,6 +12,10 @@ export interface FileAccess extends Data<FileAccessManager, FileAccess> {
   [FileAccessManager.KEY_ACCESS_LEVEL]: FileAccessLevel;
 
   [FileAccessManager.KEY_ENCRYPTED_KEY]: Uint8Array;
+}
+
+export interface UnlockedFileAccess extends FileAccess {
+  [FileAccessManager.KEY_UNLOCKED_KEY]: Uint8Array;
 }
 
 export class FileAccessManager extends DataManager<FileAccessManager, FileAccess> {
@@ -23,6 +27,8 @@ export class FileAccessManager extends DataManager<FileAccessManager, FileAccess
   public static readonly KEY_ACCESS_LEVEL = 'accessLevel';
 
   public static readonly KEY_ENCRYPTED_KEY = 'encryptedKey';
+
+  public static readonly KEY_UNLOCKED_KEY = 'key';
 
   public constructor(db: Database, transaction: () => Knex.Transaction<FileAccess>) {
     super(db, transaction, FileAccessManager.NAME, FileAccessManager.VERSION);
@@ -44,7 +50,7 @@ export class FileAccessManager extends DataManager<FileAccessManager, FileAccess
     unlockedFile: UnlockedFile,
     targetUser: User,
     level: FileAccessLevel
-  ): Promise<FileAccess> {
+  ): Promise<UnlockedFileAccess> {
     const [userKeys] = this.getManagers(UserKeyManager);
     const userKey = (
       await userKeys.query({
@@ -53,14 +59,31 @@ export class FileAccessManager extends DataManager<FileAccessManager, FileAccess
       })
     )[0]!;
 
-    return this.insert({
+    const fileKey = unlockedFile[FileManager.KEY_UNLOCKED_AES_KEY];
+
+    const fileAccess = await this.insert({
       [FileAccessManager.KEY_FILE_ID]: unlockedFile.id,
       [FileAccessManager.KEY_USER_ID]: targetUser.id,
       [FileAccessManager.KEY_ACCESS_LEVEL]: level,
-      [FileAccessManager.KEY_ENCRYPTED_KEY]: userKeys.encrypt(
-        userKey,
-        unlockedFile[FileManager.KEY_UNLOCKED_AES_KEY]
-      )
+      [FileAccessManager.KEY_ENCRYPTED_KEY]: userKeys.encrypt(userKey, fileKey)
     });
+
+    return {
+      ...fileAccess,
+      [FileAccessManager.KEY_UNLOCKED_KEY]: fileKey
+    };
+  }
+
+  public unlock(unlockedUserKey: UnlockedUserKey, fileAccess: FileAccess): UnlockedFileAccess {
+    const [userKeys] = this.getManagers(UserKeyManager);
+
+    const unlockedKey = userKeys.decrypt(
+      unlockedUserKey,
+      fileAccess[FileAccessManager.KEY_ENCRYPTED_KEY]
+    );
+
+    return { ...fileAccess, [FileAccessManager.KEY_UNLOCKED_KEY]: unlockedKey };
   }
 }
+
+Database.register(FileAccessManager);

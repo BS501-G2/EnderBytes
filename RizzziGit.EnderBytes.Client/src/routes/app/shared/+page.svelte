@@ -9,7 +9,7 @@
   } from '@rizzzi/svelte-commons';
   import FileBrowser, { type FileBrowserState } from '../file-browser.svelte';
   import { writable, type Writable } from 'svelte/store';
-  import { getFileAccesses } from '$lib/client/file';
+  import { listFileAccess, listSharedFiles, getFile } from '$lib/client/api-functions'
 
   let refresh: Writable<AwaiterResetFunction<null>> = writable();
   const fileBrowserState: Writable<FileBrowserState> = writable({ isLoading: true });
@@ -22,7 +22,7 @@
     $fileBrowserState = { isLoading: true }
 
     try {
-      const fileAccesses = await getFileAccesses()
+      const fileAccesses = await listSharedFiles()
 
       $fileBrowserState = {
         isLoading: false,
@@ -30,7 +30,7 @@
         file: null,
         access: null,
         pathChain: null,
-        files: fileAccesses.map(({ file }) => file),
+        files: await Promise.all(fileAccesses.map((fileAccess) => getFile(fileAccess.fileId))),
         title: 'Shared Files'
       }
     }

@@ -1,6 +1,12 @@
 import type { Knex } from 'knex';
 import { DataManager, Database, type Data } from '../db';
-import { FileType } from '$lib/shared/db';
+import {
+  FileAccessLevel,
+  FileNameVerificationFlag,
+  FileType,
+  fileNameInvalidCharacters,
+  fileNameLength
+} from '$lib/shared/db';
 import {
   decryptAsymmetric,
   decryptSymmetric,
@@ -9,6 +15,7 @@ import {
   randomBytes
 } from '../utils';
 import { UserKeyManager, type UnlockedUserKey } from './user-key';
+import { FileAccessManager } from './file-access';
 
 export interface File extends Data<FileManager, File> {
   [FileManager.KEY_PARENT_FILE_ID]: number | null;
@@ -82,12 +89,31 @@ export class FileManager extends DataManager<FileManager, File> {
     return [FileManager.KEY_NAME];
   }
 
+  public async verifiyFileName(
+    parentFolder: File | null,
+    fileName: string
+  ): Promise<FileNameVerificationFlag> {
+    let flag = FileNameVerificationFlag.OK;
+
+    const [min, max] = fileNameLength;
+
+    if (fileName.length > max || fileName.length < min) {
+      flag |= FileNameVerificationFlag.InvalidLength;
+    }
+
+    if (fileName.match(`[${fileNameInvalidCharacters}]`)) {
+      flag |= FileNameVerificationFlag.InvalidCharacters;
+    }
+
+    return flag;
+  }
+
   public async create<T extends FileType>(
     unlockedUserKey: UnlockedUserKey,
-    parent: (File & { [FileManager.KEY_TYPE]: FileType.Folder }) | null,
+    parent: UnlockedFile | null,
     name: string,
     type: T
-  ): Promise<UnlockedFile & { [FileManager.KEY_TYPE]: T }> {
+  ): Promise<UnlockedFile> {
     if (parent == null) {
       const key = await randomBytes(32);
       const [userKeys] = this.getManagers(UserKeyManager);
@@ -150,11 +176,63 @@ export class FileManager extends DataManager<FileManager, File> {
     }
   }
 
-  public async unlock(file: File, unlockedUserKey: UnlockedUserKey): Promise<UnlockedFile> {
+  public async getRoot(unlockedUserKey: UnlockedUserKey): Promise<File> {
+    const root = (
+      await this.query({
+        where: [
+          [FileManager.KEY_PARENT_FILE_ID, 'is', null],
+          [FileManager.KEY_OWNER_USER_ID, '=', unlockedUserKey.userId]
+        ],
+        limit: 1
+      })
+    )[0]!;
+
+    if (root != null) {
+      return root;
+    }
+
+    const newRoot = await this.create(unlockedUserKey, null, 'root', FileType.Folder);
+    return (await this.getById(newRoot[FileManager.KEY_ID]))!;
+  }
+
+  public async unlock(
+    file: File,
+    unlockedUserKey: UnlockedUserKey,
+    accessLevel?: FileAccessLevel
+  ): Promise<UnlockedFile> {
     const [userKeys] = this.getManagers(UserKeyManager);
     const parentFileid = file[FileManager.KEY_PARENT_FILE_ID];
 
     if (parentFileid != null) {
+      if (file[FileManager.KEY_OWNER_USER_ID] !== unlockedUserKey[UserKeyManager.KEY_USER_ID]) {
+        if (accessLevel == null) {
+          throw new Error('Access level is required if not the owner of the file.');
+        }
+
+        const [fileAccesses] = this.getManagers(FileAccessManager);
+
+        const fileAccess = (
+          await fileAccesses.query({
+            where: [
+              [FileAccessManager.KEY_FILE_ID, '=', file.id],
+              [FileAccessManager.KEY_USER_ID, '=', unlockedUserKey.userId],
+              [FileAccessManager.KEY_ACCESS_LEVEL, '>=', accessLevel]
+            ],
+            orderBy: [[FileAccessManager.KEY_ACCESS_LEVEL, true]]
+          })
+        )[0];
+
+        if (fileAccess != null) {
+          const unlockedFileAccess = fileAccesses.unlock(unlockedUserKey, fileAccess);
+
+          return {
+            ...file,
+            [FileManager.KEY_UNLOCKED_AES_KEY]:
+              unlockedFileAccess[FileAccessManager.KEY_UNLOCKED_KEY]
+          };
+        }
+      }
+
       const parentFile = (await this.getById(parentFileid))!;
       const unlockedParentFile = await this.unlock(parentFile, unlockedUserKey);
 
@@ -170,6 +248,10 @@ export class FileManager extends DataManager<FileManager, File> {
         [FileManager.KEY_UNLOCKED_AES_KEY]: key
       };
     } else {
+      if (file[FileManager.KEY_OWNER_USER_ID] !== unlockedUserKey[UserKeyManager.KEY_USER_ID]) {
+        throw new Error('User does not have access to the file.');
+      }
+
       const key = userKeys.decrypt(unlockedUserKey, file[FileManager.KEY_ENCRYPTED_AES_KEY]);
 
       return {
@@ -179,9 +261,7 @@ export class FileManager extends DataManager<FileManager, File> {
     }
   }
 
-  public async scanFolder(
-    folder: File & { [FileManager.KEY_TYPE]: FileType.Folder }
-  ): Promise<File[]> {
+  public async scanFolder(folder: File): Promise<File[]> {
     const files = await this.query({
       where: [
         [FileManager.KEY_PARENT_FILE_ID, '=', folder.id],

@@ -14,6 +14,7 @@ export async function load(): Promise<void> {
   }
 
   const authentication = await getAndVerifyAuthentication();
+
   if (authentication == null) {
     await goto('/login', { replaceState: true });
     return;

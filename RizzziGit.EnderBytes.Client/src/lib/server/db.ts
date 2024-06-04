@@ -1,8 +1,13 @@
 import knex, { type Knex } from 'knex';
-import { existsSync as fileExists, mkdirSync as createFolder } from 'fs';
 
 import { createTaskQueue, type TaskQueue } from '../task-queue';
-import type { M } from 'vitest/dist/reporters-yx5ZTtEV.js';
+
+let fileExists: (path: string) => boolean;
+let createFolder: (path: string) => void;
+
+void (async () => {
+  ({ existsSync: fileExists, mkdirSync: createFolder } = await import('fs'));
+})();
 
 const DATABASE_TRANSACTION_QUEUE = Symbol('DatabaseTransactionQueue');
 const DATABASE_CURRENT_TRANSACTION = Symbol('DatabaseCurrentTransaction');
@@ -30,10 +35,9 @@ interface VersionTable {
 const DATABASE_INIT = Symbol('DatabaseInit');
 const DATABASE_GET_VERSION = Symbol('GetVersion');
 
-let instantiating: boolean = false;
-let instance: Database | null = null;
-
 export class Database {
+  public static instantiating: boolean = false;
+  public static instance: Database | null = null;
   public static readonly managers: DataManagerRegistration<never, never>[] = [];
 
   public static register<M extends DataManager<M, D>, D extends Data<M, D>>(
@@ -43,28 +47,28 @@ export class Database {
   }
 
   public static async getInstance(): Promise<Database> {
-    if (instance != null) {
-      return instance;
+    if (Database.instance != null) {
+      return Database.instance;
     }
 
     try {
-      instantiating = true;
+      Database.instantiating = true;
 
       try {
-        instance = new this();
+        Database.instance = new this();
 
-        await instance[DATABASE_INIT]();
-        return instance;
+        await Database.instance[DATABASE_INIT]();
+        return Database.instance;
       } catch (error: any) {
         throw error;
       }
     } finally {
-      instantiating = false;
+      Database.instantiating = false;
     }
   }
 
   public constructor() {
-    if (!instantiating) {
+    if (!Database.instantiating) {
       throw new Error('Invalid call to Database constructor');
     }
 
@@ -185,6 +189,7 @@ export interface Data<M extends DataManager<M, D>, D extends Data<M, D>> {
   [DataManager.KEY_DATA_VERSION_ID]: number;
   [DataManager.KEY_DATA_ID]: number;
   [DataManager.KEY_DATA_CREATE_TIME]: number;
+  [DataManager.KEY_DATA_UPDATE_TIME]: number;
   [DataManager.KEY_DATA_PREVIOUS_ID]: number | null;
   [DataManager.KEY_DATA_NEXT_ID]: number | null;
 }
@@ -207,6 +212,7 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
   public static readonly KEY_DATA_ID = 'id';
   public static readonly KEY_DATA_VERSION_ID = 'versionId';
   public static readonly KEY_DATA_CREATE_TIME = 'createTime';
+  public static readonly KEY_DATA_UPDATE_TIME = 'updateTime';
   public static readonly KEY_DATA_PREVIOUS_ID = 'previousId';
   public static readonly KEY_DATA_NEXT_ID = 'nextId';
 
@@ -303,6 +309,28 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
     }
   }
 
+  public async getCreationTime(data: D): Promise<number> {
+    const holder = (await this.db
+      .table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
+      .select('*')
+      .where(DataManager.KEY_DATA_ID, '=', data[DataManager.KEY_DATA_ID])
+      .where(DataManager.KEY_DATA_PREVIOUS_ID, 'is', null)
+      .first())!;
+
+    return (<D>holder)[DataManager.KEY_DATA_CREATE_TIME];
+  }
+
+  public async getUpdateTime(data: D): Promise<number> {
+    const holder = (await this.db
+      .table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME])
+      .select('*')
+      .where(DataManager.KEY_DATA_ID, '=', data[DataManager.KEY_DATA_ID])
+      .where(DataManager.KEY_DATA_NEXT_ID, 'is', null)
+      .first())!;
+
+    return (<D>holder)[DataManager.KEY_DATA_CREATE_TIME];
+  }
+
   public async getById(id: number, options?: GetByIdOptions<M, D>): Promise<D | null> {
     const holder = await this.db
       .select('*')
@@ -330,9 +358,18 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
       query = query.where(DataManager.KEY_DATA_NEXT_ID, 'is', null);
     }
 
-    return <D | null>(
+    const result = <D | null>(
       ((await query.orderBy(DataManager.KEY_DATA_VERSION_ID, 'desc').first()) ?? null)
     );
+
+    if (result == null) {
+      return null;
+    }
+
+    return Object.assign(result, {
+      [DataManager.KEY_DATA_UPDATE_TIME]: result[DataManager.KEY_DATA_CREATE_TIME],
+      [DataManager.KEY_DATA_CREATE_TIME]: await this.getCreationTime(result)
+    });
   }
 
   public async listVersions(id: number): Promise<D[]> {

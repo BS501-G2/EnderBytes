@@ -2,15 +2,15 @@
   import { type Writable, type Readable, derived } from 'svelte/store';
   import type { FileBrowserState } from '../../file-browser.svelte';
   import FileDetails from './main-panel/side-panel/file-details.svelte';
-  import type { FileResource } from '$lib/client/file';
+  import type { File } from '$lib/server/db/file';
+    import { FileType } from '$lib/shared/db';
 
   let {
     fileBrowserState,
     selection
-  }: { fileBrowserState: Writable<FileBrowserState>; selection: Writable<FileResource[]> } =
-    $props();
+  }: { fileBrowserState: Writable<FileBrowserState>; selection: Writable<File[]> } = $props();
 
-  const selected: Readable<FileResource | null> = derived(
+  const selected: Readable<File | null> = derived(
     [fileBrowserState, selection],
     ([fileBrowserState, selection]) =>
       selection.length === 1
@@ -24,11 +24,11 @@
 <div class="side-panel-container">
   {#if !$fileBrowserState.isLoading}
     <div class="header">
-      <i class="icon fa-solid fa-{$selected?.isFolder ? 'folder' : 'file'}"></i>
+      <i class="icon fa-solid fa-{$selected?.type === FileType.Folder ? 'folder' : 'file'}"></i>
       <h3 class="file-name">
         {#if $selection.length > 1}
           {$selection.length} selected
-        {:else if $selected != null && $selected.parentId != null}
+        {:else if $selected != null && $selected.parentFileId != null}
           {$selected.name}
         {:else if $fileBrowserState.title != null}
           {$fileBrowserState.title}

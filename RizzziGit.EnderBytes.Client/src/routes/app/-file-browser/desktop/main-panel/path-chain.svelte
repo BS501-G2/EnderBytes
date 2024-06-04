@@ -1,12 +1,13 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-    import type { Writable } from 'svelte/store';
+  import type { Writable } from 'svelte/store';
 
   import { type FileBrowserState } from '../../../file-browser.svelte';
   import PathChainEntry from './path-chain/entry.svelte';
   import PathChainMenuElement, { type PathChainMenu } from './path-chain/menu.svelte';
 
   import { LoadingSpinner } from '@rizzzi/svelte-commons';
+  import { FileType } from '$lib/shared/db';
 
   const { fileBrowserState }: { fileBrowserState: Writable<FileBrowserState> } = $props();
 
@@ -18,18 +19,20 @@
     {#if $fileBrowserState!.isLoading}
       <LoadingSpinner size="1em" />
     {:else}
-      <i class="fa-regular fa-{$fileBrowserState!.file?.isFolder ? 'folder' : 'file'}"></i>
+      <i
+        class="fa-regular fa-{$fileBrowserState!.file?.type === FileType.Folder ? 'folder' : 'file'}"
+      ></i>
       {#each $fileBrowserState!.pathChain!.chain as file}
         <PathChainEntry
           {file}
           onClick={() => goto(`/app/files?id=${file.id}`)}
           onMenu={({ currentTarget }) => {
-            if (currentTarget == null || file.parentId == null) {
+            if (currentTarget == null || file.parentFileId == null) {
               return
             }
 
             pathChainMenus.push({
-              fileId: file.parentId,
+              fileId: file.parentFileId,
               forward: true,
               currentTarget: currentTarget as HTMLElement
             });

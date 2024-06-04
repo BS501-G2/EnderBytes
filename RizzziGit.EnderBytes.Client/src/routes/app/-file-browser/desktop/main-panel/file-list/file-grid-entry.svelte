@@ -2,7 +2,8 @@
   import { goto } from '$app/navigation';
   import type { Writable } from 'svelte/store';
   import type { FileBrowserState } from '../../../../file-browser.svelte';
-    import type { FileResource } from '$lib/client/file';
+    import type { File } from '$lib/server/db/file';
+    import { FileType } from '$lib/shared/db';
 
   let {
     file,
@@ -11,15 +12,15 @@
     selection
   }: {
     fileBrowserState: Writable<FileBrowserState & { isLoading: false }>;
-    file: FileResource;
+    file: File;
     onClick: (
       fileBrowserState: FileBrowserState & { isLoading: false },
-      file: FileResource,
+      file: File,
       event: MouseEvent & {
         currentTarget: EventTarget & HTMLButtonElement;
       }
     ) => void;
-    selection: Writable<FileResource[]>;
+    selection: Writable<File[]>;
   } = $props();
 </script>
 
@@ -39,7 +40,7 @@
   <img class="thumbnail" alt="Thumbnail" />
 
   <p class="name">
-    <i class="fa-regular {file.isFolder ? 'fa-folder' : 'fa-file'}"></i>
+    <i class="fa-regular {file.type === FileType.Folder ? 'fa-folder' : 'fa-file'}"></i>
     <span class="name">
       {file.name}
     </span>

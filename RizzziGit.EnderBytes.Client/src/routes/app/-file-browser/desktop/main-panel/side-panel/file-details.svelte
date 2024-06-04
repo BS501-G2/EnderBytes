@@ -2,9 +2,9 @@
   import { Button, ButtonClass, Tab, createTabId, type TabItem } from '@rizzzi/svelte-commons';
   import FileOverviewTab from './file-overview-tab.svelte';
   import FileHistoryTab from './file-history-tab.svelte';
-  import type { FileResource } from '$lib/client/file';
+  import type { File } from '$lib/server/db/file';
 
-  const { file }: { file: FileResource } = $props();
+  const { file }: { file: File } = $props();
 
   const tabs: TabItem<{
     icon: string;

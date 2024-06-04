@@ -13,7 +13,8 @@
 
   import { fly } from 'svelte/transition';
   import PathChainEntry from './entry.svelte';
-  import { type FileResource, getFile, scanFolder } from '$lib/client/file';
+  import { getFile, scanFolder } from '$lib/client/api-functions';
+  import type { File } from '$lib/server/db/file';
 
   const {
     pathChainMenu,
@@ -41,7 +42,7 @@
 >
   <div class="path-chain-menu" transition:fly|global={{ duration: 200, x: -32 }}>
     <Awaiter
-      callback={async (): Promise<FileResource[]> => {
+      callback={async (): Promise<File[]> => {
         const parentFolder = await getFile(pathChainMenu.fileId);
 
         return await scanFolder(parentFolder);
@@ -62,7 +63,7 @@
             {file}
             forward={pathChainMenu.forward}
             onMenu={({ currentTarget }) => {
-                if (currentTarget == null || file.parentId == null) {
+                if (currentTarget == null || file.parentFileId == null) {
                   return
                 }
 

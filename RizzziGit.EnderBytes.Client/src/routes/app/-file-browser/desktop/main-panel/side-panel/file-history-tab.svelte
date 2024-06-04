@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { FileResource } from '$lib/client/file';
+  import type { File } from '$lib/server/db/file';
 
-  const { file }: { file: FileResource } = $props();
+  const { file }: { file: File } = $props();
 </script>

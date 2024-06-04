@@ -1,10 +1,10 @@
 <script lang="ts">
   import UserName from '$lib/client/user.svelte';
   import { Awaiter, LoadingSpinner } from '@rizzzi/svelte-commons';
-  import type { FileResource } from '$lib/client/file';
   import { getUser } from '$lib/client/api-functions';
+    import type { File } from '$lib/server/db/file';
 
-  const { file }: { file: FileResource } = $props();
+  const { file }: { file: File } = $props();
 </script>
 
 <div class="container">
@@ -32,7 +32,7 @@
       <p class="value">
         <Awaiter
           callback={async () => {
-            const user = await getUser(file.domainUserId);
+            const user = await getUser(file.ownerUserId);
 
             return user;
           }}
@@ -47,13 +47,13 @@
       </p>
     </div>
 
-    {#if file.domainUserId != file.authorUserId}
+    {#if file.ownerUserId != file.creatorUserId}
       <div class="details-row">
         <p class="label">Created By</p>
         <p class="value">
           <Awaiter
             callback={async () => {
-              const user = await getUser(file.authorUserId);
+              const user = await getUser(file.creatorUserId);
 
               return user;
             }}

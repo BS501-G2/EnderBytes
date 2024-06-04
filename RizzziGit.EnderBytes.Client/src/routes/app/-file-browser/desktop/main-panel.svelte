@@ -5,13 +5,13 @@
   import FileList from './main-panel/file-list.svelte';
   import FileView from './main-panel/file-view.svelte';
   import PathChain from './main-panel/path-chain.svelte';
-  import type { FileResource } from '$lib/client/file';
+  import type { File } from '$lib/server/db/file';
+  import { FileType } from '$lib/shared/db';
 
   let {
     fileBrowserState,
     selection
-  }: { fileBrowserState: Writable<FileBrowserState>; selection: Writable<FileResource[]> } =
-    $props();
+  }: { fileBrowserState: Writable<FileBrowserState>; selection: Writable<File[]> } = $props();
 </script>
 
 <div class="main-panel">
@@ -19,12 +19,12 @@
     <PathChain fileBrowserState={fileBrowserState as any} />
   {/if}
 
-  {#if $fileBrowserState.isLoading || ($fileBrowserState.file != null && $fileBrowserState.file.isFolder)}
+  {#if $fileBrowserState.isLoading || ($fileBrowserState.file != null && $fileBrowserState.file.type === FileType.Folder)}
     <ControlBar fileBrowserState={fileBrowserState as any} {selection} />
   {/if}
 
   <div class="inner-panel">
-    {#if !$fileBrowserState.isLoading && $fileBrowserState.file != null && !$fileBrowserState.file.isFolder}
+    {#if !$fileBrowserState.isLoading && $fileBrowserState.file != null && $fileBrowserState.file.type !== FileType.Folder}
       <FileView fileBrowserState={fileBrowserState as any} {selection} />
     {:else}
       <FileList fileBrowserState={fileBrowserState as any} {selection} />

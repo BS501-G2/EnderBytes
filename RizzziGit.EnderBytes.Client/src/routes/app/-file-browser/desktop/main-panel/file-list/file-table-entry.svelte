@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import type { Writable } from 'svelte/store';
   import type { FileBrowserState } from '../../../../file-browser.svelte';
-  import type { FileResource } from '$lib/client/file';
+    import type { File } from '$lib/server/db/file';
 
   let {
     file,
@@ -11,11 +10,11 @@
     selection
   }: {
     fileBrowserState: Writable<FileBrowserState & { isLoading: false }>;
-    file: FileResource;
+    file: File;
     onClick: (
       fileBrowserState: FileBrowserState & { isLoading: false },
-      file: FileResource
+      file: File
     ) => void;
-    selection: Writable<FileResource[]>;
+    selection: Writable<File[]>;
   } = $props();
 </script>

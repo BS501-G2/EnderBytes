@@ -45,7 +45,7 @@
     goto(`/app/files?id=${file.id}`);
   }}
 >
-  <!-- <Awaiter
+  <Awaiter
     callback={async () => {
       const fileContent = await readFile(file);
       const url = URL.createObjectURL(
@@ -61,8 +61,8 @@
     {#snippet success({ result })}
       <img class="thumbnail" alt="Thumbnail" src={result} />
     {/snippet}
-  </Awaiter> -->
-  <img class="thumbnail" alt="Thumbnail" />
+  </Awaiter>
+  <!-- <img class="thumbnail" alt="Thumbnail" /> -->
 
   <p class="name">
     <i class="fa-regular {file.type === FileType.Folder ? 'fa-folder' : 'fa-file'}"></i>

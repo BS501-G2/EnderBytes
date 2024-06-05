@@ -8,6 +8,8 @@
   } from '../../../../file-browser.svelte';
   import type { File } from '$lib/server/db/file';
   import { FileType } from '$lib/shared/db';
+    import { Awaiter } from '@rizzzi/svelte-commons';
+    import { getFileMimeType, readFile } from '$lib/client/api-functions';
 
   let {
     file,

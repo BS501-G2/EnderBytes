@@ -128,34 +128,36 @@ async function runQueue(): Promise<void> {
         continue;
       }
 
-      while (true) {
-        try {
-          const mapped = entries.map((entry) => entry[0]);
-          let data: Uint8Array[];
-
+      void (async () => {
+        while (true) {
           try {
-            data = await bulkRequest(mapped);
-          } catch (error: any) {
-            if (error instanceof A) {
-              requestQueue.unshift(entries.pop()!);
+            const mapped = entries.map((entry) => entry[0]);
+            let data: Uint8Array[];
 
-              continue;
-            } else {
-              throw error;
+            try {
+              data = await bulkRequest(mapped);
+            } catch (error: any) {
+              if (error instanceof A) {
+                requestQueue.unshift(entries.pop()!);
+
+                continue;
+              } else {
+                throw error;
+              }
             }
-          }
 
-          for (let i = 0; i < entries.length; i++) {
-            entries[i][1](data[i]);
+            for (let i = 0; i < entries.length; i++) {
+              entries[i][1](data[i]);
+            }
+            break;
+          } catch (error: any) {
+            for (let i = 0; i < entries.length; i++) {
+              entries[i][2](error);
+            }
+            break;
           }
-          break;
-        } catch (error: any) {
-          for (let i = 0; i < entries.length; i++) {
-            entries[i][2](error);
-          }
-          break;
         }
-      }
+      })();
     }
   } finally {
     requestQueueRunning = false;

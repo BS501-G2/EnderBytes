@@ -12,7 +12,7 @@ import { FileManager, type File, type UnlockedFile } from './db/file';
 import { FileAccessManager, type FileAccess } from './db/file-access';
 import { FileContentManager } from './db/file-content';
 import { FileDataManager } from './db/file-data';
-import { FileSnapshotManager } from './db/file-snapshot';
+import { FileSnapshotManager, type FileSnapshot } from './db/file-snapshot';
 import { UserManager, type UpdateUserOptions, type User } from './db/user';
 import { UserKeyManager, type UnlockedUserKey } from './db/user-key';
 import { UserSessionManager } from './db/user-session';
@@ -435,7 +435,7 @@ export async function listPathChain(
 
   const files: File[] = [];
   while (file != null) {
-    files.push(file);
+    files.unshift(file);
 
     const parentFolderId = file[FileManager.KEY_PARENT_FILE_ID];
     if (parentFolderId == null) {
@@ -521,3 +521,156 @@ export async function getFile(
     ApiError.throw(ApiErrorType.Forbidden, 'Failed to unlock parent folder.');
   }
 }
+
+export async function listFileSnapshots(
+  authentication: Authentication | null,
+  fileId: number
+): Promise<FileSnapshot[]> {
+  const file = await getFile(authentication, fileId);
+  const unlockedUserKey = await requireAuthentication(authentication);
+  const [fileSnapshotManager, fileManager, fileContentManager] = await getManagers(
+    FileSnapshotManager,
+    FileManager,
+    FileContentManager
+  );
+
+  const unlockedFile = await fileManager.unlock(file, unlockedUserKey);
+  const mainFilecontent = await fileContentManager.getMain(unlockedFile);
+
+  return await fileSnapshotManager.list(mainFilecontent);
+}
+
+export async function getFileSize(
+  authentication: Authentication | null,
+  fileId: number
+): Promise<number> {
+  const file = await getFile(authentication, fileId);
+  const unlockedUserKey = await requireAuthentication(authentication);
+  const [fileManager, fileContentManager] = await getManagers(FileManager, FileContentManager);
+
+  const unlockedFile = await fileManager.unlock(file, unlockedUserKey);
+  const mainFilecontent = await fileContentManager.getMain(unlockedFile);
+
+  return mainFilecontent[FileContentManager.KEY_SIZE];
+}
+
+export async function readFile(
+  authentication: Authentication | null,
+  fileId: number,
+  offset: number = 0,
+  length?: number
+): Promise<Uint8Array> {
+  const file = await getFile(authentication, fileId);
+  const unlockedUserKey = await requireAuthentication(authentication);
+  const [fileDataManager, fileManager, fileContentManager, fileSnapshotManager] = await getManagers(
+    FileDataManager,
+    FileManager,
+    FileContentManager,
+    FileSnapshotManager
+  );
+
+  const unlockedFile = await fileManager.unlock(file, unlockedUserKey);
+  const mainFilecontent = await fileContentManager.getMain(unlockedFile);
+  const fileSnapshot = await fileSnapshotManager.getMain(unlockedFile, mainFilecontent);
+
+  return fileDataManager.read(
+    unlockedFile,
+    mainFilecontent,
+    fileSnapshot,
+    offset ?? undefined,
+    length ?? undefined
+  );
+}
+
+export async function moveFile(
+  authentication: Authentication | null,
+  fileIds: number[],
+  newParentFolderId: number
+) {
+  const unlockedUserKey = await requireAuthentication(authentication);
+
+  const [fileManager] = await getManagers(FileManager);
+  const files = await Promise.all(
+    fileIds.map(async (fileId) => {
+      const file = await fileManager.getById(fileId);
+
+      if (file == null) {
+        ApiError.throw(ApiErrorType.NotFound);
+      }
+
+      return file!;
+    })
+  );
+
+  let unlockedFiles: UnlockedFile[];
+  try {
+    unlockedFiles = await Promise.all(
+      files.map((file) => fileManager.unlock(file, unlockedUserKey))
+    );
+  } catch {
+    throw new ApiError(ApiErrorType.Forbidden, 'Failed to unlock parent folder.');
+  }
+
+  const newParentFolder = await fileManager.getById(newParentFolderId);
+  if (newParentFolder == null) {
+    ApiError.throw(ApiErrorType.NotFound);
+  }
+
+  let unlockedNewParentFolder: UnlockedFile;
+  try {
+    unlockedNewParentFolder = await fileManager.unlock(
+      newParentFolder,
+      unlockedUserKey,
+      FileAccessLevel.Manage
+    );
+  } catch {
+    throw new ApiError(ApiErrorType.Forbidden, 'Failed to unlock new parent folder.');
+  }
+
+  for (const unlockedFile of unlockedFiles) {
+    if (
+      unlockedFile[FileManager.KEY_OWNER_USER_ID] !==
+      unlockedNewParentFolder[FileManager.KEY_OWNER_USER_ID]
+    ) {
+      throw new ApiError(ApiErrorType.InvalidRequest, 'Cannot move files between users.');
+    }
+
+    await fileManager.move(unlockedFile, unlockedNewParentFolder);
+  }
+}
+
+export async function getFileMimeType(
+  authentication: Authentication | null,
+  fileId: number,
+  mime: boolean = true
+) {
+  const unlockedUserKey = await requireAuthentication(authentication);
+
+  const [fileManager, fileContentManager, fileSnapshotManager, fileDataManager] = await getManagers(
+    FileManager,
+    FileContentManager,
+    FileSnapshotManager,
+    FileDataManager
+  );
+  const file = await fileManager.getById(fileId);
+  if (file == null) {
+    ApiError.throw(ApiErrorType.NotFound);
+  }
+
+  let unlockedFile: UnlockedFile;
+  try {
+    unlockedFile = await fileManager.unlock(file, unlockedUserKey, FileAccessLevel.Manage);
+  } catch {
+    throw new ApiError(ApiErrorType.Forbidden, 'Failed to unlock parent folder.');
+  }
+
+  const mainFilecontent = await fileContentManager.getMain(unlockedFile);
+  const fileSnapshot = await fileSnapshotManager.getMain(unlockedFile, mainFilecontent);
+  return fileDataManager.getMime(unlockedFile, mainFilecontent, fileSnapshot, mime);
+}
+
+export async function copyFile(
+  authentication: Authentication | null,
+  fileId: number,
+  destinationId: number
+): Promise<void> {}

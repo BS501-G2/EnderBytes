@@ -19,7 +19,6 @@
     try {
       $messages = [];
       $returnedData = await callback((data) => {
-        console.log(data);
         messages.update((value) => {
           value.push(data);
           return value;

@@ -1,7 +1,12 @@
 <script lang="ts">
-  import FileBrowser, { type FileBrowserState } from '../file-browser.svelte';
+  import FileBrowser, {
+    type FileBrowserState,
+    type FileClipboard,
+    fileClipboard
+  } from '../file-browser.svelte';
   import { type ControlBarItem } from '../-file-browser/desktop/main-panel/control-bar.svelte';
   import FilterOverlay, { filterOverlayState } from './arrange-overlay.svelte';
+  import { executeBackgroundTask } from '$lib/background-task.svelte';
 
   import { page } from '$app/stores';
   import {
@@ -22,15 +27,11 @@
     getFile,
     listPathChain,
     scanFolder,
-    listFileAccess
+    listFileAccess,
+    readFile,
+    getFileMimeType,
+    moveFile
   } from '$lib/client/api-functions';
-  // import {
-  //   getFile,
-  //   getFileAccessList,
-  //   getFilePathChain,
-  //   scanFolder,
-  //   type FileResource
-  // } from '$lib/client/file';
 
   function parseId(id: string | null) {
     if (id == null) {
@@ -70,7 +71,7 @@
         !$fileBrowserState.isLoading && $fileBrowserState.file?.type === FileType.Folder
     },
     {
-      label: 'Open  File',
+      label: 'Open File',
       icon: 'fa-solid fa-folder-open',
       action: async () => {
         await goto(`/app/files?id=${$selection[0].id}`);
@@ -92,14 +93,64 @@
     {
       label: 'Download',
       icon: 'fa-solid fa-download',
-      action: async () => {},
+      action: async () => {
+        const file = $selection[0];
+        if (file == null) {
+          return;
+        }
+
+        const ro = await readFile(file);
+        const blob = new Blob([ro], { type: await getFileMimeType(file) });
+        const url = URL.createObjectURL(blob);
+
+        window.open(url, '_blank');
+      },
       group: 'actions',
-      isVisible: (selection) => !$fileBrowserState.isLoading && selection.length == 1
+      isVisible: (selection) =>
+        !$fileBrowserState.isLoading && selection.length == 1 && selection[0].type === FileType.File
     },
     {
-      label: 'Move',
-      icon: 'fa-solid fa-arrow-right-arrow-left',
-      action: async () => {},
+      label: 'Cut',
+      icon: 'fa-solid fa-scissors',
+      action: async () => {
+        if ($fileBrowserState.isLoading || $fileBrowserState.file == null) {
+          return;
+        }
+
+        $fileClipboard = {
+          files: $selection,
+          ownerUserId: $fileBrowserState.file.ownerUserId,
+          isCut: true
+        };
+
+        await executeBackgroundTask('Cut', false, (_, set) => {
+          set(`${$selection.length} file(s) put to clipboard.`);
+        }).run();
+        $selection = [];
+      },
+      group: 'actions',
+      isVisible: (selection) => !$fileBrowserState.isLoading && selection.length > 0
+    },
+    {
+      label: 'Copy',
+      icon: 'fa-solid fa-copy',
+      action: async () => {
+        if ($fileBrowserState.isLoading || $fileBrowserState.file == null) {
+          return;
+        }
+
+        $fileClipboard = {
+          files: $selection,
+          ownerUserId: $fileBrowserState.file.ownerUserId,
+          isCut: false
+        };
+
+        await executeBackgroundTask('Move', false, (_, set) => {
+          set(`${$selection.length} file(s) put to clipboard.`);
+        }).run();
+
+        $selection = [];
+      },
       group: 'actions',
       isVisible: (selection) => !$fileBrowserState.isLoading && selection.length > 0
     },
@@ -115,7 +166,52 @@
       isVisible: () =>
         !$fileBrowserState.isLoading &&
         $fileBrowserState.file?.type === FileType.Folder &&
-        ($fileBrowserState.access?.highestLevel ?? FileAccessLevel.Read) >= 2
+        ($fileBrowserState.access?.highestLevel ?? FileAccessLevel.Full) >= FileAccessLevel.Read
+    },
+    {
+      label: 'Paste',
+      icon: 'fa-solid fa-clipboard',
+      action: async () => {
+        await executeBackgroundTask('Paste', false, async (_, set) => {
+          if ($fileBrowserState.isLoading || $fileBrowserState.file == null) {
+            return;
+          }
+
+          if ($fileClipboard == null) {
+            return;
+          }
+
+          if ($fileClipboard.isCut) {
+            await moveFile($fileClipboard.files, $fileBrowserState.file);
+          }
+
+          set(`${$fileClipboard.files.length} file(s) pasted.`);
+          $refresh?.(true, null);
+        }).run();
+
+        $fileClipboard = null;
+      },
+      group: 'actions',
+      isVisible: () =>
+        $fileClipboard != null &&
+        !$fileBrowserState.isLoading &&
+        $fileBrowserState.file?.type === FileType.Folder &&
+        $selection.length === 0 &&
+        $fileClipboard.ownerUserId === $fileBrowserState.file?.ownerUserId
+    },
+    {
+      label: 'Cancel',
+      icon: 'fa-solid fa-xmark',
+      action: async () => {
+        $fileClipboard = null;
+      },
+      group: 'actions',
+      isVisible: () =>
+        $fileClipboard != null &&
+        !$fileBrowserState.isLoading &&
+        $fileBrowserState.file?.type === FileType.Folder &&
+        $selection.length === 0 &&
+        $fileClipboard != null
     }
   ];
 
@@ -147,7 +243,8 @@
           listFileAccess(file),
         ])
 
-        console.log(pathChain)
+        await new Promise<void>((resolve) => setTimeout(resolve, 250))
+
         $fileBrowserState = {
           isLoading: false,
 

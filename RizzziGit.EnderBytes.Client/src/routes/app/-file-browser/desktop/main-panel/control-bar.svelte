@@ -52,7 +52,11 @@
     <div class="control-bar">
       {#snippet action(actions: ControlBarItem[], group: ControlBarItemGroup)}
         {@const filteredActions =
-          actions?.filter((action) => action.group == group && action.isVisible($selection)) ?? []}
+          actions?.filter((action) => {
+            const a = action.group == group && action.isVisible($selection)
+
+            return a
+          }) ?? []}
 
         {#if filteredActions.length != 0}
           <div class="control-group" transition:scale|global={{ duration: 200, start: 0.95 }}>

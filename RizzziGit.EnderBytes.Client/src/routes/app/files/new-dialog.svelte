@@ -40,7 +40,8 @@
 
   const {
     fileBrowserState,
-    onNewFolder
+    onNewFolder,
+    onNewFiles
   }: {
     fileBrowserState: Writable<FileBrowserState>;
     onNewFiles: (...ids: number[]) => void;
@@ -131,6 +132,8 @@
 
             newFiles.push(newFile)
           }
+
+          onNewFiles(...newFiles.map(file => file.id));
         }}
 
         <div class="input-group">
@@ -194,6 +197,7 @@
           const folder = await createFolder($fileBrowserState.file! as DbFile & { type: FileType.Folder }, $newFolderName);
           onDismiss();
           onNewFolder(folder.id)
+          $newFolderName = ''
         }}
 
         <div class="input-group">

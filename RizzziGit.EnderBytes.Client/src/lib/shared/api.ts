@@ -1,6 +1,6 @@
-export const waitForNextBulkReqestTimeout = 0;
+export const waitForNextBulkReqestTimeout = 100;
 export const maxRequestSizeLimit = 1024 * 1024 * 256;
-export const maxBulkRequestEntryCount = 10000;
+export const maxBulkRequestEntryCount = 100;
 export const userSessionExpiryDuration = 30 * 24 * 60 * 60 * 1000;
 
 export interface Authentication {

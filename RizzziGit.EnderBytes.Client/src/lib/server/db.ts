@@ -165,7 +165,14 @@ export class Database {
   public getManager<M extends DataManager<M, D>, D extends Data<M, D>>(
     init: DataManagerConstructor<M, D>
   ): M {
-    return this.managers.find((entry) => entry.init === (init as any))!.instance as M;
+    let entry = this.managers.find((entry) => entry.init === (init as any));
+    if (entry != null) {
+      return entry.instance as M;
+    }
+
+    const instance = new init(this, () => <any>this.db);
+    this.managers.push({ init: init as never, instance: instance as never });
+    return instance;
   }
 
   public getManagers<C extends readonly DataManagerConstructor<any, any>[]>(
@@ -394,8 +401,6 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
   public async update(oldData: D, data: Partial<D>, options?: UpdateOptions<M, D>): Promise<D> {
     const latest = <D>await this.getById(oldData[DataManager.KEY_ID]);
 
-    console.log(latest.id);
-
     const baseVersion =
       options?.baseVersionId != null
         ? await this.getById(oldData[DataManager.KEY_ID], {
@@ -407,16 +412,18 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
       throw new Error('Base version not found');
     }
 
+    const insertRow = {
+      ...baseVersion,
+      ...data,
+      [DataManager.KEY_DATA_PREVIOUS_ID]: latest[DataManager.KEY_DATA_VERSION_ID],
+      [DataManager.KEY_DATA_NEXT_ID]: null,
+      [DataManager.KEY_DATA_VERSION_ID]: null,
+      [DataManager.KEY_ID]: latest[DataManager.KEY_ID],
+      [DataManager.KEY_DATA_CREATE_TIME]: Date.now()
+    };
+    delete insertRow[DataManager.KEY_DATA_UPDATE_TIME];
     const versionId = (
-      await this.db.table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]).insert({
-        ...baseVersion,
-        ...data,
-        [DataManager.KEY_DATA_PREVIOUS_ID]: latest[DataManager.KEY_DATA_VERSION_ID],
-        [DataManager.KEY_DATA_NEXT_ID]: null,
-        [DataManager.KEY_DATA_VERSION_ID]: null,
-        [DataManager.KEY_ID]: latest[DataManager.KEY_ID],
-        [DataManager.KEY_DATA_CREATE_TIME]: Date.now()
-      })
+      await this.db.table<D>(this[SYMBOL_DATA_MANAGER_DATA_TABLE_NAME]).insert(insertRow)
     )[0];
 
     await this.db
@@ -545,6 +552,7 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
 
       query = query.offset(currentOffset);
 
+      console.log(query.toQuery());
       const entries = <D[]>await query;
       if (entries.length === 0) {
         break;
@@ -565,7 +573,12 @@ export abstract class DataManager<M extends DataManager<M, D>, D extends Data<M,
           continue;
         }
 
-        results.push(entry);
+        results.push(
+          Object.assign(entry, {
+            [DataManager.KEY_DATA_UPDATE_TIME]: entry[DataManager.KEY_DATA_CREATE_TIME],
+            [DataManager.KEY_DATA_CREATE_TIME]: await this.getCreationTime(entry)
+          })
+        );
       }
 
       currentOffset += entries.length;

@@ -45,7 +45,7 @@
 {/snippet}
 
 <Tab id={tabId}>
-  {#snippet container(setTab, content)}
+  {#snippet container(_, content)}
     <div class="tab">
       {@render content()}
     </div>
@@ -67,6 +67,7 @@
       {/each}
     </div>
   {/snippet}
+
   {#snippet view(view)}
     <div class="tab-view">
       {@render view()}

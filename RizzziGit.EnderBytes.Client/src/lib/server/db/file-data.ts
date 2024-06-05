@@ -1,9 +1,14 @@
 import type { Knex } from 'knex';
 import { DataManager, Database, type Data } from '../db';
 import { FileManager, type UnlockedFile } from './file';
-import type { FileContent } from './file-content';
+import { FileContentManager, type FileContent } from './file-content';
 import type { FileSnapshot } from './file-snapshot';
 import { FileBufferManager, type FileBuffer } from './file-buffer';
+import { FileType } from '$lib/shared/db';
+import mmm, { Magic } from 'mmmagic';
+
+const magic = new Magic();
+const magicMime = new Magic(mmm.MAGIC_MIME_TYPE | mmm.MAGIC_MIME_ENCODING);
 
 export interface FileData extends Data<FileDataManager, FileData> {
   [FileDataManager.KEY_FILE_ID]: number;
@@ -11,7 +16,6 @@ export interface FileData extends Data<FileDataManager, FileData> {
   [FileDataManager.KEY_FILE_SNAPSHOT_ID]: number;
   [FileDataManager.KEY_FILE_BUFFER_ID]: number;
   [FileDataManager.KEY_INDEX]: number;
-  [FileDataManager.KEY_SIZE]: number;
 }
 
 export class FileDataManager extends DataManager<FileDataManager, FileData> {
@@ -25,7 +29,6 @@ export class FileDataManager extends DataManager<FileDataManager, FileData> {
   static readonly KEY_FILE_SNAPSHOT_ID = 'fileSnapshotId';
   static readonly KEY_FILE_BUFFER_ID = 'fileBufferId';
   static readonly KEY_INDEX = 'index';
-  static readonly KEY_SIZE = 'fileSize';
 
   public constructor(db: Database, transaction: () => Knex.Transaction<FileData>) {
     super(db, transaction, FileDataManager.NAME, FileDataManager.VERSION);
@@ -42,7 +45,6 @@ export class FileDataManager extends DataManager<FileDataManager, FileData> {
       table.integer(FileDataManager.KEY_FILE_SNAPSHOT_ID).notNullable();
       table.integer(FileDataManager.KEY_FILE_BUFFER_ID).notNullable();
       table.integer(FileDataManager.KEY_INDEX).notNullable();
-      table.integer(FileDataManager.KEY_SIZE).notNullable();
     }
   }
 
@@ -51,8 +53,7 @@ export class FileDataManager extends DataManager<FileDataManager, FileData> {
     fileContent: FileContent,
     fileSnapshot: FileSnapshot,
     buffer: Uint8Array,
-    index: number,
-    size: number
+    index: number
   ): Promise<FileData> {
     const [fileBuffers] = this.getManagers(FileBufferManager);
     const fileBuffer = await fileBuffers.create(unlockedFile, buffer);
@@ -62,25 +63,18 @@ export class FileDataManager extends DataManager<FileDataManager, FileData> {
       [FileDataManager.KEY_FILE_CONTENT_ID]: fileContent.id,
       [FileDataManager.KEY_FILE_SNAPSHOT_ID]: fileSnapshot.id,
       [FileDataManager.KEY_FILE_BUFFER_ID]: fileBuffer.id,
-      [FileDataManager.KEY_INDEX]: index,
-      [FileDataManager.KEY_SIZE]: size
+      [FileDataManager.KEY_INDEX]: index
     });
   }
 
-  async #update(
-    unlockedFile: UnlockedFile,
-    fileData: FileData,
-    buffer: Uint8Array,
-    size: number
-  ): Promise<void> {
+  async #update(unlockedFile: UnlockedFile, fileData: FileData, buffer: Uint8Array): Promise<void> {
     const [fileBuffers] = this.getManagers(FileBufferManager);
 
     const oldFileBuffer = await fileBuffers.getById(fileData[FileDataManager.KEY_FILE_BUFFER_ID]);
     const newFileBuffer = await fileBuffers.create(unlockedFile, buffer);
 
     await this.update(fileData, {
-      [FileDataManager.KEY_FILE_BUFFER_ID]: newFileBuffer[FileBufferManager.KEY_ID],
-      [FileDataManager.KEY_SIZE]: size
+      [FileDataManager.KEY_FILE_BUFFER_ID]: newFileBuffer[FileBufferManager.KEY_ID]
     });
 
     if (oldFileBuffer != null) {
@@ -141,40 +135,147 @@ export class FileDataManager extends DataManager<FileDataManager, FileData> {
     newBuffer: Uint8Array
   ) {
     const [fileBuffers] = this.getManagers(FileBufferManager);
+    const positionEnd = position + newBuffer.byteLength;
 
-    const endPosition = position + newBuffer.byteLength;
+    let written: number = 0;
     for (let index = 0; ; index++) {
-      const beginOffset = index * FileDataManager.BUFFER_SIZE;
-      const endOffset = beginOffset + FileDataManager.BUFFER_SIZE;
+      const bufferStart = index * FileDataManager.BUFFER_SIZE;
+      const bufferEnd = bufferStart + FileDataManager.BUFFER_SIZE;
 
-      if (endPosition <= beginOffset) {
+      if (positionEnd <= bufferStart) {
         break;
-      } else if (position >= endOffset) {
+      } else if (position >= bufferEnd) {
         continue;
       }
 
       const fileData = await this.#getByIndex(unlockedFile, fileContent, fileSnapshot, index);
+      let buffer: Uint8Array;
       if (fileData == null) {
-        const buffer = new Uint8Array(FileDataManager.BUFFER_SIZE);
-        const bufferStart = position - beginOffset;
-        const bufferEnd = Math.max(Math.min(endPosition, endOffset) - beginOffset, 0);
-        buffer.set(newBuffer.slice(bufferStart, bufferEnd), 0);
-        await this.#create(unlockedFile, fileContent, fileSnapshot, buffer, index, bufferEnd);
+        buffer = new Uint8Array(FileDataManager.BUFFER_SIZE);
       } else {
         const fileBuffer = fileBuffers.unlock(
           unlockedFile,
           (await fileBuffers.getById(fileData[FileDataManager.KEY_FILE_BUFFER_ID]))!
         );
-
-        const buffer = fileBuffer[FileBufferManager.KEY_UNLOCKED_BUFFER];
-        const bufferStart = position - beginOffset;
-        const bufferEnd = Math.max(
-          Math.min(endPosition, endOffset) - beginOffset,
-          fileData[FileDataManager.KEY_SIZE]
-        );
-        buffer.set(newBuffer.slice(bufferStart, bufferEnd), 0);
-        await this.#update(unlockedFile, fileData, buffer, bufferEnd);
+        buffer = fileBuffer[FileBufferManager.KEY_UNLOCKED_BUFFER];
       }
+
+      const toWrite = Math.min(
+        bufferEnd - position,
+        Math.min(newBuffer.byteLength - written, FileDataManager.BUFFER_SIZE)
+      );
+      buffer.set(
+        newBuffer.subarray(written, written + toWrite),
+        (bufferStart - position) % FileDataManager.BUFFER_SIZE
+      );
+      written += toWrite;
+
+      if (fileData == null) {
+        await this.#create(unlockedFile, fileContent, fileSnapshot, buffer, index);
+      } else {
+        await this.#update(unlockedFile, fileData, buffer);
+      }
+    }
+
+    const [fileContentManager] = this.getManagers(FileContentManager);
+    await fileContentManager.setSize(
+      fileContent,
+      Math.max(positionEnd, fileContent[FileContentManager.KEY_SIZE])
+    );
+  }
+
+  public async read(
+    unlockedFile: UnlockedFile,
+    fileContent: FileContent,
+    fileSnapshot: FileSnapshot,
+    position: number = 0,
+    length: number = fileContent[FileContentManager.KEY_SIZE]
+  ): Promise<Uint8Array> {
+    if (position >= fileContent[FileContentManager.KEY_SIZE]) {
+      throw new Error('Position out of bounds');
+    }
+
+    const [fileBuffers] = this.getManagers(FileBufferManager);
+    length = Math.min(length, fileContent[FileContentManager.KEY_SIZE] - position);
+    const positionEnd = position + length;
+
+    const output: Uint8Array[] = [];
+    let read: number = 0;
+    for (let index = 0; ; index++) {
+      const bufferStart = index * FileDataManager.BUFFER_SIZE;
+      const bufferEnd = bufferStart + FileDataManager.BUFFER_SIZE;
+
+      if (positionEnd <= bufferStart) {
+        break;
+      } else if (position >= bufferEnd) {
+        continue;
+      }
+
+      const fileData = await this.#getByIndex(unlockedFile, fileContent, fileSnapshot, index);
+      let buffer: Uint8Array;
+
+      if (fileData == null) {
+        buffer = new Uint8Array(FileDataManager.BUFFER_SIZE);
+      } else {
+        const fileBuffer = fileBuffers.unlock(
+          unlockedFile,
+          (await fileBuffers.getById(fileData[FileDataManager.KEY_FILE_BUFFER_ID]))!
+        );
+        buffer = fileBuffer[FileBufferManager.KEY_UNLOCKED_BUFFER];
+      }
+
+      const toRead = Math.min(
+        bufferEnd - position,
+        Math.min(length - read, FileDataManager.BUFFER_SIZE)
+      );
+      output.push(
+        buffer.subarray(
+          (bufferStart - position) % FileDataManager.BUFFER_SIZE,
+          ((bufferStart - position) % FileDataManager.BUFFER_SIZE) + toRead
+        )
+      );
+      read += toRead;
+    }
+
+    return Buffer.concat(output);
+  }
+
+  public async getMime(
+    unlockedFile: UnlockedFile,
+    fileContent: FileContent,
+    fileSnapshot: FileSnapshot,
+    mime: boolean = true
+  ): Promise<string> {
+    mime ??=  true
+    const [fileBufferManager] = this.getManagers(FileBufferManager);
+
+    if (unlockedFile[FileManager.KEY_TYPE] === FileType.Folder) {
+      return mime ? 'inode/directory' : 'Folder';
+    }
+
+    const fileData = await this.#getByIndex(unlockedFile, fileContent, fileSnapshot, 0);
+    if (fileData == null) {
+      return mime ? 'application/empty' : 'Empty File';
+    } else {
+      const buffer = fileBufferManager.unlock(
+        unlockedFile,
+        (await fileBufferManager.getById(fileData[FileDataManager.KEY_FILE_BUFFER_ID]))!
+      );
+
+      return await new Promise((resolve, reject) => {
+        (mime ? magicMime : magic).detect(
+          Buffer.from(buffer[FileBufferManager.KEY_UNLOCKED_BUFFER]),
+          (err, result) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve(`${mime ? result : `${result}`.split(',')[0]}`);
+            }
+          }
+        );
+      });
+
+      // return mmmagic.fromBuffer(buffer[FileBufferManager.KEY_UNLOCKED_BUFFER]).mime;
     }
   }
 }

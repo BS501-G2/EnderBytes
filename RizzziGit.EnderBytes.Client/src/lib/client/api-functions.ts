@@ -6,10 +6,12 @@ import type { QueryOptions } from '$lib/server/db';
 import { persisted } from 'svelte-persisted-store';
 import { derived, get, type Writable } from 'svelte/store';
 import { clientSideInvoke } from './api';
-import { FileType, UserKeyType, UserRole } from '$lib/shared/db';
+import { UserKeyType, UserRole } from '$lib/shared/db';
 import { BSON } from 'bson';
 import { bytesToBase64, base64ToBytes } from 'byte-base64';
 import type { File } from '$lib/server/db/file';
+import type { FileSnapshot } from '$lib/server/db/file-snapshot';
+import type { FileContent } from '$lib/server/db/file-content';
 
 const authentication: Writable<Authentication | null> = persisted('authentication', null, {
   serializer: {
@@ -58,7 +60,6 @@ export async function getAndVerifyAuthentication(): Promise<Authentication | nul
 
     return null;
   }
-
 
   return getAuthentication();
 }
@@ -118,11 +119,7 @@ export async function updateUser(id: number, newData: UpdateUserOptions) {
   return await clientSideInvoke('updateUser', getAuthentication(), id, newData);
 }
 
-export async function createFile(
-  parentFolder: File,
-  name: string,
-  content: Uint8Array
-) {
+export async function createFile(parentFolder: File, name: string, content: Uint8Array) {
   return await clientSideInvoke('createFile', getAuthentication(), parentFolder.id, name, content);
 }
 
@@ -143,9 +140,34 @@ export async function listFileAccess(file: File) {
 }
 
 export async function listSharedFiles() {
-  return await clientSideInvoke('listSharedFiles', getAuthentication())
+  return await clientSideInvoke('listSharedFiles', getAuthentication());
 }
 
-export async function getFile(fileId: number  | null) {
-  return await clientSideInvoke('getFile', getAuthentication(), fileId)
+export async function getFile(fileId: number | null) {
+  return await clientSideInvoke('getFile', getAuthentication(), fileId);
+}
+
+export async function listFileSnapshots(fileContent: FileContent): Promise<FileSnapshot[]> {
+  return await clientSideInvoke('listFileSnapshots', getAuthentication(), fileContent.id);
+}
+
+export async function getFileSize(file: File): Promise<number> {
+  return await clientSideInvoke('getFileSize', getAuthentication(), file.id);
+}
+
+export async function readFile(file: File, offset?: number, length?: number): Promise<Uint8Array> {
+  return await clientSideInvoke('readFile', getAuthentication(), file.id, offset, length);
+}
+
+export async function moveFile(files: File[], destinationFolder: File) {
+  return await clientSideInvoke(
+    'moveFile',
+    getAuthentication(),
+    files.map((file) => file.id),
+    destinationFolder.id
+  );
+}
+
+export async function getFileMimeType(file: File, mime?: boolean): Promise<string> {
+  return await clientSideInvoke('getFileMimeType', getAuthentication(), file.id, mime);
 }

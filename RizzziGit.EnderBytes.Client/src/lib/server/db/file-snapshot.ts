@@ -1,7 +1,7 @@
 import type { Knex } from 'knex';
 import { DataManager, Database, type Data } from '../db';
 import type { UnlockedFile } from './file';
-import type { FileContent } from './file-content';
+import { FileContentManager, type FileContent } from './file-content';
 
 export interface FileSnapshot extends Data<FileSnapshotManager, FileSnapshot> {
   [FileSnapshotManager.KEY_FILE_ID]: number;
@@ -33,11 +33,15 @@ export class FileSnapshotManager extends DataManager<FileSnapshotManager, FileSn
     }
   }
 
-  public async create(unlockedFile: UnlockedFile, fileContent: FileContent): Promise<FileSnapshot> {
+  public async create(
+    unlockedFile: UnlockedFile,
+    fileContent: FileContent,
+    baseFileSnapshot: FileSnapshot
+  ): Promise<FileSnapshot> {
     return this.insert({
       [FileSnapshotManager.KEY_FILE_ID]: unlockedFile.id,
       [FileSnapshotManager.KEY_FILE_CONTENT_ID]: fileContent.id,
-      [FileSnapshotManager.KEY_BASE_FILE_SNAPSHOT_ID]: null
+      [FileSnapshotManager.KEY_BASE_FILE_SNAPSHOT_ID]: baseFileSnapshot[FileSnapshotManager.KEY_ID]
     });
   }
 
@@ -51,11 +55,24 @@ export class FileSnapshotManager extends DataManager<FileSnapshotManager, FileSn
           where: [
             [FileSnapshotManager.KEY_FILE_ID, '=', unlockedFile.id],
             [FileSnapshotManager.KEY_FILE_CONTENT_ID, '=', fileContent.id],
-            [FileSnapshotManager.KEY_BASE_FILE_SNAPSHOT_ID, '=', null]
+            [FileSnapshotManager.KEY_BASE_FILE_SNAPSHOT_ID, 'is', null]
           ]
         })
-      )[0] || (await this.create(unlockedFile, fileContent))
+      )[0] ??
+      (await this.insert({
+        [FileSnapshotManager.KEY_FILE_ID]: unlockedFile.id,
+        [FileSnapshotManager.KEY_FILE_CONTENT_ID]: fileContent.id,
+        [FileSnapshotManager.KEY_BASE_FILE_SNAPSHOT_ID]: null
+      }))
     );
+  }
+
+  public async list(fileContent: FileContent): Promise<FileSnapshot[]> {
+    return await this.query({
+      where: [
+        [FileSnapshotManager.KEY_FILE_CONTENT_ID, '=', fileContent[FileContentManager.KEY_ID]]
+      ]
+    });
   }
 }
 

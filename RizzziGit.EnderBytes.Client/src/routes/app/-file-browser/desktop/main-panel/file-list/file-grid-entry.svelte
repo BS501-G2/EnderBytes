@@ -1,9 +1,13 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import type { Writable } from 'svelte/store';
-  import type { FileBrowserState } from '../../../../file-browser.svelte';
-    import type { File } from '$lib/server/db/file';
-    import { FileType } from '$lib/shared/db';
+  import {
+    type FileBrowserState,
+    type FileClipboard,
+    fileClipboard
+  } from '../../../../file-browser.svelte';
+  import type { File } from '$lib/server/db/file';
+  import { FileType } from '$lib/shared/db';
 
   let {
     file,
@@ -25,7 +29,11 @@
 </script>
 
 <button
-  class="file-entry {$selection.includes(file) ? 'selected' : ''}"
+  class="file-entry{$selection.includes(file) ? ' selected' : ''}{$fileClipboard != null &&
+  $fileClipboard.isCut &&
+  $fileClipboard.files.find((f) => f.id === file.id)
+    ? ' cut'
+    : ''}"
   onclick={(event) => {
     event.preventDefault();
 
@@ -37,6 +45,23 @@
     goto(`/app/files?id=${file.id}`);
   }}
 >
+  <!-- <Awaiter
+    callback={async () => {
+      const fileContent = await readFile(file);
+      const url = URL.createObjectURL(
+        new Blob([fileContent], { type: await getFileMimeType(file) })
+      );
+
+      return url;
+    }}
+  >
+    {#snippet loading()}
+      <img class="thumbnail" alt="Thumbnail" />
+    {/snippet}
+    {#snippet success({ result })}
+      <img class="thumbnail" alt="Thumbnail" src={result} />
+    {/snippet}
+  </Awaiter> -->
   <img class="thumbnail" alt="Thumbnail" />
 
   <p class="name">
@@ -97,6 +122,10 @@
 
   button.file-entry:hover {
     border: 1px solid var(--onBackgroundVariant);
+  }
+
+  button.file-entry.cut {
+    background-color: var(--shadow);
   }
 
   button.file-entry.selected {

@@ -15,6 +15,13 @@
     isForeign: boolean;
   }
 
+  export interface FileClipboard {
+    ownerUserId: number;
+
+    files: File[];
+    isCut: boolean;
+  }
+
   export type FileBrowserState = {
     title?: string;
 
@@ -35,6 +42,8 @@
         files: File[];
       }
   );
+
+  export const fileClipboard: Writable<FileClipboard | null> = writable(null);
 </script>
 
 <script lang="ts">
@@ -48,9 +57,12 @@
   const {
     fileBrowserState,
     selection = writable([])
-  }: { fileBrowserState: Writable<FileBrowserState>; selection?: Writable<File[]> } =
-    $props();
+  }: { fileBrowserState: Writable<FileBrowserState>; selection?: Writable<File[]> } = $props();
 </script>
+
+{#key $fileBrowserState}
+  {(selection.set([]), '')}
+{/key}
 
 <ResponsiveLayout>
   {#snippet desktop()}

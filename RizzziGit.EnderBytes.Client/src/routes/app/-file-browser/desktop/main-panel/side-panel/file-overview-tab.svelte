@@ -1,8 +1,10 @@
 <script lang="ts">
   import UserName from '$lib/client/user.svelte';
   import { Awaiter, LoadingSpinner } from '@rizzzi/svelte-commons';
-  import { getUser } from '$lib/client/api-functions';
-    import type { File } from '$lib/server/db/file';
+  import { getFileMimeType, getFileSize, getUser } from '$lib/client/api-functions';
+  import type { File } from '$lib/server/db/file';
+  import { FileType } from '$lib/shared/db';
+  import { byteUnit } from '$lib/shared/utils';
 
   const { file }: { file: File } = $props();
 </script>
@@ -30,30 +32,10 @@
     <div class="details-row">
       <p class="label">Owned By</p>
       <p class="value">
-        <Awaiter
-          callback={async () => {
-            const user = await getUser(file.ownerUserId);
-
-            return user;
-          }}
-        >
-          {#snippet loading()}
-            <LoadingSpinner size="1em" />
-          {/snippet}
-          {#snippet success({ result })}
-            <UserName user={result} />
-          {/snippet}
-        </Awaiter>
-      </p>
-    </div>
-
-    {#if file.ownerUserId != file.creatorUserId}
-      <div class="details-row">
-        <p class="label">Created By</p>
-        <p class="value">
+        {#key file.id}
           <Awaiter
             callback={async () => {
-              const user = await getUser(file.creatorUserId);
+              const user = await getUser(file.ownerUserId);
 
               return user;
             }}
@@ -65,6 +47,63 @@
               <UserName user={result} />
             {/snippet}
           </Awaiter>
+        {/key}
+      </p>
+    </div>
+
+    {#if file.type === FileType.File}
+      <div class="details-row">
+        <p class="label">Size</p>
+        <p class="value">
+          {#key file.id}
+            <Awaiter callback={async () => getFileSize(file)}>
+              {#snippet loading()}
+                <LoadingSpinner size="1em" />
+              {/snippet}
+              {#snippet success({ result })}
+                {byteUnit(result)}
+              {/snippet}
+            </Awaiter>
+          {/key}
+        </p>
+      </div>
+      <div class="details-row">
+        <p class="label">Type</p>
+        <p class="value">
+          {#key file.id}
+            <Awaiter callback={async () =>await getFileMimeType(file, false)}>
+              {#snippet loading()}
+                <LoadingSpinner size="1em" />
+              {/snippet}
+              {#snippet success({ result })}
+                {result}
+              {/snippet}
+            </Awaiter>
+          {/key}
+        </p>
+      </div>
+    {/if}
+
+    {#if file.ownerUserId != file.creatorUserId}
+      <div class="details-row">
+        <p class="label">Created By</p>
+        <p class="value">
+          {#key file.id}
+            <Awaiter
+              callback={async () => {
+                const user = await getUser(file.creatorUserId);
+
+                return user;
+              }}
+            >
+              {#snippet loading()}
+                <LoadingSpinner size="1em" />
+              {/snippet}
+              {#snippet success({ result })}
+                <UserName user={result} />
+              {/snippet}
+            </Awaiter>
+          {/key}
         </p>
       </div>
     {/if}
